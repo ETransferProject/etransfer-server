@@ -1,0 +1,374 @@
+{
+  "NetworkOptions": {
+    "NetworkPattern": {
+      "^0x[a-fA-F0-9]{40}$": ["ETH", "BSC", "ARBITRUM", "MATIC", "OPTIMISM", "AVAXC"],
+      "^T[1-9A-HJ-NP-Za-km-z]{33}$": ["TRX"],
+      "^[1-9A-HJ-NP-Za-km-z]{32,44}$": ["Solana"],
+      "^addr1[a-fA-F0-9]{58,100}$": ["Cardano"],
+      "^[a-z1-5]{1,12}$": ["EOS"],
+      "^0x[a-fA-F0-9]{64}$": ["SUI", "Aptos"],
+      "^[1,3][a-fA-F0-9]{26,35}$": ["Bitcoin"],
+      "^bc1[a-fA-F0-9]{42,62}$": ["Bitcoin"]
+    },
+    "withdrawFeeNetwork": [
+      "BSC",
+      "ARBITRUM",
+      "Solana",
+      "MATIC",
+      "OPTIMISM",
+      "AVAXC"
+    ],
+    "WithdrawLimit24h": 100000,
+    "NetworkMap": {
+      "USDT": [
+        {
+          "NetworkInfo": {
+            "Network": "SETH",
+            "Name": "Ethereum (ERC20)",
+            "MultiConfirm": "64 confirmations",
+            "ConfirmationsWithdraw": "0",
+            "MultiConfirmSeconds": 783,
+            "ContractAddress": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "BlockGenerationSeconds": 12,
+            "AveragePendingSeconds": 14,
+            "ExplorerUrl": "https://etherscan.io/address/0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "Status": "Health"
+          },
+          "DepositInfo": {
+            "MinDeposit": "0.01",
+            "MultiConfirm": "64 confirmations",
+            "MultiConfirmSeconds": 942,
+            "ContractAddress": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "ExtraNotes": [
+              "Deposits will be unlocked and available for withdrawal/other activities after 64 network confirmations.",
+              "To avoid potential losses, please don't deposit tokens other than USDT."
+            ]
+          },
+          "WithdrawInfo": {
+            "MinWithdraw": "13",
+            "WithdrawFee": 12.61,
+            "WithdrawLimit24h": "100000",
+            "MultiConfirmSeconds": 178,
+            "Decimals": 6
+          },
+          "SupportType": [
+            "Deposit",
+            "Withdraw"
+          ],
+          "SupportChain": [
+            "AELF",
+            "tDVV"
+          ]
+        },
+        {
+          "NetworkInfo": {
+            "Network": "ETH",
+            "Name": "Ethereum (ERC20)",
+            "MultiConfirm": "64 confirmations",
+            "ConfirmationsWithdraw": "0",
+            "MultiConfirmSeconds": 783,
+            "ContractAddress": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "BlockGenerationSeconds": 12,
+            "AveragePendingSeconds": 14,
+            "ExplorerUrl": "https://etherscan.io/address/0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "Status": "Health"
+          },
+          "DepositInfo": {
+            "MinDeposit": "0.01",
+            "MultiConfirm": "64 confirmations",
+            "MultiConfirmSeconds": 942,
+            "ContractAddress": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "ExtraNotes": [
+              "Deposits will be unlocked and available for withdrawal/other activities after 64 network confirmations.",
+              "To avoid potential losses, please don't deposit tokens other than USDT."
+            ]
+          },
+          "WithdrawInfo": {
+            "MinWithdraw": "13",
+            "WithdrawFee": 12.61,
+            "WithdrawLimit24h": "100000",
+            "MultiConfirmSeconds": 178,
+            "Decimals": 6
+          },
+          "SupportType": [
+            "Deposit",
+            "Withdraw"
+          ],
+          "SupportChain": [
+            "AELF",
+            "tDVV"
+          ]
+        },
+        {
+          "NetworkInfo": {
+            "Network": "TRX",
+            "Name": "TRON (TRC20)",
+            "MultiConfirm": "27 confirmations",
+            "ConfirmationsWithdraw": "0",
+            "MultiConfirmSeconds": 85,
+            "ContractAddress": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
+            "BlockGenerationSeconds": 3,
+            "AveragePendingSeconds": 3,
+            "ExplorerUrl": "https://tronscan.io/#/contract/TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
+            "Status": "Health"
+          },
+          "DepositInfo": {
+            "MinDeposit": "0.01",
+            "MultiConfirmSeconds": 244,
+            "ContractAddress": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
+            "ExtraNotes": [
+              "Deposits will be unlocked and available for withdrawal/other activities after 27 network confirmations.",
+              "To avoid potential losses, please don't deposit tokens other than USDT."
+            ]
+          },
+          "WithdrawInfo": {
+            "MinWithdraw": "3",
+            "WithdrawFee": 2.57,
+            "WithdrawLimit24h": "100000",
+            "MultiConfirmSeconds": 167,
+            "Decimals": 6
+          },
+          "SupportType": [
+            "Deposit",
+            "Withdraw"
+          ],
+          "SupportChain": [
+            "AELF",
+            "tDVV"
+          ]
+        },
+        {
+          "NetworkInfo": {
+            "Network": "BSC",
+            "Name": "BNB Smart Chain (BEP20)",
+            "MultiConfirm": "15 confirmations",
+            "ConfirmationsWithdraw": "0",
+            "MultiConfirmSeconds": 49,
+            "ContractAddress": "0x55d398326f99059ff775485246999027b3197955",
+            "BlockGenerationSeconds": 3,
+            "AveragePendingSeconds": 3,
+            "ExplorerUrl": "https://bscscan.com/address/0x55d398326f99059ff775485246999027b3197955",
+            "Status": "Health"
+          },
+          "DepositInfo": {
+            "MinDeposit": "0",
+            "MultiConfirmSeconds": 208,
+            "ContractAddress": "0x55d398326f99059ff775485246999027b3197955",
+            "ExtraNotes": [
+              "Deposits will be unlocked and available for withdrawal/other activities after Bundle 2 confirmation.",
+              "To avoid potential losses, please don't deposit tokens other than USDT."
+            ]
+          },
+          "WithdrawInfo": {
+            "MinWithdraw": "1",
+            "WithdrawFee": 0.47,
+            "WithdrawLimit24h": "100000",
+            "MultiConfirmSeconds": 167,
+            "Decimals": 18
+          },
+          "SupportType": [
+            "Deposit",
+            "Withdraw"
+          ],
+          "SupportChain": [
+            "AELF",
+            "tDVV"
+          ]
+        },
+        {
+          "NetworkInfo": {
+            "Network": "ARBITRUM",
+            "Name": "Arbitrum One",
+            "MultiConfirm": "100 confirmations",
+            "ConfirmationsWithdraw": "0",
+            "MultiConfirmSeconds": 27,
+            "ContractAddress": "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9",
+            "BlockGenerationSeconds": 0.25,
+            "AveragePendingSeconds": 1,
+            "ExplorerUrl": "https://arbiscan.io/address/0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9",
+            "Status": "Health"
+          },
+          "DepositInfo": {
+            "MinDeposit": "0",
+            "MultiConfirmSeconds": 186,
+            "ContractAddress": "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9",
+            "ExtraNotes": [
+              "Deposits will be credited and available for trading after Bundle 1 confirmation.",
+              "Deposits will be unlocked and available for withdrawal/other activities after Bundle 2 confirmation.",
+              "To avoid potential losses, please don't deposit tokens other than USDT."
+            ]
+          },
+          "WithdrawInfo": {
+            "MinWithdraw": "1",
+            "WithdrawFee": 1,
+            "WithdrawLimit24h": "100000",
+            "MultiConfirmSeconds": 165,
+            "Decimals": 6
+          },
+          "SupportType": [
+            "Deposit",
+            "Withdraw"
+          ],
+          "SupportChain": [
+            "AELF",
+            "tDVV"
+          ]
+        },
+        {
+          "NetworkInfo": {
+            "Network": "Solana",
+            "Name": "Solana",
+            "MultiConfirm": "1 confirmation",
+            "ConfirmationsWithdraw": "0",
+            "MultiConfirmSeconds": 2.4,
+            "ContractAddress": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+            "BlockGenerationSeconds": 0.4,
+            "AveragePendingSeconds": 1,
+            "ExplorerUrl": "https://explorer.solana.com/address/Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+            "Status": "Health"
+          },
+          "DepositInfo": {
+            "MinDeposit": "0",
+            "MultiConfirmSeconds": 161.4,
+            "ContractAddress": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+            "ExtraNotes": [
+              "Deposits will be unlocked and available for withdrawal/other activities after 1 network confirmation.",
+              "To avoid potential losses, please don't deposit tokens other than USDT."
+            ]
+          },
+          "WithdrawInfo": {
+            "MinWithdraw": "1",
+            "WithdrawFee": 0.89,
+            "WithdrawLimit24h": "100000",
+            "MultiConfirmSeconds": 165,
+            "Decimals": 6
+          },
+          "SupportType": [
+            "Deposit",
+            "Withdraw"
+          ],
+          "SupportChain": [
+            "AELF",
+            "tDVV"
+          ]
+        },
+        {
+          "NetworkInfo": {
+            "Network": "MATIC",
+            "Name": "Polygon",
+            "MultiConfirm": "128 confirmations",
+            "ConfirmationsWithdraw": "0",
+            "MultiConfirmSeconds": 259,
+            "ContractAddress": "0xc2132D05D31c914a87C6611C10748AEb04B58e8F",
+            "BlockGenerationSeconds": 2,
+            "AveragePendingSeconds": 2,
+            "ExplorerUrl": "https://polygonscan.com/token/0xc2132d05d31c914a87c6611c10748aeb04b58e8f",
+            "Status": "Health"
+          },
+          "DepositInfo": {
+            "MinDeposit": "0",
+            "MultiConfirmSeconds": 418,
+            "ContractAddress": "0xc2132D05D31c914a87C6611C10748AEb04B58e8F",
+            "ExtraNotes": [
+              "Deposits will be credited and available for trading after Bundle 1 confirmation.",
+              "Deposits will be unlocked and available for withdrawal/other activities after Bundle 2 confirmation.",
+              "To avoid potential losses, please don't deposit tokens other than USDT."
+            ]
+          },
+          "WithdrawInfo": {
+            "MinWithdraw": "1",
+            "WithdrawFee": 0.66,
+            "WithdrawLimit24h": "100000",
+            "MultiConfirmSeconds": 166,
+            "Decimals": 6
+          },
+          "SupportType": [
+            "Deposit",
+            "Withdraw"
+          ],
+          "SupportChain": [
+            "AELF",
+            "tDVV"
+          ]
+        },
+        {
+          "NetworkInfo": {
+            "Network": "OPTIMISM",
+            "Name": "Optimism",
+            "MultiConfirm": "100 confirmations",
+            "ConfirmationsWithdraw": "0",
+            "MultiConfirmSeconds": 203,
+            "ContractAddress": "0x94b008aa00579c1307b0ef2c499ad98a8ce58e58",
+            "BlockGenerationSeconds": 2,
+            "AveragePendingSeconds": 2,
+            "ExplorerUrl": "https://optimistic.etherscan.io/address/0x94b008aa00579c1307b0ef2c499ad98a8ce58e58",
+            "Status": "Health"
+          },
+          "DepositInfo": {
+            "MinDeposit": "0",
+            "MultiConfirmSeconds": 362,
+            "ContractAddress": "0x94b008aa00579c1307b0ef2c499ad98a8ce58e58",
+            "ExtraNotes": [
+              "Deposits will be credited and available for trading after Bundle 1 confirmation.",
+              "Deposits will be unlocked and available for withdrawal/other activities after Bundle 2 confirmation.",
+              "To avoid potential losses, please don't deposit tokens other than USDT."
+            ]
+          },
+          "WithdrawInfo": {
+            "MinWithdraw": "1",
+            "WithdrawFee": 0.48,
+            "WithdrawLimit24h": "100000",
+            "MultiConfirmSeconds": 166,
+            "Decimals": 6
+          },
+          "SupportType": [
+            "Deposit",
+            "Withdraw"
+          ],
+          "SupportChain": [
+            "AELF",
+            "tDVV"
+          ]
+        },
+        {
+          "NetworkInfo": {
+            "Network": "AVAXC",
+            "Name": "AVAX C-Chain",
+            "MultiConfirm": "18 confirmations",
+            "ConfirmationsWithdraw": "0",
+            "MultiConfirmSeconds": 39.54,
+            "ContractAddress": "0x9702230a8ea53601f5cd2dc00fdbc13d4df4a8c7",
+            "BlockGenerationSeconds": 2.03,
+            "AveragePendingSeconds": 2,
+            "ExplorerUrl": "https://subnets.avax.network/c-chain/token/0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7",
+            "Status": "Health"
+          },
+          "DepositInfo": {
+            "MinDeposit": "0.01",
+            "MultiConfirmSeconds": 198.54,
+            "ContractAddress": "0x9702230a8ea53601f5cd2dc00fdbc13d4df4a8c7",
+            "ExtraNotes": [
+              "Deposits will be unlocked and available for withdrawal/other activities after 18 network confirmations.",
+              "To avoid potential losses, please don't deposit tokens other than USDT."
+            ]
+          },
+          "WithdrawInfo": {
+            "MinWithdraw": "1",
+            "WithdrawFee": 0.38,
+            "WithdrawLimit24h": "100000",
+            "MultiConfirmSeconds": 166,
+            "Decimals": 6
+          },
+          "SupportType": [
+            "Deposit",
+            "Withdraw"
+          ],
+          "SupportChain": [
+            "AELF",
+            "tDVV"
+          ]
+        }
+      ]
+    }
+  }
+}

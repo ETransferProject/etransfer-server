@@ -1,0 +1,11 @@
+{
+  "ClientId": "ETransferServer_HttpApi_Host_001",
+  "apollo": {
+    "UseApollo" : false,
+    "AppId": "ETransferServer",
+    "MetaServer": "http://localhost:8080",
+    "Namespaces": [
+      "network.json"
+    ]
+  }
+}

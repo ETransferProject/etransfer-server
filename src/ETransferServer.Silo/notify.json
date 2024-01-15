@@ -1,0 +1,21 @@
+{
+  
+  "NotifyTemplates": {
+    "Templates":{
+      "WithdrawFeeAlarm" : {
+        "FeiShuGroup": {
+          "WebhookUrl": "https://open.feishu.cn/open-apis/bot/v2/hook/xxxxx",
+          "Secret": "xxxxx",
+          "TitleTemplate": "orange",
+          "Title": "❗️[test] Withdraw expense alert",
+          "Contents": [
+            "Network: **{network}**  Percentage of fluctuation **{percent}%**",
+            "Last fee: **{lastFeeAmount} {lastFeeSymbol}**\nLast time: **{lastFeeTime}**",
+            "Current fee: **{currentFeeAmount} {currentFeeSymbol}**\nCurrent time: **{currentFeeTime}**"
+          ]
+        }
+      } 
+    }
+  }
+  
+}

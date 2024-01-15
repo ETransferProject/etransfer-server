@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net7.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <RootNamespace>ETransferServer.Grains</RootNamespace>
+        <PackageId>ETransferServer.Grains</PackageId>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="AElf.AElfNode.EventHandler.BackgroundJob" Version="1.1.9" />
+        <PackageReference Include="Confluent.Kafka" Version="2.3.0" />
+        <PackageReference Include="Microsoft.Extensions.Http" Version="7.0.0" />
+        <PackageReference Include="Microsoft.Orleans.CodeGenerator.MSBuild" Version="3.6.5">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="Microsoft.Orleans.Core.Abstractions" Version="3.6.5" />
+        <PackageReference Include="MongoDB.Bson" Version="2.17.1" />
+        <PackageReference Include="AElf.Contracts.MultiToken" Version="1.6.0" />
+        <PackageReference Include="AElf.Core" Version="1.6.0" />
+        <PackageReference Include="AElf.CSharp.Core" Version="1.6.0" />
+        <PackageReference Include="AElf.Kernel.Types" Version="1.6.0" />
+        <PackageReference Include="AElf.Types" Version="1.6.0" />
+        <PackageReference Include="Volo.Abp.Autofac" Version="7.0.0" />
+        <PackageReference Include="Volo.Abp.BackgroundJobs.Domain" Version="7.0.0" />
+        <PackageReference Include="Volo.Abp.Caching" Version="7.0.0" />
+        <PackageReference Include="GraphQL.Client.Serializer.Newtonsoft" Version="5.1.0" />
+        <PackageReference Include="GraphQL.Client" Version="5.1.0" />
+        <PackageReference Include="Volo.Abp.RabbitMQ" Version="7.0.0" />
+
+        <PackageReference Include="GraphQL" Version="7.4.1" />
+        <PackageReference Include="GraphQL.Client.Abstractions" Version="6.0.0" />
+        <PackageReference Include="GraphQL.SystemTextJson" Version="7.4.1" />
+
+
+    </ItemGroup>
+    
+    <ItemGroup>
+      <ProjectReference Include="..\ETransferServer.Application.Contracts\ETransferServer.Application.Contracts.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Orleans_CodeGenInputs Remove="Common\AElfSdk\ContractProvider.cs" />
+      <Orleans_CodeGenInputs Remove="Common\AElfSdk\Dtos\SenderAccount.cs" />
+      <Orleans_CodeGenInputs Remove="Common\AElfSdk\Dtos\SystemContractName.cs" />
+      <Orleans_CodeGenInputs Remove="Common\AElfSdk\SignatureProvider.cs" />
+    </ItemGroup>
+</Project>

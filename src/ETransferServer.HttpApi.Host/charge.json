@@ -1,0 +1,35 @@
+{
+  "ChargeInfoOptions": {
+    "WithdrawInfos": {
+      "USDT": {
+        "MaxAmount": "123456.78",
+        "MinAmount": "12.34",
+        "LimitCurrency": "USDT",
+        "TotalLimit": "1000000.00",
+        "RemainingLimit": "12345.67",
+        "TransactionFee": "",
+        "TransactionUnit": "USDT",
+        "ReceiveAmount": "",
+        "FeeList": [
+          {
+            "Name": "1",
+            "Currency": "2",
+            "Amount": "2"
+          }
+        ]
+      }
+    },
+    "DepositInfos": {
+      "USDT": {
+        "DepositAddress": "0xc2132d05d31c914a87c6611c10748aeb04b58e8f",
+        "MaxAmount": "123456.78",
+        "MinAmount": "12.34",
+        "LimitCurrency": "USDT",
+        "TotalLimit": "1000000.00",
+        "RemainingLimit": "12345.67",
+        "TransactionFee": "0.2",
+        "TransactionUnit": "USDT"
+      }
+    }
+  }
+}

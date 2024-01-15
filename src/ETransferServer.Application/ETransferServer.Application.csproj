@@ -1,0 +1,60 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <Import Project="..\..\common.props" />
+
+  <PropertyGroup>
+    <TargetFramework>net7.0</TargetFramework>
+    <RootNamespace>ETransferServer</RootNamespace>
+  </PropertyGroup>
+
+  
+
+  <ItemGroup>
+    <ProjectReference Include="..\ETransferServer.Domain\ETransferServer.Domain.csproj" />
+    <ProjectReference Include="..\ETransferServer.Application.Contracts\ETransferServer.Application.Contracts.csproj" />
+    <ProjectReference Include="..\ETransferServer.Grains\ETransferServer.Grains.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="GraphQL" Version="7.4.1" />
+    <PackageReference Include="GraphQL.Client.Abstractions" Version="6.0.0" />
+    <PackageReference Include="GraphQL.SystemTextJson" Version="7.4.1" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="7.0.0" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="6.25.1" />
+    <PackageReference Include="Volo.Abp.Account.Application" Version="7.0.0" />
+    <PackageReference Include="Volo.Abp.BlobStoring" Version="7.0.0" />
+    <PackageReference Include="Volo.Abp.Core" Version="7.0.2" />
+    <PackageReference Include="Volo.Abp.Identity.Application" Version="7.0.0" />
+    <PackageReference Include="Volo.Abp.PermissionManagement.Application" Version="7.0.0" />
+    <PackageReference Include="Volo.Abp.TenantManagement.Application" Version="7.0.0" />
+    <PackageReference Include="Volo.Abp.FeatureManagement.Application" Version="7.0.0" />
+    <PackageReference Include="Volo.Abp.SettingManagement.Application" Version="7.0.0" />
+    <PackageReference Include="AElf.Whitelist.Application" Version="0.0.3" />
+    <PackageReference Include="GraphQL.Client.Serializer.Newtonsoft" Version="5.1.0" />
+    <PackageReference Include="GraphQL.Client" Version="5.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Protobuf\" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <ContractReference Include="..\..\protobuf\acs12.proto">
+      <Link>Protobuf\Proto\acs12.proto</Link>
+    </ContractReference>
+    <ContractReference Include="..\..\protobuf\authority_info.proto">
+      <Link>Protobuf\Proto\authority_info.proto</Link>
+    </ContractReference>
+    <ContractReference Include="..\..\protobuf\token_pool_contract.proto">
+      <Link>Protobuf\Proto\token_pool_contract.proto</Link>
+    </ContractReference>
+    <ContractReference Include="..\..\protobuf\token_contract.proto">
+      <Link>Protobuf\Proto\token_contract.proto</Link>
+    </ContractReference>
+    <ContractReference Include="..\..\protobuf\ca_contract.proto">
+      <Link>Protobuf\Proto\ca_contract.proto</Link>
+    </ContractReference>
+  </ItemGroup>
+
+
+</Project>
