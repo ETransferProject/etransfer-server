@@ -1,0 +1,71 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net7.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <RootNamespace>ETransferServer.Auth</RootNamespace>
+        <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+        <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
+        <GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
+        <MvcRazorExcludeRefAssembliesFromPublish>false</MvcRazorExcludeRefAssembliesFromPublish>
+        <PreserveCompilationReferences>true</PreserveCompilationReferences>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Update="Pages\**\*.js">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+        <None Update="Pages\**\*.css">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="AElf.Cryptography" Version="1.6.0" />
+        <PackageReference Include="AElf.Client" Version="1.1.0" />
+        <PackageReference Include="AElf.Core" Version="1.6.0" />
+        <PackageReference Include="AElf.CSharp.Core" Version="1.6.0" />
+        <PackageReference Include="AElf.Kernel.Types" Version="1.6.0" />
+        <PackageReference Include="AElf.Types" Version="1.6.0" />
+        <PackageReference Include="Serilog.AspNetCore" Version="6.0.1" />
+        <PackageReference Include="Serilog.Sinks.Async" Version="1.5.0" />
+        <PackageReference Include="Serilog.Sinks.RollingFile" Version="3.3.0" />
+        <PackageReference Include="Microsoft.AspNetCore.DataProtection.StackExchangeRedis" Version="6.0.5" />
+        <PackageReference Include="DistributedLock.Redis" Version="1.0.2" />
+        <PackageReference Include="GraphQL.Client" Version="5.1.0" />
+        <PackageReference Include="GraphQL.Client.Serializer.Newtonsoft" Version="5.1.0" />
+        <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="6.25.1" />
+        <PackageReference Include="Volo.Abp.EventBus.RabbitMQ" Version="7.0.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Volo.Abp.AspNetCore.Mvc.UI.Theme.LeptonXLite" Version="2.0.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Volo.Abp.Autofac" Version="7.0.0" />
+        <PackageReference Include="Volo.Abp.Caching.StackExchangeRedis" Version="7.0.0" />
+        <PackageReference Include="Volo.Abp.DistributedLocking" Version="7.0.0" />
+        <PackageReference Include="Volo.Abp.AspNetCore.Serilog" Version="7.0.0" />
+        <PackageReference Include="Volo.Abp.Account.Web.OpenIddict" Version="7.0.0" />
+        <PackageReference Include="Volo.Abp.Account.Application" Version="7.0.0" />
+        <PackageReference Include="Volo.Abp.Account.HttpApi" Version="7.0.0" />
+        <ProjectReference Include="..\ETransferServer.Grains\ETransferServer.Grains.csproj" />
+        <ProjectReference Include="..\ETransferServer.MongoDB\ETransferServer.MongoDB.csproj" />
+        <ProjectReference Include="..\ETransferServer.Application.Contracts\ETransferServer.Application.Contracts.csproj">
+            <GlobalPropertiesToRemove></GlobalPropertiesToRemove>
+        </ProjectReference>
+<!--        <ProjectReference Include="..\ETransferServer.Signature\ETransferServer.Signature.csproj" />-->
+    </ItemGroup>
+    
+    <ItemGroup>
+        <ContractReference Include="..\..\protobuf\acs12.proto">
+            <Link>Protobuf\Proto\acs12.proto</Link>
+        </ContractReference>
+        <ContractReference Include="..\..\protobuf\ca_contract.proto">
+            <Link>Protobuf\Proto\ca_contract.proto</Link>
+        </ContractReference>
+    </ItemGroup>
+
+</Project>

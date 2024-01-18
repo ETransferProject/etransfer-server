@@ -1,0 +1,107 @@
+syntax = "proto3";
+
+import "aelf/core.proto";
+import "aelf/options.proto";
+import "acs12.proto";
+
+import "google/protobuf/empty.proto";
+
+option csharp_namespace = "ETransfer.Contracts.TokenPool";
+
+service TokenPoolContract {
+    option (aelf.csharp_state) = "ETransfer.Contracts.TokenPool.TokenPoolContractState";
+    option (aelf.base) = "acs12.proto";
+    
+    rpc Initialize (InitializeInput) returns (google.protobuf.Empty) {}
+
+    rpc TransferToken(TransferTokenInput) returns (google.protobuf.Empty) {}
+    
+    // For Admin.
+    rpc SetAdmin (aelf.Address) returns (google.protobuf.Empty) {}
+    
+    rpc Withdraw(WithdrawInput) returns (google.protobuf.Empty) {}
+    
+    rpc AddTokenPool(AddTokenPoolInput) returns (google.protobuf.Empty) {}
+    
+    rpc AddTokenHolders(AddTokenHolderInput) returns (google.protobuf.Empty) {}
+
+    // Views.
+    rpc GetAdmin (google.protobuf.Empty) returns (aelf.Address){
+        option (aelf.is_view) = true;
+    }
+    
+    rpc GetPoolInfo(GetPoolInfoInput) returns (PoolInfo) {
+        option (aelf.is_view) = true;
+    }
+    
+    rpc GetSymbolTokens(google.protobuf.Empty) returns (TokenSymbolList) {
+        option (aelf.is_view) = true;
+    }
+}
+
+message InitializeInput {
+    aelf.Address admin = 1;
+    TokenSymbolList token_symbol_list = 2;
+}
+
+message TransferTokenInput {
+    string symbol = 1;
+    int64 amount = 2;
+}
+
+message WithdrawInput {
+    string symbol = 1;
+    int64 amount = 2;
+    aelf.Hash virtual_hash = 3;
+}
+
+message TokenSymbolList {
+    repeated string value = 1;
+}
+
+message AddTokenPoolInput {
+    string symbol = 1;
+}
+
+message AddTokenHolderInput {
+    string symbol = 1;
+    int32 holder_count = 2;
+}
+
+message GetPoolInfoInput {
+    string symbol = 1;
+}
+
+message PoolInfo {
+    string symbol = 1;
+    repeated TokenHolder token_holders = 2;
+}
+
+message TokenHolderList{
+    repeated TokenHolder value = 1;
+}
+
+message TokenHolder {
+    aelf.Hash virtual_hash = 1;
+    aelf.Address address = 2;
+}
+
+// event log
+message TokenPoolTransferred{
+    option (aelf.is_event) = true;
+    string symbol = 1;
+    int64 amount = 2;
+    aelf.Address from = 3;
+    aelf.Address to = 4;
+}
+
+message TokenPoolAdded {
+    option (aelf.is_event) = true;
+    string symbol = 1;
+}
+
+message TokenHolderAdded{
+    option (aelf.is_event) = true;
+    string symbol = 1;
+    TokenHolderList token_holders = 2;
+}

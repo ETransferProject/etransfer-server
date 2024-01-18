@@ -1,0 +1,24 @@
+{
+  "CoinNetworks": {
+    "CoBo": {
+      "ALGO_USDT" : "USDT@ALGO",
+      "ARBITRUM_USDT" : "USDT@ARBITRUM",
+      "AURORA_USDT" : "USDT@AURORA",
+      "AVAXC_USDT" : "USDT@AVAXC",
+      "BNB_USDT" : "USDT@BNB",
+      "BSC_USDT" : "USDT@BSC",
+      "BTC_USDT" : "USDT@BTC",
+      "CRO_USDT" : "USDT@CRO",
+      "EOS_USDT" : "USDT@EOS",
+      "ETH_USDT" : "USDT@ETH",
+      "HECO_USDT" : "USDT@HECO",
+      "MATIC_USDT" : "USDT@MATIC",
+      "OPTIMISM_USDT" : "USDT@OPTIMISM",
+      "Solana_USDT" : "USDT@Solana",
+      "TRX_USDT" : "USDT@TRX",
+      "VAPOR_USDT" : "USDT@VAPOR"
+    }
+  }
+  
+  
+}

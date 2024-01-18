@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- File name extension must be .runsettings -->
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>      
+       <DataCollector friendlyName="XPlat code coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+          <Exclude>[xunit.*]*,
+          [*Tests]*
+          </Exclude> <!-- [Assembly-Filter]Type-Filter -->
+          <ExcludeByFile>
+          **/test/**/*.cs
+          ,**/src/ETransferServer.Domain/**/*.cs
+          ,**/src/ETransferServer.Domain.Shared/**/*.cs
+          ,**/src/ETransferServer.Application.Contracts/**/*.cs
+          ,**/src/ETransferServer.AuthServer/**/*.cs
+          ,**/src/ETransferServer.DbMigrator/**/*.cs
+          ,**/src/ETransferServer.HttpApi/**/*.cs
+          ,**/src/ETransferServer.HttpApi.Client/**/*.cs
+          ,**/src/ETransferServer.HttpApi.Host/**/*.cs
+          ,**/src/ETransferServer.HttpApi.MongoDB/**/*.cs
+          ,**/src/ETransferServer.SignatureApi.Host/**/*.cs
+          ,**/src/ETransferServer.Silo/**/*.cs
+          ,**/src/ETransferServer.Grains/**/*.cs
+          ,**/src/ETransferServer.Application/Properties/*.cs
+          ,**/src/ETransferServer.Application/Options/*.cs
+          ,**/src/ETransferServer.Application/Protobuf/**/*.cs
+          ,**/src/ETransferServer.Application/User/UserAddressOptions.cs
+          ,**/src/ETransferServer.Application/User/UserAppService.cs
+          ,**/src/ETransferServer.Application/Order/OrderWithdrawAppService.cs
+          </ExcludeByFile>
+          <ExcludeByAttribute>Obsolete,GeneratedCodeAttribute</ExcludeByAttribute>
+          <SingleHit>false</SingleHit>
+        </Configuration>
+      </DataCollector>    
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>
