@@ -31,8 +31,10 @@ public class ETransferServerApplicationAutoMapperProfile : Profile
 
         CreateMap<FeeInfo, Fee>().ReverseMap();
         CreateMap<TransferInfo, Transfer>().ReverseMap();
-        CreateMap<DepositOrderDto, DepositOrder>().ReverseMap();
-        CreateMap<WithdrawOrderDto, Orders.WithdrawOrder>().ReverseMap();
+        CreateMap<DepositOrderDto, OrderIndex>().ReverseMap();
+        CreateMap<WithdrawOrderDto, OrderIndex>().ReverseMap();
+        CreateMap<OrderIndex, OrderIndexDto>().ReverseMap();
+        CreateMap<Transfer, TransferInfoDto>().ReverseMap();
         CreateMap<TokenConfig, TokenConfigDto>().ReverseMap();
         CreateMap<NetworkInfo, NetworkDto>()
             .ForMember(des => des.MultiConfirmTime, opt =>

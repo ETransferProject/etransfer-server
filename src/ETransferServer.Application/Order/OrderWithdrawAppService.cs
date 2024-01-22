@@ -22,6 +22,7 @@ using ETransferServer.Grains.Options;
 using ETransferServer.Models;
 using ETransferServer.Network;
 using ETransferServer.Options;
+using ETransferServer.Orders;
 using ETransferServer.Withdraw.Dtos;
 using ETransferServer.WithdrawOrder.Dtos;
 using Google.Protobuf;
@@ -53,7 +54,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
     private const int ThirdPartDecimals = 6;
     private const int ElfDecimals = 8;
 
-    private readonly INESTRepository<Orders.WithdrawOrder, Guid> _withdrawOrderIndexRepository;
+    private readonly INESTRepository<OrderIndex, Guid> _withdrawOrderIndexRepository;
     private readonly IObjectMapper _objectMapper;
     private readonly ILogger<OrderWithdrawAppService> _logger;
     private readonly IClusterClient _clusterClient;
@@ -67,7 +68,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
     private readonly IDistributedCache<Tuple<decimal, long>> _minThirdPartFeeCache;
 
 
-    public OrderWithdrawAppService(INESTRepository<Orders.WithdrawOrder, Guid> WithdrawOrderIndexRepository,
+    public OrderWithdrawAppService(INESTRepository<OrderIndex, Guid> withdrawOrderIndexRepository,
         IObjectMapper objectMapper,
         ILogger<OrderWithdrawAppService> logger, 
         IOptionsMonitor<NetworkOptions> networkInfoOptions,
@@ -81,7 +82,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         IDistributedCache<Tuple<decimal, long>> minThirdPartFeeCache
         )
     {
-        _withdrawOrderIndexRepository = WithdrawOrderIndexRepository;
+        _withdrawOrderIndexRepository = withdrawOrderIndexRepository;
         _objectMapper = objectMapper;
         _logger = logger;
         _networkInfoOptions = networkInfoOptions;
@@ -493,7 +494,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         try
         {
             await _withdrawOrderIndexRepository.AddOrUpdateAsync(
-                _objectMapper.Map<WithdrawOrderDto, Orders.WithdrawOrder>(dto));
+                _objectMapper.Map<WithdrawOrderDto, OrderIndex>(dto));
         }
         catch (Exception ex)
         {

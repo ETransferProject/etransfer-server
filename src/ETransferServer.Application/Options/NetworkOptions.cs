@@ -30,6 +30,7 @@ public class NetworkInfo
     public decimal BlockGenerationSeconds { get; set; }
     public decimal AveragePendingSeconds { get; set; }
     public string ExplorerUrl { get; set; }
+    public string Icon { get; set; }
     public string Status { get; set; }
 }
 

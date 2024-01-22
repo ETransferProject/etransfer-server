@@ -25,14 +25,14 @@ namespace ETransferServer.Order;
 [DisableAuditing]
 public class OrderDepositAppService : ApplicationService, IOrderDepositAppService
 {
-    private readonly INESTRepository<DepositOrder, Guid> _depositOrderIndexRepository;
+    private readonly INESTRepository<OrderIndex, Guid> _depositOrderIndexRepository;
     private readonly IObjectMapper _objectMapper;
     private readonly ILogger<OrderDepositAppService> _logger;
     private readonly NetworkOptions _networkInfoOptions;
     private readonly IUserAddressService _userAddressService;
     private readonly IClusterClient _clusterClient;
 
-    public OrderDepositAppService(INESTRepository<DepositOrder, Guid> depositOrderIndexRepository,
+    public OrderDepositAppService(INESTRepository<OrderIndex, Guid> depositOrderIndexRepository,
         IObjectMapper objectMapper,
         ILogger<OrderDepositAppService> logger, IOptionsSnapshot<NetworkOptions> networkInfoOptions,
         IUserAddressService userAddressService, IClusterClient clusterClient)
@@ -99,7 +99,7 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
         try
         {
             await _depositOrderIndexRepository.BulkAddOrUpdateAsync(
-                _objectMapper.Map<List<DepositOrderDto>, List<DepositOrder>>(dtoList));
+                _objectMapper.Map<List<DepositOrderDto>, List<OrderIndex>>(dtoList));
         }
         catch (Exception ex)
         {
@@ -114,7 +114,7 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
     {
         try
         {
-            await _depositOrderIndexRepository.AddOrUpdateAsync(_objectMapper.Map<DepositOrderDto, DepositOrder>(dto));
+            await _depositOrderIndexRepository.AddOrUpdateAsync(_objectMapper.Map<DepositOrderDto, OrderIndex>(dto));
         }
         catch (Exception ex)
         {

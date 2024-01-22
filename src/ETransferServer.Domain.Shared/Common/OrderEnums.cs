@@ -2,7 +2,7 @@ namespace ETransferServer.Common;
 
 public enum OrderTypeEnum
 {
-    Deposit,
+    Deposit = 1,
     Withdraw,
 }
 
@@ -47,4 +47,12 @@ public enum ThirdPartOrderStatusEnum
     Success,
     Pending,
     Fail
+}
+
+public enum OrderStatusResponseEnum
+{
+    All,
+    Processing,
+    Succeed,
+    Failed
 }

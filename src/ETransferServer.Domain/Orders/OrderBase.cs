@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using Nest;
-using ETransferServer.Dtos.Order;
 
 namespace ETransferServer.Orders;
 
@@ -16,6 +15,7 @@ public abstract class OrderBase : OrderEntity<Guid>
     public long LastModifyTime { get; set; }
     public long CreateTime { get; set; }
     public long ExpireTime { get; set; }
+    public long ArrivalTime { get; set; }
     [Keyword] public string Status { get; set; }
     public Dictionary<string, string> ExtensionInfo { get; set; }
 }
