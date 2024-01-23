@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using ETransferServer.Models;
@@ -30,16 +31,37 @@ public class NetworkAppServiceTest : ETransferServerApplicationTestBase
     [Fact]
     public async Task GetNetworkListATest()
     {
-        var result = await _networkAppService.GetNetworkListAsync(new GetNetworkListRequestDto()
+        var dto = new GetNetworkListRequestDto()
         {
             ChainId = "AELF",
             Address = "test",
             Symbol = "USDT",
             Type = "Withdraw"
-        });
+        };
+        var result = await _networkAppService.GetNetworkListAsync(dto);
 
         result.ShouldNotBeNull();
         result.ChainId.ShouldBe("AELF");
+
+        dto.Type = "Deposit";
+        dto.Address = "";
+        result = await _networkAppService.GetNetworkListAsync(dto);
+        result.ShouldNotBeNull();
+
+        dto.Address = null;
+        result = await _networkAppService.GetNetworkListAsync(dto);
+        result.ShouldNotBeNull();
+
+        dto.ChainId = "";
+        try
+        {
+            await _networkAppService.GetNetworkListAsync(dto);
+        }
+        catch (Exception e)
+        {
+            
+        }
+
     }
 
     private IOptions<NetworkOptions> MockNetworkOptions()
@@ -65,6 +87,7 @@ public class NetworkAppServiceTest : ETransferServerApplicationTestBase
                             },
                             SupportType = new List<string>() { "Withdraw" },
                             SupportChain = new List<string>() { "AELF" },
+                            WithdrawInfo = new WithdrawInfo()
                         }
                     }
                 },

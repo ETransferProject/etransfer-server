@@ -213,28 +213,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
     // feeAmount in symbol => expire at milliseconds timestamp
     private async Task<Tuple<decimal, long>> CalculateThirdPartFeeAsync(Guid userId, string network, string symbol)
     {
-        var coBoCoinGrain = _clusterClient.GetGrain<ICoBoCoinGrain>(ICoBoCoinGrain.Id( network, symbol));
-        var coin = await coBoCoinGrain.GetAsync();
-        AssertHelper.NotNull(coin, "CoBo coin detail not found");
-        _logger.LogDebug("CoBo AbsEstimateFee={Fee}, FeeCoin={Coin}, expireTime={Ts}", coin.AbsEstimateFee,
-            coin.FeeCoin, coin.ExpireTime);
-        var feeCoin = coin.FeeCoin.Split(CommonConstant.Underline);
-        var feeSymbol = feeCoin.Length == 1 ? feeCoin[0] : feeCoin[1];
-
-        var exchangeSymbolPair = string.Join(CommonConstant.Underline, feeSymbol, symbol);
-        var exchangeGrain = _clusterClient.GetGrain<ITokenExchangeGrain>(exchangeSymbolPair);
-        var exchange = await exchangeGrain.GetAsync();
-        AssertHelper.NotEmpty(exchange, "Exchange data not found {}", exchangeSymbolPair);
-
-        var avgExchange = exchange.Values
-            .Where(ex => ex.Exchange > 0)
-            .Average(ex => ex.Exchange);
-        AssertHelper.IsTrue(avgExchange > 0, "Exchange amount error {}" + avgExchange);
-        _logger.LogDebug("Exchange: {Exchange}", string.Join(CommonConstant.Comma,
-            exchange.Select(kv => string.Join(CommonConstant.Hyphen, kv.Key, kv.Value.FromSymbol, kv.Value.ToSymbol,
-                kv.Value.Exchange, kv.Value.Timestamp)).ToArray()));
-
-        var estimateFee = coin.AbsEstimateFee.SafeToDecimal() * avgExchange;
+        var (estimateFee, coin) = await _networkAppService.CalculateNetworkFeeAsync(network, symbol);
 
         var coinFeeCacheKey = CacheKey(FeeInfo.FeeName.CoBoFee, userId.ToString(), network, symbol);
         await _coBoCoinCache.SetAsync(coinFeeCacheKey, new CoBoCoinDto { AbsEstimateFee = estimateFee.ToString(ThirdPartDecimals, DecimalHelper.RoundingOption.Ceiling) }, 
@@ -326,7 +305,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
     {
         try
         {
-            var network = await _networkAppService.GetNetworkListAsync(new GetNetworkListRequestDto
+            var network = await _networkAppService.GetNetworkListWithoutFeeAsync(new GetNetworkListRequestDto
             {
                 Type = OrderTypeEnum.Withdraw.ToString(),
                 ChainId = chainId,
@@ -335,7 +314,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             });
             return network != null && !network.NetworkList.IsNullOrEmpty();
         }
-        catch (UserFriendlyException e)
+        catch (Exception e)
         {
             return false;
         }
