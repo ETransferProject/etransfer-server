@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using AElf.Indexing.Elasticsearch;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans;
 using ETransferServer.Common;
 using ETransferServer.Deposit.Dtos;
 using ETransferServer.Dtos.Order;
@@ -30,19 +29,18 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
     private readonly ILogger<OrderDepositAppService> _logger;
     private readonly NetworkOptions _networkInfoOptions;
     private readonly IUserAddressService _userAddressService;
-    private readonly IClusterClient _clusterClient;
 
     public OrderDepositAppService(INESTRepository<DepositOrder, Guid> depositOrderIndexRepository,
         IObjectMapper objectMapper,
-        ILogger<OrderDepositAppService> logger, IOptionsSnapshot<NetworkOptions> networkInfoOptions,
-        IUserAddressService userAddressService, IClusterClient clusterClient)
+        ILogger<OrderDepositAppService> logger,
+        IOptionsSnapshot<NetworkOptions> networkInfoOptions,
+        IUserAddressService userAddressService)
     {
         _depositOrderIndexRepository = depositOrderIndexRepository;
         _networkInfoOptions = networkInfoOptions.Value;
         _objectMapper = objectMapper;
         _logger = logger;
         _userAddressService = userAddressService;
-        _clusterClient = clusterClient;
     }
 
     public async Task<GetDepositInfoDto> GetDepositInfoAsync(GetDepositRequestDto request)
@@ -51,20 +49,13 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
         {
             AssertHelper.IsTrue(request.ChainId == ChainId.AELF || request.ChainId == ChainId.tDVV
                 || request.ChainId == ChainId.tDVW, "Param is invalid. Please refresh and try again.");
-
-            if (!_networkInfoOptions.NetworkMap.ContainsKey(request.Symbol))
-            {
-                throw new UserFriendlyException("Symbol is not exist. Please refresh and try again.");
-            }
+            AssertHelper.IsTrue(_networkInfoOptions.NetworkMap.ContainsKey(request.Symbol), 
+                "Symbol is not exist. Please refresh and try again.");
             
             var networkConfigs = _networkInfoOptions.NetworkMap[request.Symbol];
             var depositInfo = networkConfigs.Where(n => n.NetworkInfo.Network == request.Network)
                 .Select(n => n.DepositInfo).FirstOrDefault();
-
-            if (depositInfo == null)
-            {
-                throw new UserFriendlyException("Network is not exist. Please refresh and try again.");
-            }
+            AssertHelper.IsTrue(depositInfo != null, "Network is not exist. Please refresh and try again.");
 
             var getUserDepositAddressInput = new GetUserDepositAddressInput()
             {

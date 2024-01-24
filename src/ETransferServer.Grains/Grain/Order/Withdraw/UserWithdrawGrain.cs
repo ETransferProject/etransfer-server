@@ -105,22 +105,21 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
 
     public async Task<WithdrawOrderDto> CreateOrder(WithdrawOrderDto withdrawOrderDto)
     {
-        AssertHelper.NotNull(withdrawOrderDto, "Empty withdraw order");
+        AssertHelper.NotNull(withdrawOrderDto, ErrorResult.OrderParamInvalidCode);
         AssertHelper.IsTrue(withdrawOrderDto.OrderType == OrderTypeEnum.Withdraw.ToString(),
-            "Invalid order type {OrderType}", withdrawOrderDto.OrderType);
-        AssertHelper.NotNull(withdrawOrderDto.FromTransfer, "Invalid from transfer info");
-        AssertHelper.NotEmpty(withdrawOrderDto.FromTransfer.ChainId, "Invalid from transfer chainId");
-        AssertHelper.NotEmpty(withdrawOrderDto.RawTransaction, "Invalid rawTransaction");
-        AssertHelper.NotNull(withdrawOrderDto.ToTransfer, "Invalid toTransfer");
-        AssertHelper.NotNull(withdrawOrderDto.ToTransfer.Network, "Invalid toTransfer network");
-        AssertHelper.NotNull(withdrawOrderDto.ToTransfer.ToAddress, "Invalid toTransfer toAddress");
-        AssertHelper.NotNull(withdrawOrderDto.ToTransfer.Symbol, "Invalid toTransfer symbol");
-        AssertHelper.IsTrue(withdrawOrderDto.ToTransfer.Amount > 0, "Invalid toTransfer amount");
+            ErrorResult.OrderParamInvalidCode);
+        AssertHelper.NotNull(withdrawOrderDto.FromTransfer, ErrorResult.OrderParamInvalidCode);
+        AssertHelper.NotEmpty(withdrawOrderDto.FromTransfer.ChainId, ErrorResult.OrderParamInvalidCode);
+        AssertHelper.NotEmpty(withdrawOrderDto.RawTransaction, ErrorResult.OrderParamInvalidCode);
+        AssertHelper.NotNull(withdrawOrderDto.ToTransfer, ErrorResult.OrderParamInvalidCode);
+        AssertHelper.NotNull(withdrawOrderDto.ToTransfer.Network, ErrorResult.OrderParamInvalidCode);
+        AssertHelper.NotNull(withdrawOrderDto.ToTransfer.ToAddress, ErrorResult.OrderParamInvalidCode);
+        AssertHelper.NotNull(withdrawOrderDto.ToTransfer.Symbol, ErrorResult.OrderParamInvalidCode);
+        AssertHelper.IsTrue(withdrawOrderDto.ToTransfer.Amount > 0, ErrorResult.OrderParamInvalidCode);
         
         var coinInfo = _withdrawNetworkOptions.CurrentValue.GetNetworkInfo(withdrawOrderDto.ToTransfer.Network,
             withdrawOrderDto.ToTransfer.Symbol);
-        AssertHelper.IsTrue(coinInfo.Decimal >= 0, "Invalid withdraw coin {Coin} decimal: {Decimals}", 
-            coinInfo.Coin, coinInfo.Decimal);
+        AssertHelper.IsTrue(coinInfo.Decimal >= 0, ErrorResult.OrderParamInvalidCode);
         
         withdrawOrderDto.Id = this.GetPrimaryKey();
         withdrawOrderDto.Status = OrderStatusEnum.Created.ToString();
@@ -133,7 +132,11 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
     {
         // save withdraw order to Grain
         var res = await _recordGrain.AddOrUpdateAsync(orderDto);
-        AssertHelper.IsTrue(res.Success, "save order data error, orderId = {Id}", orderDto.Id);
+        if (!res.Success)
+        {
+            _logger.LogError("save order data error, orderId = {Id}", orderDto.Id);
+        }
+        AssertHelper.IsTrue(res.Success, ErrorResult.OrderSaveFailCode);
 
         // save order status flow
         var orderFlowRes = await _orderStatusFlowGrain.AddAsync(orderDto.Status, externalInfo);

@@ -109,12 +109,12 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
             .Where(kv => request.Address.Match(kv.Key))
             .SelectMany(kv => kv.Value)
             .ToList();
-        AssertHelper.NotEmpty(networkByAddress, "Please enter a correct address.");
+        AssertHelper.NotEmpty(networkByAddress, ErrorResult.AddressFormatWrongCode);
         
         getNetworkListDto.NetworkList = getNetworkListDto.NetworkList
             .Where(net => net.Network.IsIn(networkByAddress))
             .ToList();
-        AssertHelper.NotEmpty(getNetworkListDto.NetworkList, "{Networks} is currently not supported.",
+        AssertHelper.NotEmpty(getNetworkListDto.NetworkList, ErrorResult.NetworkNotSupportCode,
             string.Join(CommonConstant.Slash, networkByAddress));
         return getNetworkListDto;
     }
