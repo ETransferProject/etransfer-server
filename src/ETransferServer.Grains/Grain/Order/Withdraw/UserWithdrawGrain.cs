@@ -56,6 +56,7 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
     private IOrderStatusFlowGrain _orderStatusFlowGrain;
     private IUserWithdrawTxTimerGrain _withdrawTimerGrain;
     private IWithdrawTimerGrain _withdrawQueryTimerGrain;
+    private IOrderStatusReminderGrain _orderStatusReminderGrain;
 
     private readonly IContractProvider _contractProvider;
     private readonly IUserWithdrawProvider _userWithdrawProvider;
@@ -101,6 +102,9 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         _withdrawQueryTimerGrain =
             GrainFactory.GetGrain<IWithdrawTimerGrain>(
                 GuidHelper.UniqGuid(nameof(IWithdrawTimerGrain)));
+        _orderStatusReminderGrain = 
+            GrainFactory.GetGrain<IOrderStatusReminderGrain>(
+                GuidHelper.UniqGuid(nameof(IOrderStatusReminderGrain)));
     }
 
     public async Task<WithdrawOrderDto> CreateOrder(WithdrawOrderDto withdrawOrderDto)
@@ -150,5 +154,10 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         await _orderChangeStream.OnNextAsync(orderDto);
 
         return res.Value;
+    }
+    
+    public async Task AddCheckOrder(WithdrawOrderDto orderDto)
+    {
+        await _orderStatusReminderGrain.AddReminder(orderDto.Id +  "_" + OrderStatusReminderGrain.Type.Deposit);
     }
 }

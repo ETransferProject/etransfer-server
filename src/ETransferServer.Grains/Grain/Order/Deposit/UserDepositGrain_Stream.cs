@@ -34,6 +34,7 @@ public partial class UserDepositGrain
             case OrderStatusEnum.FromTransferConfirmed:
             {
                 orderDto.Status = OrderStatusEnum.ToStartTransfer.ToString();
+                await AddCheckOrder(orderDto);
                 await AddOrUpdateOrder(orderDto);
                 break;
             }
