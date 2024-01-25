@@ -14,34 +14,33 @@
             "Current fee: **{currentFeeAmount} {currentFeeSymbol}**\nCurrent time: **{currentFeeTime}**"
           ]
         }
-      } 
-    }
-  },
-  "OrderStatusAlarm" : {
-    "FeiShuGroup": {
-      "WebhookUrl": "https://open.feishu.cn/open-apis/bot/v2/hook/xxxxx",
-      "Secret": "xxxxx",
-      "TitleTemplate": "orange",
-      "Title": "❗️[test3] Order Status Alert",
-      "Contents": [
-        "Order Status Failed\n",
-        "UserId: {userId}\n",
-        "OrderId: {orderId}\n",
-        "OrderType: {orderType}\n",
-        "TxId: {txId}\n",
-        "Status: {status}\n",
-        "CreateTime: {createTime}\n",
-        "Reason: {reason}\n",
-        "AmountFrom: {amountFrom}\n",
-        "AmountTo: {amountTo}\n",
-        "NetworkFrom: {networkFrom}\n",
-        "FromAddressFrom: {fromAddressFrom}\n",
-        "FromAddressTo: {fromAddressTo}\n",
-        "NetworkTo: {networkTo}\n",
-        "ToAddressFrom: {toAddressFrom}\n",
-        "ToAddressTo: {toAddressTo}\n"
-      ]
+      },
+      "OrderStatusAlarm" : {
+        "FeiShuGroup": {
+          "WebhookUrl": "https://open.feishu.cn/open-apis/bot/v2/hook/xxxxx",
+          "Secret": "xxxxx",
+          "TitleTemplate": "orange",
+          "Title": "❗️[test3] Order Status Alert",
+          "Contents": [
+            "Order Status Failed\n",
+            "UserId: {userId}\n",
+            "OrderId: {orderId}\n",
+            "OrderType: {orderType}\n",
+            "TxId: {txId}\n",
+            "Status: {status}\n",
+            "CreateTime: {createTime}\n",
+            "Reason: {reason}\n",
+            "AmountFrom: {amountFrom}\n",
+            "AmountTo: {amountTo}\n",
+            "NetworkFrom: {networkFrom}\n",
+            "FromAddressFrom: {fromAddressFrom}\n",
+            "FromAddressTo: {fromAddressTo}\n",
+            "NetworkTo: {networkTo}\n",
+            "ToAddressFrom: {toAddressFrom}\n",
+            "ToAddressTo: {toAddressTo}\n"
+          ]
+        }
+      }
     }
   }
-  
 }
