@@ -1,6 +1,8 @@
 using ETransferServer.Common;
 using ETransferServer.Dtos.Notify;
 using ETransferServer.Dtos.Order;
+using ETransferServer.Grains.Grain.Order.Deposit;
+using ETransferServer.Grains.Grain.Order.Withdraw;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans;
@@ -85,9 +87,9 @@ public class OrderStatusReminderGrain : Orleans.Grain, IOrderStatusReminderGrain
         AssertHelper.IsTrue(providerExists, "Provider not found");
         AssertHelper.NotNull(order, "order is null");
         var createTime = 0l;
-        if (order.CreateTime != null)
+        if (order.CreateTime.HasValue)
         { 
-            createTime = (long)order.CreateTime;
+            createTime = order.CreateTime.Value;
         }
 
         var toTransfer = order.ToTransfer;
@@ -128,15 +130,16 @@ public class OrderStatusReminderGrain : Orleans.Grain, IOrderStatusReminderGrain
         
         try
         {
-            switch (orderType)
+            var orderTypeEnum = Enum.Parse<OrderTypeEnum>(orderType);
+            switch (orderTypeEnum)
             {
-                case OrderTypeEnum.Withdraw.ToString():
-                    var grain = GrainFactory.GetGrain<IUserWithdrawRecordGrain>(orderId);
-                    order = (await grain.GetAsync())?.Value;
+                case OrderTypeEnum.Withdraw:
+                    var withdrawRecordGrain = GrainFactory.GetGrain<IUserWithdrawRecordGrain>(orderId);
+                    order = (await withdrawRecordGrain.GetAsync())?.Value;
                     break;
-                case OrderTypeEnum.Deposit.ToString():
-                    var grain = GrainFactory.GetGrain<IUserDepositRecordGrain>(orderId);
-                    order = (await grain.GetAsync())?.Value;
+                case OrderTypeEnum.Deposit:
+                    var depositRecordGrain = GrainFactory.GetGrain<IUserDepositRecordGrain>(orderId);
+                    order = (await depositRecordGrain.GetAsync())?.Value;
                     break;
                 default:
                     _logger.LogInformation("OrderStatusReminderGrain reminderName not right orderType={type} orderId={guid}", orderType, orderId);

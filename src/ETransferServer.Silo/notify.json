@@ -17,8 +17,8 @@
       },
       "OrderStatusAlarm" : {
         "FeiShuGroup": {
-          "WebhookUrl": "https://open.feishu.cn/open-apis/bot/v2/hook/b6203b22-c7bb-47e6-aea7-273fe07f8086",
-          "Secret": "W0IC2kwfweTbAvvw10Sumc",
+          "WebhookUrl": "https://open.feishu.cn/open-apis/bot/v2/hook/xxxxx",
+          "Secret": "xxxxx",
           "TitleTemplate": "orange",
           "Title": "❗️[test3] Order Status Alert",
           "Contents": [
