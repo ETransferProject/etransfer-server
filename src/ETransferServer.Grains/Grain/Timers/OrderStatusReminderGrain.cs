@@ -56,7 +56,7 @@ public class OrderStatusReminderGrain : Orleans.Grain, IOrderStatusReminderGrain
     public async Task CheckOrder(String reminderName)
     {
         _logger.LogInformation("OrderStatusReminderGrain CheckOrder reminderName={reminderName}", reminderName);
-        var nameSplit = reminderName.Split(CommonConstant.Hyphen);
+        var nameSplit = reminderName.Split(CommonConstant.Underline);
         var orderId = Guid.Parse(nameSplit[0]);
         var orderType = nameSplit.Length > 1 ? nameSplit[1] : "";
         var order = await GetOrder(orderType, orderId);
