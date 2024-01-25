@@ -1,8 +1,6 @@
 using ETransferServer.Common;
 using ETransferServer.Dtos.Notify;
 using ETransferServer.Dtos.Order;
-using ETransferServer.Grains.Grain.Order.Deposit;
-using ETransferServer.Grains.Grain.Order.Withdraw;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans;
@@ -56,16 +54,16 @@ public class OrderStatusReminderGrain : Orleans.Grain, IOrderStatusReminderGrain
     public async Task CheckOrder(String reminderName)
     {
         _logger.LogInformation("OrderStatusReminderGrain CheckOrder reminderName={reminderName}", reminderName);
-        var split = reminderName.Split("_");
-        var guid = new Guid(split[0]);
-        var type = split.Length > 1 ? split[1] : "";
-        var order = await GetOrder(type, guid);
+        var nameSplit = reminderName.Split(CommonConstant.Hyphen);
+        var orderId = Guid.Parse(nameSplit[0]);
+        var orderType = nameSplit.Length > 1 ? nameSplit[1] : "";
+        var order = await GetOrder(orderType, orderId);
 
         _logger.LogInformation("OrderStatusReminderGrain CheckOrder order={order}", order);
         var canCancel = true;
         if (!OrderStatusEnum.Finish.ToString().Equals(order.Status))
         {
-            canCancel = await SendNotifyAsync(order, type);
+            canCancel = await SendNotifyAsync(order, orderType);
         }
 
         if (canCancel)
@@ -85,7 +83,8 @@ public class OrderStatusReminderGrain : Orleans.Grain, IOrderStatusReminderGrain
         _logger.LogInformation("OrderStatusReminderGrain SendNotifyAsync order={} type={}", order, type);
         var providerExists = _notifyProvider.TryGetValue(NotifyTypeEnum.FeiShuGroup.ToString(), out var provider);
         AssertHelper.IsTrue(providerExists, "Provider not found");
-        long createTime = 0;
+        AssertHelper.NotNull(order, "order is null");
+        var createTime = 0l;
         if (order.CreateTime != null)
         { 
             createTime = (long)order.CreateTime;
@@ -120,33 +119,33 @@ public class OrderStatusReminderGrain : Orleans.Grain, IOrderStatusReminderGrain
         return await provider.SendNotifyAsync(notifyRequest);
     }
 
-    private async Task<BaseOrderDto> GetOrder(string type, Guid guid)
+    private async Task<BaseOrderDto> GetOrder(string orderType, Guid orderId)
     {
         var order = new BaseOrderDto
         {
-            Id = guid
+            Id = orderId
         };
         
         try
         {
-            if (type == Type.Withdraw)
+            switch (orderType)
             {
-                var grain = GrainFactory.GetGrain<IUserWithdrawRecordGrain>(guid);
-                order = (await grain.GetAsync()).Value;
-            }
-            else if (type == Type.Deposit)
-            {
-                var grain = GrainFactory.GetGrain<IUserDepositRecordGrain>(guid);
-                order = (await grain.GetAsync()).Value;
-            }
-            else
-            {
-                _logger.LogInformation("OrderStatusReminderGrain reminderName not right type={type} guid={guid}", type, guid);
+                case OrderTypeEnum.Withdraw.ToString():
+                    var grain = GrainFactory.GetGrain<IUserWithdrawRecordGrain>(orderId);
+                    order = (await grain.GetAsync())?.Value;
+                    break;
+                case OrderTypeEnum.Deposit.ToString():
+                    var grain = GrainFactory.GetGrain<IUserDepositRecordGrain>(orderId);
+                    order = (await grain.GetAsync())?.Value;
+                    break;
+                default:
+                    _logger.LogInformation("OrderStatusReminderGrain reminderName not right orderType={type} orderId={guid}", orderType, orderId);
+                    break;
             }
         }
         catch (Exception e)
         {
-            _logger.LogError(e,"OrderStatusReminderGrain Exception type={type} guid={guid}", type, guid);
+            _logger.LogError(e,"OrderStatusReminderGrain Exception orderType={type} orderId={guid}", orderType, orderId);
         }
 
         return order;
@@ -173,11 +172,5 @@ public class OrderStatusReminderGrain : Orleans.Grain, IOrderStatusReminderGrain
         public const string NetworkTo = "networkTo";
         public const string ToAddressFrom = "toAddressFrom";
         public const string ToAddressTo = "toAddressTo";
-    }
-
-    public static class Type
-    {
-        public const string Withdraw = "Withdraw";
-        public const string Deposit = "Deposit";
     }
 }

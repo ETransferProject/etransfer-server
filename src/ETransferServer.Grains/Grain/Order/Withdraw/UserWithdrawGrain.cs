@@ -158,6 +158,6 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
     
     public async Task AddCheckOrder(WithdrawOrderDto orderDto)
     {
-        await _orderStatusReminderGrain.AddReminder(orderDto.Id +  "_" + OrderStatusReminderGrain.Type.Deposit);
+        await _orderStatusReminderGrain.AddReminder(GuidHelper.GenerateId(orderDto.Id.ToString(), OrderTypeEnum.Withdraw.ToString()));
     }
 }

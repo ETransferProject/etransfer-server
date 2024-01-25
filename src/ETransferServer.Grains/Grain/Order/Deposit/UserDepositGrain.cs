@@ -106,6 +106,6 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
 
     public async Task AddCheckOrder(DepositOrderDto orderDto)
     {
-        await _orderStatusReminderGrain.AddReminder(orderDto.Id + "_" + OrderStatusReminderGrain.Type.Deposit);
+        await _orderStatusReminderGrain.AddReminder(GuidHelper.GenerateId(orderDto.Id.ToString(), OrderTypeEnum.Deposit.ToString()));
     }
 }
