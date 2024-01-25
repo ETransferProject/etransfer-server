@@ -326,7 +326,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             AssertHelper.IsTrue(request.FromChainId == ChainId.AELF || request.FromChainId == ChainId.tDVV ||
                 request.FromChainId == ChainId.tDVW, ErrorResult.ChainIdInvalidCode);
             AssertHelper.IsTrue(_networkInfoOptions.CurrentValue.NetworkMap.ContainsKey(request.Symbol),
-                ErrorResult.SymbolInvalidCode, null, request.Symbol);
+                ErrorResult.SymbolInvalidCode);
             AssertHelper.IsTrue(await IsAddressSupport(request.FromChainId, request.Symbol, request.ToAddress),
                 ErrorResult.AddressInvalidCode);
 
@@ -372,11 +372,11 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             var tokenGrain = _clusterClient.GetGrain<ITokenGrain>(ITokenGrain.GenGrainId(transferTokenInput.Symbol,
                 request.FromChainId));
             var tokenDto = await tokenGrain.GetToken();
-            AssertHelper.NotNull(tokenDto, ErrorResult.SymbolErrorCode);
-            AssertHelper.IsTrue(transferTokenInput.Symbol == request.Symbol, ErrorResult.SymbolErrorCode);
+            AssertHelper.NotNull(tokenDto, ErrorResult.SymbolNullCode);
+            AssertHelper.IsTrue(transferTokenInput.Symbol == request.Symbol, ErrorResult.SymbolNotEqualCode);
 
             var expectedAmount = request.Amount * (decimal)Math.Pow(10, tokenDto.Decimals);
-            AssertHelper.IsTrue(transferTokenInput.Amount == expectedAmount, ErrorResult.AmountErrorCode);
+            AssertHelper.IsTrue(transferTokenInput.Amount == expectedAmount, ErrorResult.AmountNotEqualCode);
 
             // Do create
             return await DoCreateOrderAsync(request, transaction, withdrawAmount,
@@ -459,7 +459,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         var rawTransactionHash = transaction.GetHash().ToHex();
         var transactionGrain = _clusterClient.GetGrain<ITransactionGrain>(rawTransactionHash);
         var saveTransactionResult = await transactionGrain.Create();
-        AssertHelper.IsTrue(saveTransactionResult.Success, ErrorResult.TxFailCode);
+        AssertHelper.IsTrue(saveTransactionResult.Success, ErrorResult.TransactionFailCode);
     }
 
     public async Task<bool> AddOrUpdateAsync(WithdrawOrderDto dto)

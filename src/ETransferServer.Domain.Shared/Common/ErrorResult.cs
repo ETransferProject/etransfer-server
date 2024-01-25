@@ -13,11 +13,11 @@ public static class ErrorResult
     public const int JwtInvalidCode = 40007;
     public const int FeeInvalidCode = 40008;
     public const int AmountInsufficientCode = 40009;
-    public const int SymbolErrorCode = 40010;
-    public const int AmountErrorCode = 40011;
-    public const int WithdrawLimitInsufficientCode = 40012;
-    public const int TxFailCode = 40013;
-    public const int OrderParamInvalidCode = 40014;
+    public const int SymbolNullCode = 40010;
+    public const int SymbolNotEqualCode = 40011;
+    public const int AmountNotEqualCode = 40012;
+    public const int WithdrawLimitInsufficientCode = 40013;
+    public const int TransactionFailCode = 40014;
     public const int OrderSaveFailCode = 40015;
     public const int AddressFormatWrongCode = 40100;
     public const int NetworkNotSupportCode = 40101;
@@ -29,21 +29,21 @@ public static class ErrorResult
     
     public static readonly Dictionary<int, string> ResponseMappings = new()
     {
-        { 40001, "The transaction fee on the {network_name} rose suddenly due to the gas price fluctruation on the destination chain. Please initiate a new transaction and try again later." },
+        { 40001, "{network_name} is experiencing a sudden rise in transaction fees. Please initiate the transaction again." },
         { 40002, "Your transaction has expired. Please initiate a new transaction to proceed." },
-        { 40003, "Invalid source ChainID received. Please wait as we investigate this matter. You will not encounter any asset loss, your transaction safety is our priority." },
-        { 40004, "Unsupported token {received_token_symbol} received, only support USDT is supported currently. You will not encounter any asset loss, your transaction safety is our priority." },
-        { 40005, "Unsupported address received, please check the receiving address. You will not encounter any asset loss, your transaction safety is our priority." },
-        { 40006, "Unsupported network received, please check the withdrawal network. You will not encounter any asset loss, your transaction safety is our priority." },
-        { 40007, "Failed to create the transaction" },
-        { 40008, "Wrong transaction fee." },
-        { 40009, "Insufficient sending amount. Please ensure that your withdrawal amount is correct (it should be greater than the transaction fee)." },
-        { 40010, "Invalid token symbol, only USDT is supported currently. Please check the symbol of the token." },
-        { 40011, "Invalid sending amount. Please ensure that your withdrawal amount is correct (it should be greater than the transaction fee)." },
-        { 40012, "The withdrawal limit available today is insufficient, with only {amount} remaining. You can withdraw a smaller amount or try again after {number} hours." },
-        { 40013, "Transaction is built error." },
-        { 40014, "Failed to create the order. Please check the transaction input and try again." },
-        { 40015, "Failed to synchronize the order." },
+        { 40003, "Invalid source ChainID. The ETransfer team is actively looking into this issue. Please be assured that your accounts and assets will remain unaffected." },
+        { 40004, "Unsupported token. Currently only USDT is supported. Please check and ensure you provide the right token symbol." },
+        { 40005, "Unsupported address. Please check and ensure you provide the right withdrawal address." },
+        { 40006, "Unsupported network. Please check and ensure you provide the right withdrawal network." },
+        { 40007, "Failed to initiate the transaction. The ETransfer team is actively looking into this issue. Please be assured that your accounts and assets will remain unaffected." },
+        { 40008, "Invalid transaction fee. Please check and ensure the transaction fee is correct and try again half an hour later." },
+        { 40009, "Invalid withdrawal amount. Please check and ensure you enter the right amount (should be greater than the transaction fee)." },
+        { 40010, "Unsupported token. Currently only USDT is supported. Please check and ensure you provide the right token symbol." },
+        { 40011, "Unsupported token. Currently only USDT is supported. The ETransfer team is actively looking into this issue. Please be assured that your accounts and assets will remain unaffected." },
+        { 40012, "Invalid withdrawal amount. The ETransfer team is actively looking into this issue. Please be assured that your accounts and assets will remain unaffected." },
+        { 40013, "The remaining withdrawal quota for today is insufficient, with {amount} available. Please try again after {number} hours or consider transferring a smaller amount." },
+        { 40014, "Transaction failed. The ETransfer team is actively looking into this issue. Please be assured that your accounts and assets will remain unaffected." },
+        { 40015, "Failed to synchronise data. The ETransfer team is actively looking into this issue. Please be assured that your accounts and assets will remain unaffected." },
         { 40100, "Please enter a correct address." },
         { 40101, "{Networks} is currently not supported." }
     };

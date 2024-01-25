@@ -105,21 +105,21 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
 
     public async Task<WithdrawOrderDto> CreateOrder(WithdrawOrderDto withdrawOrderDto)
     {
-        AssertHelper.NotNull(withdrawOrderDto, ErrorResult.OrderParamInvalidCode);
+        AssertHelper.NotNull(withdrawOrderDto, ErrorResult.TransactionFailCode);
         AssertHelper.IsTrue(withdrawOrderDto.OrderType == OrderTypeEnum.Withdraw.ToString(),
-            ErrorResult.OrderParamInvalidCode);
-        AssertHelper.NotNull(withdrawOrderDto.FromTransfer, ErrorResult.OrderParamInvalidCode);
-        AssertHelper.NotEmpty(withdrawOrderDto.FromTransfer.ChainId, ErrorResult.OrderParamInvalidCode);
-        AssertHelper.NotEmpty(withdrawOrderDto.RawTransaction, ErrorResult.OrderParamInvalidCode);
-        AssertHelper.NotNull(withdrawOrderDto.ToTransfer, ErrorResult.OrderParamInvalidCode);
-        AssertHelper.NotNull(withdrawOrderDto.ToTransfer.Network, ErrorResult.OrderParamInvalidCode);
-        AssertHelper.NotNull(withdrawOrderDto.ToTransfer.ToAddress, ErrorResult.OrderParamInvalidCode);
-        AssertHelper.NotNull(withdrawOrderDto.ToTransfer.Symbol, ErrorResult.OrderParamInvalidCode);
-        AssertHelper.IsTrue(withdrawOrderDto.ToTransfer.Amount > 0, ErrorResult.OrderParamInvalidCode);
+            ErrorResult.TransactionFailCode);
+        AssertHelper.NotNull(withdrawOrderDto.FromTransfer, ErrorResult.TransactionFailCode);
+        AssertHelper.NotEmpty(withdrawOrderDto.FromTransfer.ChainId, ErrorResult.TransactionFailCode);
+        AssertHelper.NotEmpty(withdrawOrderDto.RawTransaction, ErrorResult.TransactionFailCode);
+        AssertHelper.NotNull(withdrawOrderDto.ToTransfer, ErrorResult.TransactionFailCode);
+        AssertHelper.NotNull(withdrawOrderDto.ToTransfer.Network, ErrorResult.TransactionFailCode);
+        AssertHelper.NotNull(withdrawOrderDto.ToTransfer.ToAddress, ErrorResult.TransactionFailCode);
+        AssertHelper.NotNull(withdrawOrderDto.ToTransfer.Symbol, ErrorResult.TransactionFailCode);
+        AssertHelper.IsTrue(withdrawOrderDto.ToTransfer.Amount > 0, ErrorResult.TransactionFailCode);
         
         var coinInfo = _withdrawNetworkOptions.CurrentValue.GetNetworkInfo(withdrawOrderDto.ToTransfer.Network,
             withdrawOrderDto.ToTransfer.Symbol);
-        AssertHelper.IsTrue(coinInfo.Decimal >= 0, ErrorResult.OrderParamInvalidCode);
+        AssertHelper.IsTrue(coinInfo.Decimal >= 0, ErrorResult.TransactionFailCode);
         
         withdrawOrderDto.Id = this.GetPrimaryKey();
         withdrawOrderDto.Status = OrderStatusEnum.Created.ToString();
