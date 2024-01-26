@@ -2,7 +2,7 @@ namespace ETransferServer.Common;
 
 public static class CommonConstant
 {
-
+    public const string Space = " ";
     public const string EmptyString = "";
     public const string Dot = ".";
     public const string Hyphen = "-";

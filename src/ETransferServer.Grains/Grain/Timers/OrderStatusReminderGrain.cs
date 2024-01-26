@@ -10,6 +10,7 @@ using Orleans.Runtime;
 using Orleans.Timers;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.Provider.Notify;
+using Volo.Abp;
 
 namespace ETransferServer.Grains.Grain.Timers;
 
@@ -25,10 +26,10 @@ public class OrderStatusReminderGrain : Orleans.Grain, IOrderStatusReminderGrain
     private readonly IReminderRegistry _reminderRegistry;
     private readonly IOptionsMonitor<TimerOptions> _timerOptions;
     private readonly Dictionary<string, INotifyProvider> _notifyProvider;
+    private Dictionary<string, int> _reminderCountMap = new() ;
 
     public OrderStatusReminderGrain(IReminderRegistry reminderRegistry, ILogger<OrderStatusReminderGrain> logger,
-        IOptionsMonitor<TimerOptions> timerOptions, IEnumerable<INotifyProvider> notifyProvider
-        )
+        IOptionsMonitor<TimerOptions> timerOptions, IEnumerable<INotifyProvider> notifyProvider)
     {
         _reminderRegistry = reminderRegistry;
         _logger = logger;
@@ -55,23 +56,30 @@ public class OrderStatusReminderGrain : Orleans.Grain, IOrderStatusReminderGrain
 
     public async Task CheckOrder(String reminderName)
     {
-        _logger.LogInformation("OrderStatusReminderGrain CheckOrder reminderName={reminderName}", reminderName);
-        var nameSplit = reminderName.Split(CommonConstant.Underline);
-        var orderId = Guid.Parse(nameSplit[0]);
-        var orderType = nameSplit.Length > 1 ? nameSplit[1] : "";
-        var order = await GetOrder(orderType, orderId);
-
-        _logger.LogInformation("OrderStatusReminderGrain CheckOrder order={order}", order);
-        var canCancel = true;
-        if (!OrderStatusEnum.Finish.ToString().Equals(order.Status))
+        var cancel = false;
+        try
         {
-            canCancel = await SendNotifyAsync(order, orderType);
+            _reminderCountMap.GetOrAdd(reminderName, _ => new());
+            _logger.LogInformation("OrderStatusReminderGrain CheckOrder reminderName={reminderName}", reminderName);
+            var nameSplit = reminderName.Split(CommonConstant.Underline);
+            var orderId = Guid.Parse(nameSplit[0]);
+            var orderType = nameSplit.Length > 1 ? nameSplit[1] : "";
+            var order = await GetOrder(orderType, orderId);
+
+            _logger.LogInformation("OrderStatusReminderGrain CheckOrder order={order}", order);
+            cancel = OrderStatusEnum.Finish.ToString().Equals(order.Status) || await SendNotifyAsync(order, orderType);
         }
-
-        if (canCancel)
+        catch (Exception e)
         {
-            var grainReminder = await _reminderRegistry.GetReminder(reminderName);
-            await _reminderRegistry.UnregisterReminder(grainReminder);
+            _logger.LogError(e, "OrderStatusReminderGrain CheckOrder Exception reminderName={reminderName}",
+                reminderName);
+        }
+        finally
+        {
+            if (cancel || ++_reminderCountMap[reminderName] >= 3)
+            {
+                await CancelReminder(reminderName);
+            }
         }
     }
 
@@ -80,12 +88,18 @@ public class OrderStatusReminderGrain : Orleans.Grain, IOrderStatusReminderGrain
         await StartReminder(id);
     }
 
+    private async Task CancelReminder(string reminderName)
+    {
+        var grainReminder = await _reminderRegistry.GetReminder(reminderName);
+        await _reminderRegistry.UnregisterReminder(grainReminder);
+        _reminderCountMap.Remove(reminderName);
+    }
+
     private async Task<bool> SendNotifyAsync(BaseOrderDto order, string type)
     {
         _logger.LogInformation("OrderStatusReminderGrain SendNotifyAsync order={} type={}", order, type);
         var providerExists = _notifyProvider.TryGetValue(NotifyTypeEnum.FeiShuGroup.ToString(), out var provider);
         AssertHelper.IsTrue(providerExists, "Provider not found");
-        AssertHelper.NotNull(order, "order is null");
         var createTime = 0l;
         if (order.CreateTime.HasValue)
         { 
@@ -100,22 +114,27 @@ public class OrderStatusReminderGrain : Orleans.Grain, IOrderStatusReminderGrain
             Params = new Dictionary<string, string>
             {
                 [Keys.UserId] = order.UserId.ToString(),
-                [Keys.OrderType] = order.OrderType == null ? "" : order.OrderType,
+                [Keys.OrderType] = order.OrderType,
                 [Keys.OrderId] = order.Id.ToString(),
-                [Keys.CreateTime] = createTime > 0 ? TimeHelper.GetDateTimeFromTimeStamp(createTime).ToUtc8String() : "",
-                [Keys.TxId] = toTransfer == null ? "" : toTransfer.TxId,
-                [Keys.Status] = toTransfer == null ? "" : toTransfer.Status,
+                [Keys.CreateTime] = TimeHelper.GetDateTimeFromTimeStamp(createTime).ToUtc8String(),
+                [Keys.TxId] = toTransfer?.TxId,
                 [Keys.Reason] = order.ExtensionInfo.IsNullOrEmpty() ? "" : order.ExtensionInfo.First().Value,
-                [Keys.AmountFrom] = fromTransfer != null && fromTransfer.Amount != null ? fromTransfer.Amount + fromTransfer.Symbol : "",
-                [Keys.AmountTo] = toTransfer != null && toTransfer.Amount != null ? toTransfer.Amount + toTransfer.Symbol : "",
 
-                [Keys.NetworkFrom] = fromTransfer == null ? "" : fromTransfer.Network,
-                [Keys.FromAddressFrom] = fromTransfer == null ? "" : fromTransfer.FromAddress,
-                [Keys.FromAddressTo] = fromTransfer == null ? "" : fromTransfer.ToAddress,
+                [Keys.AmountFrom] = GetAmount(fromTransfer),
+                [Keys.AmountTo] = GetAmount(toTransfer),
 
-                [Keys.NetworkTo] = toTransfer == null ? "" : toTransfer.Network,
-                [Keys.ToAddressFrom] = toTransfer == null ? "" : toTransfer.FromAddress,
-                [Keys.ToAddressTo] = toTransfer == null ? "" : toTransfer.ToAddress,
+                [Keys.NetworkFrom] = OrderTypeEnum.Withdraw.ToString().Equals(order.OrderType)
+                    ? fromTransfer?.ChainId
+                    : fromTransfer?.Network,
+                [Keys.NetworkTo] = OrderTypeEnum.Withdraw.ToString().Equals(order.OrderType)
+                    ? toTransfer?.Network
+                    : toTransfer?.ChainId,
+
+                [Keys.FromAddressFrom] = fromTransfer?.FromAddress,
+                [Keys.FromAddressTo] = fromTransfer?.ToAddress,
+
+                [Keys.ToAddressFrom] = toTransfer?.FromAddress,
+                [Keys.ToAddressTo] = toTransfer?.ToAddress,
             }
         };
         return await provider.SendNotifyAsync(notifyRequest);
@@ -151,7 +170,13 @@ public class OrderStatusReminderGrain : Orleans.Grain, IOrderStatusReminderGrain
             _logger.LogError(e,"OrderStatusReminderGrain Exception orderType={type} orderId={guid}", orderType, orderId);
         }
 
+        AssertHelper.NotNull(order, "order is null");
         return order;
+    }
+
+    private static string GetAmount(TransferInfo transferInfo)
+    {
+        return transferInfo != null ? string.Join(CommonConstant.Space, transferInfo.Amount, transferInfo.Symbol) : "";
     }
 
     private static class Keys
@@ -161,7 +186,6 @@ public class OrderStatusReminderGrain : Orleans.Grain, IOrderStatusReminderGrain
         public const string OrderId = "orderId";
         public const string CreateTime = "createTime";
         public const string TxId = "txId";
-        public const string Status = "status";
         public const string Reason = "reason";
         public const string AmountFrom = "amountFrom";
         public const string AmountTo = "amountTo";
