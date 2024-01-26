@@ -10,7 +10,6 @@ using Orleans.Runtime;
 using Orleans.Timers;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.Provider.Notify;
-using Volo.Abp;
 
 namespace ETransferServer.Grains.Grain.Timers;
 
@@ -26,7 +25,8 @@ public class OrderStatusReminderGrain : Orleans.Grain, IOrderStatusReminderGrain
     private readonly IReminderRegistry _reminderRegistry;
     private readonly IOptionsMonitor<TimerOptions> _timerOptions;
     private readonly Dictionary<string, INotifyProvider> _notifyProvider;
-    private Dictionary<string, int> _reminderCountMap = new() ;
+    private readonly Dictionary<string, int> _reminderCountMap = new();
+    private const int RetryCountMax = 3;
 
     public OrderStatusReminderGrain(IReminderRegistry reminderRegistry, ILogger<OrderStatusReminderGrain> logger,
         IOptionsMonitor<TimerOptions> timerOptions, IEnumerable<INotifyProvider> notifyProvider)
@@ -76,7 +76,7 @@ public class OrderStatusReminderGrain : Orleans.Grain, IOrderStatusReminderGrain
         }
         finally
         {
-            if (cancel || ++_reminderCountMap[reminderName] >= 3)
+            if (++_reminderCountMap[reminderName] >= RetryCountMax || cancel)
             {
                 await CancelReminder(reminderName);
             }
@@ -97,7 +97,7 @@ public class OrderStatusReminderGrain : Orleans.Grain, IOrderStatusReminderGrain
 
     private async Task<bool> SendNotifyAsync(BaseOrderDto order, string type)
     {
-        _logger.LogInformation("OrderStatusReminderGrain SendNotifyAsync order={} type={}", order, type);
+        _logger.LogInformation("OrderStatusReminderGrain SendNotifyAsync order={order} type={type}", order, type);
         var providerExists = _notifyProvider.TryGetValue(NotifyTypeEnum.FeiShuGroup.ToString(), out var provider);
         AssertHelper.IsTrue(providerExists, "Provider not found");
         var createTime = 0l;
@@ -161,13 +161,13 @@ public class OrderStatusReminderGrain : Orleans.Grain, IOrderStatusReminderGrain
                     order = (await depositRecordGrain.GetAsync())?.Value;
                     break;
                 default:
-                    _logger.LogInformation("OrderStatusReminderGrain reminderName not right orderType={type} orderId={guid}", orderType, orderId);
+                    _logger.LogInformation("OrderStatusReminderGrain reminderName not right orderType={orderType} orderId={orderId}", orderType, orderId);
                     break;
             }
         }
         catch (Exception e)
         {
-            _logger.LogError(e,"OrderStatusReminderGrain Exception orderType={type} orderId={guid}", orderType, orderId);
+            _logger.LogError(e,"OrderStatusReminderGrain Exception orderType={orderType} orderId={orderId}", orderType, orderId);
         }
 
         AssertHelper.NotNull(order, "order is null");
