@@ -17,27 +17,16 @@
       },
       "OrderStatusAlarm" : {
         "FeiShuGroup": {
-          "WebhookUrl": "https://open.feishu.cn/open-apis/bot/v2/hook/xxxxx",
-          "Secret": "xxxxx",
+          "WebhookUrl": "",
+          "Secret": "",
           "TitleTemplate": "orange",
-          "Title": "❗️[test3] Order Status Alert",
+          "Title": "❗️[test3] Order failed alert",
           "Contents": [
-            "Order Status Failed\n",
-            "UserId: {userId}\n",
-            "OrderId: {orderId}\n",
-            "OrderType: {orderType}\n",
-            "TxId: {txId}\n",
-            "Status: {status}\n",
-            "CreateTime: {createTime}\n",
-            "Reason: {reason}\n",
-            "AmountFrom: {amountFrom}\n",
-            "AmountTo: {amountTo}\n",
-            "NetworkFrom: {networkFrom}\n",
-            "FromAddressFrom: {fromAddressFrom}\n",
-            "FromAddressTo: {fromAddressTo}\n",
-            "NetworkTo: {networkTo}\n",
-            "ToAddressFrom: {toAddressFrom}\n",
-            "ToAddressTo: {toAddressTo}\n"
+            "OrderType: {orderType}",
+            "OrderId: {orderId}\nUserId: {userId}\nTxId: {txId}\nCreateTime: {createTime}\nReason: {reason}",
+            "NetworkFrom: {networkFrom} NetworkTo: {networkTo}\nAmountFrom: {amountFrom} AmountTo: {amountTo}",
+            "FromAddressFrom: {fromAddressFrom}\nFromAddressTo: {fromAddressTo}",
+            "ToAddressFrom: {toAddressFrom}\nToAddressTo: {toAddressTo}"
           ]
         }
       }
