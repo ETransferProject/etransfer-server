@@ -50,6 +50,7 @@ public partial class UserWithdrawGrain
             // After the multiple confirmation of the transaction is successful,
             // call the three-party service to transfer the currency to the user's address.
             case OrderStatusEnum.FromTransferConfirmed:
+                await AddCheckOrder(orderDto);
                 orderDto.Status = OrderStatusEnum.ToStartTransfer.ToString();
                 await AddOrUpdateOrder(orderDto);
                 break;
