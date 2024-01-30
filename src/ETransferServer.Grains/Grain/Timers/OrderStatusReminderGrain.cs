@@ -66,7 +66,7 @@ public class OrderStatusReminderGrain : Orleans.Grain, IOrderStatusReminderGrain
             var orderType = nameSplit.Length > 1 ? nameSplit[1] : "";
             var order = await GetOrder(orderType, orderId);
 
-            _logger.LogInformation("OrderStatusReminderGrain CheckOrder order={order}", order);
+            _logger.LogInformation("OrderStatusReminderGrain CheckOrder orderId={orderId}", order.Id);
             cancel = OrderStatusEnum.Finish.ToString().Equals(order.Status) || await SendNotifyAsync(order, orderType);
         }
         catch (Exception e)
@@ -97,7 +97,7 @@ public class OrderStatusReminderGrain : Orleans.Grain, IOrderStatusReminderGrain
 
     private async Task<bool> SendNotifyAsync(BaseOrderDto order, string type)
     {
-        _logger.LogInformation("OrderStatusReminderGrain SendNotifyAsync order={order} type={type}", order, type);
+        _logger.LogInformation("OrderStatusReminderGrain SendNotifyAsync orderId={orderId} type={type}", order.Id, type);
         var providerExists = _notifyProvider.TryGetValue(NotifyTypeEnum.FeiShuGroup.ToString(), out var provider);
         AssertHelper.IsTrue(providerExists, "Provider not found");
         var createTime = 0l;
