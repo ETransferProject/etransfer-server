@@ -36,5 +36,16 @@ public static class DecimalHelper
         return roundedValue.ToString(formatString, CultureInfo.InvariantCulture);
     }
 
+    public static string ToString(this decimal value, int validDigitalCount, int decimalPlaces,
+        RoundingOption roundingOption = RoundingOption.Round)
+    {
+        var roundedValue = value.ToString(decimalPlaces, roundingOption);
+        var integers = (int)(double.Parse(roundedValue) * Math.Pow(10, decimalPlaces));
+        var integersCount = integers.ToString().Length - decimalPlaces;
+        var decimals = (decimal)Math.Round(Math.Truncate(double.Parse(roundedValue) * Math.Pow(10, validDigitalCount - integersCount)) 
+                                          / Math.Pow(10, validDigitalCount - integersCount), decimalPlaces);
+        return decimals.ToString();
+    }
+
 
 }

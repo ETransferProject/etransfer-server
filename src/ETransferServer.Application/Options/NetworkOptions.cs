@@ -47,6 +47,8 @@ public class WithdrawInfo
 {
     public string MinWithdraw { get; set; }
     public decimal WithdrawFee { get; set; }
+    public decimal WithdrawLocalFee { get; set; }
+    public string WithdrawLocalFeeUnit { get; set; }
     public string WithdrawLimit24h { get; set; }
     public decimal MultiConfirmSeconds { get; set; }
     public int Decimals { get; set; }

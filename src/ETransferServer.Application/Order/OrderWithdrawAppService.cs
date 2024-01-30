@@ -304,7 +304,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
     {
         try
         {
-            var network = await _networkAppService.GetNetworkListWithoutFeeAsync(new GetNetworkListRequestDto
+            var network = await _networkAppService.GetNetworkListWithLocalFeeAsync(new GetNetworkListRequestDto
             {
                 Type = OrderTypeEnum.Withdraw.ToString(),
                 ChainId = chainId,
@@ -379,8 +379,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             AssertHelper.IsTrue(transferTokenInput.Amount == expectedAmount, ErrorResult.AmountNotEqualCode);
 
             // Do create
-            return await DoCreateOrderAsync(request, transaction, withdrawAmount,
-                networkConfig.WithdrawInfo.WithdrawFee.ToString());
+            return await DoCreateOrderAsync(request, transaction, withdrawAmount, thirdPartFeeDto.AbsEstimateFee);
         }
         catch (UserFriendlyException e)
         {

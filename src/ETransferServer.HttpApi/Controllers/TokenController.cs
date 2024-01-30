@@ -21,7 +21,7 @@ public class TokenController : ETransferController
     }
 
     [HttpGet("list")]
-    public async Task<GetTokenListDto> ReceiveAsync( GetTokenListRequestDto request)
+    public async Task<GetTokenListDto> GetTokenListAsync( GetTokenListRequestDto request)
     {
         return await _tokenAppService.GetTokenListAsync(request);
     }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using CoinGecko.Entities.Response.Simple;
@@ -63,6 +64,43 @@ public class CoinGeckoProvider : IExchangeProvider
             Exchange = (decimal)exchange,
             Timestamp = DateTime.UtcNow.ToUtcMilliSeconds()
         };
+    }
+    
+    public async Task<List<TokenExchangeDto>> LatestAsync(List<string> fromSymbol, string toSymbol)
+    {
+        fromSymbol = fromSymbol.ConvertAll(item => MappingSymbol(item).ToLower()).Distinct().ToList();
+        var from = fromSymbol.JoinAsString(CommonConstant.Comma);
+        var to = MappingSymbol(toSymbol);
+        var url = _coinGeckoOptions.CurrentValue.BaseUrl + SimplePriceUri;
+        _logger.LogDebug("CoinGecko url {Url}", url);
+        
+        var price = await _httpProvider.InvokeAsync<Price>(HttpMethod.Get,
+            _coinGeckoOptions.CurrentValue.BaseUrl + SimplePriceUri,
+            header: new Dictionary<string, string>
+            {
+                ["x-cg-pro-api-key"] = _coinGeckoOptions.CurrentValue.ApiKey
+            },
+            param: new Dictionary<string, string>
+            {
+                ["ids"] = string.Join(CommonConstant.Comma, from, to),
+                ["vs_currencies"] = FiatCurrency
+            });
+        AssertHelper.IsTrue(price.ContainsKey(to), "CoinGecko not support symbol {}", to);
+        var exchangeList = new List<TokenExchangeDto>();
+        foreach (var item in fromSymbol)
+        {
+            if(item.Equals(to)) continue;
+            var exchange = price[item][FiatCurrency] / price[to][FiatCurrency];
+            exchangeList.Add(new TokenExchangeDto
+            {
+                FromSymbol = item,
+                ToSymbol = toSymbol,
+                Exchange = (decimal)exchange,
+                Timestamp = DateTime.UtcNow.ToUtcMilliSeconds()
+            });
+        }
+
+        return exchangeList;
     }
 
     private string MappingSymbol(string sourceSymbol)
