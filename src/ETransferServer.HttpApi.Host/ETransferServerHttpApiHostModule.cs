@@ -35,6 +35,7 @@ using Volo.Abp.Caching.StackExchangeRedis;
 using Volo.Abp.EventBus.RabbitMq;
 using Volo.Abp.Localization;
 using Volo.Abp.Modularity;
+using Volo.Abp.OpenIddict.Tokens;
 using Volo.Abp.Swashbuckle;
 using Volo.Abp.Threading;
 using Volo.Abp.VirtualFileSystem;
@@ -74,6 +75,7 @@ namespace ETransferServer
             ConfigureRedis(context, configuration, hostingEnvironment);
             ConfigureCors(context, configuration);
             ConfigureSwaggerServices(context, configuration);
+            ConfigureTokenCleanupService();
             ConfigureOrleans(context, configuration);
             ConfigureGraphQl(context, configuration);
             context.Services.AddAutoResponseWrapper();
@@ -216,6 +218,11 @@ namespace ETransferServer
                         .AllowCredentials();
                 });
             });
+        }
+
+        private void ConfigureTokenCleanupService()
+        {
+            Configure<TokenCleanupOptions>(x => x.IsCleanupEnabled = false);
         }
 
         private static void ConfigureOrleans(ServiceConfigurationContext context, IConfiguration configuration)
