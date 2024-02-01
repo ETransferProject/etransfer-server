@@ -5,6 +5,6 @@ namespace ETransferServer.User;
 
 public interface IUserAppService
 {
-    Task CreateUserAsync(UserDto user);
+    Task AddOrUpdateUserAsync(UserDto user);
     Task<UserDto> GetUserByIdAsync(string userId);
 }

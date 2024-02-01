@@ -20,6 +20,7 @@ using ETransferServer.Auth.Dtos;
 using ETransferServer.Auth.Options;
 using ETransferServer.Grains.Grain.Users;
 using ETransferServer.User.Dtos;
+using NUglify.JavaScript.Syntax;
 using Volo.Abp.DistributedLocking;
 using Volo.Abp.Identity;
 using Volo.Abp.OpenIddict;
@@ -120,6 +121,30 @@ public class SignatureGrantHandler : ITokenExtensionGrant
 
             user = await userManager.GetByIdAsync(userId);
         }
+        else
+        {
+            _logger.LogInformation("check user data consistency, userId:{userId}", user.Id.ToString());
+            var userGrain = _clusterClient.GetGrain<IUserGrain>(user.Id);
+            var userInfo = await userGrain.GetUser();
+            if (!userInfo.Success)
+            {
+                return GetForbidResult(OpenIddictConstants.Errors.ServerError, userInfo.Message);
+            }
+
+            if (userInfo.Data.AddressInfos.IsNullOrEmpty() || userInfo.Data.AddressInfos.Count == 1)
+            {
+                _logger.LogInformation("save user info into grain again, userId:{userId}", user.Id.ToString());
+                var addressInfos = await GetAddressInfosAsync(caHash, version);
+                await userGrain.AddOrUpdateUser(new UserGrainDto()
+                {
+                    UserId = user.Id,
+                    CaHash = caHash,
+                    AppId = AuthConstant.PortKeyAppId,
+                    AddressInfos = addressInfos
+                });
+                _logger.LogInformation("save user success, userId:{userId}", user.Id.ToString());
+            }
+        }
 
         var userClaimsPrincipalFactory = context.HttpContext.RequestServices
             .GetRequiredService<IUserClaimsPrincipalFactory<IdentityUser>>();
@@ -216,7 +241,7 @@ public class SignatureGrantHandler : ITokenExtensionGrant
                 var grain = _clusterClient.GetGrain<IUserGrain>(userId);
 
                 var addressInfos = await GetAddressInfosAsync(caHash, version);
-                await grain.CreateUser(new UserGrainDto()
+                await grain.AddOrUpdateUser(new UserGrainDto()
                 {
                     UserId = userId,
                     CaHash = caHash,
@@ -239,7 +264,9 @@ public class SignatureGrantHandler : ITokenExtensionGrant
     private async Task<List<AddressInfo>> GetAddressInfosAsync(string caHash, string version)
     {
         var addressInfos = new List<AddressInfo>();
-        var holderInfoDto = await GetHolderInfosAsync(_graphQlOptions.Url, caHash);
+        var holderInfoDto =
+            await GetHolderInfosAsync(
+                AuthConstant.PortKeyVersion2.Equals(version) ? _graphQlOptions.Url2 : _graphQlOptions.Url, caHash);
 
         var chainIds = new List<string>();
         if (holderInfoDto != null && !holderInfoDto.CaHolderInfo.IsNullOrEmpty())
@@ -262,7 +289,6 @@ public class SignatureGrantHandler : ITokenExtensionGrant
             catch (Exception e)
             {
                 _logger.LogError(e, "get holder from chain error, caHash:{caHash}", caHash);
-                continue;
             }
         }
 
