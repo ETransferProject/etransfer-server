@@ -77,7 +77,7 @@ public static class AssertHelper
     {
         if (!expression)
         {
-            throw new UserFriendlyException(Format(reason.IsNullOrWhiteSpace() ? ErrorResult.GetMessage(code) : reason, args), code.ToString());
+            throw new UserFriendlyException(Format(code != DefaultErrorCode  ? ErrorResult.GetMessage(code) : reason, args), code.ToString());
         }
     }
     
