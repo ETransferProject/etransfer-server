@@ -49,6 +49,8 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
     private const string CaContractName2 = "Portkey.Contracts.CA2";
     private const string ManagerForwardCall = "ManagerForwardCall";
     private const string TransferToken = "TransferToken";
+    private const string PortKeyVersion = "v1";
+    private const string PortKeyVersion2 = "v2";
     private const int ThirdPartDecimals = 6;
     private const int ElfDecimals = 8;
 
@@ -105,6 +107,9 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
                 "Param is invalid. Please refresh and try again.");
             AssertHelper.IsTrue(_networkInfoOptions.CurrentValue.NetworkMap.ContainsKey(request.Symbol),
                 "Symbol is not exist. Please refresh and try again.");
+            AssertHelper.IsTrue(
+                string.IsNullOrWhiteSpace(request.Version) || PortKeyVersion.Equals(request.Version) ||
+                PortKeyVersion2.Equals(request.Version), "Version is invalid. Please refresh and try again.");
 
             var tokenInfoGrain =
                 _clusterClient.GetGrain<ITokenWithdrawLimitGrain>(
@@ -120,7 +125,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
                 _networkInfoOptions.CurrentValue.WithdrawLimit24H.ToString(CultureInfo.InvariantCulture);
 
             // query async
-            var networkFeeTask = CalculateNetworkFeeAsync(request.ChainId);
+            var networkFeeTask = CalculateNetworkFeeAsync(request.ChainId, request.Version);
             var thirdPartFeeTask = request.Network.IsNullOrEmpty()
                 ? CalculateThirdPartFeesWithCacheAsync(userId, request.Symbol)
                 : CalculateThirdPartFeeAsync(userId, request.Network, request.Symbol);
@@ -250,7 +255,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
     }
 
 
-    public async Task<decimal> CalculateNetworkFeeAsync(string chainId)
+    private async Task<decimal> CalculateNetworkFeeAsync(string chainId, string version)
     {
         var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
         if (userId == null || userId == Guid.Empty) return 0;
@@ -260,9 +265,14 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         AssertHelper.IsTrue(userDto.Success, "User not exists");
 
         var addressInfo = userDto.Data.AddressInfos.FirstOrDefault(addr => addr.ChainId == chainId);
-        AssertHelper.NotEmpty(addressInfo?.Address, "User address of chainId {} empty", chainId);
+        var address = addressInfo?.Address.IsNullOrEmpty() ?? true
+            ? ConvertVirtualAddressToContractAddress(Hash.LoadFromHex(userDto.Data.CaHash),
+                Address.FromBase58(await _contractProvider.GetContractAddressAsync(chainId,
+                    PortKeyVersion2.Equals(version) ? CaContractName2 : CaContractName)))
+            : Address.FromBase58(addressInfo.Address);
+        _logger.LogInformation("Get address when calculate fee: {address}, chainId: {chainId}, version: {version}",
+            address, chainId, version);
 
-        var address = Address.FromBase58(addressInfo.Address);
         var balance = await _contractProvider.CallTransactionAsync<GetBalanceOutput>(chainId,
             SystemContractName.TokenContract,
             "GetBalance",
@@ -298,6 +308,12 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         _logger.LogDebug("Fee of address {Address}, balance={Balance}, freeAllowance={Free}, transactionFee={TxFee}",
             addressInfo.Address, balanceDecimal, allowanceDecimal, transactionFee);
         return Math.Min(balanceDecimal, transactionFee);
+    }
+
+    private Address ConvertVirtualAddressToContractAddress(Hash virtualAddress, Address contractAddress)
+    {
+        return Address.FromPublicKey(contractAddress.Value.Concat(virtualAddress.Value.ToByteArray().ComputeHash())
+            .ToArray());
     }
 
     private async Task<bool> IsAddressSupport(string chainId, string symbol, string address)
