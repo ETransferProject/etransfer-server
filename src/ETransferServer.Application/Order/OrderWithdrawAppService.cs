@@ -270,8 +270,9 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
                 Address.FromBase58(await _contractProvider.GetContractAddressAsync(chainId,
                     PortKeyVersion2.Equals(version) ? CaContractName2 : CaContractName)))
             : Address.FromBase58(addressInfo.Address);
-        _logger.LogInformation("Get address when calculate fee: {address}, chainId: {chainId}, version: {version}",
-            address, chainId, version);
+        _logger.LogInformation(
+            "Get address when calculate fee: {address}, userId: {userId}, chainId: {chainId}, version: {version}",
+            address, userId.ToString(), chainId, version);
 
         var balance = await _contractProvider.CallTransactionAsync<GetBalanceOutput>(chainId,
             SystemContractName.TokenContract,
