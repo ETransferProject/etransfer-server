@@ -33,6 +33,7 @@ public partial class UserDepositGrain
             // which is the first state of the charge order.
             case OrderStatusEnum.FromTransferConfirmed:
             {
+                await AddCheckOrder(orderDto);
                 orderDto.Status = OrderStatusEnum.ToStartTransfer.ToString();
                 await AddOrUpdateOrder(orderDto);
                 break;

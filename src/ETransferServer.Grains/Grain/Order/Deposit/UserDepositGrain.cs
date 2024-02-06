@@ -39,6 +39,7 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
     private IOrderStatusFlowGrain _orderStatusFlowGrain;
     private IUserDepositTxTimerGrain _depositTxTimerGrain;
     private IDepositOrderRetryTimerGrain _depositOrderRetryTimerGrain;
+    private IOrderStatusReminderGrain _orderStatusReminderGrain;
 
     internal JsonSerializerSettings JsonSettings = JsonSettingsBuilder.New()
         .WithAElfTypesConverters()
@@ -77,6 +78,9 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
         _depositOrderRetryTimerGrain =
             GrainFactory.GetGrain<IDepositOrderRetryTimerGrain>(
                 GuidHelper.UniqGuid(nameof(IDepositOrderRetryTimerGrain)));
+        _orderStatusReminderGrain = 
+            GrainFactory.GetGrain<IOrderStatusReminderGrain>(
+                GuidHelper.UniqGuid(nameof(IOrderStatusReminderGrain)));
     }
 
     public async Task AddOrUpdateOrder(DepositOrderDto orderDto, Dictionary<string, string> externalInfo = null)
@@ -98,5 +102,10 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
         _logger.LogInformation("push to stream, type:deposit, orderId:{orderId}, status:{status}", orderDto.Id,
             orderDto.Status);
         await _orderChangeStream.OnNextAsync(orderDto);
+    }
+    
+    public async Task AddCheckOrder(DepositOrderDto orderDto)
+    {
+        await _orderStatusReminderGrain.AddReminder(GuidHelper.GenerateId(orderDto.Id.ToString(), OrderTypeEnum.Deposit.ToString()));
     }
 }

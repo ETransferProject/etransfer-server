@@ -17,6 +17,12 @@ public interface ITokenWithdrawLimitGrain : IGrainWithStringKey
     {
         return GuidHelper.GenerateGrainId(symbol, DateTime.UtcNow.Date.ToUtcString(TimeHelper.DatePattern));
     }
+    
+    public static string GenerateGrainId(string symbol, long timestamp)
+    {
+        return GuidHelper.GenerateGrainId(symbol, 
+            TimeHelper.GetDateTimeFromTimeStamp(timestamp).Date.ToUtcString(TimeHelper.DatePattern));
+    }
 }
 
 public class TokenWithdrawLimitGrain : Grain<TokenLimitState>, ITokenWithdrawLimitGrain

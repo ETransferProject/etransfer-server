@@ -14,7 +14,22 @@
             "Current fee: **{currentFeeAmount} {currentFeeSymbol}**\nCurrent time: **{currentFeeTime}**"
           ]
         }
-      } 
+      },
+      "OrderStatusAlarm" : {
+        "FeiShuGroup": {
+          "WebhookUrl": "",
+          "Secret": "",
+          "TitleTemplate": "orange",
+          "Title": "❗️[test3] Order failed alert",
+          "Contents": [
+            "OrderType: {orderType}",
+            "OrderId: {orderId}\nUserId: {userId}\nTxId: {txId}\nCreateTime: {createTime}\nReason: {reason}",
+            "NetworkFrom: {networkFrom} NetworkTo: {networkTo}\nAmountFrom: {amountFrom} AmountTo: {amountTo}",
+            "FromAddressFrom: {fromAddressFrom}\nFromAddressTo: {fromAddressTo}",
+            "ToAddressFrom: {toAddressFrom}\nToAddressTo: {toAddressTo}"
+          ]
+        }
+      }
     }
   }
   

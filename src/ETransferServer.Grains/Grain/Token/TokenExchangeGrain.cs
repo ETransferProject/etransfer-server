@@ -12,6 +12,7 @@ namespace ETransferServer.Grains.Grain.Token;
 public interface ITokenExchangeGrain : IGrainWithStringKey
 {
     Task<Dictionary<string, TokenExchangeDto>> GetAsync();
+    Task<Dictionary<string, TokenExchangeDto>> GetByProviderAsync(ExchangeProviderName name, string symbol);
 }
 
 public class TokenExchangeGrain : Grain<TokenExchangeState>, ITokenExchangeGrain
@@ -65,6 +66,44 @@ public class TokenExchangeGrain : Grain<TokenExchangeState>, ITokenExchangeGrain
             catch (Exception e)
             {
                 _logger.LogError(e, "Query exchange failed, providerName={ProviderName}", providerName);
+            }
+        }
+
+        await WriteStateAsync();
+
+        return State.ExchangeInfos;
+    }
+
+    public async Task<Dictionary<string, TokenExchangeDto>> GetByProviderAsync(ExchangeProviderName name, string symbol)
+    {
+        var now = DateTime.UtcNow.ToUtcMilliSeconds();
+        if (State.LastModifyTime > 0 && State.ExpireTime > now)
+        {
+            return State.ExchangeInfos;
+        }
+
+        var symbolValue = this.GetPrimaryKeyString().Split(CommonConstant.Underline).ToList();
+        if (symbolValue.Count < 1)
+        {
+            return new Dictionary<string, TokenExchangeDto>();
+        }
+
+        symbolValue = symbolValue.ConvertAll(item => MappingSymbol(item));
+        var asyncTasks = await _exchangeProviders[name.ToString()].LatestAsync(symbolValue, symbol);
+        
+        State.LastModifyTime = now;
+        State.ExpireTime = now + _exchangeOptions.CurrentValue.DataExpireSeconds * 1000;
+        State.ExchangeInfos = new Dictionary<string, TokenExchangeDto>();
+        foreach (var item in asyncTasks)
+        {
+            try
+            {
+                State.ExchangeInfos.Add(item.FromSymbol, item);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "Query exchange failed, token={tokenName}, providerName={providerName}", 
+                    item.FromSymbol, name);
             }
         }
 

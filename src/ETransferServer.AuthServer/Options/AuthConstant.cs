@@ -4,6 +4,8 @@ public class AuthConstant
 {
     public const string GetHolderInfo = "GetHolderInfo";
     public const string PortKeyAppId = "PortKey";
+    public const string PortKeyVersion = "v1";
+    public const string PortKeyVersion2 = "v2";
 }
 
 public static class ContractName

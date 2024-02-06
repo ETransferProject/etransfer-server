@@ -32,6 +32,7 @@ public class OrderController : ETransferController
         _networkAppService = networkAppService;
     }
     
+    [Authorize]
     [HttpGet("network/list")]
     public async Task<GetNetworkListDto> GetNetworkListAsync(GetNetworkListRequestDto request)
     {

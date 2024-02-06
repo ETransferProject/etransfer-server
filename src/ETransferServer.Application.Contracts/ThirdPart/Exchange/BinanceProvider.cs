@@ -69,6 +69,10 @@ public class BinanceProvider : IExchangeProvider
         });
     }
 
+    public async Task<List<TokenExchangeDto>> LatestAsync(List<string> fromSymbol, string toSymbol)
+    {
+        throw new NotSupportedException();
+    }
 
     public async Task<TokenExchangeDto> HistoryAsync(string fromToken, string toToken, long timestamp)
     {

@@ -47,6 +47,8 @@
           "WithdrawInfo": {
             "MinWithdraw": "13",
             "WithdrawFee": 12.61,
+            "WithdrawLocalFee": 0.004,
+            "WithdrawLocalFeeUnit": "ETH",
             "WithdrawLimit24h": "100000",
             "MultiConfirmSeconds": 178,
             "Decimals": 6
@@ -86,6 +88,8 @@
           "WithdrawInfo": {
             "MinWithdraw": "13",
             "WithdrawFee": 12.61,
+            "WithdrawLocalFee": 0.004,
+            "WithdrawLocalFeeUnit": "ETH",
             "WithdrawLimit24h": "100000",
             "MultiConfirmSeconds": 178,
             "Decimals": 6
@@ -124,6 +128,8 @@
           "WithdrawInfo": {
             "MinWithdraw": "3",
             "WithdrawFee": 2.57,
+            "WithdrawLocalFee": 20,
+            "WithdrawLocalFeeUnit": "TRON",
             "WithdrawLimit24h": "100000",
             "MultiConfirmSeconds": 167,
             "Decimals": 6
@@ -162,6 +168,8 @@
           "WithdrawInfo": {
             "MinWithdraw": "1",
             "WithdrawFee": 0.47,
+            "WithdrawLocalFee": 0.0016,
+            "WithdrawLocalFeeUnit": "BNB",
             "WithdrawLimit24h": "100000",
             "MultiConfirmSeconds": 167,
             "Decimals": 18
@@ -201,6 +209,8 @@
           "WithdrawInfo": {
             "MinWithdraw": "1",
             "WithdrawFee": 1,
+            "WithdrawLocalFee": 0.000005,
+            "WithdrawLocalFeeUnit": "ETH",
             "WithdrawLimit24h": "100000",
             "MultiConfirmSeconds": 165,
             "Decimals": 6
@@ -239,6 +249,8 @@
           "WithdrawInfo": {
             "MinWithdraw": "1",
             "WithdrawFee": 0.89,
+            "WithdrawLocalFee": 0.000005,
+            "WithdrawLocalFeeUnit": "SOL",
             "WithdrawLimit24h": "100000",
             "MultiConfirmSeconds": 165,
             "Decimals": 6
@@ -278,6 +290,8 @@
           "WithdrawInfo": {
             "MinWithdraw": "1",
             "WithdrawFee": 0.66,
+            "WithdrawLocalFee": 0.0016,
+            "WithdrawLocalFeeUnit": "MATIC",
             "WithdrawLimit24h": "100000",
             "MultiConfirmSeconds": 166,
             "Decimals": 6
@@ -317,6 +331,8 @@
           "WithdrawInfo": {
             "MinWithdraw": "1",
             "WithdrawFee": 0.48,
+            "WithdrawLocalFee": 0.00007,
+            "WithdrawLocalFeeUnit": "ETH",
             "WithdrawLimit24h": "100000",
             "MultiConfirmSeconds": 166,
             "Decimals": 6
@@ -355,6 +371,8 @@
           "WithdrawInfo": {
             "MinWithdraw": "1",
             "WithdrawFee": 0.38,
+            "WithdrawLocalFee": 0.00125,
+            "WithdrawLocalFeeUnit": "AVAXC",
             "WithdrawLimit24h": "100000",
             "MultiConfirmSeconds": 166,
             "Decimals": 6

@@ -72,6 +72,11 @@ public class OkxProvider : IExchangeProvider
         };
     }
 
+    public async Task<List<TokenExchangeDto>> LatestAsync(List<string> fromSymbol, string toSymbol)
+    {
+        throw new NotSupportedException();
+    }
+
     public async Task<TokenExchangeDto> HistoryAsync(string fromSymbol, string toSymbol, long timestamp)
     {
         // The first k-line after one minute of inquiry returns the latest price.

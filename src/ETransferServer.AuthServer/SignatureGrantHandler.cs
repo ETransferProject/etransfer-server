@@ -20,6 +20,7 @@ using ETransferServer.Auth.Dtos;
 using ETransferServer.Auth.Options;
 using ETransferServer.Grains.Grain.Users;
 using ETransferServer.User.Dtos;
+using NUglify.JavaScript.Syntax;
 using Volo.Abp.DistributedLocking;
 using Volo.Abp.Identity;
 using Volo.Abp.OpenIddict;
@@ -47,8 +48,9 @@ public class SignatureGrantHandler : ITokenExtensionGrant
         var caHash = context.Request.GetParameter("ca_hash").ToString();
         var chainId = context.Request.GetParameter("chain_id").ToString();
         var scope = context.Request.GetParameter("scope").ToString();
+        var version = context.Request.GetParameter("version")?.ToString();
 
-        var invalidParamResult = CheckParams(publicKeyVal, signatureVal, plainText, caHash, chainId, scope);
+        var invalidParamResult = CheckParams(publicKeyVal, signatureVal, plainText, caHash, chainId, scope, version);
         if (invalidParamResult != null)
         {
             return invalidParamResult;
@@ -56,8 +58,8 @@ public class SignatureGrantHandler : ITokenExtensionGrant
 
         _logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<SignatureGrantHandler>>();
         _logger.LogInformation(
-            "publicKeyVal:{publicKeyVal}, signatureVal:{signatureVal}, plainText:{plainText}, caHash:{caHash}, chainId:{chainId}",
-            publicKeyVal, signatureVal, plainText, caHash, chainId);
+            "publicKeyVal:{publicKeyVal}, signatureVal:{signatureVal}, plainText:{plainText}, caHash:{caHash}, chainId:{chainId}, version:{version}",
+            publicKeyVal, signatureVal, plainText, caHash, chainId, version);
 
         var rawText = Encoding.UTF8.GetString(ByteArrayHelper.HexStringToByteArray(plainText));
         var nonce = rawText.TrimEnd().Substring(plainText.IndexOf("Nonce:") + 7);
@@ -95,7 +97,9 @@ public class SignatureGrantHandler : ITokenExtensionGrant
         _chainOptions = context.HttpContext.RequestServices.GetRequiredService<IOptionsSnapshot<ChainOptions>>()
             .Value;
 
-        var managerCheck = await CheckAddressAsync(chainId, _graphQlOptions.Url, caHash, address, _chainOptions);
+        var managerCheck = await CheckAddressAsync(chainId,
+   AuthConstant.PortKeyVersion2.Equals(version) ? _graphQlOptions.Url2 : _graphQlOptions.Url,
+            caHash, address, version, _chainOptions);
         if (!managerCheck.HasValue || !managerCheck.Value)
         {
             _logger.LogError(
@@ -109,13 +113,37 @@ public class SignatureGrantHandler : ITokenExtensionGrant
         if (user == null)
         {
             var userId = Guid.NewGuid();
-            var createUserResult = await CreateUserAsync(userManager, userId, caHash);
+            var createUserResult = await CreateUserAsync(userManager, userId, caHash, version);
             if (!createUserResult)
             {
                 return GetForbidResult(OpenIddictConstants.Errors.ServerError, "Create user failed.");
             }
 
             user = await userManager.GetByIdAsync(userId);
+        }
+        else
+        {
+            _logger.LogInformation("check user data consistency, userId:{userId}", user.Id.ToString());
+            var userGrain = _clusterClient.GetGrain<IUserGrain>(user.Id);
+            var userInfo = await userGrain.GetUser();
+            if (!userInfo.Success)
+            {
+                return GetForbidResult(OpenIddictConstants.Errors.ServerError, userInfo.Message);
+            }
+
+            if (userInfo.Data.AddressInfos.IsNullOrEmpty() || userInfo.Data.AddressInfos.Count == 1)
+            {
+                _logger.LogInformation("save user info into grain again, userId:{userId}", user.Id.ToString());
+                var addressInfos = await GetAddressInfosAsync(caHash, version);
+                await userGrain.AddOrUpdateUser(new UserGrainDto()
+                {
+                    UserId = user.Id,
+                    CaHash = caHash,
+                    AppId = AuthConstant.PortKeyAppId,
+                    AddressInfos = addressInfos
+                });
+                _logger.LogInformation("save user success, userId:{userId}", user.Id.ToString());
+            }
         }
 
         var userClaimsPrincipalFactory = context.HttpContext.RequestServices
@@ -134,7 +162,7 @@ public class SignatureGrantHandler : ITokenExtensionGrant
     }
 
     private ForbidResult CheckParams(string publicKeyVal, string signatureVal, string plainText, string caHash,
-        string chainId, string scope)
+        string chainId, string scope, string version)
     {
         var errors = new List<string>();
         if (string.IsNullOrWhiteSpace(publicKeyVal))
@@ -166,6 +194,12 @@ public class SignatureGrantHandler : ITokenExtensionGrant
         {
             errors.Add("invalid parameter scope.");
         }
+        
+        if (!(string.IsNullOrWhiteSpace(version) || AuthConstant.PortKeyVersion.Equals(version) || 
+              AuthConstant.PortKeyVersion2.Equals(version)))
+        {
+            errors.Add("invalid parameter version.");
+        }
 
         if (errors.Count > 0)
         {
@@ -190,7 +224,7 @@ public class SignatureGrantHandler : ITokenExtensionGrant
         return message.Contains(',') ? message.TrimEnd().TrimEnd(',') : message;
     }
 
-    private async Task<bool> CreateUserAsync(IdentityUserManager userManager, Guid userId, string caHash)
+    private async Task<bool> CreateUserAsync(IdentityUserManager userManager, Guid userId, string caHash, string version)
     {
         var result = false;
         await using var handle =
@@ -206,8 +240,8 @@ public class SignatureGrantHandler : ITokenExtensionGrant
                 _logger.LogInformation("save user info into grain, userId:{userId}", userId.ToString());
                 var grain = _clusterClient.GetGrain<IUserGrain>(userId);
 
-                var addressInfos = await GetAddressInfosAsync(caHash);
-                await grain.CreateUser(new UserGrainDto()
+                var addressInfos = await GetAddressInfosAsync(caHash, version);
+                await grain.AddOrUpdateUser(new UserGrainDto()
                 {
                     UserId = userId,
                     CaHash = caHash,
@@ -227,10 +261,12 @@ public class SignatureGrantHandler : ITokenExtensionGrant
         return result;
     }
 
-    private async Task<List<AddressInfo>> GetAddressInfosAsync(string caHash)
+    private async Task<List<AddressInfo>> GetAddressInfosAsync(string caHash, string version)
     {
         var addressInfos = new List<AddressInfo>();
-        var holderInfoDto = await GetHolderInfosAsync(_graphQlOptions.Url, caHash);
+        var holderInfoDto =
+            await GetHolderInfosAsync(
+                AuthConstant.PortKeyVersion2.Equals(version) ? _graphQlOptions.Url2 : _graphQlOptions.Url, caHash);
 
         var chainIds = new List<string>();
         if (holderInfoDto != null && !holderInfoDto.CaHolderInfo.IsNullOrEmpty())
@@ -247,20 +283,19 @@ public class SignatureGrantHandler : ITokenExtensionGrant
         {
             try
             {
-                var addressInfo = await GetAddressInfoAsync(chainId, caHash);
+                var addressInfo = await GetAddressInfoAsync(chainId, caHash, version);
                 addressInfos.Add(addressInfo);
             }
             catch (Exception e)
             {
                 _logger.LogError(e, "get holder from chain error, caHash:{caHash}", caHash);
-                continue;
             }
         }
 
         return addressInfos;
     }
 
-    private async Task<AddressInfo> GetAddressInfoAsync(string chainId, string caHash)
+    private async Task<AddressInfo> GetAddressInfoAsync(string chainId, string caHash, string version)
     {
         var param = new GetHolderInfoInput
         {
@@ -269,8 +304,8 @@ public class SignatureGrantHandler : ITokenExtensionGrant
         };
 
         var output =
-            await CallTransactionAsync<GetHolderInfoOutput>(chainId, AuthConstant.GetHolderInfo, param, false,
-                _chainOptions);
+            await CallTransactionAsync<GetHolderInfoOutput>(chainId, AuthConstant.GetHolderInfo, version, 
+                param, false, _chainOptions);
 
         return new AddressInfo()
         {
@@ -300,13 +335,13 @@ public class SignatureGrantHandler : ITokenExtensionGrant
     }
 
     private async Task<bool?> CheckAddressAsync(string chainId, string graphQlUrl, string caHash, string manager,
-        ChainOptions chainOptions)
+        string version, ChainOptions chainOptions)
     {
         var graphQlResult = await CheckAddressFromGraphQlAsync(graphQlUrl, caHash, manager);
         if (!graphQlResult.HasValue || !graphQlResult.Value)
         {
             _logger.LogDebug("graphql is invalid.");
-            return await CheckAddressFromContractAsync(chainId, caHash, manager, chainOptions);
+            return await CheckAddressFromContractAsync(chainId, caHash, manager, version, chainOptions);
         }
 
         return true;
@@ -320,7 +355,7 @@ public class SignatureGrantHandler : ITokenExtensionGrant
         return caHolder?.Any(t => t.Address == managerAddress);
     }
 
-    private async Task<bool?> CheckAddressFromContractAsync(string chainId, string caHash, string manager,
+    private async Task<bool?> CheckAddressFromContractAsync(string chainId, string caHash, string manager, string version,
         ChainOptions chainOptions)
     {
         var param = new GetHolderInfoInput
@@ -330,13 +365,13 @@ public class SignatureGrantHandler : ITokenExtensionGrant
         };
 
         var output =
-            await CallTransactionAsync<GetHolderInfoOutput>(chainId, AuthConstant.GetHolderInfo, param, false,
-                chainOptions);
+            await CallTransactionAsync<GetHolderInfoOutput>(chainId, AuthConstant.GetHolderInfo, version, 
+                param, false, chainOptions);
 
         return output?.ManagerInfos?.Any(t => t.Address.ToBase58() == manager);
     }
 
-    private async Task<T> CallTransactionAsync<T>(string chainId, string methodName, IMessage param,
+    private async Task<T> CallTransactionAsync<T>(string chainId, string methodName, string version, IMessage param,
         bool isCrossChain, ChainOptions chainOptions) where T : class, IMessage<T>, new()
     {
         try
@@ -350,7 +385,7 @@ public class SignatureGrantHandler : ITokenExtensionGrant
             var contractAddress = isCrossChain
                 ? (await client.GetContractAddressByNameAsync(HashHelper.ComputeFrom(ContractName.CrossChain)))
                 .ToBase58()
-                : chainInfo.ContractAddress;
+                : AuthConstant.PortKeyVersion2.Equals(version) ? chainInfo.ContractAddress2: chainInfo.ContractAddress;
 
             var transaction =
                 await client.GenerateTransactionAsync(address, contractAddress,

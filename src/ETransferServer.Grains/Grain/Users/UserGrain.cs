@@ -8,7 +8,7 @@ namespace ETransferServer.Grains.Grain.Users;
 
 public interface IUserGrain : IGrainWithGuidKey
 {
-    Task<GrainResultDto<UserGrainDto>> CreateUser(UserGrainDto input);
+    Task<GrainResultDto<UserGrainDto>> AddOrUpdateUser(UserGrainDto input);
     Task<GrainResultDto<UserGrainDto>> GetUser();
 }
 
@@ -35,19 +35,21 @@ public class UserGrain : Grain<UserState>, IUserGrain
         await base.OnDeactivateAsync();
     }
 
-    public async Task<GrainResultDto<UserGrainDto>> CreateUser(UserGrainDto input)
+    public async Task<GrainResultDto<UserGrainDto>> AddOrUpdateUser(UserGrainDto input)
     {
         State.Id = this.GetPrimaryKey();
         State.UserId = this.GetPrimaryKey();
         State.AddressInfos = input.AddressInfos;
         State.AppId = input.AppId;
         State.CaHash = input.CaHash;
-        State.CreateTime = new DateTimeOffset(DateTime.UtcNow).ToUnixTimeMilliseconds();
-        State.ModificationTime = State.CreateTime;
-
+        State.ModificationTime = new DateTimeOffset(DateTime.UtcNow).ToUnixTimeMilliseconds();
+        State.CreateTime = State.CreateTime > 0
+            ? State.CreateTime
+            : State.ModificationTime;
+        
         await WriteStateAsync();
 
-        await _userAppService.CreateUserAsync(_objectMapper.Map<UserState, UserDto>(State));
+        await _userAppService.AddOrUpdateUserAsync(_objectMapper.Map<UserState, UserDto>(State));
         return new GrainResultDto<UserGrainDto>()
         {
             Success = true,
@@ -62,7 +64,7 @@ public class UserGrain : Grain<UserState>, IUserGrain
             return Task.FromResult(new GrainResultDto<UserGrainDto>()
             {
                 Success = false,
-                Message = "user not exists."
+                Message = "User not exists."
             });
         }
         

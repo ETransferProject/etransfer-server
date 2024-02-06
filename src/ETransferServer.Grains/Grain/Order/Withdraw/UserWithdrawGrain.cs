@@ -56,6 +56,7 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
     private IOrderStatusFlowGrain _orderStatusFlowGrain;
     private IUserWithdrawTxTimerGrain _withdrawTimerGrain;
     private IWithdrawTimerGrain _withdrawQueryTimerGrain;
+    private IOrderStatusReminderGrain _orderStatusReminderGrain;
 
     private readonly IContractProvider _contractProvider;
     private readonly IUserWithdrawProvider _userWithdrawProvider;
@@ -101,26 +102,28 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         _withdrawQueryTimerGrain =
             GrainFactory.GetGrain<IWithdrawTimerGrain>(
                 GuidHelper.UniqGuid(nameof(IWithdrawTimerGrain)));
+        _orderStatusReminderGrain = 
+            GrainFactory.GetGrain<IOrderStatusReminderGrain>(
+                GuidHelper.UniqGuid(nameof(IOrderStatusReminderGrain)));
     }
 
     public async Task<WithdrawOrderDto> CreateOrder(WithdrawOrderDto withdrawOrderDto)
     {
-        AssertHelper.NotNull(withdrawOrderDto, "Empty withdraw order");
+        AssertHelper.NotNull(withdrawOrderDto, ErrorResult.TransactionFailCode);
         AssertHelper.IsTrue(withdrawOrderDto.OrderType == OrderTypeEnum.Withdraw.ToString(),
-            "Invalid order type {OrderType}", withdrawOrderDto.OrderType);
-        AssertHelper.NotNull(withdrawOrderDto.FromTransfer, "Invalid from transfer info");
-        AssertHelper.NotEmpty(withdrawOrderDto.FromTransfer.ChainId, "Invalid from transfer chainId");
-        AssertHelper.NotEmpty(withdrawOrderDto.RawTransaction, "Invalid rawTransaction");
-        AssertHelper.NotNull(withdrawOrderDto.ToTransfer, "Invalid toTransfer");
-        AssertHelper.NotNull(withdrawOrderDto.ToTransfer.Network, "Invalid toTransfer network");
-        AssertHelper.NotNull(withdrawOrderDto.ToTransfer.ToAddress, "Invalid toTransfer toAddress");
-        AssertHelper.NotNull(withdrawOrderDto.ToTransfer.Symbol, "Invalid toTransfer symbol");
-        AssertHelper.IsTrue(withdrawOrderDto.ToTransfer.Amount > 0, "Invalid toTransfer amount");
+            ErrorResult.TransactionFailCode);
+        AssertHelper.NotNull(withdrawOrderDto.FromTransfer, ErrorResult.TransactionFailCode);
+        AssertHelper.NotEmpty(withdrawOrderDto.FromTransfer.ChainId, ErrorResult.TransactionFailCode);
+        AssertHelper.NotEmpty(withdrawOrderDto.RawTransaction, ErrorResult.TransactionFailCode);
+        AssertHelper.NotNull(withdrawOrderDto.ToTransfer, ErrorResult.TransactionFailCode);
+        AssertHelper.NotNull(withdrawOrderDto.ToTransfer.Network, ErrorResult.TransactionFailCode);
+        AssertHelper.NotNull(withdrawOrderDto.ToTransfer.ToAddress, ErrorResult.TransactionFailCode);
+        AssertHelper.NotNull(withdrawOrderDto.ToTransfer.Symbol, ErrorResult.TransactionFailCode);
+        AssertHelper.IsTrue(withdrawOrderDto.ToTransfer.Amount > 0, ErrorResult.TransactionFailCode);
         
         var coinInfo = _withdrawNetworkOptions.CurrentValue.GetNetworkInfo(withdrawOrderDto.ToTransfer.Network,
             withdrawOrderDto.ToTransfer.Symbol);
-        AssertHelper.IsTrue(coinInfo.Decimal >= 0, "Invalid withdraw coin {Coin} decimal: {Decimals}", 
-            coinInfo.Coin, coinInfo.Decimal);
+        AssertHelper.IsTrue(coinInfo.Decimal >= 0, ErrorResult.TransactionFailCode);
         
         withdrawOrderDto.Id = this.GetPrimaryKey();
         withdrawOrderDto.Status = OrderStatusEnum.Created.ToString();
@@ -133,7 +136,11 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
     {
         // save withdraw order to Grain
         var res = await _recordGrain.AddOrUpdateAsync(orderDto);
-        AssertHelper.IsTrue(res.Success, "save order data error, orderId = {Id}", orderDto.Id);
+        if (!res.Success)
+        {
+            _logger.LogError("save order data error, orderId = {Id}", orderDto.Id);
+        }
+        AssertHelper.IsTrue(res.Success, ErrorResult.OrderSaveFailCode);
 
         // save order status flow
         var orderFlowRes = await _orderStatusFlowGrain.AddAsync(orderDto.Status, externalInfo);
@@ -150,5 +157,10 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         await _orderChangeStream.OnNextAsync(orderDto);
 
         return res.Value;
+    }
+    
+    public async Task AddCheckOrder(WithdrawOrderDto orderDto)
+    {
+        await _orderStatusReminderGrain.AddReminder(GuidHelper.GenerateId(orderDto.Id.ToString(), OrderTypeEnum.Withdraw.ToString()));
     }
 }

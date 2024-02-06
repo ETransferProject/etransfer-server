@@ -36,7 +36,6 @@ using Volo.Abp.Auditing;
 using Volo.Abp.Caching;
 using Volo.Abp.ObjectMapping;
 using Volo.Abp.Users;
-using ErrorCode = ETransferServer.Common.ErrorCode;
 using NetworkOptions = ETransferServer.Options.NetworkOptions;
 
 namespace ETransferServer.Order;
@@ -50,6 +49,8 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
     private const string CaContractName2 = "Portkey.Contracts.CA2";
     private const string ManagerForwardCall = "ManagerForwardCall";
     private const string TransferToken = "TransferToken";
+    private const string PortKeyVersion = "v1";
+    private const string PortKeyVersion2 = "v2";
     private const int ThirdPartDecimals = 6;
     private const int ElfDecimals = 8;
 
@@ -106,6 +107,9 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
                 "Param is invalid. Please refresh and try again.");
             AssertHelper.IsTrue(_networkInfoOptions.CurrentValue.NetworkMap.ContainsKey(request.Symbol),
                 "Symbol is not exist. Please refresh and try again.");
+            AssertHelper.IsTrue(
+                string.IsNullOrWhiteSpace(request.Version) || PortKeyVersion.Equals(request.Version) ||
+                PortKeyVersion2.Equals(request.Version), "Version is invalid. Please refresh and try again.");
 
             var tokenInfoGrain =
                 _clusterClient.GetGrain<ITokenWithdrawLimitGrain>(
@@ -121,7 +125,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
                 _networkInfoOptions.CurrentValue.WithdrawLimit24H.ToString(CultureInfo.InvariantCulture);
 
             // query async
-            var networkFeeTask = CalculateNetworkFeeAsync(request.ChainId);
+            var networkFeeTask = CalculateNetworkFeeAsync(request.ChainId, request.Version);
             var thirdPartFeeTask = request.Network.IsNullOrEmpty()
                 ? CalculateThirdPartFeesWithCacheAsync(userId, request.Symbol)
                 : CalculateThirdPartFeeAsync(userId, request.Network, request.Symbol);
@@ -213,28 +217,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
     // feeAmount in symbol => expire at milliseconds timestamp
     private async Task<Tuple<decimal, long>> CalculateThirdPartFeeAsync(Guid userId, string network, string symbol)
     {
-        var coBoCoinGrain = _clusterClient.GetGrain<ICoBoCoinGrain>(ICoBoCoinGrain.Id( network, symbol));
-        var coin = await coBoCoinGrain.GetAsync();
-        AssertHelper.NotNull(coin, "CoBo coin detail not found");
-        _logger.LogDebug("CoBo AbsEstimateFee={Fee}, FeeCoin={Coin}, expireTime={Ts}", coin.AbsEstimateFee,
-            coin.FeeCoin, coin.ExpireTime);
-        var feeCoin = coin.FeeCoin.Split(CommonConstant.Underline);
-        var feeSymbol = feeCoin.Length == 1 ? feeCoin[0] : feeCoin[1];
-
-        var exchangeSymbolPair = string.Join(CommonConstant.Underline, feeSymbol, symbol);
-        var exchangeGrain = _clusterClient.GetGrain<ITokenExchangeGrain>(exchangeSymbolPair);
-        var exchange = await exchangeGrain.GetAsync();
-        AssertHelper.NotEmpty(exchange, "Exchange data not found {}", exchangeSymbolPair);
-
-        var avgExchange = exchange.Values
-            .Where(ex => ex.Exchange > 0)
-            .Average(ex => ex.Exchange);
-        AssertHelper.IsTrue(avgExchange > 0, "Exchange amount error {}" + avgExchange);
-        _logger.LogDebug("Exchange: {Exchange}", string.Join(CommonConstant.Comma,
-            exchange.Select(kv => string.Join(CommonConstant.Hyphen, kv.Key, kv.Value.FromSymbol, kv.Value.ToSymbol,
-                kv.Value.Exchange, kv.Value.Timestamp)).ToArray()));
-
-        var estimateFee = coin.AbsEstimateFee.SafeToDecimal() * avgExchange;
+        var (estimateFee, coin) = await _networkAppService.CalculateNetworkFeeAsync(network, symbol);
 
         var coinFeeCacheKey = CacheKey(FeeInfo.FeeName.CoBoFee, userId.ToString(), network, symbol);
         await _coBoCoinCache.SetAsync(coinFeeCacheKey, new CoBoCoinDto { AbsEstimateFee = estimateFee.ToString(ThirdPartDecimals, DecimalHelper.RoundingOption.Ceiling) }, 
@@ -272,7 +255,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
     }
 
 
-    public async Task<decimal> CalculateNetworkFeeAsync(string chainId)
+    private async Task<decimal> CalculateNetworkFeeAsync(string chainId, string version)
     {
         var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
         if (userId == null || userId == Guid.Empty) return 0;
@@ -282,9 +265,15 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         AssertHelper.IsTrue(userDto.Success, "User not exists");
 
         var addressInfo = userDto.Data.AddressInfos.FirstOrDefault(addr => addr.ChainId == chainId);
-        AssertHelper.NotEmpty(addressInfo?.Address, "User address of chainId {} empty", chainId);
+        var address = addressInfo?.Address.IsNullOrEmpty() ?? true
+            ? ConvertVirtualAddressToContractAddress(Hash.LoadFromHex(userDto.Data.CaHash),
+                Address.FromBase58(await _contractProvider.GetContractAddressAsync(chainId,
+                    PortKeyVersion2.Equals(version) ? CaContractName2 : CaContractName)))
+            : Address.FromBase58(addressInfo.Address);
+        _logger.LogInformation(
+            "Get address when calculate fee: {address}, userId: {userId}, chainId: {chainId}, version: {version}",
+            address, userId.ToString(), chainId, version);
 
-        var address = Address.FromBase58(addressInfo.Address);
         var balance = await _contractProvider.CallTransactionAsync<GetBalanceOutput>(chainId,
             SystemContractName.TokenContract,
             "GetBalance",
@@ -322,11 +311,17 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         return Math.Min(balanceDecimal, transactionFee);
     }
 
+    private Address ConvertVirtualAddressToContractAddress(Hash virtualAddress, Address contractAddress)
+    {
+        return Address.FromPublicKey(contractAddress.Value.Concat(virtualAddress.Value.ToByteArray().ComputeHash())
+            .ToArray());
+    }
+
     private async Task<bool> IsAddressSupport(string chainId, string symbol, string address)
     {
         try
         {
-            var network = await _networkAppService.GetNetworkListAsync(new GetNetworkListRequestDto
+            var network = await _networkAppService.GetNetworkListWithLocalFeeAsync(new GetNetworkListRequestDto
             {
                 Type = OrderTypeEnum.Withdraw.ToString(),
                 ChainId = chainId,
@@ -335,7 +330,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             });
             return network != null && !network.NetworkList.IsNullOrEmpty();
         }
-        catch (UserFriendlyException e)
+        catch (Exception e)
         {
             return false;
         }
@@ -345,49 +340,44 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
     {
         try {
             var userId = CurrentUser.GetId();
-            if (request.FromChainId != ChainId.AELF && request.FromChainId != ChainId.tDVV &&
-                request.FromChainId != ChainId.tDVW)
-            {
-                throw new UserFriendlyException("Param is invalid. Please refresh and try again.");
-            }
-
+            AssertHelper.IsTrue(request.FromChainId == ChainId.AELF || request.FromChainId == ChainId.tDVV ||
+                request.FromChainId == ChainId.tDVW, ErrorResult.ChainIdInvalidCode);
             AssertHelper.IsTrue(_networkInfoOptions.CurrentValue.NetworkMap.ContainsKey(request.Symbol),
-                "Symbol is not exist. Please refresh and try again.");
+                ErrorResult.SymbolInvalidCode);
             AssertHelper.IsTrue(await IsAddressSupport(request.FromChainId, request.Symbol, request.ToAddress),
-                "Address invalid");
+                ErrorResult.AddressInvalidCode);
 
             var networkConfig = _networkInfoOptions.CurrentValue.NetworkMap[request.Symbol]
                 .FirstOrDefault(t => t.NetworkInfo.Network == request.Network);
-            AssertHelper.NotNull(networkConfig, "Network is not exist. Please refresh and try again.");
+            AssertHelper.NotNull(networkConfig, ErrorResult.NetworkInvalidCode);
 
             var userGrain = _clusterClient.GetGrain<IUserGrain>(userId);
             var userDto = await userGrain.GetUser();
-            AssertHelper.IsTrue(userDto.Success, "User not exists. Please refresh and try again.");
+            AssertHelper.IsTrue(userDto.Success, ErrorResult.JwtInvalidCode);
 
             var coBoCoinCacheKey = CacheKey(FeeInfo.FeeName.CoBoFee, userId.ToString(), request.Network, request.Symbol);
             var thirdPartFeeDto = await _coBoCoinCache.GetAsync(coBoCoinCacheKey);
-            AssertHelper.IsTrue(thirdPartFeeDto != null, ErrorCode.FeeExpired, "Your transaction has expired. Please initiate a new transaction to proceed.");
+            AssertHelper.IsTrue(thirdPartFeeDto != null, ErrorResult.FeeExpiredCode);
             _logger.LogDebug("Cobo fee get cache: {fee}", thirdPartFeeDto.AbsEstimateFee);
         
             var inputThirdPartFee = thirdPartFeeDto.AbsEstimateFee.SafeToDecimal(-1);
-            AssertHelper.IsTrue(inputThirdPartFee >= 0, "Invalid thirdPart fee");
+            AssertHelper.IsTrue(inputThirdPartFee >= 0, ErrorResult.FeeInvalidCode);
 
             // query fees async
             var thirdPartFee = (await CalculateThirdPartFeeAsync(userId, request.Network, request.Symbol)).Item1;
             AssertHelper.IsTrue(
                 Math.Abs(inputThirdPartFee - thirdPartFee) / thirdPartFee <=
                 _withdrawOptions.CurrentValue.FeeFluctuationPercent,
-                ErrorCode.TransactionFeeFluctuatedSignificantly,
-                "Transaction failed due to a sudden rise in transaction fees. Please initiate the transaction again.");
+                ErrorResult.FeeExceedCode, null, request.Network);
 
             // withdraw fee to thirdPart
             var withdrawAmount = request.Amount - inputThirdPartFee;
-            AssertHelper.IsTrue(withdrawAmount > 0, "Insufficient withdraw amount");
+            AssertHelper.IsTrue(withdrawAmount > 0, ErrorResult.AmountInsufficientCode);
 
             var minWithdraw = Math.Max(thirdPartFee, _withdrawOptions.CurrentValue.MinThirdPartFee)
                 .ToString(2, DecimalHelper.RoundingOption.Ceiling)
                 .SafeToDecimal();
-            AssertHelper.IsTrue(request.Amount >= minWithdraw, "Insufficient withdraw amount");
+            AssertHelper.IsTrue(request.Amount >= minWithdraw, ErrorResult.AmountInsufficientCode);
             
             // Verify that the transaction information matches the order
             var transaction =
@@ -399,15 +389,14 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             var tokenGrain = _clusterClient.GetGrain<ITokenGrain>(ITokenGrain.GenGrainId(transferTokenInput.Symbol,
                 request.FromChainId));
             var tokenDto = await tokenGrain.GetToken();
-            AssertHelper.NotNull(tokenDto, "Symbol token not found {Symbol}", transferTokenInput.Symbol);
-            AssertHelper.IsTrue(transferTokenInput.Symbol == request.Symbol, "Invalid symbol of transferTokenInput");
+            AssertHelper.NotNull(tokenDto, ErrorResult.SymbolNullCode);
+            AssertHelper.IsTrue(transferTokenInput.Symbol == request.Symbol, ErrorResult.SymbolNotEqualCode);
 
             var expectedAmount = request.Amount * (decimal)Math.Pow(10, tokenDto.Decimals);
-            AssertHelper.IsTrue(transferTokenInput.Amount == expectedAmount, "Invalid amount of transferTokenInput");
+            AssertHelper.IsTrue(transferTokenInput.Amount == expectedAmount, ErrorResult.AmountNotEqualCode);
 
             // Do create
-            return await DoCreateOrderAsync(request, transaction, withdrawAmount,
-                networkConfig.WithdrawInfo.WithdrawFee.ToString());
+            return await DoCreateOrderAsync(request, transaction, withdrawAmount, thirdPartFeeDto.AbsEstimateFee);
         }
         catch (UserFriendlyException e)
         {
@@ -431,8 +420,9 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         // amount limit
         var tokenInfoGrain =
             _clusterClient.GetGrain<ITokenWithdrawLimitGrain>(ITokenWithdrawLimitGrain.GenerateGrainId(request.Symbol));
-        AssertHelper.IsTrue(await tokenInfoGrain.Acquire(request.Amount),
-            "Amount RemainingLimit is no enough. Please refresh and try again.");
+        AssertHelper.IsTrue(await tokenInfoGrain.Acquire(request.Amount), ErrorResult.WithdrawLimitInsufficientCode, null,
+            (await tokenInfoGrain.GetLimit()).RemainingLimit, TimeHelper.GetHourDiff(DateTime.UtcNow,
+                DateTime.UtcNow.AddDays(1).Date));
         try
         {
             var orderId = Guid.NewGuid();
@@ -485,7 +475,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         var rawTransactionHash = transaction.GetHash().ToHex();
         var transactionGrain = _clusterClient.GetGrain<ITransactionGrain>(rawTransactionHash);
         var saveTransactionResult = await transactionGrain.Create();
-        AssertHelper.IsTrue(saveTransactionResult.Success, "Transaction id exits TxId={TxId}", rawTransactionHash);
+        AssertHelper.IsTrue(saveTransactionResult.Success, ErrorResult.TransactionFailCode);
     }
 
     public async Task<bool> AddOrUpdateAsync(WithdrawOrderDto dto)
