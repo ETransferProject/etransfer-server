@@ -75,9 +75,10 @@ public class UserAddressService : ApplicationService, IUserAddressService
             // first get new address from non-first evm lists of the config, then get from first evm of the config.
             var evmsList = evmCoins.FindAll(e => e != evmCoins.First()).ConvertAll(e => e.Split(DepositAddressOptions.DefaultDelimiter)[0]);
             var firstList = new List<string> { evmCoins.First().Split(DepositAddressOptions.DefaultDelimiter)[0] };
+            var firstSymbol = evmCoins.First().Split(DepositAddressOptions.DefaultDelimiter)[1];
             return evmsList.Count > 0 ? 
-                await GetNewAddressAsync(evmsList, input.Symbol)?? await GetNewAddressAsync(firstList, input.Symbol) 
-                : await GetNewAddressAsync(firstList, input.Symbol);
+                await GetNewAddressAsync(evmsList, firstSymbol)?? await GetNewAddressAsync(firstList, firstSymbol) 
+                : await GetNewAddressAsync(firstList, firstSymbol);
         }
         
         return await GetNewAddressAsync(new List<string>{ input.NetWork }, input.Symbol);

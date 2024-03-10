@@ -67,6 +67,7 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
                 foreach (var networkDto in getNetworkListDto.NetworkList)
                 {
                     networkDto.WithdrawFee = null;
+                    networkDto.WithdrawFeeUnit = request.Symbol;
                 }
                 _logger.LogError(e, "Get withdraw fee failed by CoinGecko.");
             }
@@ -118,7 +119,7 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
         foreach (var networkDto in getNetworkListDto.NetworkList)
         {
             if (!withdrawInfo.TryGetValue(networkDto.Network, out var withdraw)) continue;
-            networkDto.WithdrawFeeUnit = request.Symbol;
+            networkDto.WithdrawFeeUnit = withdraw.WithdrawLocalFeeUnit;
             networkDto.WithdrawFee = withdraw.WithdrawLocalFee.ToString(CultureInfo.InvariantCulture);
         }
         
@@ -174,8 +175,9 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
 
         foreach (var network in networkList)
         {
-            network.WithdrawFee = (network.WithdrawFee.SafeToDecimal() * exchange[_coinGeckoOptions.CoinIdMapping[network.Network]].Exchange)
+            network.WithdrawFee = (network.WithdrawFee.SafeToDecimal() * exchange[_coinGeckoOptions.CoinIdMapping[network.WithdrawFeeUnit]].Exchange)
                 .ToString(ThirdPartDigitals, ThirdPartDecimals, DecimalHelper.RoundingOption.Ceiling);
+            network.WithdrawFeeUnit = symbol;
         }
 
         return networkList;
