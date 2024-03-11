@@ -11,6 +11,11 @@ namespace ETransferServer.Grains.Grain.Token;
 
 public interface ITokenExchangeGrain : IGrainWithStringKey
 {
+    public static string GetGrainId(string fromSymbol, string toSymbol)
+    {
+        return string.Join(CommonConstant.Underline, fromSymbol, toSymbol);
+    }
+
     Task<Dictionary<string, TokenExchangeDto>> GetAsync();
     Task<Dictionary<string, TokenExchangeDto>> GetByProviderAsync(ExchangeProviderName name, string symbol);
 }
@@ -48,12 +53,18 @@ public class TokenExchangeGrain : Grain<TokenExchangeState>, ITokenExchangeGrain
         }
 
         var asyncTasks = new Dictionary<string, Task<TokenExchangeDto>>();
-        foreach (var provider in _exchangeProviders.Values)
+        var fromSymbol = MappingSymbol(symbolValue[0].ToUpper());
+        var toSymbol = MappingSymbol(symbolValue[1].ToUpper());
+        var providerOption =
+            _exchangeOptions.CurrentValue.SymbolProviders.GetValueOrDefault(fromSymbol,
+                _exchangeOptions.CurrentValue.DefaultProviders);
+        var providers = _exchangeProviders.Values.Where(provider => providerOption.Contains(provider.Name().ToString()))
+            .ToList();
+        foreach (var provider in providers)
         {
-            asyncTasks[provider.Name().ToString()] =
-                provider.LatestAsync(MappingSymbol(symbolValue[0].ToUpper()), MappingSymbol(symbolValue[1].ToUpper()));
+            asyncTasks[provider.Name().ToString()] = provider.LatestAsync(fromSymbol, toSymbol);
         }
-        
+
         State.LastModifyTime = now;
         State.ExpireTime = now + _exchangeOptions.CurrentValue.DataExpireSeconds * 1000;
         State.ExchangeInfos = new Dictionary<string, TokenExchangeDto>();
@@ -90,7 +101,7 @@ public class TokenExchangeGrain : Grain<TokenExchangeState>, ITokenExchangeGrain
 
         symbolValue = symbolValue.ConvertAll(item => MappingSymbol(item));
         var asyncTasks = await _exchangeProviders[name.ToString()].LatestAsync(symbolValue, symbol);
-        
+
         State.LastModifyTime = now;
         State.ExpireTime = now + _exchangeOptions.CurrentValue.DataExpireSeconds * 1000;
         State.ExchangeInfos = new Dictionary<string, TokenExchangeDto>();
@@ -102,7 +113,7 @@ public class TokenExchangeGrain : Grain<TokenExchangeState>, ITokenExchangeGrain
             }
             catch (Exception e)
             {
-                _logger.LogError(e, "Query exchange failed, token={tokenName}, providerName={providerName}", 
+                _logger.LogError(e, "Query exchange failed, token={tokenName}, providerName={providerName}",
                     item.FromSymbol, name);
             }
         }
@@ -118,5 +129,4 @@ public class TokenExchangeGrain : Grain<TokenExchangeState>, ITokenExchangeGrain
             ? targetSymbol
             : sourceSymbol;
     }
-    
 }
