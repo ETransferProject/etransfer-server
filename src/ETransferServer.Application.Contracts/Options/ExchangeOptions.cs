@@ -21,7 +21,7 @@ public class ExchangeOptions
         ExchangeProviderName.Binance.ToString()
     };
 
-    public Dictionary<string, List<string>> SymbolProviders = new();
+    public Dictionary<string, List<string>> SymbolProviders { get; set; } = new();
 }
 
 public class BinanceOptions

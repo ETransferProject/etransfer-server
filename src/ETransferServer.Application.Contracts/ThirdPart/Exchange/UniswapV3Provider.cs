@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Castle.Core.Logging;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Token;
 using ETransferServer.Options;
@@ -21,10 +20,12 @@ public class UniswapV3Provider : IExchangeProvider, ISingletonDependency
     private readonly GraphQLHttpClient _client;
     private readonly IOptionsMonitor<ExchangeOptions> _exchangeOptions;
     
-    public UniswapV3Provider(IOptionsMonitor<ExchangeOptions> exchangeOptions)
+    public UniswapV3Provider(IOptionsMonitor<ExchangeOptions> exchangeOptions,
+        ILogger<UniswapV3Provider> logger)
     {
         _exchangeOptions = exchangeOptions;
         _client = new GraphQLHttpClient(_exchangeOptions.CurrentValue.UniswapV3.BaseUrl, new NewtonsoftJsonSerializer());
+        _logger = logger;
     }
     
     public ExchangeProviderName Name()
@@ -59,7 +60,8 @@ public class UniswapV3Provider : IExchangeProvider, ISingletonDependency
                 poolId
             }
         });
-        _logger.LogDebug("UniSwapV3 price pair={Pair} poolId={poolId}, resp={Resp}", JsonConvert.SerializeObject(resp));
+        _logger.LogDebug("UniSwapV3 price pair={Pair} poolId={poolId}, resp={Resp}", symbolPair, poolId,
+            JsonConvert.SerializeObject(resp));
         AssertHelper.IsTrue(resp.Data != null, "Response data empty");
         AssertHelper.NotEmpty(resp.Data!.Data, "Response list empty");
         var swapResp = resp.Data.Data[0];

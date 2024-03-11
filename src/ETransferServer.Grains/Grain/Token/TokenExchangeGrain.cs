@@ -56,7 +56,7 @@ public class TokenExchangeGrain : Grain<TokenExchangeState>, ITokenExchangeGrain
         var fromSymbol = MappingSymbol(symbolValue[0].ToUpper());
         var toSymbol = MappingSymbol(symbolValue[1].ToUpper());
         var providerOption =
-            _exchangeOptions.CurrentValue.SymbolProviders.GetValueOrDefault(fromSymbol,
+            _exchangeOptions.CurrentValue.SymbolProviders.GetValueOrDefault(symbolValue[1].ToUpper(),
                 _exchangeOptions.CurrentValue.DefaultProviders);
         var providers = _exchangeProviders.Values.Where(provider => providerOption.Contains(provider.Name().ToString()))
             .ToList();
