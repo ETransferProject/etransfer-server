@@ -15,7 +15,7 @@ public class ExchangeOptions
 
     public int DataExpireSeconds { get; set; } = 60;
 
-    public List<string> DefaultProviders = new()
+    public List<string> DefaultProviders { get; set; } = new()
     {
         ExchangeProviderName.CoinGecko.ToString(), ExchangeProviderName.Okx.ToString(),
         ExchangeProviderName.Binance.ToString()

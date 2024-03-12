@@ -42,7 +42,7 @@ public class CoinGeckoProvider : IExchangeProvider
         var to = MappingSymbol(toSymbol);
         var url = _coinGeckoOptions.CurrentValue.BaseUrl + SimplePriceUri;
         _logger.LogDebug("CoinGecko url {Url}", url);
-        
+
         var price = await _httpProvider.InvokeAsync<Price>(HttpMethod.Get,
             _coinGeckoOptions.CurrentValue.BaseUrl + SimplePriceUri,
             header: new Dictionary<string, string>
@@ -51,12 +51,16 @@ public class CoinGeckoProvider : IExchangeProvider
             },
             param: new Dictionary<string, string>
             {
-                ["ids"] = string.Join(CommonConstant.Comma, from, to),
+                ["ids"] = string.Join(CommonConstant.Comma,
+                    new List<string> { from, to }.Where(s =>
+                        !string.Equals(s, FiatCurrency, StringComparison.CurrentCultureIgnoreCase)).ToList()),
                 ["vs_currencies"] = FiatCurrency
             });
         AssertHelper.IsTrue(price.ContainsKey(from), "CoinGecko not support symbol {}", from);
-        AssertHelper.IsTrue(price.ContainsKey(to), "CoinGecko not support symbol {}", to);
-        var exchange = price[from][FiatCurrency] / price[to][FiatCurrency];
+        AssertHelper.IsTrue(
+            string.Equals(to, FiatCurrency, StringComparison.CurrentCultureIgnoreCase) || price.ContainsKey(to),
+            "CoinGecko not support symbol {}", to);
+        var exchange = Price(price, from, FiatCurrency) / Price(price, to, FiatCurrency);
         return new TokenExchangeDto
         {
             FromSymbol = fromSymbol,
@@ -65,7 +69,13 @@ public class CoinGeckoProvider : IExchangeProvider
             Timestamp = DateTime.UtcNow.ToUtcMilliSeconds()
         };
     }
-    
+
+
+    public decimal? Price(Price price, string cryptoSymbol, string fiatSymbol)
+    {
+        return string.Equals(cryptoSymbol, fiatSymbol, StringComparison.CurrentCultureIgnoreCase) ? 1 : price[cryptoSymbol][fiatSymbol];
+    }
+
     public async Task<List<TokenExchangeDto>> LatestAsync(List<string> fromSymbol, string toSymbol)
     {
         fromSymbol = fromSymbol.ConvertAll(item => MappingSymbol(item).ToLower()).Distinct().ToList();
@@ -73,7 +83,7 @@ public class CoinGeckoProvider : IExchangeProvider
         var to = MappingSymbol(toSymbol);
         var url = _coinGeckoOptions.CurrentValue.BaseUrl + SimplePriceUri;
         _logger.LogDebug("CoinGecko url {Url}", url);
-        
+
         var price = await _httpProvider.InvokeAsync<Price>(HttpMethod.Get,
             _coinGeckoOptions.CurrentValue.BaseUrl + SimplePriceUri,
             header: new Dictionary<string, string>
@@ -89,7 +99,7 @@ public class CoinGeckoProvider : IExchangeProvider
         var exchangeList = new List<TokenExchangeDto>();
         foreach (var item in fromSymbol)
         {
-            if(item.Equals(to)) continue;
+            if (item.Equals(to)) continue;
             var exchange = price[item][FiatCurrency] / price[to][FiatCurrency];
             exchangeList.Add(new TokenExchangeDto
             {

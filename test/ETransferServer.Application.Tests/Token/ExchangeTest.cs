@@ -64,20 +64,21 @@ public class ExchangeTest : ETransferServerApplicationTestBase
     [Fact]
     public async Task QueryExchange()
     {
-        // var client = ServiceProvider.GetRequiredService<IClusterClient>();
-        // var exchangeGrain = client.GetGrain<ITokenExchangeGrain>(ITokenExchangeGrain.GetGrainId("ETH", "USDT"));
+        var providers = ServiceProvider.GetRequiredService<IEnumerable<IExchangeProvider>>();
+        //
+        // var exchangeGrain = Cluster.Client.GetGrain<ITokenExchangeGrain>(ITokenExchangeGrain.GetGrainId("ELF", "USDT"));
         // var exchange = await exchangeGrain.GetAsync();
+        // Output.WriteLine(JsonConvert.SerializeObject(exchange));
+        
         var gateIoProvider = ServiceProvider.GetRequiredService<GateIoProvider>();
         var gateIoExchange = await gateIoProvider.LatestAsync("ELF", "USDT");
         Output.WriteLine(JsonConvert.SerializeObject(gateIoExchange));
-
-
+        
         var uniswapV3Provider = ServiceProvider.GetRequiredService<UniswapV3Provider>();
         var uniswapExchange = await uniswapV3Provider.LatestAsync("USDC", "USDT");
         Output.WriteLine(JsonConvert.SerializeObject(uniswapExchange));
 
-
-
+        
     }
     
     
