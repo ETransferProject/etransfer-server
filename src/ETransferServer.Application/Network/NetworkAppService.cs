@@ -70,7 +70,7 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
                     networkDto.WithdrawFee = null;
                     networkDto.WithdrawFeeUnit = request.Symbol;
                 }
-                _logger.LogError(e, "Get withdraw fee failed by CoinGecko.");
+                _logger.LogError(e, "Get withdraw fee failed by exchange.");
             }
             return getNetworkListDto;
         }
@@ -154,6 +154,23 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
         var estimateFee = coin.AbsEstimateFee.SafeToDecimal() * avgExchange;
         return Tuple.Create(estimateFee, coin);
     }
+    
+    public async Task<decimal> GetAvgExchangeAsync(string fromSymbol, string toSymbol)
+    {
+        var exchangeSymbolPair = string.Join(CommonConstant.Underline, fromSymbol, toSymbol);
+        var exchangeGrain = _clusterClient.GetGrain<ITokenExchangeGrain>(exchangeSymbolPair);
+        var exchange = await exchangeGrain.GetAsync();
+        AssertHelper.NotEmpty(exchange, "Exchange data not found {}", exchangeSymbolPair);
+
+        var avgExchange = exchange.Values
+            .Where(ex => ex.Exchange > 0)
+            .Average(ex => ex.Exchange);
+        AssertHelper.IsTrue(avgExchange > 0, "Exchange amount error {}" + avgExchange);
+        _logger.LogDebug("Exchange: {Exchange}", string.Join(CommonConstant.Comma,
+            exchange.Select(kv => string.Join(CommonConstant.Hyphen, kv.Key, kv.Value.FromSymbol, kv.Value.ToSymbol,
+                kv.Value.Exchange, kv.Value.Timestamp)).ToArray()));
+        return avgExchange;
+    }
 
     private async Task<List<NetworkDto>> CalculateNetworkFeeListAsync(List<NetworkDto> networkList, string symbol)
     {
@@ -183,23 +200,6 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
         }
 
         return networkList;
-    }
-
-    private async Task<decimal> GetAvgExchangeAsync(string fromSymbol, string toSymbol)
-    {
-        var exchangeSymbolPair = string.Join(CommonConstant.Underline, fromSymbol, toSymbol);
-        var exchangeGrain = _clusterClient.GetGrain<ITokenExchangeGrain>(exchangeSymbolPair);
-        var exchange = await exchangeGrain.GetAsync();
-        AssertHelper.NotEmpty(exchange, "Exchange data not found {}", exchangeSymbolPair);
-
-        var avgExchange = exchange.Values
-            .Where(ex => ex.Exchange > 0)
-            .Average(ex => ex.Exchange);
-        AssertHelper.IsTrue(avgExchange > 0, "Exchange amount error {}" + avgExchange);
-        _logger.LogDebug("Exchange: {Exchange}", string.Join(CommonConstant.Comma,
-            exchange.Select(kv => string.Join(CommonConstant.Hyphen, kv.Key, kv.Value.FromSymbol, kv.Value.ToSymbol,
-                kv.Value.Exchange, kv.Value.Timestamp)).ToArray()));
-        return avgExchange;
     }
 
     private async Task<string> GetCacheFeeAsync(string network, string symbol)

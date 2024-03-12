@@ -146,6 +146,30 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             withdrawInfoDto.ReceiveAmount = receiveAmount > 0
                 ? receiveAmount.ToString(ThirdPartDecimals, DecimalHelper.RoundingOption.Ceiling)
                 : withdrawInfoDto.ReceiveAmount;
+            try
+            {
+                var avgExchange =
+                    await _networkAppService.GetAvgExchangeAsync(request.Symbol, CommonConstant.Symbol.USD);
+                withdrawInfoDto.AmountUsd =
+                    (request.Amount * avgExchange).ToString(ThirdPartDecimals,
+                        DecimalHelper.RoundingOption.Ceiling);
+                withdrawInfoDto.ReceiveAmountUsd =
+                    (withdrawInfoDto.ReceiveAmount.SafeToDecimal() * avgExchange).ToString(ThirdPartDecimals,
+                        DecimalHelper.RoundingOption.Ceiling);
+                var fee = feeAmount * avgExchange;
+                if (networkFee > 0)
+                {
+                    avgExchange =
+                        await _networkAppService.GetAvgExchangeAsync(CommonConstant.Symbol.Elf, CommonConstant.Symbol.USD);
+                    fee += networkFee * avgExchange;
+                }
+                withdrawInfoDto.FeeUsd = fee.ToString(ThirdPartDecimals, DecimalHelper.RoundingOption.Ceiling);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "Get withdraw avg exchange failed.");
+            }
+
             if (request.Address.IsNullOrEmpty())
                 return new GetWithdrawInfoDto { WithdrawInfo = withdrawInfoDto };
 
