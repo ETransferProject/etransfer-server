@@ -60,7 +60,7 @@ public class TokenExchangeGrain : Grain<TokenExchangeState>, ITokenExchangeGrain
         toSymbol = isUsd ? CommonConstant.Symbol.USDT : toSymbol;
         var usdToUsdtTask = isUsd ? ExchangeFromUsdtToUsd() : null;
         var providerOption =
-            _exchangeOptions.CurrentValue.SymbolProviders.GetValueOrDefault(symbolValue[1].ToUpper(),
+            _exchangeOptions.CurrentValue.SymbolProviders.GetValueOrDefault(symbolValue[isUsd ? 0 : 1].ToUpper(),
                 _exchangeOptions.CurrentValue.DefaultProviders);
         var providers = _exchangeProviders.Values.Where(provider => providerOption.Contains(provider.Name().ToString()))
             .ToList();

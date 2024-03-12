@@ -362,12 +362,14 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
 
     public async Task<CreateWithdrawOrderDto> CreateWithdrawOrderInfoAsync(GetWithdrawOrderRequestDto request)
     {
-        try {
+        try
+        {
             var userId = CurrentUser.GetId();
-            AssertHelper.IsTrue(request.FromChainId == ChainId.AELF || request.FromChainId == ChainId.tDVV ||
+            AssertHelper.IsTrue(
+                request.FromChainId == ChainId.AELF || request.FromChainId == ChainId.tDVV ||
                 request.FromChainId == ChainId.tDVW, ErrorResult.ChainIdInvalidCode);
             AssertHelper.IsTrue(_networkInfoOptions.CurrentValue.NetworkMap.ContainsKey(request.Symbol),
-                ErrorResult.SymbolInvalidCode);
+                ErrorResult.SymbolInvalidCode, null, request.Symbol);
             AssertHelper.IsTrue(await IsAddressSupport(request.FromChainId, request.Symbol, request.ToAddress),
                 ErrorResult.AddressInvalidCode);
 
@@ -379,11 +381,12 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             var userDto = await userGrain.GetUser();
             AssertHelper.IsTrue(userDto.Success, ErrorResult.JwtInvalidCode);
 
-            var coBoCoinCacheKey = CacheKey(FeeInfo.FeeName.CoBoFee, userId.ToString(), request.Network, request.Symbol);
+            var coBoCoinCacheKey =
+                CacheKey(FeeInfo.FeeName.CoBoFee, userId.ToString(), request.Network, request.Symbol);
             var thirdPartFeeDto = await _coBoCoinCache.GetAsync(coBoCoinCacheKey);
             AssertHelper.IsTrue(thirdPartFeeDto != null, ErrorResult.FeeExpiredCode);
             _logger.LogDebug("Cobo fee get cache: {fee}", thirdPartFeeDto.AbsEstimateFee);
-        
+
             var inputThirdPartFee = thirdPartFeeDto.AbsEstimateFee.SafeToDecimal(-1);
             AssertHelper.IsTrue(inputThirdPartFee >= 0, ErrorResult.FeeInvalidCode);
 
@@ -402,7 +405,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
                 .ToString(2, DecimalHelper.RoundingOption.Ceiling)
                 .SafeToDecimal();
             AssertHelper.IsTrue(request.Amount >= minWithdraw, ErrorResult.AmountInsufficientCode);
-            
+
             // Verify that the transaction information matches the order
             var transaction =
                 Transaction.Parser.ParseFrom(ByteArrayHelper.HexStringToByteArray(request.RawTransaction));
@@ -413,8 +416,9 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             var tokenGrain = _clusterClient.GetGrain<ITokenGrain>(ITokenGrain.GenGrainId(transferTokenInput.Symbol,
                 request.FromChainId));
             var tokenDto = await tokenGrain.GetToken();
-            AssertHelper.NotNull(tokenDto, ErrorResult.SymbolNullCode);
-            AssertHelper.IsTrue(transferTokenInput.Symbol == request.Symbol, ErrorResult.SymbolNotEqualCode);
+            AssertHelper.NotNull(tokenDto, ErrorResult.SymbolInvalidCode, transferTokenInput.Symbol);
+            AssertHelper.IsTrue(transferTokenInput.Symbol == request.Symbol, ErrorResult.SymbolInvalidCode, null,
+                transferTokenInput.Symbol);
 
             var expectedAmount = request.Amount * (decimal)Math.Pow(10, tokenDto.Decimals);
             AssertHelper.IsTrue(transferTokenInput.Amount == expectedAmount, ErrorResult.AmountNotEqualCode);
