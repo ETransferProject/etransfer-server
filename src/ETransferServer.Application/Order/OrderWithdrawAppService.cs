@@ -256,7 +256,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         {
             // If new data is generated
             // go through the monitoring logic.
-            await DoMonitorAsync(network, estimateFee, symbol);
+            await DoMonitorAsync(network, coin.AbsEstimateFee.SafeToDecimal(), symbol);
             _coBoCoinCache.GetOrAdd(monitorCacheKey, () => coin, () => new DistributedCacheEntryOptions
             {
                 AbsoluteExpiration = DateTimeOffset.FromUnixTimeMilliseconds(coin.ExpireTime)
