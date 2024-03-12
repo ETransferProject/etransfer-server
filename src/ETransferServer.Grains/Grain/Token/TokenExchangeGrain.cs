@@ -55,6 +55,10 @@ public class TokenExchangeGrain : Grain<TokenExchangeState>, ITokenExchangeGrain
         var asyncTasks = new Dictionary<string, Task<TokenExchangeDto>>();
         var fromSymbol = MappingSymbol(symbolValue[0].ToUpper());
         var toSymbol = MappingSymbol(symbolValue[1].ToUpper());
+        
+        var isUsd = toSymbol.ToUpper() == CommonConstant.Symbol.USD;
+        toSymbol = isUsd ? CommonConstant.Symbol.USDT : toSymbol;
+        var usdToUsdtTask = isUsd ? ExchangeFromUsdtToUsd() : null;
         var providerOption =
             _exchangeOptions.CurrentValue.SymbolProviders.GetValueOrDefault(symbolValue[1].ToUpper(),
                 _exchangeOptions.CurrentValue.DefaultProviders);
@@ -68,22 +72,52 @@ public class TokenExchangeGrain : Grain<TokenExchangeState>, ITokenExchangeGrain
         State.LastModifyTime = now;
         State.ExpireTime = now + _exchangeOptions.CurrentValue.DataExpireSeconds * 1000;
         State.ExchangeInfos = new Dictionary<string, TokenExchangeDto>();
+        var usdtPriceInUsd = isUsd ? await usdToUsdtTask : null;
         foreach (var (providerName, exchangeTask) in asyncTasks)
         {
             try
             {
-                State.ExchangeInfos.Add(providerName, await exchangeTask);
+                var exchange = await exchangeTask;
+                
+                // if usd, convert price to usd
+                exchange.Exchange = isUsd ? exchange.Exchange * usdtPriceInUsd.Exchange : exchange.Exchange;
+                
+                State.ExchangeInfos.Add(providerName, exchange);
             }
             catch (Exception e)
             {
                 _logger.LogError(e, "Query exchange failed, providerName={ProviderName}", providerName);
             }
         }
-
+        
         await WriteStateAsync();
-
         return State.ExchangeInfos;
     }
+
+
+    private async Task<TokenExchangeDto> ExchangeFromUsdtToUsd()
+    {
+        try
+        {
+            AssertHelper.IsTrue(_exchangeProviders.ContainsKey(ExchangeProviderName.CoinGecko.ToString()), "CoinGecko not support");
+            var resp = await _exchangeProviders.GetValueOrDefault(ExchangeProviderName.CoinGecko.ToString())
+                .LatestAsync(CommonConstant.Symbol.USDT, CommonConstant.Symbol.USD);
+            return resp;
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Get usdt price in usd failed, use the fixed price");
+            return new TokenExchangeDto
+            {
+                FromSymbol = CommonConstant.Symbol.USD,
+                ToSymbol = CommonConstant.Symbol.USDT,
+                Timestamp = DateTime.UtcNow.ToUtcMilliSeconds(),
+                Exchange = 1M
+            };
+        }
+
+    }
+
 
     public async Task<Dictionary<string, TokenExchangeDto>> GetByProviderAsync(ExchangeProviderName name, string symbol)
     {

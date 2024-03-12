@@ -32,6 +32,7 @@ public static class CommonConstant
     public static class Symbol
     {
         public const string Elf = "ELF";
+        public const string USD = "USD";
         public const string USDT = "USDT";
         
     }
