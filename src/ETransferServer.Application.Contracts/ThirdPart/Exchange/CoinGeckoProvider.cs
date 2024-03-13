@@ -40,6 +40,10 @@ public class CoinGeckoProvider : IExchangeProvider
     {
         var from = MappingSymbol(fromSymbol);
         var to = MappingSymbol(toSymbol);
+        if (from == to)
+        {
+            return TokenExchangeDto.One(fromSymbol, toSymbol, DateTime.UtcNow.ToUtcMilliSeconds());
+        }
         var url = _coinGeckoOptions.CurrentValue.BaseUrl + SimplePriceUri;
         _logger.LogDebug("CoinGecko url {Url}", url);
 

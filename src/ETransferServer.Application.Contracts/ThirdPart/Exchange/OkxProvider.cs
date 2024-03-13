@@ -42,6 +42,11 @@ public class OkxProvider : IExchangeProvider
 
     public async Task<TokenExchangeDto> LatestAsync(string fromSymbol, string toSymbol)
     {
+        if (fromSymbol == toSymbol)
+        {
+            return TokenExchangeDto.One(fromSymbol, toSymbol, DateTime.UtcNow.ToUtcMilliSeconds());
+        }
+
         // The first k-line after one minute of inquiry returns the latest price.
         var req = new OkxKLineReq()
         {
@@ -79,6 +84,11 @@ public class OkxProvider : IExchangeProvider
 
     public async Task<TokenExchangeDto> HistoryAsync(string fromSymbol, string toSymbol, long timestamp)
     {
+        if (fromSymbol == toSymbol)
+        {
+            return TokenExchangeDto.One(fromSymbol, toSymbol, timestamp);
+        }
+        
         // The first k-line after one minute of inquiry returns the latest price.
         var req = new OkxKLineReq()
         {

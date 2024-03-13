@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
@@ -35,8 +36,14 @@ public class GateIoProvider : IExchangeProvider, ISingletonDependency
 
     public async Task<TokenExchangeDto> LatestAsync(string fromSymbol, string toSymbol)
     {
+
+
         var from = SymbolMapping(fromSymbol);
         var to = SymbolMapping(toSymbol);
+        if (from == to)
+        {
+            return TokenExchangeDto.One(fromSymbol, toSymbol, DateTime.UtcNow.ToUtcMilliSeconds());
+        }
         var resp = await _httpProvider.InvokeAsync<List<List<string>>>(_exchangeOptions.CurrentValue.GateIo.BaseUrl,
             Api.Candlesticks, param: new Dictionary<string, string>
             {
@@ -72,6 +79,10 @@ public class GateIoProvider : IExchangeProvider, ISingletonDependency
     {
         var from = SymbolMapping(fromSymbol);
         var to = SymbolMapping(toSymbol);
+        if (from == to)
+        {
+            return TokenExchangeDto.One(fromSymbol, toSymbol, timestamp);
+        }
         var resp = await _httpProvider.InvokeAsync<List<List<string>>>(_exchangeOptions.CurrentValue.GateIo.BaseUrl,
             Api.Candlesticks, param: new Dictionary<string, string>
             {

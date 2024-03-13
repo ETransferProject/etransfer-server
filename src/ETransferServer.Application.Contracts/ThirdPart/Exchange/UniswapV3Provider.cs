@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using ETransferServer.Common;
@@ -40,6 +41,13 @@ public class UniswapV3Provider : IExchangeProvider, ISingletonDependency
 
     public async Task<TokenExchangeDto> LatestAsync(string fromSymbol, string toSymbol)
     {
+        var from = MappingSymbol(fromSymbol);
+        var to = MappingSymbol(toSymbol);
+        if (from == to)
+        {
+            return TokenExchangeDto.One(fromSymbol, toSymbol, DateTime.UtcNow.ToUtcMilliSeconds());
+        }
+
         var symbolPair = string.Join(CommonConstant.Underline, MappingSymbol(fromSymbol), MappingSymbol(toSymbol));
         var poolId = _exchangeOptions.CurrentValue.UniswapV3.PoolId.GetValueOrDefault(symbolPair);
         AssertHelper.NotEmpty(poolId, "PoolId not found of {}", symbolPair);

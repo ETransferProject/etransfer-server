@@ -1,7 +1,7 @@
 {
   "NetworkOptions": {
     "NetworkPattern": {
-      "^0x[a-fA-F0-9]{40}$": ["SETH", "SGR", "ETH", "BSC", "ARBITRUM", "MATIC", "OPTIMISM", "AVAXC"],
+      "^0x[a-fA-F0-9]{40}$": ["SETH", "ETH", "BSC", "ARBITRUM", "MATIC", "OPTIMISM", "AVAXC"],
       "^T[1-9A-HJ-NP-Za-km-z]{33}$": ["TRX"],
       "^[1-9A-HJ-NP-Za-km-z]{32,44}$": ["Solana"],
       "^addr1[a-fA-F0-9]{58,100}$": ["Cardano"],
@@ -387,7 +387,7 @@
           ]
         }
       ],
-      "SGR": [
+      "SGR-1": [
         {
           "NetworkInfo": {
             "Network": "ETH",
