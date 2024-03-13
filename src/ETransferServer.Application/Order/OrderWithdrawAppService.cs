@@ -28,6 +28,7 @@ using Google.Protobuf;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 using Orleans;
 using Portkey.Contracts.CA;
 using Volo.Abp;
@@ -417,6 +418,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             var tokenGrain = _clusterClient.GetGrain<ITokenGrain>(ITokenGrain.GenGrainId(transferTokenInput.Symbol,
                 request.FromChainId));
             var tokenDto = await tokenGrain.GetToken();
+            _logger.LogDebug("Token info: {Token}", JsonConvert.SerializeObject(tokenDto));
             AssertHelper.NotNull(tokenDto, ErrorResult.SymbolInvalidCode, transferTokenInput.Symbol);
             AssertHelper.IsTrue(transferTokenInput.Symbol == request.Symbol, ErrorResult.SymbolInvalidCode, null,
                 transferTokenInput.Symbol);
