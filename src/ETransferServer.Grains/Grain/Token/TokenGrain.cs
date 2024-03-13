@@ -5,6 +5,7 @@ using ETransferServer.Common.AElfSdk;
 using ETransferServer.Common.AElfSdk.Dtos;
 using ETransferServer.Dtos.Token;
 using ETransferServer.Grains.State.Token;
+using Microsoft.Extensions.Logging;
 using Volo.Abp.ObjectMapping;
 
 namespace ETransferServer.Grains.Grain.Token;
@@ -26,30 +27,40 @@ public interface ITokenGrain : IGrainWithStringKey
 
 public class TokenGrain : Grain<TokenState>, ITokenGrain
 {
+    private readonly ILogger<TokenGrain> _logger;
     private readonly IObjectMapper _objectMapper;
     private readonly IContractProvider _contractProvider;
 
-    public TokenGrain(IObjectMapper objectMapper, IContractProvider contractProvider)
+    public TokenGrain(IObjectMapper objectMapper, IContractProvider contractProvider, ILogger<TokenGrain> logger)
     {
         _objectMapper = objectMapper;
         _contractProvider = contractProvider;
+        _logger = logger;
     }
 
     public async Task<TokenDto> GetToken()
     {
-        if (State.Symbol.NotNullOrEmpty())
+        try
+        {
+            if (State.Symbol.NotNullOrEmpty())
+                return _objectMapper.Map<TokenState, TokenDto>(State);
+
+            var grainId = TokenGrainId.FromGrainId(this.GetPrimaryKeyString());
+            if (grainId == null) return null;
+
+            var tokenInfo = await _contractProvider.CallTransactionAsync<TokenInfo>(grainId.ChainId,
+                SystemContractName.TokenContract, "GetTokenInfo", new GetTokenInfoInput { Symbol = grainId.Symbol });
+            if (tokenInfo == null) return null;
+
+            _objectMapper.Map(tokenInfo, State);
+            await WriteStateAsync();
             return _objectMapper.Map<TokenState, TokenDto>(State);
-
-        var grainId = TokenGrainId.FromGrainId(this.GetPrimaryKeyString());
-        if (grainId == null) return null;
-
-        var tokenInfo = await _contractProvider.CallTransactionAsync<TokenInfo>(grainId.ChainId,
-            SystemContractName.TokenContract, "GetTokenInfo", new GetTokenInfoInput { Symbol = grainId.Symbol });
-        if (tokenInfo == null) return null;
-
-        _objectMapper.Map(tokenInfo, State);
-        await WriteStateAsync();
-        return _objectMapper.Map<TokenState, TokenDto>(State);
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Get token failed {Pk}", this.GetPrimaryKeyString());
+            throw;
+        }
     }
 }
 
