@@ -92,11 +92,11 @@ public class TokenGrainId
     public static TokenGrainId FromGrainId(string grainId)
     {
         var vals = grainId.Split(CommonConstant.Hyphen);
-        if (vals.Length != 2 || vals[0].IsNullOrEmpty() || vals[1].IsNullOrEmpty())
+        if (vals.Length < 2 || vals[0].IsNullOrEmpty() || vals[1].IsNullOrEmpty())
         {
             return null;
         }
 
-        return new TokenGrainId(vals[1], vals[0]);
+        return new TokenGrainId(grainId.Substring(vals[0].Length + 1), vals[0]);
     }
 }
