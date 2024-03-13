@@ -1,7 +1,7 @@
 {
   "NetworkOptions": {
     "NetworkPattern": {
-      "^0x[a-fA-F0-9]{40}$": ["SETH", "SGR", "ETH", "BSC", "ARBITRUM", "MATIC", "OPTIMISM", "AVAXC"],
+      "^0x[a-fA-F0-9]{40}$": ["SETH", "ETH", "BSC", "ARBITRUM", "MATIC", "OPTIMISM", "AVAXC"],
       "^T[1-9A-HJ-NP-Za-km-z]{33}$": ["TRX"],
       "^[1-9A-HJ-NP-Za-km-z]{32,44}$": ["Solana"],
       "^addr1[a-fA-F0-9]{58,100}$": ["Cardano"],
@@ -35,6 +35,7 @@
             "Status": "Health"
           },
           "DepositInfo": {
+            "IsOpen": true,
             "MinDeposit": "0.01",
             "MultiConfirm": "64 confirmations",
             "MultiConfirmSeconds": 942,
@@ -45,6 +46,7 @@
             ]
           },
           "WithdrawInfo": {
+            "IsOpen": true,
             "MinWithdraw": "13",
             "WithdrawFee": 12.61,
             "WithdrawLocalFee": 0.004,
@@ -76,6 +78,7 @@
             "Status": "Health"
           },
           "DepositInfo": {
+            "IsOpen": true,
             "MinDeposit": "0.01",
             "MultiConfirm": "64 confirmations",
             "MultiConfirmSeconds": 942,
@@ -86,6 +89,7 @@
             ]
           },
           "WithdrawInfo": {
+            "IsOpen": true,
             "MinWithdraw": "13",
             "WithdrawFee": 12.61,
             "WithdrawLocalFee": 0.004,
@@ -117,6 +121,7 @@
             "Status": "Health"
           },
           "DepositInfo": {
+            "IsOpen": true,
             "MinDeposit": "0.01",
             "MultiConfirmSeconds": 244,
             "ContractAddress": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
@@ -126,6 +131,7 @@
             ]
           },
           "WithdrawInfo": {
+            "IsOpen": true,
             "MinWithdraw": "3",
             "WithdrawFee": 2.57,
             "WithdrawLocalFee": 20,
@@ -157,6 +163,7 @@
             "Status": "Health"
           },
           "DepositInfo": {
+            "IsOpen": true,
             "MinDeposit": "0",
             "MultiConfirmSeconds": 208,
             "ContractAddress": "0x55d398326f99059ff775485246999027b3197955",
@@ -166,6 +173,7 @@
             ]
           },
           "WithdrawInfo": {
+            "IsOpen": true,
             "MinWithdraw": "1",
             "WithdrawFee": 0.47,
             "WithdrawLocalFee": 0.001795,
@@ -197,6 +205,7 @@
             "Status": "Health"
           },
           "DepositInfo": {
+            "IsOpen": true,
             "MinDeposit": "0",
             "MultiConfirmSeconds": 186,
             "ContractAddress": "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9",
@@ -207,6 +216,7 @@
             ]
           },
           "WithdrawInfo": {
+            "IsOpen": true,
             "MinWithdraw": "1",
             "WithdrawFee": 1,
             "WithdrawLocalFee": 0.0006,
@@ -238,6 +248,7 @@
             "Status": "Health"
           },
           "DepositInfo": {
+            "IsOpen": true,
             "MinDeposit": "0",
             "MultiConfirmSeconds": 161.4,
             "ContractAddress": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
@@ -247,6 +258,7 @@
             ]
           },
           "WithdrawInfo": {
+            "IsOpen": true,
             "MinWithdraw": "1",
             "WithdrawFee": 0.89,
             "WithdrawLocalFee": 0.01,
@@ -278,6 +290,7 @@
             "Status": "Health"
           },
           "DepositInfo": {
+            "IsOpen": true,
             "MinDeposit": "0",
             "MultiConfirmSeconds": 418,
             "ContractAddress": "0xc2132D05D31c914a87C6611C10748AEb04B58e8F",
@@ -288,6 +301,7 @@
             ]
           },
           "WithdrawInfo": {
+            "IsOpen": true,
             "MinWithdraw": "1",
             "WithdrawFee": 0.66,
             "WithdrawLocalFee": 0.6,
@@ -319,6 +333,7 @@
             "Status": "Health"
           },
           "DepositInfo": {
+            "IsOpen": true,
             "MinDeposit": "0",
             "MultiConfirmSeconds": 362,
             "ContractAddress": "0x94b008aa00579c1307b0ef2c499ad98a8ce58e58",
@@ -329,6 +344,7 @@
             ]
           },
           "WithdrawInfo": {
+            "IsOpen": true,
             "MinWithdraw": "1",
             "WithdrawFee": 0.48,
             "WithdrawLocalFee": 0.0001,
@@ -360,6 +376,7 @@
             "Status": "Health"
           },
           "DepositInfo": {
+            "IsOpen": true,
             "MinDeposit": "0.01",
             "MultiConfirmSeconds": 198.54,
             "ContractAddress": "0x9702230a8ea53601f5cd2dc00fdbc13d4df4a8c7",
@@ -369,6 +386,7 @@
             ]
           },
           "WithdrawInfo": {
+            "IsOpen": true,
             "MinWithdraw": "1",
             "WithdrawFee": 0.38,
             "WithdrawLocalFee": 0.01,
@@ -402,6 +420,7 @@
             "Status": "Health"
           },
           "DepositInfo": {
+            "IsOpen": true,
             "MinDeposit": "0.01",
             "MultiConfirm": "64 confirmations",
             "MultiConfirmSeconds": 942,
@@ -412,6 +431,7 @@
             ]
           },
           "WithdrawInfo": {
+            "IsOpen": true,
             "MinWithdraw": "13",
             "WithdrawFee": 12.61,
             "WithdrawLocalFee": 0.004,

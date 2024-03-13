@@ -49,7 +49,8 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
         try
         {
             var getNetworkListDto = await GetNetworkListWithLocalFeeAsync(request);
-
+            if (request.Type == OrderTypeEnum.Deposit.ToString()) return getNetworkListDto;
+            
             // fill withdraw fee
             foreach (var networkDto in getNetworkListDto.NetworkList)
             {
@@ -119,11 +120,12 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
 
         foreach (var networkDto in getNetworkListDto.NetworkList)
         {
-            if (!withdrawInfo.TryGetValue(networkDto.Network, out var withdraw)) continue;
+            if (request.Type == OrderTypeEnum.Deposit.ToString() ||
+                !withdrawInfo.TryGetValue(networkDto.Network, out var withdraw)) continue;
             networkDto.WithdrawFeeUnit = withdraw.WithdrawLocalFeeUnit;
             networkDto.WithdrawFee = withdraw.WithdrawLocalFee.ToString(CultureInfo.InvariantCulture);
         }
-        
+
         if (request.Address.IsNullOrEmpty()) return getNetworkListDto;
         
         var networkByAddress = _networkOptions.NetworkPattern
@@ -221,14 +223,20 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
             var multiConfirmSeconds = config.NetworkInfo.MultiConfirmSeconds;
             if (type == OrderTypeEnum.Deposit.ToString() && config.DepositInfo != null)
             {
+                networkDto.Status = config.DepositInfo.IsOpen
+                    ? CommonConstant.NetworkStatus.Health
+                    : CommonConstant.NetworkStatus.Offline;
                 multiConfirmSeconds = config.DepositInfo.MultiConfirmSeconds;
             }
 
             if (type == OrderTypeEnum.Withdraw.ToString() && config.WithdrawInfo != null)
             {
+                networkDto.Status = config.WithdrawInfo.IsOpen
+                    ? CommonConstant.NetworkStatus.Health
+                    : CommonConstant.NetworkStatus.Offline;
                 multiConfirmSeconds = config.WithdrawInfo.MultiConfirmSeconds;
             }
-            
+
             networkDto.MultiConfirmTime = TimeHelper.SecondsToMinute((int)multiConfirmSeconds);
         }
     }
