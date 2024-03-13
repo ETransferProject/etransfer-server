@@ -449,9 +449,10 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         await AssertTxReplayAttacksAsync(transaction);
 
         // amount limit
+        var amountUsd = await CalculateAmountUsdAsync(request.Symbol, request.Amount);
         var tokenInfoGrain =
             _clusterClient.GetGrain<ITokenWithdrawLimitGrain>(ITokenWithdrawLimitGrain.GenerateGrainId(request.Symbol));
-        AssertHelper.IsTrue(await tokenInfoGrain.Acquire(request.Amount), ErrorResult.WithdrawLimitInsufficientCode, null,
+        AssertHelper.IsTrue(await tokenInfoGrain.Acquire(amountUsd), ErrorResult.WithdrawLimitInsufficientCode, null,
             (await tokenInfoGrain.GetLimit()).RemainingLimit, TimeHelper.GetHourDiff(DateTime.UtcNow,
                 DateTime.UtcNow.AddDays(1).Date));
         try
@@ -463,6 +464,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
                 UserId = CurrentUser.GetId(),
                 RawTransaction = request.RawTransaction,
                 OrderType = OrderTypeEnum.Withdraw.ToString(),
+                AmountUsd = amountUsd,
                 FromTransfer = new TransferInfo
                 {
                     ChainId = request.FromChainId,
@@ -492,7 +494,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         }
         catch (Exception e)
         {
-            await tokenInfoGrain.Reverse((long)request.Amount);
+            await tokenInfoGrain.Reverse(amountUsd);
             _logger.LogError(e,
                 "Create withdraw order error, fromChainId:{FromChainId}, network:{Network}, rawTransaction:{RawTransaction}, toAddress:{ToAddress}, amount:{Amount}, symbol:{Symbol}",
                 request.FromChainId, request.Network, request.RawTransaction, request.ToAddress, request.Amount,
@@ -507,6 +509,25 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         var transactionGrain = _clusterClient.GetGrain<ITransactionGrain>(rawTransactionHash);
         var saveTransactionResult = await transactionGrain.Create();
         AssertHelper.IsTrue(saveTransactionResult.Success, ErrorResult.TransactionFailCode);
+    }
+
+    private async Task<decimal> CalculateAmountUsdAsync(string symbol, decimal amount)
+    {
+        var amountUsd = 0M;
+        try
+        {
+            var avgExchange =
+                await _networkAppService.GetAvgExchangeAsync(symbol, CommonConstant.Symbol.USD);
+            amountUsd = amount * avgExchange;
+            _logger.LogDebug("CalculateAmountUsd: {symbol}, {amount}, {amountUsd}", symbol, amount, amountUsd);
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Create withdraw order error in exchange usd, symbol: {symbol}", symbol);
+        }
+
+        AssertHelper.IsTrue(amountUsd > 0, ErrorResult.TransactionFailCode);
+        return amountUsd;
     }
 
     public async Task<bool> AddOrUpdateAsync(WithdrawOrderDto dto)
