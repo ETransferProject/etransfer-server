@@ -268,6 +268,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
 
     public async Task DoMonitorAsync(string network, decimal estimateFee, string symbol)
     {
+        _logger.LogDebug("Withdraw fee monitor, network={Network}, fee={Fee}, symbol={Symbol}", network, estimateFee, symbol);
         await _clusterClient
             .GetGrain<IWithdrawFeeMonitorGrain>(IWithdrawFeeMonitorGrain.GrainId(ThirdPartServiceNameEnum.Cobo,
                 network, symbol))
