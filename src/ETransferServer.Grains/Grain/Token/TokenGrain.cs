@@ -6,6 +6,7 @@ using ETransferServer.Common.AElfSdk.Dtos;
 using ETransferServer.Dtos.Token;
 using ETransferServer.Grains.State.Token;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 using Volo.Abp.ObjectMapping;
 
 namespace ETransferServer.Grains.Grain.Token;
@@ -54,6 +55,8 @@ public class TokenGrain : Grain<TokenState>, ITokenGrain
 
             _objectMapper.Map(tokenInfo, State);
             await WriteStateAsync();
+            _logger.LogInformation("Get token Info {Token}", JsonConvert.SerializeObject(State));
+
             return _objectMapper.Map<TokenState, TokenDto>(State);
         }
         catch (Exception e)
