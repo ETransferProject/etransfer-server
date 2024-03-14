@@ -118,12 +118,8 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
 
             var tokenLimit = await tokenInfoGrain.GetLimit();
             var withdrawInfoDto = new WithdrawInfoDto();
-            withdrawInfoDto.MaxAmount = tokenLimit.RemainingLimit.ToString();
             withdrawInfoDto.LimitCurrency = request.Symbol;
-            withdrawInfoDto.RemainingLimit = tokenLimit.RemainingLimit.ToString();
             withdrawInfoDto.TransactionUnit = request.Symbol;
-            withdrawInfoDto.TotalLimit =
-                _networkInfoOptions.CurrentValue.WithdrawLimit24H.ToString(CultureInfo.InvariantCulture);
 
             // query async
             var networkFeeTask = CalculateNetworkFeeAsync(request.ChainId, request.Version);
@@ -146,11 +142,17 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
                 .ToString(2, DecimalHelper.RoundingOption.Ceiling);
             withdrawInfoDto.ReceiveAmount = receiveAmount > 0
                 ? receiveAmount.ToString(ThirdPartDecimals, DecimalHelper.RoundingOption.Ceiling)
-                : withdrawInfoDto.ReceiveAmount;
+                : withdrawInfoDto.ReceiveAmount ?? default(int).ToString();
             try
             {
                 var avgExchange =
                     await _networkAppService.GetAvgExchangeAsync(request.Symbol, CommonConstant.Symbol.USD);
+                withdrawInfoDto.TotalLimit =
+                    (_networkInfoOptions.CurrentValue.WithdrawLimit24H / avgExchange).ToString(ThirdPartDecimals,
+                        DecimalHelper.RoundingOption.Ceiling);
+                withdrawInfoDto.MaxAmount = (tokenLimit.RemainingLimit / avgExchange).ToString(ThirdPartDecimals,
+                    DecimalHelper.RoundingOption.Ceiling);
+                withdrawInfoDto.RemainingLimit = withdrawInfoDto.MaxAmount;
                 withdrawInfoDto.AmountUsd =
                     (request.Amount * avgExchange).ToString(ThirdPartDecimals,
                         DecimalHelper.RoundingOption.Ceiling);

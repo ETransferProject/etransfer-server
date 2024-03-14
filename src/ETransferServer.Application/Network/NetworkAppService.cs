@@ -96,17 +96,14 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
         AssertHelper.NotEmpty(request.Type, "Invalid type. Please refresh and try again.");
         AssertHelper.NotEmpty(request.Symbol, "Invalid symbol. Please refresh and try again.");
         AssertHelper.IsTrue(request.Type == OrderTypeEnum.Deposit.ToString()
-                            || request.Type == OrderTypeEnum.Withdraw.ToString(), "Invalid type value. Please refresh and try again.");
+                            || request.Type == OrderTypeEnum.Withdraw.ToString(),
+            "Invalid type value. Please refresh and try again.");
+        AssertHelper.IsTrue(_networkOptions.NetworkMap.ContainsKey(request.Symbol),
+            "Symbol is not exist. Please refresh and try again.");
 
-        var networkConfigs = new List<NetworkConfig>();
-        if (_networkOptions.NetworkMap.TryGetValue(request.Symbol, out var result))
-        {
-            AssertHelper.NotNull(request, "Symbol not exists. Please refresh and try again.");
-            AssertHelper.NotEmpty(result, "Support network empty. Please refresh and try again.");
-            networkConfigs = result.Where(a =>
-                    a.SupportType.Contains(request.Type) && a.SupportChain.Contains(request.ChainId))
-                .ToList();
-        }
+        var networkConfigs = _networkOptions.NetworkMap[request.Symbol].Where(a =>
+                a.SupportType.Contains(request.Type) && a.SupportChain.Contains(request.ChainId))
+            .ToList();
 
         var networkInfos = networkConfigs.Select(config => config.NetworkInfo).ToList();
         var withdrawInfo = networkConfigs
@@ -114,7 +111,7 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
             .ToDictionary(config => config.NetworkInfo.Network, config => config.WithdrawInfo);
         var getNetworkListDto = new GetNetworkListDto();
         getNetworkListDto.ChainId = request.ChainId;
-        
+
         getNetworkListDto.NetworkList = _objectMapper.Map<List<NetworkInfo>, List<NetworkDto>>(networkInfos);
         FillMultiConfirmMinutes(request.Type, getNetworkListDto.NetworkList, networkConfigs);
 
@@ -127,13 +124,13 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
         }
 
         if (request.Address.IsNullOrEmpty()) return getNetworkListDto;
-        
+
         var networkByAddress = _networkOptions.NetworkPattern
             .Where(kv => request.Address.Match(kv.Key))
             .SelectMany(kv => kv.Value)
             .ToList();
         AssertHelper.NotEmpty(networkByAddress, ErrorResult.AddressFormatWrongCode);
-        
+
         getNetworkListDto.NetworkList = getNetworkListDto.NetworkList
             .Where(net => net.Network.IsIn(networkByAddress))
             .ToList();
