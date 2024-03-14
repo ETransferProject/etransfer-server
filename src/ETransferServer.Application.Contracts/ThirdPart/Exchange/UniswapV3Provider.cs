@@ -68,7 +68,7 @@ public class UniswapV3Provider : IExchangeProvider, ISingletonDependency
                 poolId
             }
         });
-        _logger.LogDebug("UniSwapV3 price pair={Pair} poolId={poolId}, resp={Resp}", symbolPair, poolId,
+        _logger.LogDebug("UniSwapV3 price pair={Pair} poolId={PoolId}, resp={Resp}", symbolPair, poolId,
             JsonConvert.SerializeObject(resp));
         AssertHelper.IsTrue(resp.Data != null, "Response data empty");
         AssertHelper.NotEmpty(resp.Data!.Data, "Response list empty");
@@ -80,7 +80,7 @@ public class UniswapV3Provider : IExchangeProvider, ISingletonDependency
             FromSymbol = fromSymbol,
             ToSymbol = toSymbol,
             Timestamp = swapResp.Timestamp.SafeToLong() * 1000,
-            Exchange = price0InEth / price1InEth
+            Exchange = price1InEth / price0InEth
         };
     }
 
