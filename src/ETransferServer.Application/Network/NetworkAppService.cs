@@ -29,7 +29,6 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
     private readonly IObjectMapper _objectMapper;
     private readonly IClusterClient _clusterClient;
     private const int ThirdPartDigitals = 4;
-    private const int ThirdPartDecimals = 6;
 
     public NetworkAppService(ILogger<NetworkAppService> logger, 
         IOptionsSnapshot<NetworkOptions> networkOptions,
@@ -181,7 +180,7 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
         foreach (var network in networkList)
         {
             network.WithdrawFee = (network.WithdrawFee.SafeToDecimal() * exchange[_coinGeckoOptions.CoinIdMapping[network.WithdrawFeeUnit]].Exchange)
-                .ToString(ThirdPartDigitals, ThirdPartDecimals, DecimalHelper.RoundingOption.Ceiling);
+                .ToString(ThirdPartDigitals, DecimalHelper.GetDecimals(symbol), DecimalHelper.RoundingOption.Ceiling);
             network.WithdrawFeeUnit = symbol;
         }
 
@@ -194,7 +193,7 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
         {
             var avgExchange = await GetAvgExchangeAsync(network.Network, symbol);
             network.WithdrawFee = (network.WithdrawFee.SafeToDecimal() * avgExchange)
-                .ToString(ThirdPartDigitals, ThirdPartDecimals, DecimalHelper.RoundingOption.Ceiling);
+                .ToString(ThirdPartDigitals, DecimalHelper.GetDecimals(symbol), DecimalHelper.RoundingOption.Ceiling);
             network.WithdrawFeeUnit = symbol;
         }
 

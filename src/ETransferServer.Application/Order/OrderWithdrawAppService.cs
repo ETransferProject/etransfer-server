@@ -52,7 +52,6 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
     private const string TransferToken = "TransferToken";
     private const string PortKeyVersion = "v1";
     private const string PortKeyVersion2 = "v2";
-    private const int ThirdPartDecimals = 6;
     private const int ElfDecimals = 8;
 
     private readonly INESTRepository<Orders.WithdrawOrder, Guid> _withdrawOrderIndexRepository;
@@ -123,13 +122,13 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
 
             // query async
             var networkFeeTask = CalculateNetworkFeeAsync(request.ChainId, request.Version);
+            var decimals = DecimalHelper.GetDecimals(request.Symbol);
             var thirdPartFeeTask = request.Network.IsNullOrEmpty()
                 ? CalculateThirdPartFeesWithCacheAsync(userId, request.Symbol)
                 : CalculateThirdPartFeeAsync(userId, request.Network, request.Symbol);
 
             var (feeAmount, expireAt) = await thirdPartFeeTask;
-            withdrawInfoDto.TransactionFee =
-                feeAmount.ToString(ThirdPartDecimals, DecimalHelper.RoundingOption.Ceiling);
+            withdrawInfoDto.TransactionFee = feeAmount.ToString(decimals, DecimalHelper.RoundingOption.Ceiling);
             withdrawInfoDto.TransactionUnit = request.Symbol;
             withdrawInfoDto.ExpiredTimestamp = expireAt.ToString();
 
@@ -141,23 +140,23 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             withdrawInfoDto.MinAmount = Math.Max(feeAmount, _withdrawOptions.CurrentValue.MinThirdPartFee)
                 .ToString(2, DecimalHelper.RoundingOption.Ceiling);
             withdrawInfoDto.ReceiveAmount = receiveAmount > 0
-                ? receiveAmount.ToString(ThirdPartDecimals, DecimalHelper.RoundingOption.Ceiling)
+                ? receiveAmount.ToString(decimals, DecimalHelper.RoundingOption.Ceiling)
                 : withdrawInfoDto.ReceiveAmount ?? default(int).ToString();
             try
             {
                 var avgExchange =
                     await _networkAppService.GetAvgExchangeAsync(request.Symbol, CommonConstant.Symbol.USD);
                 withdrawInfoDto.TotalLimit =
-                    (_networkInfoOptions.CurrentValue.WithdrawLimit24H / avgExchange).ToString(ThirdPartDecimals,
+                    (_networkInfoOptions.CurrentValue.WithdrawLimit24H / avgExchange).ToString(decimals,
                         DecimalHelper.RoundingOption.Ceiling);
-                withdrawInfoDto.MaxAmount = (tokenLimit.RemainingLimit / avgExchange).ToString(ThirdPartDecimals,
+                withdrawInfoDto.MaxAmount = (tokenLimit.RemainingLimit / avgExchange).ToString(decimals,
                     DecimalHelper.RoundingOption.Ceiling);
                 withdrawInfoDto.RemainingLimit = withdrawInfoDto.MaxAmount;
                 withdrawInfoDto.AmountUsd =
-                    (request.Amount * avgExchange).ToString(ThirdPartDecimals,
+                    (request.Amount * avgExchange).ToString(decimals,
                         DecimalHelper.RoundingOption.Ceiling);
                 withdrawInfoDto.ReceiveAmountUsd =
-                    (withdrawInfoDto.ReceiveAmount.SafeToDecimal() * avgExchange).ToString(ThirdPartDecimals,
+                    (withdrawInfoDto.ReceiveAmount.SafeToDecimal() * avgExchange).ToString(decimals,
                         DecimalHelper.RoundingOption.Ceiling);
                 var fee = feeAmount * avgExchange;
                 if (networkFee > 0)
@@ -166,7 +165,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
                         await _networkAppService.GetAvgExchangeAsync(CommonConstant.Symbol.Elf, CommonConstant.Symbol.USD);
                     fee += networkFee * avgExchange;
                 }
-                withdrawInfoDto.FeeUsd = fee.ToString(ThirdPartDecimals, DecimalHelper.RoundingOption.Ceiling);
+                withdrawInfoDto.FeeUsd = fee.ToString(decimals, DecimalHelper.RoundingOption.Ceiling);
             }
             catch (Exception e)
             {
@@ -247,7 +246,8 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         var (estimateFee, coin) = await _networkAppService.CalculateNetworkFeeAsync(network, symbol);
 
         var coinFeeCacheKey = CacheKey(FeeInfo.FeeName.CoBoFee, userId.ToString(), network, symbol);
-        await _coBoCoinCache.SetAsync(coinFeeCacheKey, new CoBoCoinDto { AbsEstimateFee = estimateFee.ToString(ThirdPartDecimals, DecimalHelper.RoundingOption.Ceiling) }, 
+        var decimals = DecimalHelper.GetDecimals(symbol);
+        await _coBoCoinCache.SetAsync(coinFeeCacheKey, new CoBoCoinDto { AbsEstimateFee = estimateFee.ToString(decimals, DecimalHelper.RoundingOption.Ceiling) }, 
             new DistributedCacheEntryOptions
             {
                 AbsoluteExpiration = DateTimeOffset.UtcNow.AddSeconds(_withdrawInfoOptions.ThirdPartCacheFeeExpireSeconds)

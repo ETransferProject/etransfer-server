@@ -247,9 +247,8 @@ public class ContractProvider : IContractProvider, ISingletonDependency
 
                 rawTxResult = await QueryTransactionResultAsync(chainId, transactionId);
                 _logger.LogDebug(
-                    "WaitTransactionResultAsync chainId={ChainId}, transactionId={TransactionId}, status={Status}",
-                    chainId,
-                    transactionId, rawTxResult.Status);
+                    "WaitTransactionResultAsync chainId={ChainId}, transactionId={TransactionId}, status={Status}" +
+                    ", error={Error}", chainId, transactionId, rawTxResult.Status, rawTxResult.Error);
             }
         }
         catch (Exception e)

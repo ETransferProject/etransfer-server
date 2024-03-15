@@ -31,7 +31,6 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
     private readonly NetworkOptions _networkInfoOptions;
     private readonly IUserAddressService _userAddressService;
     private readonly INetworkAppService _networkAppService;
-    private const int ThirdPartDecimals = 6;
 
     public OrderDepositAppService(INESTRepository<DepositOrder, Guid> depositOrderIndexRepository,
         IObjectMapper objectMapper,
@@ -83,7 +82,8 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
                 var avgExchange =
                     await _networkAppService.GetAvgExchangeAsync(request.Symbol, CommonConstant.Symbol.USD);
                 getDepositInfoDto.DepositInfo.MinAmountUsd =
-                    (depositInfo.MinDeposit.SafeToDecimal() * avgExchange).ToString(ThirdPartDecimals,
+                    (depositInfo.MinDeposit.SafeToDecimal() * avgExchange).ToString(
+                        DecimalHelper.GetDecimals(request.Symbol),
                         DecimalHelper.RoundingOption.Ceiling);
             }
             catch (Exception e)

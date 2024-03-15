@@ -15,7 +15,7 @@ public class GetWithdrawListRequestDto : IValidatableObject
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         int decimalPlaces = Amount.ToString().Length - Amount.ToString().IndexOf('.') - 1;
-        if (decimalPlaces > 6 || Amount < 0)
+        if (decimalPlaces > 8 || Amount < 0)
         {
             yield return new ValidationResult(
                 "Amount invalid.",

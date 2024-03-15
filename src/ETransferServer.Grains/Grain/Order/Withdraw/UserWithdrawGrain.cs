@@ -146,7 +146,7 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         var orderFlowRes = await _orderStatusFlowGrain.AddAsync(orderDto.Status, externalInfo);
 
         // save withdraw order to ES
-        await _userWithdrawProvider.AddOrUpdateSync(orderDto);
+        await _userWithdrawProvider.AddOrUpdateSync(res.Value);
 
         // save order flow to ES
         await _orderStatusFlowProvider.AddOrUpdate(orderDto.Id, orderFlowRes);
