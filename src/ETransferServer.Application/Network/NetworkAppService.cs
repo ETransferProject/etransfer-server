@@ -160,11 +160,6 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
         var exchangeSymbolPair = string.Join(CommonConstant.Underline, fromSymbol, toSymbol);
         var exchangeGrain = _clusterClient.GetGrain<ITokenExchangeGrain>(exchangeSymbolPair);
         var exchange = await exchangeGrain.GetAsync();
-        if (exchange.IsNullOrEmpty() && _exchangeOptions.CurrentValue.BottomExchange.TryGetValue(exchangeSymbolPair, out var bottomExchange))
-        {
-            _logger.LogWarning("Exchange empty, use bottom exchange {Pair}, price={Price}", exchangeSymbolPair, bottomExchange);
-            return bottomExchange.SafeToDecimal();
-        }
         AssertHelper.NotEmpty(exchange, "Exchange data not found {}", exchangeSymbolPair);
 
         var avgExchange = exchange.Values

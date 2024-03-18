@@ -89,6 +89,22 @@ public class TokenExchangeGrain : Grain<TokenExchangeState>, ITokenExchangeGrain
                 _logger.LogError(e, "Query exchange failed, providerName={ProviderName}", providerName);
             }
         }
+
+        if (State.ExchangeInfos.IsNullOrEmpty())
+        {
+            var symbolPair = string.Join(CommonConstant.Underline, fromSymbol, toSymbol);
+            if (_exchangeOptions.CurrentValue.BottomExchange.TryGetValue(symbolPair, out var bottomExchange))
+            {
+                _logger.LogWarning("Exchange empty, use bottom exchange {Pair}, price={Price}", symbolPair, bottomExchange);
+                State.ExchangeInfos.Add(symbolPair, new TokenExchangeDto
+                {
+                    FromSymbol = fromSymbol,
+                    ToSymbol = toSymbol,
+                    Exchange = bottomExchange.SafeToDecimal(),
+                    Timestamp = now
+                });
+            }
+        }
         
         await WriteStateAsync();
         return State.ExchangeInfos;
