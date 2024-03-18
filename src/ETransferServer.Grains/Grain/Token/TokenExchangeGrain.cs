@@ -56,9 +56,16 @@ public class TokenExchangeGrain : Grain<TokenExchangeState>, ITokenExchangeGrain
         }
 
         var asyncTasks = new Dictionary<string, Task<TokenExchangeDto>>();
-        var isUsd = toSymbol.ToUpper() == CommonConstant.Symbol.USD;
-        toSymbol = isUsd ? CommonConstant.Symbol.USDT : toSymbol;
-        var usdToUsdtTask = isUsd ? ExchangeFromUsdtToUsd() : null;
+        var isUsd = toSymbol.ToUpper() == CommonConstant.Symbol.USD ? "to" :
+            fromSymbol.ToUpper() == CommonConstant.Symbol.USD ? "from" : "none";
+        toSymbol = isUsd == "to" ? CommonConstant.Symbol.USDT : toSymbol;
+        fromSymbol = isUsd == "from" ? CommonConstant.Symbol.USDT : fromSymbol;
+        if (isUsd == "from")
+        {
+            (fromSymbol, toSymbol) = (toSymbol, fromSymbol);
+        }
+
+        var usdToUsdtTask = isUsd != "none" ? ExchangeFromUsdtToUsd() : null;
         var providerOption = _exchangeOptions.CurrentValue.GetSymbolProviders(fromSymbol, toSymbol);
         var providers = _exchangeProviders.Values.Where(provider => providerOption.Contains(provider.Name().ToString()))
             .ToList();
@@ -68,7 +75,7 @@ public class TokenExchangeGrain : Grain<TokenExchangeState>, ITokenExchangeGrain
         }
 
         var result = new Dictionary<string, TokenExchangeDto>();
-        var usdtPriceInUsd = isUsd ? await usdToUsdtTask : null;
+        var usdtPriceInUsd = isUsd != "none" ? await usdToUsdtTask : null;
         foreach (var (providerName, exchangeTask) in asyncTasks)
         {
             try
@@ -76,7 +83,8 @@ public class TokenExchangeGrain : Grain<TokenExchangeState>, ITokenExchangeGrain
                 var exchange = await exchangeTask;
 
                 // if usd, convert price to usd
-                exchange.Exchange = isUsd ? exchange.Exchange * usdtPriceInUsd.Exchange : exchange.Exchange;
+                exchange.Exchange = isUsd == "to" ? exchange.Exchange * usdtPriceInUsd.Exchange :
+                    isUsd == "from" ? 1 / (exchange.Exchange * usdtPriceInUsd.Exchange) : exchange.Exchange;
 
                 result.Add(providerName, exchange);
             }
@@ -85,7 +93,7 @@ public class TokenExchangeGrain : Grain<TokenExchangeState>, ITokenExchangeGrain
                 _logger.LogError(e, "Query exchange failed, providerName={ProviderName}", providerName);
             }
         }
-        
+
         if (!result.IsNullOrEmpty())
         {
             return result;
