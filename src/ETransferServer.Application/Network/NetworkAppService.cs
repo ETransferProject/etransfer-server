@@ -162,6 +162,7 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
         var exchange = await exchangeGrain.GetAsync();
         if (exchange.IsNullOrEmpty() && _exchangeOptions.CurrentValue.BottomExchange.TryGetValue(exchangeSymbolPair, out var bottomExchange))
         {
+            _logger.LogWarning("Exchange empty, use bottom exchange {Pair}, price={Price}", exchangeSymbolPair, bottomExchange);
             return bottomExchange.SafeToDecimal();
         }
         AssertHelper.NotEmpty(exchange, "Exchange data not found {}", exchangeSymbolPair);
