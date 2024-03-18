@@ -47,20 +47,18 @@ public class UniswapV3Provider : IExchangeProvider, ISingletonDependency
         {
             return TokenExchangeDto.One(fromSymbol, toSymbol, DateTime.UtcNow.ToUtcMilliSeconds());
         }
-
+        
         var symbolPair = string.Join(CommonConstant.Underline, MappingSymbol(fromSymbol), MappingSymbol(toSymbol));
         var poolId = _exchangeOptions.CurrentValue.UniswapV3.PoolId.GetValueOrDefault(symbolPair);
         AssertHelper.NotEmpty(poolId, "PoolId not found of {}", symbolPair);
         var resp = await _client.SendQueryAsync<ResponseWrapper<List<SwapResponse>>>(new GraphQLRequest
         {
             Query = @"query($poolId:String){
-                        data:swaps(
-                            orderBy: timestamp, orderDirection:desc, first: 1,
-                            where: { pool: $poolId }
+                        data:pools(
+                            where: { id: $poolId }
                         ) {
-                            id, timestamp, 
-                            token0{id, name, derivedETH}, 
-                            token1{id, name, derivedETH}
+                            token0{id, symbol, derivedETH}, 
+                            token1{id, symbol, derivedETH}
                         }
                     }",
             Variables = new
@@ -73,14 +71,15 @@ public class UniswapV3Provider : IExchangeProvider, ISingletonDependency
         AssertHelper.IsTrue(resp.Data != null, "Response data empty");
         AssertHelper.NotEmpty(resp.Data!.Data, "Response list empty");
         var swapResp = resp.Data.Data[0];
-        var price0InEth = swapResp.Token0.DerivedETH.SafeToDecimal();
-        var price1InEth = swapResp.Token1.DerivedETH.SafeToDecimal();
+        
+        var priceFrom = (swapResp.Token0.Symbol.Equals(fromSymbol) ? swapResp.Token0 : swapResp.Token1).DerivedETH.SafeToDecimal();
+        var priceTo = (swapResp.Token0.Symbol.Equals(toSymbol) ? swapResp.Token0 : swapResp.Token1).DerivedETH.SafeToDecimal();
         return new TokenExchangeDto
         {
             FromSymbol = fromSymbol,
             ToSymbol = toSymbol,
             Timestamp = swapResp.Timestamp.SafeToLong() * 1000,
-            Exchange = price1InEth / price0InEth
+            Exchange = priceFrom / priceTo
         };
     }
 
@@ -120,6 +119,7 @@ public class UniswapV3Provider : IExchangeProvider, ISingletonDependency
     public class SwapToken
     {
         public string Id { get; set; }
+        public string Symbol { get; set; }
         public string DerivedETH { get; set; }
         public string Decimals { get; set; }
     }

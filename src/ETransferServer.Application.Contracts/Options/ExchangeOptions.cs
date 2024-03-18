@@ -24,6 +24,15 @@ public class ExchangeOptions
     public Dictionary<string, List<string>> SymbolProviders { get; set; } = new();
 
     public Dictionary<string, string> BottomExchange { get; set; } = new();
+
+    public List<string> SymbolExchangeViaUSDT { get; set; } = new();
+
+    public List<string> GetSymbolProviders(string fromSymbol, string toSymbol)
+    {
+        return SymbolProviders.TryGetValue(fromSymbol.ToUpper(), out var fromProvider) ? fromProvider :
+            SymbolProviders.TryGetValue(toSymbol.ToUpper(), out var toProvider) ? toProvider : DefaultProviders;
+    }
+
 }
 
 public class BinanceOptions

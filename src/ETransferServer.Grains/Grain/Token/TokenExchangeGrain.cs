@@ -38,6 +38,103 @@ public class TokenExchangeGrain : Grain<TokenExchangeState>, ITokenExchangeGrain
     }
 
 
+    public async Task<Dictionary<string, TokenExchangeDto>> DoGetAsync(string fromSymbol, string toSymbol)
+    {
+        var now = DateTime.UtcNow.ToUtcMilliSeconds();
+        if (fromSymbol == toSymbol)
+        {
+            return new Dictionary<string, TokenExchangeDto>
+            {
+                ["default"] = new()
+                {
+                    FromSymbol = fromSymbol,
+                    ToSymbol = toSymbol,
+                    Exchange = 1,
+                    Timestamp = now
+                }
+            };
+        }
+
+        var asyncTasks = new Dictionary<string, Task<TokenExchangeDto>>();
+        var isUsd = toSymbol.ToUpper() == CommonConstant.Symbol.USD;
+        toSymbol = isUsd ? CommonConstant.Symbol.USDT : toSymbol;
+        var usdToUsdtTask = isUsd ? ExchangeFromUsdtToUsd() : null;
+        var providerOption = _exchangeOptions.CurrentValue.GetSymbolProviders(fromSymbol, toSymbol);
+        var providers = _exchangeProviders.Values.Where(provider => providerOption.Contains(provider.Name().ToString()))
+            .ToList();
+        foreach (var provider in providers)
+        {
+            asyncTasks[provider.Name().ToString()] = provider.LatestAsync(fromSymbol, toSymbol);
+        }
+
+        var result = new Dictionary<string, TokenExchangeDto>();
+        var usdtPriceInUsd = isUsd ? await usdToUsdtTask : null;
+        foreach (var (providerName, exchangeTask) in asyncTasks)
+        {
+            try
+            {
+                var exchange = await exchangeTask;
+
+                // if usd, convert price to usd
+                exchange.Exchange = isUsd ? exchange.Exchange * usdtPriceInUsd.Exchange : exchange.Exchange;
+
+                result.Add(providerName, exchange);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "Query exchange failed, providerName={ProviderName}", providerName);
+            }
+        }
+        
+        if (!result.IsNullOrEmpty())
+        {
+            return result;
+        }
+
+        var symbolPair = string.Join(CommonConstant.Underline, fromSymbol, toSymbol);
+        _logger.LogWarning("Exchange empty, use bottom exchange {Pair}", symbolPair);
+        if (!_exchangeOptions.CurrentValue.BottomExchange.TryGetValue(symbolPair, out var bottomExchange))
+        {
+            return result;
+        }
+
+        _logger.LogWarning("Exchange empty, use bottom exchange {Pair}, price={Price}", symbolPair,
+            bottomExchange);
+        result.Add("bottom", new TokenExchangeDto
+        {
+            FromSymbol = fromSymbol,
+            ToSymbol = toSymbol,
+            Exchange = bottomExchange.SafeToDecimal(),
+            Timestamp = now
+        });
+        return result;
+    }
+
+    public async Task<Dictionary<string, TokenExchangeDto>> GetViaUsdt(string fromSymbol, string toSymbol)
+    {
+        var fromToUsdtTask = DoGetAsync(fromSymbol, CommonConstant.Symbol.USDT);
+        var toToUsdtTask = DoGetAsync(toSymbol, CommonConstant.Symbol.USDT);
+
+        var fromToUsdt = await fromToUsdtTask;
+        var toToUsdt = await toToUsdtTask;
+        AssertHelper.NotEmpty(fromToUsdt, "GetViaUSDT failed, from={}, to={}, fromSymbolUsdtEmpty", fromSymbol,
+            toSymbol);
+        AssertHelper.NotEmpty(toToUsdt, "GetViaUSDT failed, from={}, to={}, toSymbolUsdtEmpty", fromSymbol, toSymbol);
+
+
+        return new Dictionary<string, TokenExchangeDto>
+        {
+            ["viaUSDT"] = new()
+            {
+                FromSymbol = fromSymbol,
+                ToSymbol = toSymbol,
+                Timestamp = DateTime.UtcNow.ToUtcMilliSeconds(),
+                Exchange = fromToUsdt.Values.Select(ex => ex.Exchange).Average() /
+                           toToUsdt.Values.Select(ex => ex.Exchange).Average()
+            }
+        };
+    }
+
     public async Task<Dictionary<string, TokenExchangeDto>> GetAsync()
     {
         var now = DateTime.UtcNow.ToUtcMilliSeconds();
@@ -52,60 +149,17 @@ public class TokenExchangeGrain : Grain<TokenExchangeState>, ITokenExchangeGrain
             return new Dictionary<string, TokenExchangeDto>();
         }
 
-        var asyncTasks = new Dictionary<string, Task<TokenExchangeDto>>();
         var fromSymbol = MappingSymbol(symbolValue[0].ToUpper());
         var toSymbol = MappingSymbol(symbolValue[1].ToUpper());
-        
-        var isUsd = toSymbol.ToUpper() == CommonConstant.Symbol.USD;
-        toSymbol = isUsd ? CommonConstant.Symbol.USDT : toSymbol;
-        var usdToUsdtTask = isUsd ? ExchangeFromUsdtToUsd() : null;
-        var providerOption =
-            _exchangeOptions.CurrentValue.SymbolProviders.GetValueOrDefault(symbolValue[isUsd ? 0 : 1].ToUpper(),
-                _exchangeOptions.CurrentValue.DefaultProviders);
-        var providers = _exchangeProviders.Values.Where(provider => providerOption.Contains(provider.Name().ToString()))
-            .ToList();
-        foreach (var provider in providers)
-        {
-            asyncTasks[provider.Name().ToString()] = provider.LatestAsync(fromSymbol, toSymbol);
-        }
+
+        State.ExchangeInfos =
+            _exchangeOptions.CurrentValue.SymbolExchangeViaUSDT.Contains(fromSymbol) ||
+            _exchangeOptions.CurrentValue.SymbolExchangeViaUSDT.Contains(toSymbol)
+                ? await GetViaUsdt(fromSymbol, toSymbol)
+                : await DoGetAsync(fromSymbol, toSymbol);
 
         State.LastModifyTime = now;
         State.ExpireTime = now + _exchangeOptions.CurrentValue.DataExpireSeconds * 1000;
-        State.ExchangeInfos = new Dictionary<string, TokenExchangeDto>();
-        var usdtPriceInUsd = isUsd ? await usdToUsdtTask : null;
-        foreach (var (providerName, exchangeTask) in asyncTasks)
-        {
-            try
-            {
-                var exchange = await exchangeTask;
-                
-                // if usd, convert price to usd
-                exchange.Exchange = isUsd ? exchange.Exchange * usdtPriceInUsd.Exchange : exchange.Exchange;
-                
-                State.ExchangeInfos.Add(providerName, exchange);
-            }
-            catch (Exception e)
-            {
-                _logger.LogError(e, "Query exchange failed, providerName={ProviderName}", providerName);
-            }
-        }
-
-        if (State.ExchangeInfos.IsNullOrEmpty())
-        {
-            var symbolPair = string.Join(CommonConstant.Underline, fromSymbol, toSymbol);
-            if (_exchangeOptions.CurrentValue.BottomExchange.TryGetValue(symbolPair, out var bottomExchange))
-            {
-                _logger.LogWarning("Exchange empty, use bottom exchange {Pair}, price={Price}", symbolPair, bottomExchange);
-                State.ExchangeInfos.Add(symbolPair, new TokenExchangeDto
-                {
-                    FromSymbol = fromSymbol,
-                    ToSymbol = toSymbol,
-                    Exchange = bottomExchange.SafeToDecimal(),
-                    Timestamp = now
-                });
-            }
-        }
-        
         await WriteStateAsync();
         return State.ExchangeInfos;
     }
@@ -115,7 +169,8 @@ public class TokenExchangeGrain : Grain<TokenExchangeState>, ITokenExchangeGrain
     {
         try
         {
-            AssertHelper.IsTrue(_exchangeProviders.ContainsKey(ExchangeProviderName.CoinGecko.ToString()), "CoinGecko not support");
+            AssertHelper.IsTrue(_exchangeProviders.ContainsKey(ExchangeProviderName.CoinGecko.ToString()),
+                "CoinGecko not support");
             var resp = await _exchangeProviders.GetValueOrDefault(ExchangeProviderName.CoinGecko.ToString())
                 .LatestAsync(CommonConstant.Symbol.USDT, CommonConstant.Symbol.USD);
             return resp;
@@ -131,7 +186,6 @@ public class TokenExchangeGrain : Grain<TokenExchangeState>, ITokenExchangeGrain
                 Exchange = 1M
             };
         }
-
     }
 
 
