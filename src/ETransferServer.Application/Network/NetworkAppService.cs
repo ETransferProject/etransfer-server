@@ -26,6 +26,7 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
     private readonly ILogger<NetworkAppService> _logger;
     private readonly NetworkOptions _networkOptions;
     private readonly CoinGeckoOptions _coinGeckoOptions;
+    private readonly IOptionsMonitor<ExchangeOptions> _exchangeOptions;
     private readonly IObjectMapper _objectMapper;
     private readonly IClusterClient _clusterClient;
     private const int ThirdPartDigitals = 4;
@@ -34,13 +35,14 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
         IOptionsSnapshot<NetworkOptions> networkOptions,
         IOptionsSnapshot<CoinGeckoOptions> coinGeckoOptions,
         IObjectMapper objectMapper,
-        IClusterClient clusterClient)
+        IClusterClient clusterClient, IOptionsMonitor<ExchangeOptions> exchangeOptions)
     {
         _logger = logger;
         _networkOptions = networkOptions.Value;
         _coinGeckoOptions = coinGeckoOptions.Value;
         _objectMapper = objectMapper;
         _clusterClient = clusterClient;
+        _exchangeOptions = exchangeOptions;
     }
 
     public async Task<GetNetworkListDto> GetNetworkListAsync(GetNetworkListRequestDto request)
@@ -158,6 +160,10 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
         var exchangeSymbolPair = string.Join(CommonConstant.Underline, fromSymbol, toSymbol);
         var exchangeGrain = _clusterClient.GetGrain<ITokenExchangeGrain>(exchangeSymbolPair);
         var exchange = await exchangeGrain.GetAsync();
+        if (exchange.IsNullOrEmpty() && _exchangeOptions.CurrentValue.BottomExchange.TryGetValue(exchangeSymbolPair, out var bottomExchange))
+        {
+            return bottomExchange.SafeToDecimal();
+        }
         AssertHelper.NotEmpty(exchange, "Exchange data not found {}", exchangeSymbolPair);
 
         var avgExchange = exchange.Values

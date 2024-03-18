@@ -22,6 +22,8 @@ public class ExchangeOptions
     };
 
     public Dictionary<string, List<string>> SymbolProviders { get; set; } = new();
+
+    public Dictionary<string, string> BottomExchange { get; set; } = new();
 }
 
 public class BinanceOptions
