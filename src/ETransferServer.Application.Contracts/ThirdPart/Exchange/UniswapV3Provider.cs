@@ -72,8 +72,8 @@ public class UniswapV3Provider : IExchangeProvider, ISingletonDependency
         AssertHelper.NotEmpty(resp.Data!.Data, "Response list empty");
         var swapResp = resp.Data.Data[0];
         
-        var priceFrom = (swapResp.Token0.Symbol.Equals(fromSymbol) ? swapResp.Token0 : swapResp.Token1).DerivedETH.SafeToDecimal();
-        var priceTo = (swapResp.Token0.Symbol.Equals(toSymbol) ? swapResp.Token0 : swapResp.Token1).DerivedETH.SafeToDecimal();
+        var priceFrom = (swapResp.Token0.Symbol.Equals(from) ? swapResp.Token0 : swapResp.Token1).DerivedETH.SafeToDecimal();
+        var priceTo = (swapResp.Token0.Symbol.Equals(to) ? swapResp.Token0 : swapResp.Token1).DerivedETH.SafeToDecimal();
         return new TokenExchangeDto
         {
             FromSymbol = fromSymbol,
