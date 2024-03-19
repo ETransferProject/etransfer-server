@@ -80,7 +80,7 @@ public partial class UserWithdrawGrain
                 _logger.LogError("Order {Id} ToTransferFailed, invalid status, current status={Status}",
                     this.GetPrimaryKey(),
                     status.ToString());
-                await ReverseTokenLimitAsync(orderDto.Id, orderDto.ToTransfer.Symbol, orderDto.FromTransfer.Amount);
+                await ReverseTokenLimitAsync(orderDto.Id, orderDto.ToTransfer.Symbol, orderDto.AmountUsd);
                 break;
             
             // To completed stream
@@ -92,7 +92,7 @@ public partial class UserWithdrawGrain
             case OrderStatusEnum.Failed:
                 _logger.LogInformation("Order {Id} stream end, current status={Status}", this.GetPrimaryKey(),
                     status.ToString());
-                await ReverseTokenLimitAsync(orderDto.Id, orderDto.ToTransfer.Symbol, orderDto.FromTransfer.Amount);
+                await ReverseTokenLimitAsync(orderDto.Id, orderDto.ToTransfer.Symbol, orderDto.AmountUsd);
                 break;
 
             // Invalid status

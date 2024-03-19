@@ -16,7 +16,8 @@
       "OPTIMISM_USDT" : "USDT@OPTIMISM",
       "Solana_USDT" : "USDT@Solana",
       "TRX_USDT" : "USDT@TRX",
-      "VAPOR_USDT" : "USDT@VAPOR"
+      "VAPOR_USDT" : "USDT@VAPOR",
+      "ETH_SGR" : "SGR-1@ETH"
     }
   }
   

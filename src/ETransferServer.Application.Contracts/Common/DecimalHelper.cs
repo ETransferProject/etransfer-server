@@ -47,5 +47,8 @@ public static class DecimalHelper
         return decimals.ToString();
     }
 
-
+    public static int GetDecimals(string symbol)
+    {
+        return symbol == CommonConstant.Symbol.USDT ? 6 : 8;
+    }
 }

@@ -28,10 +28,17 @@ public static class CommonConstant
         public const string AElf = "AELF";
         public const string ETH = "ETH";
     }
+    
+    public static class NetworkStatus
+    {
+        public const string Health = "Health";
+        public const string Offline = "Offline";
+    }
 
     public static class Symbol
     {
         public const string Elf = "ELF";
+        public const string USD = "USD";
         public const string USDT = "USDT";
         
     }

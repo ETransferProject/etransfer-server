@@ -22,4 +22,6 @@ public enum ExchangeProviderName
     Binance,
     Okx,
     CoinGecko,
+    GateIo,
+    UniSwapV3,
 }

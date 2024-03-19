@@ -26,22 +26,23 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
     private readonly ILogger<NetworkAppService> _logger;
     private readonly NetworkOptions _networkOptions;
     private readonly CoinGeckoOptions _coinGeckoOptions;
+    private readonly IOptionsMonitor<ExchangeOptions> _exchangeOptions;
     private readonly IObjectMapper _objectMapper;
     private readonly IClusterClient _clusterClient;
     private const int ThirdPartDigitals = 4;
-    private const int ThirdPartDecimals = 6;
 
     public NetworkAppService(ILogger<NetworkAppService> logger, 
         IOptionsSnapshot<NetworkOptions> networkOptions,
         IOptionsSnapshot<CoinGeckoOptions> coinGeckoOptions,
         IObjectMapper objectMapper,
-        IClusterClient clusterClient)
+        IClusterClient clusterClient, IOptionsMonitor<ExchangeOptions> exchangeOptions)
     {
         _logger = logger;
         _networkOptions = networkOptions.Value;
         _coinGeckoOptions = coinGeckoOptions.Value;
         _objectMapper = objectMapper;
         _clusterClient = clusterClient;
+        _exchangeOptions = exchangeOptions;
     }
 
     public async Task<GetNetworkListDto> GetNetworkListAsync(GetNetworkListRequestDto request)
@@ -49,7 +50,8 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
         try
         {
             var getNetworkListDto = await GetNetworkListWithLocalFeeAsync(request);
-
+            if (request.Type == OrderTypeEnum.Deposit.ToString()) return getNetworkListDto;
+            
             // fill withdraw fee
             foreach (var networkDto in getNetworkListDto.NetworkList)
             {
@@ -59,16 +61,18 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
 
             try
             {
-                getNetworkListDto.NetworkList =
-                    await CalculateNetworkFeeListAsync(getNetworkListDto.NetworkList, request.Symbol);
+                getNetworkListDto.NetworkList = request.Symbol == CommonConstant.Symbol.USDT ?
+                    await CalculateNetworkFeeListAsync(getNetworkListDto.NetworkList, request.Symbol)
+                    : await CalculateAvgNetworkFeeListAsync(getNetworkListDto.NetworkList, request.Symbol);
             }
             catch (Exception e)
             {
                 foreach (var networkDto in getNetworkListDto.NetworkList)
                 {
                     networkDto.WithdrawFee = null;
+                    networkDto.WithdrawFeeUnit = request.Symbol;
                 }
-                _logger.LogError(e, "Get withdraw fee failed by CoinGecko.");
+                _logger.LogError(e, "Get withdraw fee failed by exchange.");
             }
             return getNetworkListDto;
         }
@@ -93,17 +97,14 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
         AssertHelper.NotEmpty(request.Type, "Invalid type. Please refresh and try again.");
         AssertHelper.NotEmpty(request.Symbol, "Invalid symbol. Please refresh and try again.");
         AssertHelper.IsTrue(request.Type == OrderTypeEnum.Deposit.ToString()
-                            || request.Type == OrderTypeEnum.Withdraw.ToString(), "Invalid type value. Please refresh and try again.");
+                            || request.Type == OrderTypeEnum.Withdraw.ToString(),
+            "Invalid type value. Please refresh and try again.");
+        AssertHelper.IsTrue(_networkOptions.NetworkMap.ContainsKey(request.Symbol),
+            "Symbol is not exist. Please refresh and try again.");
 
-        var networkConfigs = new List<NetworkConfig>();
-        if (_networkOptions.NetworkMap.TryGetValue(request.Symbol, out var result))
-        {
-            AssertHelper.NotNull(request, "Symbol not exists. Please refresh and try again.");
-            AssertHelper.NotEmpty(result, "Support network empty. Please refresh and try again.");
-            networkConfigs = result.Where(a =>
-                    a.SupportType.Contains(request.Type) && a.SupportChain.Contains(request.ChainId))
-                .ToList();
-        }
+        var networkConfigs = _networkOptions.NetworkMap[request.Symbol].Where(a =>
+                a.SupportType.Contains(request.Type) && a.SupportChain.Contains(request.ChainId))
+            .ToList();
 
         var networkInfos = networkConfigs.Select(config => config.NetworkInfo).ToList();
         var withdrawInfo = networkConfigs
@@ -111,25 +112,26 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
             .ToDictionary(config => config.NetworkInfo.Network, config => config.WithdrawInfo);
         var getNetworkListDto = new GetNetworkListDto();
         getNetworkListDto.ChainId = request.ChainId;
-        
+
         getNetworkListDto.NetworkList = _objectMapper.Map<List<NetworkInfo>, List<NetworkDto>>(networkInfos);
         FillMultiConfirmMinutes(request.Type, getNetworkListDto.NetworkList, networkConfigs);
 
         foreach (var networkDto in getNetworkListDto.NetworkList)
         {
-            if (!withdrawInfo.TryGetValue(networkDto.Network, out var withdraw)) continue;
-            networkDto.WithdrawFeeUnit = request.Symbol;
+            if (request.Type == OrderTypeEnum.Deposit.ToString() ||
+                !withdrawInfo.TryGetValue(networkDto.Network, out var withdraw)) continue;
+            networkDto.WithdrawFeeUnit = withdraw.WithdrawLocalFeeUnit;
             networkDto.WithdrawFee = withdraw.WithdrawLocalFee.ToString(CultureInfo.InvariantCulture);
         }
-        
+
         if (request.Address.IsNullOrEmpty()) return getNetworkListDto;
-        
+
         var networkByAddress = _networkOptions.NetworkPattern
             .Where(kv => request.Address.Match(kv.Key))
             .SelectMany(kv => kv.Value)
             .ToList();
         AssertHelper.NotEmpty(networkByAddress, ErrorResult.AddressFormatWrongCode);
-        
+
         getNetworkListDto.NetworkList = getNetworkListDto.NetworkList
             .Where(net => net.Network.IsIn(networkByAddress))
             .ToList();
@@ -148,7 +150,14 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
         var feeCoin = coin.FeeCoin.Split(CommonConstant.Underline);
         var feeSymbol = feeCoin.Length == 1 ? feeCoin[0] : feeCoin[1];
 
-        var exchangeSymbolPair = string.Join(CommonConstant.Underline, feeSymbol, symbol);
+        var avgExchange = await GetAvgExchangeAsync(feeSymbol, symbol);
+        var estimateFee = coin.AbsEstimateFee.SafeToDecimal() * avgExchange;
+        return Tuple.Create(estimateFee, coin);
+    }
+    
+    public async Task<decimal> GetAvgExchangeAsync(string fromSymbol, string toSymbol)
+    {
+        var exchangeSymbolPair = string.Join(CommonConstant.Underline, fromSymbol, toSymbol);
         var exchangeGrain = _clusterClient.GetGrain<ITokenExchangeGrain>(exchangeSymbolPair);
         var exchange = await exchangeGrain.GetAsync();
         AssertHelper.NotEmpty(exchange, "Exchange data not found {}", exchangeSymbolPair);
@@ -160,9 +169,7 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
         _logger.LogDebug("Exchange: {Exchange}", string.Join(CommonConstant.Comma,
             exchange.Select(kv => string.Join(CommonConstant.Hyphen, kv.Key, kv.Value.FromSymbol, kv.Value.ToSymbol,
                 kv.Value.Exchange, kv.Value.Timestamp)).ToArray()));
-
-        var estimateFee = coin.AbsEstimateFee.SafeToDecimal() * avgExchange;
-        return Tuple.Create(estimateFee, coin);
+        return avgExchange;
     }
 
     private async Task<List<NetworkDto>> CalculateNetworkFeeListAsync(List<NetworkDto> networkList, string symbol)
@@ -174,13 +181,27 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
 
         foreach (var network in networkList)
         {
-            network.WithdrawFee = (network.WithdrawFee.SafeToDecimal() * exchange[_coinGeckoOptions.CoinIdMapping[network.Network]].Exchange)
-                .ToString(ThirdPartDigitals, ThirdPartDecimals, DecimalHelper.RoundingOption.Ceiling);
+            network.WithdrawFee = (network.WithdrawFee.SafeToDecimal() * exchange[_coinGeckoOptions.CoinIdMapping[network.WithdrawFeeUnit]].Exchange)
+                .ToString(ThirdPartDigitals, DecimalHelper.GetDecimals(symbol), DecimalHelper.RoundingOption.Ceiling);
+            network.WithdrawFeeUnit = symbol;
         }
 
         return networkList;
     }
     
+    private async Task<List<NetworkDto>> CalculateAvgNetworkFeeListAsync(List<NetworkDto> networkList, string symbol)
+    {
+        foreach (var network in networkList)
+        {
+            var avgExchange = await GetAvgExchangeAsync(network.Network, symbol);
+            network.WithdrawFee = (network.WithdrawFee.SafeToDecimal() * avgExchange)
+                .ToString(ThirdPartDigitals, DecimalHelper.GetDecimals(symbol), DecimalHelper.RoundingOption.Ceiling);
+            network.WithdrawFeeUnit = symbol;
+        }
+
+        return networkList;
+    }
+
     private async Task<string> GetCacheFeeAsync(string network, string symbol)
     {
         var coBoCoinGrain = _clusterClient.GetGrain<ICoBoCoinGrain>(ICoBoCoinGrain.Id(network, symbol));
@@ -200,14 +221,20 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
             var multiConfirmSeconds = config.NetworkInfo.MultiConfirmSeconds;
             if (type == OrderTypeEnum.Deposit.ToString() && config.DepositInfo != null)
             {
+                networkDto.Status = config.DepositInfo.IsOpen
+                    ? CommonConstant.NetworkStatus.Health
+                    : CommonConstant.NetworkStatus.Offline;
                 multiConfirmSeconds = config.DepositInfo.MultiConfirmSeconds;
             }
 
             if (type == OrderTypeEnum.Withdraw.ToString() && config.WithdrawInfo != null)
             {
+                networkDto.Status = config.WithdrawInfo.IsOpen
+                    ? CommonConstant.NetworkStatus.Health
+                    : CommonConstant.NetworkStatus.Offline;
                 multiConfirmSeconds = config.WithdrawInfo.MultiConfirmSeconds;
             }
-            
+
             networkDto.MultiConfirmTime = TimeHelper.SecondsToMinute((int)multiConfirmSeconds);
         }
     }

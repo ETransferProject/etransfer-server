@@ -56,7 +56,7 @@ public class WithdrawFeeMonitorGrain : Grain<WithdrawFeeMonitorDto>, IWithdrawFe
 
             var netWorkInfo =
                 _withdrawNetworkOptions.CurrentValue.NetworkInfos.FirstOrDefault(n =>
-                    n.Coin == string.Join(CommonConstant.Underline, network, symbol));
+                    n.Coin.StartsWith(string.Join(CommonConstant.Underline, network, CommonConstant.EmptyString)));
             AssertHelper.NotNull(netWorkInfo, "Network {} not found", network);
 
             var latestFeeTime = State.FeeTime;
@@ -71,6 +71,9 @@ public class WithdrawFeeMonitorGrain : Grain<WithdrawFeeMonitorDto>, IWithdrawFe
             var currentFeeAmount = currentFee.Amount.SafeToDecimal();
             var latestFeeAmount = latestFee.Amount.SafeToDecimal();
             var percent = Math.Abs(currentFeeAmount - latestFeeAmount) / latestFeeAmount * 100;
+            _logger.LogDebug(
+                "Withdraw fee monitor, latest={Latest}, current={Current}, percent={Percent}, Network={Network}, Symbol={Symbol}",
+                latestFeeAmount, currentFeeAmount, percent, network, feeInfo.Symbol);
             if (percent <= netWorkInfo.FeeAlarmPercent) return;
 
             var sendSuccess =

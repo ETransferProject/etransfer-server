@@ -52,6 +52,10 @@ public class BinanceProvider : IExchangeProvider
 
     public async Task<TokenExchangeDto> LatestAsync(string fromToken, string toToken)
     {
+        if (fromToken == toToken)
+        {
+            return TokenExchangeDto.One(fromToken, toToken, DateTime.UtcNow.ToUtcMilliSeconds());
+        }
         return await BlockDetectAsync(async () =>
         {
             var res = await _httpProvider.InvokeAsync<BinanceTickerPrice>(
@@ -76,6 +80,10 @@ public class BinanceProvider : IExchangeProvider
 
     public async Task<TokenExchangeDto> HistoryAsync(string fromToken, string toToken, long timestamp)
     {
+        if (fromToken == toToken)
+        {
+            return TokenExchangeDto.One(fromToken, toToken, timestamp);
+        }
         return await BlockDetectAsync(async () =>
         {
             var time = TimeHelper.GetDateTimeFromTimeStamp(timestamp)

@@ -9,6 +9,7 @@ using ETransferServer.Common;
 using ETransferServer.Deposit.Dtos;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Models;
+using ETransferServer.Network;
 using ETransferServer.Options;
 using ETransferServer.Orders;
 using ETransferServer.User;
@@ -29,18 +30,21 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
     private readonly ILogger<OrderDepositAppService> _logger;
     private readonly NetworkOptions _networkInfoOptions;
     private readonly IUserAddressService _userAddressService;
+    private readonly INetworkAppService _networkAppService;
 
     public OrderDepositAppService(INESTRepository<DepositOrder, Guid> depositOrderIndexRepository,
         IObjectMapper objectMapper,
         ILogger<OrderDepositAppService> logger,
         IOptionsSnapshot<NetworkOptions> networkInfoOptions,
-        IUserAddressService userAddressService)
+        IUserAddressService userAddressService,
+        INetworkAppService networkAppService)
     {
         _depositOrderIndexRepository = depositOrderIndexRepository;
         _networkInfoOptions = networkInfoOptions.Value;
         _objectMapper = objectMapper;
         _logger = logger;
         _userAddressService = userAddressService;
+        _networkAppService = networkAppService;
     }
 
     public async Task<GetDepositInfoDto> GetDepositInfoAsync(GetDepositRequestDto request)
@@ -73,7 +77,19 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
                 MinAmount = depositInfo.MinDeposit,
                 ExtraNotes = depositInfo.ExtraNotes
             };
-
+            try
+            {
+                var avgExchange =
+                    await _networkAppService.GetAvgExchangeAsync(request.Symbol, CommonConstant.Symbol.USD);
+                getDepositInfoDto.DepositInfo.MinAmountUsd =
+                    (depositInfo.MinDeposit.SafeToDecimal() * avgExchange).ToString(
+                        DecimalHelper.GetDecimals(request.Symbol),
+                        DecimalHelper.RoundingOption.Ceiling);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "Get deposit avg exchange failed.");
+            }
 
             return getDepositInfoDto;
         }

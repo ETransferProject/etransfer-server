@@ -93,7 +93,7 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
         var orderFlowRes = await _orderStatusFlowGrain.AddAsync(orderDto.Status, externalInfo);
 
         // save deposit order to ES
-        await _userDepositProvider.AddOrUpdateSync(orderDto);
+        await _userDepositProvider.AddOrUpdateSync(res.Value);
 
         // save order flow to ES
         await _orderStatusFlowProvider.AddOrUpdate(orderDto.Id, orderFlowRes);

@@ -28,6 +28,7 @@ using Google.Protobuf;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 using Orleans;
 using Portkey.Contracts.CA;
 using Volo.Abp;
@@ -51,7 +52,6 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
     private const string TransferToken = "TransferToken";
     private const string PortKeyVersion = "v1";
     private const string PortKeyVersion2 = "v2";
-    private const int ThirdPartDecimals = 6;
     private const int ElfDecimals = 8;
 
     private readonly INESTRepository<Orders.WithdrawOrder, Guid> _withdrawOrderIndexRepository;
@@ -117,22 +117,18 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
 
             var tokenLimit = await tokenInfoGrain.GetLimit();
             var withdrawInfoDto = new WithdrawInfoDto();
-            withdrawInfoDto.MaxAmount = tokenLimit.RemainingLimit.ToString();
             withdrawInfoDto.LimitCurrency = request.Symbol;
-            withdrawInfoDto.RemainingLimit = tokenLimit.RemainingLimit.ToString();
             withdrawInfoDto.TransactionUnit = request.Symbol;
-            withdrawInfoDto.TotalLimit =
-                _networkInfoOptions.CurrentValue.WithdrawLimit24H.ToString(CultureInfo.InvariantCulture);
 
             // query async
             var networkFeeTask = CalculateNetworkFeeAsync(request.ChainId, request.Version);
+            var decimals = DecimalHelper.GetDecimals(request.Symbol);
             var thirdPartFeeTask = request.Network.IsNullOrEmpty()
                 ? CalculateThirdPartFeesWithCacheAsync(userId, request.Symbol)
                 : CalculateThirdPartFeeAsync(userId, request.Network, request.Symbol);
 
             var (feeAmount, expireAt) = await thirdPartFeeTask;
-            withdrawInfoDto.TransactionFee =
-                feeAmount.ToString(ThirdPartDecimals, DecimalHelper.RoundingOption.Ceiling);
+            withdrawInfoDto.TransactionFee = feeAmount.ToString(decimals, DecimalHelper.RoundingOption.Ceiling);
             withdrawInfoDto.TransactionUnit = request.Symbol;
             withdrawInfoDto.ExpiredTimestamp = expireAt.ToString();
 
@@ -144,8 +140,38 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             withdrawInfoDto.MinAmount = Math.Max(feeAmount, _withdrawOptions.CurrentValue.MinThirdPartFee)
                 .ToString(2, DecimalHelper.RoundingOption.Ceiling);
             withdrawInfoDto.ReceiveAmount = receiveAmount > 0
-                ? receiveAmount.ToString(ThirdPartDecimals, DecimalHelper.RoundingOption.Ceiling)
-                : withdrawInfoDto.ReceiveAmount;
+                ? receiveAmount.ToString(decimals, DecimalHelper.RoundingOption.Ceiling)
+                : withdrawInfoDto.ReceiveAmount ?? default(int).ToString();
+            try
+            {
+                var avgExchange =
+                    await _networkAppService.GetAvgExchangeAsync(request.Symbol, CommonConstant.Symbol.USD);
+                withdrawInfoDto.TotalLimit =
+                    (_networkInfoOptions.CurrentValue.WithdrawLimit24H / avgExchange).ToString(decimals,
+                        DecimalHelper.RoundingOption.Ceiling);
+                withdrawInfoDto.MaxAmount = (tokenLimit.RemainingLimit / avgExchange).ToString(decimals,
+                    DecimalHelper.RoundingOption.Ceiling);
+                withdrawInfoDto.RemainingLimit = withdrawInfoDto.MaxAmount;
+                withdrawInfoDto.AmountUsd =
+                    (request.Amount * avgExchange).ToString(decimals,
+                        DecimalHelper.RoundingOption.Ceiling);
+                withdrawInfoDto.ReceiveAmountUsd =
+                    (withdrawInfoDto.ReceiveAmount.SafeToDecimal() * avgExchange).ToString(decimals,
+                        DecimalHelper.RoundingOption.Ceiling);
+                var fee = feeAmount * avgExchange;
+                if (networkFee > 0)
+                {
+                    avgExchange =
+                        await _networkAppService.GetAvgExchangeAsync(CommonConstant.Symbol.Elf, CommonConstant.Symbol.USD);
+                    fee += networkFee * avgExchange;
+                }
+                withdrawInfoDto.FeeUsd = fee.ToString(decimals, DecimalHelper.RoundingOption.Ceiling);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "Get withdraw avg exchange failed.");
+            }
+
             if (request.Address.IsNullOrEmpty())
                 return new GetWithdrawInfoDto { WithdrawInfo = withdrawInfoDto };
 
@@ -220,7 +246,8 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         var (estimateFee, coin) = await _networkAppService.CalculateNetworkFeeAsync(network, symbol);
 
         var coinFeeCacheKey = CacheKey(FeeInfo.FeeName.CoBoFee, userId.ToString(), network, symbol);
-        await _coBoCoinCache.SetAsync(coinFeeCacheKey, new CoBoCoinDto { AbsEstimateFee = estimateFee.ToString(ThirdPartDecimals, DecimalHelper.RoundingOption.Ceiling) }, 
+        var decimals = DecimalHelper.GetDecimals(symbol);
+        await _coBoCoinCache.SetAsync(coinFeeCacheKey, new CoBoCoinDto { AbsEstimateFee = estimateFee.ToString(decimals, DecimalHelper.RoundingOption.Ceiling) }, 
             new DistributedCacheEntryOptions
             {
                 AbsoluteExpiration = DateTimeOffset.UtcNow.AddSeconds(_withdrawInfoOptions.ThirdPartCacheFeeExpireSeconds)
@@ -232,7 +259,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         {
             // If new data is generated
             // go through the monitoring logic.
-            await DoMonitorAsync(network, estimateFee, symbol);
+            await DoMonitorAsync(network, coin.AbsEstimateFee.SafeToDecimal(), coin.FeeCoin);
             _coBoCoinCache.GetOrAdd(monitorCacheKey, () => coin, () => new DistributedCacheEntryOptions
             {
                 AbsoluteExpiration = DateTimeOffset.FromUnixTimeMilliseconds(coin.ExpireTime)
@@ -244,6 +271,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
 
     public async Task DoMonitorAsync(string network, decimal estimateFee, string symbol)
     {
+        _logger.LogDebug("Withdraw fee monitor, network={Network}, fee={Fee}, symbol={Symbol}", network, estimateFee, symbol);
         await _clusterClient
             .GetGrain<IWithdrawFeeMonitorGrain>(IWithdrawFeeMonitorGrain.GrainId(ThirdPartServiceNameEnum.Cobo,
                 network, symbol))
@@ -338,12 +366,14 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
 
     public async Task<CreateWithdrawOrderDto> CreateWithdrawOrderInfoAsync(GetWithdrawOrderRequestDto request)
     {
-        try {
+        try
+        {
             var userId = CurrentUser.GetId();
-            AssertHelper.IsTrue(request.FromChainId == ChainId.AELF || request.FromChainId == ChainId.tDVV ||
+            AssertHelper.IsTrue(
+                request.FromChainId == ChainId.AELF || request.FromChainId == ChainId.tDVV ||
                 request.FromChainId == ChainId.tDVW, ErrorResult.ChainIdInvalidCode);
             AssertHelper.IsTrue(_networkInfoOptions.CurrentValue.NetworkMap.ContainsKey(request.Symbol),
-                ErrorResult.SymbolInvalidCode);
+                ErrorResult.SymbolInvalidCode, null, request.Symbol);
             AssertHelper.IsTrue(await IsAddressSupport(request.FromChainId, request.Symbol, request.ToAddress),
                 ErrorResult.AddressInvalidCode);
 
@@ -355,11 +385,12 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             var userDto = await userGrain.GetUser();
             AssertHelper.IsTrue(userDto.Success, ErrorResult.JwtInvalidCode);
 
-            var coBoCoinCacheKey = CacheKey(FeeInfo.FeeName.CoBoFee, userId.ToString(), request.Network, request.Symbol);
+            var coBoCoinCacheKey =
+                CacheKey(FeeInfo.FeeName.CoBoFee, userId.ToString(), request.Network, request.Symbol);
             var thirdPartFeeDto = await _coBoCoinCache.GetAsync(coBoCoinCacheKey);
             AssertHelper.IsTrue(thirdPartFeeDto != null, ErrorResult.FeeExpiredCode);
             _logger.LogDebug("Cobo fee get cache: {fee}", thirdPartFeeDto.AbsEstimateFee);
-        
+
             var inputThirdPartFee = thirdPartFeeDto.AbsEstimateFee.SafeToDecimal(-1);
             AssertHelper.IsTrue(inputThirdPartFee >= 0, ErrorResult.FeeInvalidCode);
 
@@ -378,7 +409,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
                 .ToString(2, DecimalHelper.RoundingOption.Ceiling)
                 .SafeToDecimal();
             AssertHelper.IsTrue(request.Amount >= minWithdraw, ErrorResult.AmountInsufficientCode);
-            
+
             // Verify that the transaction information matches the order
             var transaction =
                 Transaction.Parser.ParseFrom(ByteArrayHelper.HexStringToByteArray(request.RawTransaction));
@@ -389,8 +420,10 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             var tokenGrain = _clusterClient.GetGrain<ITokenGrain>(ITokenGrain.GenGrainId(transferTokenInput.Symbol,
                 request.FromChainId));
             var tokenDto = await tokenGrain.GetToken();
-            AssertHelper.NotNull(tokenDto, ErrorResult.SymbolNullCode);
-            AssertHelper.IsTrue(transferTokenInput.Symbol == request.Symbol, ErrorResult.SymbolNotEqualCode);
+            _logger.LogDebug("Token info: {Token}", JsonConvert.SerializeObject(tokenDto));
+            AssertHelper.NotNull(tokenDto, ErrorResult.SymbolInvalidCode, transferTokenInput.Symbol);
+            AssertHelper.IsTrue(transferTokenInput.Symbol == request.Symbol, ErrorResult.SymbolInvalidCode, null,
+                transferTokenInput.Symbol);
 
             var expectedAmount = request.Amount * (decimal)Math.Pow(10, tokenDto.Decimals);
             AssertHelper.IsTrue(transferTokenInput.Amount == expectedAmount, ErrorResult.AmountNotEqualCode);
@@ -418,9 +451,10 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         await AssertTxReplayAttacksAsync(transaction);
 
         // amount limit
+        var amountUsd = await CalculateAmountUsdAsync(request.Symbol, request.Amount);
         var tokenInfoGrain =
             _clusterClient.GetGrain<ITokenWithdrawLimitGrain>(ITokenWithdrawLimitGrain.GenerateGrainId(request.Symbol));
-        AssertHelper.IsTrue(await tokenInfoGrain.Acquire(request.Amount), ErrorResult.WithdrawLimitInsufficientCode, null,
+        AssertHelper.IsTrue(await tokenInfoGrain.Acquire(amountUsd), ErrorResult.WithdrawLimitInsufficientCode, null,
             (await tokenInfoGrain.GetLimit()).RemainingLimit, TimeHelper.GetHourDiff(DateTime.UtcNow,
                 DateTime.UtcNow.AddDays(1).Date));
         try
@@ -432,6 +466,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
                 UserId = CurrentUser.GetId(),
                 RawTransaction = request.RawTransaction,
                 OrderType = OrderTypeEnum.Withdraw.ToString(),
+                AmountUsd = amountUsd,
                 FromTransfer = new TransferInfo
                 {
                     ChainId = request.FromChainId,
@@ -461,7 +496,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         }
         catch (Exception e)
         {
-            await tokenInfoGrain.Reverse((long)request.Amount);
+            await tokenInfoGrain.Reverse(amountUsd);
             _logger.LogError(e,
                 "Create withdraw order error, fromChainId:{FromChainId}, network:{Network}, rawTransaction:{RawTransaction}, toAddress:{ToAddress}, amount:{Amount}, symbol:{Symbol}",
                 request.FromChainId, request.Network, request.RawTransaction, request.ToAddress, request.Amount,
@@ -476,6 +511,25 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         var transactionGrain = _clusterClient.GetGrain<ITransactionGrain>(rawTransactionHash);
         var saveTransactionResult = await transactionGrain.Create();
         AssertHelper.IsTrue(saveTransactionResult.Success, ErrorResult.TransactionFailCode);
+    }
+
+    private async Task<decimal> CalculateAmountUsdAsync(string symbol, decimal amount)
+    {
+        var amountUsd = 0M;
+        try
+        {
+            var avgExchange =
+                await _networkAppService.GetAvgExchangeAsync(symbol, CommonConstant.Symbol.USD);
+            amountUsd = amount * avgExchange;
+            _logger.LogDebug("CalculateAmountUsd: {symbol}, {amount}, {amountUsd}", symbol, amount, amountUsd);
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Create withdraw order error in exchange usd, symbol: {symbol}", symbol);
+        }
+
+        AssertHelper.IsTrue(amountUsd > 0, ErrorResult.TransactionFailCode);
+        return amountUsd;
     }
 
     public async Task<bool> AddOrUpdateAsync(WithdrawOrderDto dto)

@@ -1,3 +1,6 @@
+using ETransferServer.ThirdPart.Exchange;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans;
 using Volo.Abp.AutoMapper;
 using Volo.Abp.EventBus;
 using Volo.Abp.Modularity;
@@ -7,6 +10,7 @@ namespace ETransferServer;
 [DependsOn(
     typeof(AbpEventBusModule),
     typeof(ETransferServerApplicationModule),
+    // typeof(ETransferServerOrleansTestBaseModule),
     typeof(ETransferServerApplicationContractsModule),
     typeof(ETransferServerOrleansTestBaseModule),
     typeof(ETransferServerDomainTestModule)
@@ -17,6 +21,5 @@ public class ETransferServerApplicationTestModule : AbpModule
     {
         base.ConfigureServices(context);
         Configure<AbpAutoMapperOptions>(options => { options.AddMaps<ETransferServerApplicationModule>(); });
-        
     }
 }
