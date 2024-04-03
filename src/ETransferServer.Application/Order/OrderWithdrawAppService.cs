@@ -54,7 +54,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
     private const string PortKeyVersion2 = "v2";
     private const int ElfDecimals = 8;
 
-    private readonly INESTRepository<Orders.WithdrawOrder, Guid> _withdrawOrderIndexRepository;
+    private readonly INESTRepository<Orders.OrderIndex, Guid> _withdrawOrderIndexRepository;
     private readonly IObjectMapper _objectMapper;
     private readonly ILogger<OrderWithdrawAppService> _logger;
     private readonly IClusterClient _clusterClient;
@@ -68,7 +68,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
     private readonly IDistributedCache<Tuple<decimal, long>> _minThirdPartFeeCache;
 
 
-    public OrderWithdrawAppService(INESTRepository<Orders.WithdrawOrder, Guid> WithdrawOrderIndexRepository,
+    public OrderWithdrawAppService(INESTRepository<Orders.OrderIndex, Guid> withdrawOrderIndexRepository,
         IObjectMapper objectMapper,
         ILogger<OrderWithdrawAppService> logger, 
         IOptionsMonitor<NetworkOptions> networkInfoOptions,
@@ -82,7 +82,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         IDistributedCache<Tuple<decimal, long>> minThirdPartFeeCache
         )
     {
-        _withdrawOrderIndexRepository = WithdrawOrderIndexRepository;
+        _withdrawOrderIndexRepository = withdrawOrderIndexRepository;
         _objectMapper = objectMapper;
         _logger = logger;
         _networkInfoOptions = networkInfoOptions;
@@ -368,6 +368,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
     {
         try
         {
+            _logger.LogDebug("CreateWithdrawOrder: {request}", JsonConvert.SerializeObject(request));
             var userId = CurrentUser.GetId();
             AssertHelper.IsTrue(
                 request.FromChainId == ChainId.AELF || request.FromChainId == ChainId.tDVV ||
@@ -537,7 +538,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         try
         {
             await _withdrawOrderIndexRepository.AddOrUpdateAsync(
-                _objectMapper.Map<WithdrawOrderDto, Orders.WithdrawOrder>(dto));
+                _objectMapper.Map<WithdrawOrderDto, Orders.OrderIndex>(dto));
         }
         catch (Exception ex)
         {
@@ -558,28 +559,45 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
     {
         try
         {
-            AssertHelper.IsTrue(transaction.MethodName == ManagerForwardCall, "invalid method name");
+            TransferTokenInput transferTokenInput;
+            switch (transaction.MethodName)
+            {
+                case ManagerForwardCall:
+                    var caContractAddress1 = await _contractProvider.GetContractAddressAsync(chainId, CaContractName);
+                    var caContractAddress2 = await _contractProvider.GetContractAddressAsync(chainId, CaContractName2);
+                    AssertHelper.IsTrue(caContractAddress1 == transaction.To.ToBase58()
+                                        || caContractAddress2 == transaction.To.ToBase58(),
+                        "Invalid caContract address");
 
-            var caContractAddress1 = await _contractProvider.GetContractAddressAsync(chainId, CaContractName);
-            var caContractAddress2 = await _contractProvider.GetContractAddressAsync(chainId, CaContractName2);
-            AssertHelper.IsTrue(caContractAddress1 == transaction.To.ToBase58()
-                                || caContractAddress2 == transaction.To.ToBase58(), "Invalid caContract address");
+                    var param = ManagerForwardCallInput.Parser.ParseFrom(transaction.Params);
+                    AssertHelper.IsTrue(param.MethodName == TransferToken, "Invalid ManagerForwardCall method {Mtd}",
+                        param.MethodName);
+                    AssertHelper.IsTrue(param.ContractAddress != new Address(), "Invalid ManagerForwardCall address");
+                    AssertHelper.IsTrue(!param.Args.IsNullOrEmpty(), "Invalid ManagerForwardCall param");
 
-            var param = ManagerForwardCallInput.Parser.ParseFrom(transaction.Params);
-            AssertHelper.IsTrue(param.MethodName == TransferToken, "Invalid ManagerForwardCall method {Mtd}",
-                param.MethodName);
-            AssertHelper.IsTrue(param.ContractAddress != new Address(), "Invalid ManagerForwardCall address");
-            AssertHelper.IsTrue(!param.Args.IsNullOrEmpty(), "Invalid ManagerForwardCall param");
+                    var tokenPoolContractAddress =
+                        await _contractProvider.GetContractAddressAsync(chainId, TokenPoolContractName);
+                    AssertHelper.IsTrue(tokenPoolContractAddress == param.ContractAddress.ToBase58(),
+                        "Invalid tokenPoolContract address");
+                    AssertHelper.IsTrue(param.CaHash.ToHex() == caHash, "caHash not match");
 
-            var tokenPoolContractAddress = await _contractProvider.GetContractAddressAsync(chainId, TokenPoolContractName);
-            AssertHelper.IsTrue(tokenPoolContractAddress == param.ContractAddress.ToBase58(),
-                "Invalid tokenPoolContract address");
-            AssertHelper.IsTrue(param.CaHash.ToHex() == caHash, "caHash not match");
+                    transferTokenInput = TransferTokenInput.Parser.ParseFrom(param.Args);
+                    AssertHelper.IsTrue(transferTokenInput.Amount > 0, "Tx Token amount {amount} invalid",
+                        transferTokenInput.Amount);
+                    break;
+                case TransferToken:
+                    tokenPoolContractAddress =
+                        await _contractProvider.GetContractAddressAsync(chainId, TokenPoolContractName);
+                    AssertHelper.IsTrue(tokenPoolContractAddress == transaction.To.ToBase58(),
+                        "Invalid tokenPoolContract address");
 
-            var transferTokenInput = TransferTokenInput.Parser.ParseFrom(param.Args);
-            AssertHelper.IsTrue(transferTokenInput.Amount > 0, "Tx Token amount {amount} invalid",
-                transferTokenInput.Amount);
-
+                    transferTokenInput = TransferTokenInput.Parser.ParseFrom(transaction.Params);
+                    AssertHelper.IsTrue(transferTokenInput.Amount > 0, "Tx Token amount {amount} invalid",
+                        transferTokenInput.Amount);
+                    break;
+                default:
+                    throw new UserFriendlyException("invalid method name");
+            }
             return new CommonResponseDto<TransferTokenInput>(transferTokenInput);
         }
         catch (UserFriendlyException e)

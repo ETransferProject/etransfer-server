@@ -301,8 +301,9 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
                 order.Status = OrderStatusEnum.ToTransferConfirmed.ToString();
                 if (result.AbsCoBoFee.NotNullOrEmpty() && result.FeeCoin.NotNullOrEmpty())
                 {
-                    order.ThirdPartFee ??= new ();
-                    order.ThirdPartFee.Add(new FeeInfo(result.FeeCoin, result.Amount, FeeInfo.FeeName.CoBoFee));
+                    order.ThirdPartFee ??= new();
+                    order.ThirdPartFee.Add(new FeeInfo(result.FeeCoin, result.Amount, result.FeeDecimal,
+                        FeeInfo.FeeName.CoBoFee));
                 }
                 await userWithdrawGrain.AddOrUpdateOrder(order, order.ExtensionInfo);
                 break;

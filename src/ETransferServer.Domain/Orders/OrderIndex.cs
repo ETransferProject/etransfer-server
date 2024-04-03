@@ -4,7 +4,7 @@ using ETransferServer.Dtos.Order;
 
 namespace ETransferServer.Orders;
 
-public class WithdrawOrder: OrderBase, IIndexBuild
+public class OrderIndex: OrderBase, IIndexBuild
 {
     public string RawTransaction { get; set; }
     public List<FeeInfo> ThirdPartFee { get; set; } = new();

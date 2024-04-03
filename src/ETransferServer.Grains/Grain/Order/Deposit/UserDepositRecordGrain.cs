@@ -4,8 +4,8 @@ using Orleans;
 using ETransferServer.Common;
 using ETransferServer.Common.Dtos;
 using ETransferServer.Dtos.Order;
-using ETransferServer.Grains.Options;
 using ETransferServer.Grains.State.Order;
+using ETransferServer.Options;
 using Volo.Abp.ObjectMapping;
 
 namespace ETransferServer.Grains.Grain.Order.Deposit;
@@ -21,13 +21,15 @@ public class UserDepositRecordGrain : Grain<DepositOrderState>, IUserDepositReco
 {
     private readonly IObjectMapper _objectMapper;
     private readonly ILogger<UserDepositRecordGrain> _logger;
-    private readonly IOptionsMonitor<TimerOptions> _timerOptions;
+    private readonly IOptionsMonitor<ChainOptions> _chainOptions;
 
-    public UserDepositRecordGrain(IObjectMapper objectMapper, ILogger<UserDepositRecordGrain> logger1, IOptionsMonitor<TimerOptions> timerOptions)
+    public UserDepositRecordGrain(IObjectMapper objectMapper, 
+        ILogger<UserDepositRecordGrain> logger, 
+        IOptionsMonitor<ChainOptions> chainOptions)
     {
         _objectMapper = objectMapper;
-        _logger = logger1;
-        _timerOptions = timerOptions;
+        _logger = logger;
+        _chainOptions = chainOptions;
     }
 
     public async Task<CommonResponseDto<DepositOrderDto>> CreateOrUpdateAsync(DepositOrderDto orderDto)
@@ -36,11 +38,18 @@ public class UserDepositRecordGrain : Grain<DepositOrderState>, IUserDepositReco
         {
             var now = DateTime.UtcNow.ToUtcMilliSeconds();
             var createTime = State.CreateTime ?? DateTime.UtcNow.ToUtcMilliSeconds();
+            var arrivalTime = State.ArrivalTime ?? DateTime.UtcNow.AddSeconds(
+                _chainOptions.CurrentValue.ChainInfos[orderDto.ToTransfer.ChainId].EstimatedArrivalTime).ToUtcMilliSeconds();
             
             _objectMapper.Map(orderDto, State);
             State.Id = this.GetPrimaryKey();
             State.CreateTime = createTime;
             State.LastModifyTime = now;
+            State.ArrivalTime = arrivalTime;
+            if (orderDto.Status == OrderStatusEnum.Finish.ToString())
+            {
+                State.ArrivalTime = State.LastModifyTime;
+            }
 
             await WriteStateAsync();
             return new CommonResponseDto<DepositOrderDto>(_objectMapper.Map<DepositOrderState, DepositOrderDto>(State));
