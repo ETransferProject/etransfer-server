@@ -40,4 +40,5 @@ public class Fee
     [Keyword] public string Name { get; set; }
     [Keyword] public string Symbol { get; set; }
     [Keyword] public string Amount { get; set; }
+    [Keyword] public string Decimals { get; set; }
 }

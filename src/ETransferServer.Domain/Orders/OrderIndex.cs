@@ -1,11 +1,11 @@
 using System.Collections.Generic;
 using AElf.Indexing.Elasticsearch;
-using ETransferServer.Dtos.Order;
+using Nest;
 
 namespace ETransferServer.Orders;
 
 public class OrderIndex: OrderBase, IIndexBuild
 {
-    public string RawTransaction { get; set; }
-    public List<FeeInfo> ThirdPartFee { get; set; } = new();
+    [Keyword] public string RawTransaction { get; set; }
+    public List<Fee> ThirdPartFee { get; set; } = new();
 }
