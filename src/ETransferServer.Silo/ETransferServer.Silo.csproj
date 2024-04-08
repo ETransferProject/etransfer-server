@@ -9,6 +9,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="Com.Ctrip.Framework.Apollo.Configuration" Version="2.10.1" />
         <PackageReference Include="AElf.Orleans.Streams.Kafka" Version="1.0.0" />
         <PackageReference Include="Confluent.Kafka" Version="2.3.0" />
         <PackageReference Include="JsonNet.PrivateSettersContractResolvers" Version="1.0.0" />
@@ -49,6 +50,9 @@
         </Content>
         <None Update="notify.json">
           <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="apollosettings.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
     </ItemGroup>
     

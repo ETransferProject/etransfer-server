@@ -55,6 +55,10 @@ public class Program
             })
             .ConfigureAppConfiguration((h,c)=>c.AddJsonFile("network.json")) 
             .UseOrleansSnapshot()
+            #if !DEBUG
+            .ConfigureAppConfiguration((h, c) => c.AddJsonFile("apollosettings.json"))
+            .UseApollo()
+            #endif
             .UseAutofac()
             .UseSerilog();
 }

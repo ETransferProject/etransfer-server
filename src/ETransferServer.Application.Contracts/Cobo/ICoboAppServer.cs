@@ -6,5 +6,5 @@ namespace ETransferServer.Cobo;
 
 public interface ICoboAppService : IApplicationService
 {
-     Task<TransactionNotificationResponse> TransactionNotificationAsync(string timeStamp, string signature, string body);
+     Task<TransactionNotificationResponse> TransactionNotificationAsync(long timeStamp, string signature, string body);
 }

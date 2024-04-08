@@ -1,9 +1,11 @@
 using System;
+using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using ETransferServer.Cobo;
 using Microsoft.Extensions.Logging;
+using Org.BouncyCastle.Asn1;
 using Org.BouncyCastle.Asn1.Sec;
 using Org.BouncyCastle.Asn1.X9;
 using Org.BouncyCastle.Crypto;
@@ -135,20 +137,22 @@ public class Ecdsa: ISingletonDependency
         byte[] contentHash = ComputeSHA256(content);
         _logger.LogInformation("Secp256k1 VerifySignatureAsync begin3 timestamp:{content} signature:{signature} body:{pubKey}", content, signature, pubKey);
 
-        ECDomainParameters domainParameters = new ECDomainParameters(SecNamedCurves.GetByName(SecpKey));
-        ECPoint q = domainParameters.Curve.DecodePoint(pubKeyBytes);
+        X9ECParameters curveParams = SecNamedCurves.GetByName("secp256k1");
+        ECDomainParameters domainParameters = new ECDomainParameters(curveParams.Curve, curveParams.G, curveParams.N, curveParams.H, curveParams.GetSeed());
         _logger.LogInformation("Secp256k1 VerifySignatureAsync begin4 timestamp:{content} signature:{signature} body:{pubKey}", content, signature, pubKey);
+        ECPoint q = domainParameters.Curve.DecodePoint(pubKeyBytes);
         ECPublicKeyParameters publicKeyParameters = new ECPublicKeyParameters(q, domainParameters);
 
         ECDsaSigner signer = new ECDsaSigner();
         signer.Init(false, publicKeyParameters);
         _logger.LogInformation("Secp256k1 VerifySignatureAsync begin5 timestamp:{content} signature:{signature} body:{pubKey}", content, signature, pubKey);
 
-        BigInteger r = new BigInteger(1, signatureBytes, 0, 32);
-        BigInteger s = new BigInteger(1, signatureBytes, 32, 32);
+        // BigInteger r = new BigInteger(1, signatureBytes, 0, 32);
+        // BigInteger s = new BigInteger(1, signatureBytes, 32, 32);
+        
         _logger.LogInformation("Secp256k1 VerifySignatureAsync begin6 timestamp:{content} signature:{signature} body:{pubKey}", content, signature, pubKey);
-
-        return signer.VerifySignature(contentHash, r, s);
+        BigInteger[] rs = DecodeFromDER(signatureBytes);
+        return signer.VerifySignature(contentHash, rs[0], rs[1]);
     }
 
     private static byte[] HexStringToByteArray(string hex)
@@ -167,6 +171,59 @@ public class Ecdsa: ISingletonDependency
         using (SHA256 sha256 = SHA256.Create())
         {
             return sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(content));
+        }
+    }
+    
+    public static BigInteger[] DecodeFromDER(byte[] bytes)
+    {
+        bool allowUnsafeInteger = false;
+        try
+        {
+            // Check if the 'org.bouncycastle.asn1.allow_unsafe_integer' switch is set to true
+            allowUnsafeInteger = AppContext.TryGetSwitch("org.bouncycastle.asn1.allow_unsafe_integer", out bool switchEnabled) && switchEnabled;
+        }
+        catch (Exception)
+        {
+            // Ignore any exceptions, default value of allowUnsafeInteger will be false
+        }
+
+        Asn1InputStream decoder = null;
+        try
+        {
+            decoder = new Asn1InputStream(bytes);
+            Asn1Object seqObj = decoder.ReadObject();
+            DerSequence seq = (DerSequence)seqObj;
+            
+            if (seq.Count != 2)
+            {
+                throw new Exception("Invalid DER sequence");
+            }
+            
+            DerInteger r = (DerInteger)seq[0];
+            DerInteger s = (DerInteger)seq[1];
+            
+            // Convert DerInteger to BigInteger
+            BigInteger rBigInt = new BigInteger(r.PositiveValue.ToByteArrayUnsigned());
+            BigInteger sBigInt = new BigInteger(s.PositiveValue.ToByteArrayUnsigned());
+            
+            return new BigInteger[] { rBigInt, sBigInt };
+        }
+        catch (IOException e)
+        {
+            throw new Exception(e.Message);
+        }
+        finally
+        {
+            if (decoder != null)
+            {
+                try
+                {
+                    decoder.Close();
+                }
+                catch (IOException ignored)
+                {
+                }
+            }
         }
     }
 }

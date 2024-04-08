@@ -89,12 +89,10 @@ public class CoBoProvider : ICoBoProvider, ISingletonDependency
         _logger.LogInformation("GetTransaction get transaction by time from cobo, id:{id}", input.Id);
 
         var uriParam = ObjToUriParam(input);
-        var result = await _proxyCoBoClientProvider.GetAsync<CoBoTransactionDto>(
-            CoBoConstant.GetTransaction + uriParam);
-
+        var url = CoBoConstant.GetTransaction + uriParam;
+        var result = await _proxyCoBoClientProvider.GetAsync<CoBoTransactionDto>(url);
         _logger.LogInformation(
             "GetTransaction get transaction by time from cobo, Id:{id} transaction", input.Id);
-        
         return result;
     }
 

@@ -20,7 +20,7 @@ public class CoboController : ETransferController
     }
     
     [HttpPost("custody_callback/")]
-    public async Task<TransactionNotificationResponse> TransactionNotification([FromHeader(Name = "Biz-Timestamp")] string timestamp,
+    public async Task<TransactionNotificationResponse> TransactionNotification([FromHeader(Name = "Biz-Timestamp")] long timestamp,
         [FromHeader(Name = "Biz-Resp-Signature")] string signature,
         [FromBody] string body)
     {
