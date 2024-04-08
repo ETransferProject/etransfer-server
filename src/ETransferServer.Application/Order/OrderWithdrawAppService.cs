@@ -491,7 +491,8 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             var order = await grain.CreateOrder(withdrawOrderDto);
             var getWithdrawOrderInfoDto = new CreateWithdrawOrderDto()
             {
-                OrderId = order.Id.ToString()
+                OrderId = order.Id.ToString(),
+                TransactionId = transaction.GetHash().ToHex()
             };
             return getWithdrawOrderInfoDto;
         }
