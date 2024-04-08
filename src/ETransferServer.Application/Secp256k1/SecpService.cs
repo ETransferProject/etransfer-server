@@ -1,9 +1,9 @@
 using System;
-using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
-using Org.BouncyCastle.Asn1;
+using ETransferServer.Cobo;
+using Microsoft.Extensions.Logging;
 using Org.BouncyCastle.Asn1.Sec;
 using Org.BouncyCastle.Asn1.X9;
 using Org.BouncyCastle.Crypto;
@@ -12,7 +12,6 @@ using Org.BouncyCastle.Crypto.Parameters;
 using Org.BouncyCastle.Crypto.Signers;
 using Org.BouncyCastle.Math;
 using Org.BouncyCastle.Security;
-using Org.BouncyCastle.Utilities;
 using Volo.Abp.DependencyInjection;
 using ECPoint = Org.BouncyCastle.Math.EC.ECPoint;
 
@@ -23,8 +22,14 @@ public class Ecdsa: ISingletonDependency
 {
     private const string SecpKey = "secp256k1";
     private const string SecpName = "SHA-256withECDSA";
+    private readonly ILogger<CoboAppService> _logger;
     
     // Sign a message using the private key
+    public Ecdsa(ILogger<CoboAppService> logger)
+    {
+        _logger = logger;
+    }
+    
     public async Task<byte[]>  SignMessageAsync(AsymmetricCipherKeyPair keyPair, byte[] message)
     {
         ISigner signer = SignerUtilities.GetSigner(SecpName);
@@ -75,13 +80,6 @@ public class Ecdsa: ISingletonDependency
         publicKeyStr = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEydH4aqLZ5a18C47P6yp/MHhGEvIjyj+nO2Ek93u4aN2oaaNWzs6W5X/w/a4A5NaCOMdF21Sin7avqGaGHjamqg==";
         messageStr = "SGVsbG8sIHdvcmxkIQ==";
         return true;
-        ////
-
-        /// 
-        // byte[] publicKey = Convert.FromBase64String(publicKeyStr);
-        // byte[] message = Convert.FromBase64String(messageStr);
-        // byte[] signature = Convert.FromBase64String(signatureStr);
-        // return VerifySignature(publicKey, signature, message);
 
     }
     
@@ -131,18 +129,24 @@ public class Ecdsa: ISingletonDependency
     public async Task<bool> VerifySignatureAsync(string content, string signature, string pubKey)
     {
         byte[] pubKeyBytes = HexStringToByteArray(pubKey);
+        _logger.LogInformation("Secp256k1 VerifySignatureAsync begin1 timestamp:{content} signature:{signature} body:{pubKey}", content, signature, pubKey);
         byte[] signatureBytes = HexStringToByteArray(signature);
+        _logger.LogInformation("Secp256k1 VerifySignatureAsync begin2 timestamp:{content} signature:{signature} body:{pubKey}", content, signature, pubKey);
         byte[] contentHash = ComputeSHA256(content);
+        _logger.LogInformation("Secp256k1 VerifySignatureAsync begin3 timestamp:{content} signature:{signature} body:{pubKey}", content, signature, pubKey);
 
         ECDomainParameters domainParameters = new ECDomainParameters(SecNamedCurves.GetByName(SecpKey));
         ECPoint q = domainParameters.Curve.DecodePoint(pubKeyBytes);
+        _logger.LogInformation("Secp256k1 VerifySignatureAsync begin4 timestamp:{content} signature:{signature} body:{pubKey}", content, signature, pubKey);
         ECPublicKeyParameters publicKeyParameters = new ECPublicKeyParameters(q, domainParameters);
 
         ECDsaSigner signer = new ECDsaSigner();
         signer.Init(false, publicKeyParameters);
+        _logger.LogInformation("Secp256k1 VerifySignatureAsync begin5 timestamp:{content} signature:{signature} body:{pubKey}", content, signature, pubKey);
 
         BigInteger r = new BigInteger(1, signatureBytes, 0, 32);
         BigInteger s = new BigInteger(1, signatureBytes, 32, 32);
+        _logger.LogInformation("Secp256k1 VerifySignatureAsync begin6 timestamp:{content} signature:{signature} body:{pubKey}", content, signature, pubKey);
 
         return signer.VerifySignature(contentHash, r, s);
     }

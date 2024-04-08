@@ -42,7 +42,7 @@ public class CoboAppService : ETransferServerAppService, ICoboAppService
         bool verifyResult = false;
         try
         {
-            _logger.LogInformation("CocoService CoboCallBackAsync timestamp:{timestamp} signature:{signature} body:{body}", timestamp, signature, body);
+            _logger.LogInformation("CocoService CoboCallBackAsync begin timestamp:{timestamp} signature:{signature} body:{body}", timestamp, signature, body);
             if (!string.IsNullOrEmpty(timestamp) && !string.IsNullOrEmpty(signature))
             {
                 string content = body + "|" + timestamp;
@@ -51,6 +51,7 @@ public class CoboAppService : ETransferServerAppService, ICoboAppService
                 verifyResult = await _ecdsaClient.VerifySignatureAsync(content, signature, _coBoOptions.CurrentValue.PublicKey);
                 if (false == verifyResult)
                 {
+                    _logger.LogInformation("CocoService CoboCallBackAsync begin timestamp:{timestamp} signature:{signature} body:{body} verifyResult false", timestamp, signature, body);
                     res.Success = false;
                 }
 
@@ -68,13 +69,16 @@ public class CoboAppService : ETransferServerAppService, ICoboAppService
         var orderInfoGrain = await _clusterClient.GetGrain<IUserDepositRecordGrain>(id).GetAsync();
         if (orderInfoGrain.Success)
         {
-            _logger.LogInformation("");
+            _logger.LogInformation("CocoService CoboCallBackAsync timestamp:{timestamp} signature:{signature} body:{body} orderInfoGrain.Success orderInfo id: {id}", 
+                timestamp, signature, body, id);
             res.Success = false;
             return res;
         }
         await _clusterClient.GetGrain<ICoBoDepositQueryTimerGrain>(id).GetDepositOrder(orderInfo);
         
         verifyResult = await CustomCheck(body);
+        _logger.LogInformation("CocoService CoboCallBackAsync end timestamp:{timestamp} signature:{signature} body:{body} orderInfoGrain.Success verifyResult: {verifyResult}", 
+            timestamp, signature, body, verifyResult);
         
         // add your checking policy
         // call grain
