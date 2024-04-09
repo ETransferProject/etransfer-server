@@ -62,9 +62,9 @@ public class TokenAppServiceTest : ETransferServerApplicationTestBase
         }
     }
 
-    private IOptions<TokenOptions> MockTokenOptions()
+    private IOptionsSnapshot<TokenOptions> MockTokenOptions()
     {
-        var mockOptionsSnapshot = new Mock<IOptions<TokenOptions>>();
+        var mockOptionsSnapshot = new Mock<IOptionsSnapshot<TokenOptions>>();
         mockOptionsSnapshot.Setup(o => o.Value).Returns(
             new TokenOptions
             {
