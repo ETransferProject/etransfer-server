@@ -112,6 +112,10 @@ public class SignatureGrantHandler : ITokenExtensionGrant
         {
             caHash = address;
         }
+        else
+        {
+            caHash = context.Request.GetParameter("ca_hash").ToString();
+        }
 
         var managerCheck = await CheckAddressAsync(chainId,
    AuthConstant.PortKeyVersion2.Equals(version) ? _graphQlOptions.Url2 : _graphQlOptions.Url,
@@ -181,14 +185,14 @@ public class SignatureGrantHandler : ITokenExtensionGrant
         string chainId, string version, string source)
     {
         var errors = new List<string>();
-        if (string.IsNullOrWhiteSpace(source))
-        {
-            errors.Add("invalid parameter source.");
-        }
-        if (source != _source_portkey && string.IsNullOrWhiteSpace(publicKeyVal))
-        {
-            errors.Add("invalid parameter pubkey.");
-        }
+        // if (string.IsNullOrWhiteSpace(source))
+        // {
+        //     errors.Add("invalid parameter source.");
+        // }
+        // if (source != _source_portkey && string.IsNullOrWhiteSpace(publicKeyVal))
+        // {
+        //     errors.Add("invalid parameter pubkey.");
+        // }
 
         if (string.IsNullOrWhiteSpace(signatureVal))
         {
