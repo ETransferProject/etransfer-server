@@ -100,7 +100,7 @@ public static class OrleansHostExtensions
                 .UseLinuxEnvironmentStatistics()
                 .ConfigureLogging(logging => { logging.SetMinimumLevel(LogLevel.Debug).AddConsole(); })
                 .AddStartupTask<GrainStartupTask>()
-                .UseKafkaMqStreamProvider(configuration);
+            .UseKafkaMqStreamProvider(configuration);
             //.AddStartupTask<TestWithdraw>();
         });
     }

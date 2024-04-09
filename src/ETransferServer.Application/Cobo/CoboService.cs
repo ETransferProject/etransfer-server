@@ -12,6 +12,7 @@ using ETransferServer.ThirdPart.CoBo;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using ETransferServer.ThirdPart.CoBo.Dtos;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 using NBitcoin;
 using NBitcoin.Crypto;
@@ -29,39 +30,48 @@ public class CoboAppService : ETransferServerAppService, ICoboAppService
     private readonly IClusterClient _clusterClient;
     private readonly ICoBoProvider _coBoProvider;
     private readonly IOptionsMonitor<CoBoOptions> _coBoOptions;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
     public CoboAppService(Ecdsa ecdsaClient, ILogger<CoboAppService> logger, IClusterClient clusterClient, 
-        ICoBoProvider coBoProvider, IOptionsMonitor<CoBoOptions> coBoOptions)
+        ICoBoProvider coBoProvider, IOptionsMonitor<CoBoOptions> coBoOptions, IHttpContextAccessor httpContextAccessor)
     {
         _ecdsaClient = ecdsaClient;
         _logger = logger;
         _clusterClient = clusterClient;
         _coBoProvider = coBoProvider;
         _coBoOptions = coBoOptions;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     public async Task<TransactionNotificationResponse> TransactionNotificationAsync(long timestamp, string signature, string body)
     {
         var res = new TransactionNotificationResponse { };
+        var ip = _httpContextAccessor.HttpContext.Connection.RemoteIpAddress.ToString();
+        var coboIps = _coBoOptions.CurrentValue.CoboIps;
+        if (!coboIps.Contains(ip))
+        {
+            res.Result = "Illegal request address";
+            return res;
+        }
+        
         bool verifyResult = false;
         try
         {
             _logger.LogInformation("CocoService CoboCallBackAsync begin timestamp:{timestamp} signature:{signature} body:{body}", timestamp, signature, body);
             if (!string.IsNullOrEmpty(signature))
             {
-                timestamp = 1673530794575;
-                var publicKeys = "032f45930f652d72e0c90f71869dfe9af7d713b1f67dc2f7cb51f9572778b9c876";
-                signature =
-                    "304402207f1a49a302bece956da7e0a3e9a77f0fb33ccc368ef2fa4dacac5c96d7d5f542022052dc95dbf0f409e290e38481b8b624ba2748ee08de6141be067ab80f5daf9b92";
-                body = "{\"id\": \"20230110151203000381527000003478\", \"coin\": \"BTC\", \"display_code\": \"BTC\", \"description\": \"Bitcoin\", \"decimal\": 8, \"address\": \"3DPAyjXaYtBfZMbY8XVEUQShr2fYu9MMcg\", \"source_address\": \"bc1q46uh8ywdq22p7dhzkwxg49v5guvpx9kwgrjzlm\", \"side\": \"withdraw\", \"amount\": \"1000\", \"abs_amount\": \"0.00001\", \"txid\": \"c1a9b2d97c548cfd1c564d563d84ca136b247c96f0ad1fc7e0e2fb7cf05d74cb\", \"vout_n\": 0, \"request_id\": \"web_send_by_user_1272_1673332884996\", \"status\": \"success\", \"abs_cobo_fee\": \"0\", \"created_time\": 1673332885187, \"last_time\": 1673334723525, \"confirmed_num\": 3, \"request_created_time\": 1673332885187, \"tx_detail\": {\"txid\": \"c1a9b2d97c548cfd1c564d563d84ca136b247c96f0ad1fc7e0e2fb7cf05d74cb\", \"blocknum\": 771229, \"blockhash\": \"000000000000000000056f5be0c51de238fa793ca2ba76f81c7245842e1c0bbd\", \"fee\": 0, \"actualgas\": 1460, \"gasprice\": 1, \"hexstr\": \"\"}, \"source_address_detail\": \"bc1q46uh8ywdq22p7dhzkwxg49v5guvpx9kwgrjzlm\", \"memo\": \"\", \"confirming_threshold\": 3, \"fee_coin\": \"BTC\", \"fee_amount\": 40000, \"fee_decimal\": 8, \"type\": \"external\"}";
-                string content = body + "|" + timestamp;
+                // timestamp = 1673530794575;
+                // var publicKeys = "032f45930f652d72e0c90f71869dfe9af7d713b1f67dc2f7cb51f9572778b9c876";
+                // signature = "304402207f1a49a302bece956da7e0a3e9a77f0fb33ccc368ef2fa4dacac5c96d7d5f542022052dc95dbf0f409e290e38481b8b624ba2748ee08de6141be067ab80f5daf9b92";
+                // body = "{\"Id\":\"20240321192739000163526000000738\",\"Coin\":\"SETH_SGR-1\",\"display_code\":\"SGR\",\"Description\":\"\",\"Decimal\":8,\"Address\":\"0x2f3a3326095dec3b9507b4881df800bf7968320e\",\"source_address\":\"0x1736d5684080703b2052f0f563c2bc48c00fe60d\",\"Side\":\"deposit\",\"Amount\":\"173761171\",\"abs_amount\":\"1.73761171\",\"txid\":\"0x48b6c1c7e5c0b560baf56cb02e815cc8371d3d49fa0b175d37a113b61ddef6d9\",\"vout_n\":0,\"request_id\":null,\"Status\":\"success\",\"created_time\":1711020459000,\"last_time\":1711020459000,\"Remark\":\"\",\"confirmed_num\":68,\"confirming_threshold\":64,\"abs_cobo_fee\":\"0\",\"fee_coin\":null,\"fee_amount\":null,\"fee_decimal\":null}";
                 // var publicKeys = _coBoOptions.CurrentValue.PublicKey;
-                verifyResult = await _ecdsaClient.VerifySignatureAsync(content, signature, publicKeys);
+                string content = body + "|" + timestamp;
+                verifyResult = await _ecdsaClient.VerifySignatureAsync(content, signature, _coBoOptions.CurrentValue.PublicKey);
                 if (false == verifyResult)
                 {
                     _logger.LogInformation("CocoService CoboCallBackAsync begin timestamp:{timestamp} signature:{signature} body:{body} verifyResult false", timestamp, signature, body);
                     res.Success = false;
-                    // return res;
+                    return res;
                 }
 
             }
@@ -81,19 +91,15 @@ public class CoboAppService : ETransferServerAppService, ICoboAppService
             _logger.LogInformation("CocoService TransactionNotificationAsync order not exists, orderId:{orderId}", id);
             return res;
         }
-        var orderInfoInGrain = await _clusterClient.GetGrain<ICoBoDepositQueryTimerGrain>(id).GetDepositOrder(orderInfo);
-        
-        verifyResult = await CustomCheck(body);
+        // var orderInfoInGrain = await _clusterClient.GetGrain<ICoBoDepositQueryTimerGrain>(id).GetDepositOrder(orderInfo); // test code
+        verifyResult = await CustomCheckAndAdd(body);
         _logger.LogInformation("CocoService CoboCallBackAsync end timestamp:{timestamp} signature:{signature} body:{body} orderInfoGrain.Success verifyResult: {verifyResult}", 
             timestamp, signature, body, verifyResult);
-        
-        // add your checking policy
-        // call grain
         res.Success = verifyResult;
         return res;
     }
     
-    public async Task<bool> CustomCheck(string body)
+    public async Task<bool> CustomCheckAndAdd(string body)
     {
         // policy校验
         // 查询 UserDepositRecordGrain
@@ -107,6 +113,8 @@ public class CoboAppService : ETransferServerAppService, ICoboAppService
         }
         try
         {
+            var grain = _clusterClient.GetGrain<ICoBoDepositQueryTimerGrain>(id);
+            await grain.CreateDepositOrder(orderInfo);
             var orderInfoNew = await _coBoProvider.GetTransaction(new TransactionIdRequestDto
                     {
                         Id = orderInfo.Id
@@ -116,7 +124,7 @@ public class CoboAppService : ETransferServerAppService, ICoboAppService
         }
         catch (Exception e)
         {
-            _logger.LogError(e, "CoboService CustomCheck GetTransaction transaction error.");
+            _logger.LogError(e, "CoboService CustomCheck GetTransaction transaction error e:{e}", e.Message);
         }
         return false;
     }
