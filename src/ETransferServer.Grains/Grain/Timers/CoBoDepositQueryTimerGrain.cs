@@ -4,8 +4,10 @@ using Newtonsoft.Json;
 using Orleans;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Order;
+using ETransferServer.Dtos.User;
 using ETransferServer.Grains.Common;
 using ETransferServer.Grains.Grain.Order.Deposit;
+using ETransferServer.Grains.Grain.Users;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.State.Order;
 using ETransferServer.ThirdPart.CoBo;
@@ -179,10 +181,15 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
     {
         var coinInfo = CoBoHelper.MatchNetwork(coBoTransaction.Coin, _networkOption.CurrentValue.CoBo);
 
-        var userAddress = await _userAddressService.GetUnAssignedAddressAsync(coBoTransaction.Address);
+        var addressGrain = GrainFactory.GetGrain<IUserTokenDepositAddressGrain>(coBoTransaction.Address);
+        var res = await addressGrain.Get();
+        var userAddress = !res.Success || res.Data == null
+            ? await _userAddressService.GetAssignedAddressAsync(coBoTransaction.Address)
+            : res.Data as UserAddressDto;
+        
         AssertHelper.NotNull(userAddress, "user address empty");
         AssertHelper.NotEmpty(userAddress.UserId, "address user id empty");
-        
+
         var user = await _userAppService.GetUserByIdAsync(userAddress.UserId);
         AssertHelper.NotNull(user, "user empty");
 

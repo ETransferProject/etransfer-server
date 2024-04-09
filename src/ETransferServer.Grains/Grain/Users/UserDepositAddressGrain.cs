@@ -116,6 +116,8 @@ public class UserDepositAddressGrain : Grain<TokenDepositAddressState>, IUserDep
         addressDto.UpdateTime = DateTimeHelper.ToUnixTimeMilliseconds(DateTime.UtcNow);
         
         await grain.AddOrUpdate(addressDto);
+        var addressGrain = GrainFactory.GetGrain<IUserTokenDepositAddressGrain>(addressDto.UserToken.Address);
+        await addressGrain.AddOrUpdate(addressDto);
         await _userAddressProvider.UpdateSync(addressDto);
 
         return addressDto.UserToken.Address;

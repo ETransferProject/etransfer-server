@@ -83,7 +83,8 @@ public class TokenAddressTimerGrain: Grain<TokenAddressState>, ITokenAddressTime
                 var addressList = new List<UserAddressDto>();
                 foreach (var address in addresses.Addresses)
                 {
-                    if (addressHits.Contains(address))
+                    var addressGrain = GrainFactory.GetGrain<IUserTokenDepositAddressGrain>(address);
+                    if (addressHits.Contains(address) || await addressGrain.Exist())
                     {
                         _logger.LogDebug("Address:{address} from cobo has exsited.", address);
                         continue;
@@ -103,6 +104,7 @@ public class TokenAddressTimerGrain: Grain<TokenAddressState>, ITokenAddressTime
                         UpdateTime = DateTimeHelper.ToUnixTimeMilliseconds(DateTime.UtcNow)
                     };
                     addressList.Add(newAddress);
+                    await addressGrain.AddOrUpdate(newAddress);
                 }
                 _logger.LogDebug("AddressList count: {count}", addressList.Count);
                 if (addressList.Count == 0) continue;

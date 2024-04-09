@@ -84,7 +84,7 @@ public class UserAddressService : ApplicationService, IUserAddressService
         return await GetNewAddressAsync(new List<string>{ input.NetWork }, input.Symbol);
     }
 
-    public async Task<UserAddressDto> GetUnAssignedAddressAsync(string address)
+    public async Task<UserAddressDto> GetAssignedAddressAsync(string address)
     {
         if (address.IsNullOrWhiteSpace()) return null;
         var mustQuery = new List<Func<QueryContainerDescriptor<UserAddress>, QueryContainer>>();

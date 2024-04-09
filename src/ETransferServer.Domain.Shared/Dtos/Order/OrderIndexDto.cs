@@ -1,9 +1,11 @@
+using System;
 using System.Collections.Generic;
 
 namespace ETransferServer.Dtos.Order;
 
 public class OrderIndexDto
 {
+    public Guid Id { get; set; }
     public string OrderType { get; set; }
     public string Status { get; set; }
     public long LastModifyTime { get; set; }
