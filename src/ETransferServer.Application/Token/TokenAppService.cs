@@ -21,7 +21,7 @@ public class TokenAppService : ETransferServerAppService, ITokenAppService
     private readonly TokenOptions _tokenOptions;
     private readonly IObjectMapper _objectMapper;
 
-    public TokenAppService(ILogger<TokenAppService> logger, IOptions<TokenOptions> tokenOptions,
+    public TokenAppService(ILogger<TokenAppService> logger, IOptionsSnapshot<TokenOptions> tokenOptions,
         IObjectMapper objectMapper)
     {
         _logger = logger;

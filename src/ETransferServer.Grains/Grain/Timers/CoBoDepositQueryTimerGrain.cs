@@ -19,6 +19,7 @@ public interface ICoBoDepositQueryTimerGrain : IGrainWithGuidKey
     public Task<DateTime> GetLastCallbackTime();
 
     Task CreateDepositOrder(CoBoTransactionDto depositOrder);
+    Task<bool> GetDepositOrder(CoBoTransactionDto coBoTransaction);
 }
 
 public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQueryTimerGrain
@@ -151,6 +152,27 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
                 "Create deposit order error, coBoTransactionId={CoBoTxId}, requestId={CoBoRequestId}, coBoSymbol={Symbol}, amount={Amount}",
                 coBoTransaction.TxId, coBoTransaction.RequestId, coBoTransaction.Coin, coBoTransaction.AbsAmount);
         }
+    }
+    public async Task<bool> GetDepositOrder(CoBoTransactionDto coBoTransaction)
+    {
+        try
+        {
+            var orderDto = await ConvertToDepositOrderDto(coBoTransaction);
+            var userDepositRecordGrain = GrainFactory.GetGrain<IUserDepositRecordGrain>(orderDto.Id);
+            var orderExists = await userDepositRecordGrain.GetAsync();
+            if (orderExists is { Success: true })
+            {
+                return true;
+            }
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e,
+                "GetDepositOrder get deposit order error, coBoTransactionId={CoBoTxId}, requestId={CoBoRequestId}, coBoSymbol={Symbol}, amount={Amount}",
+                coBoTransaction.TxId, coBoTransaction.RequestId, coBoTransaction.Coin, coBoTransaction.AbsAmount);
+        }
+    
+        return false;
     }
 
     private async Task<DepositOrderDto> ConvertToDepositOrderDto(CoBoTransactionDto coBoTransaction)

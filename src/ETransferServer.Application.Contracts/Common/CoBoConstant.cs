@@ -12,6 +12,7 @@ public static class CoBoConstant
     public const string GetAccountDetail = "/v1/custody/org_info/";
     public const string GetAddresses = "/v1/custody/new_addresses/";
     public const string GetTransactionsByTimeEx = "/v1/custody/transactions_by_time_ex/";
+    public const string GetTransaction = "/v1/custody/transaction/";
     public const string Withdraw = "/v1/custody/new_withdraw_request/";
     public const string WithdrawInfoByRequestId = "/v1/custody/withdraw_info_by_request_id/";
 
