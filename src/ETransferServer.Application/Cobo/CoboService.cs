@@ -46,17 +46,13 @@ public class CoboAppService : ETransferServerAppService, ICoboAppService
     public async Task<TransactionNotificationResponse> TransactionNotificationAsync(long timestamp, string signature, string body)
     {
         var res = new TransactionNotificationResponse { };
-        var ip = _httpContextAccessor.HttpContext.Connection.RemoteIpAddress.ToString();
-        var coboIps = _coBoOptions.CurrentValue.CoboIps;
-        if (!coboIps.Contains(ip))
-        {
-            res.Result = "Illegal request address";
-            return res;
-        }
-        
         bool verifyResult = false;
         try
         {
+            if (RequestIpIllegal())
+            {
+                return res;
+            }
             _logger.LogInformation("CocoService CoboCallBackAsync begin timestamp:{timestamp} signature:{signature} body:{body}", timestamp, signature, body);
             if (!string.IsNullOrEmpty(signature))
             {
@@ -98,7 +94,24 @@ public class CoboAppService : ETransferServerAppService, ICoboAppService
         res.Success = verifyResult;
         return res;
     }
-    
+
+    public bool RequestIpIllegal()
+    {
+        var ipAddress = _httpContextAccessor.HttpContext.Connection.RemoteIpAddress;
+        if (ipAddress.IsIPv4MappedToIPv6)
+        {
+            ipAddress = ipAddress.MapToIPv4();
+        }
+        
+        var coboIps = _coBoOptions.CurrentValue.CoboIps;
+        if (coboIps.Contains(ipAddress.ToString()))
+        {
+            return false;
+        }
+        
+        return true;
+    }
+
     public async Task<bool> CustomCheckAndAdd(string body)
     {
         // policy校验
