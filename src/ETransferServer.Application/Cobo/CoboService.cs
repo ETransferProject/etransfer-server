@@ -56,7 +56,7 @@ public class CoboAppService : ETransferServerAppService, ICoboAppService
         var tokenTest = _tokenOptions.Value.Deposit["AELF"][0].Decimals;
         var netWorkTest = _networkOptions.Value.WithdrawFeeNetwork[0];
         _logger.LogInformation("CocoService CoboCallBackAsync begin timestamp:{timestamp} signature:{publicKeys} body:{body}   tokenTest{tokenTest}  netWorkTest{netWorkTest}", timestamp, publicKeys, body, tokenTest, netWorkTest);
-        res.Exception = publicKeys;
+        res.Exception = publicKeys + tokenTest + netWorkTest;
         return res;
         // 
         bool verifyResult = false;
