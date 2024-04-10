@@ -61,6 +61,7 @@ namespace ETransferServer
             Configure<AbpAutoMapperOptions>(options => { options.AddMaps<ETransferServerHttpApiHostModule>(); });
             var configuration = context.Services.GetConfiguration();
             var hostingEnvironment = context.Services.GetHostingEnvironment();
+            Configure<SignatureServiceOption>(configuration.GetSection("SignatureService"));
             Configure<ChainOptions>(configuration.GetSection("Chains"));
             Configure<TokenOptions>(configuration.GetSection("TokenOptions"));
             Configure<NetworkOptions>(configuration.GetSection("NetworkOptions"));
