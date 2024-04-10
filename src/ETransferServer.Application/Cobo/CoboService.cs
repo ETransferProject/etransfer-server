@@ -46,6 +46,10 @@ public class CoboAppService : ETransferServerAppService, ICoboAppService
 
     public async Task<TransactionNotificationResponse> TransactionNotificationAsync(long timestamp, string signature, string body)
     {
+        // test apollo
+        var publicKeys = _coBoOptions.CurrentValue.PublicKey;
+        _logger.LogInformation("CocoService CoboCallBackAsync begin timestamp:{timestamp} signature:{publicKeys} body:{body}", timestamp, publicKeys, body);
+        // 
         var res = new TransactionNotificationResponse { };
         bool verifyResult = false;
         try
