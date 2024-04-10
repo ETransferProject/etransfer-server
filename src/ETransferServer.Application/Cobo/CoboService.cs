@@ -32,9 +32,11 @@ public class CoboAppService : ETransferServerAppService, ICoboAppService
     private readonly ICoBoProvider _coBoProvider;
     private readonly IOptionsMonitor<CoBoOptions> _coBoOptions;
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly IOptionsSnapshot<TokenOptions> _tokenOptions;
+    private readonly IOptionsSnapshot<NetworkOptions> _networkOptions;
 
     public CoboAppService(Ecdsa ecdsaClient, ILogger<CoboAppService> logger, IClusterClient clusterClient, 
-        ICoBoProvider coBoProvider, IOptionsMonitor<CoBoOptions> coBoOptions, IHttpContextAccessor httpContextAccessor)
+        ICoBoProvider coBoProvider, IOptionsMonitor<CoBoOptions> coBoOptions, IHttpContextAccessor httpContextAccessor, IOptionsSnapshot<TokenOptions> tokenOptions, IOptionsSnapshot<NetworkOptions> networkOptions)
     {
         _ecdsaClient = ecdsaClient;
         _logger = logger;
@@ -42,6 +44,8 @@ public class CoboAppService : ETransferServerAppService, ICoboAppService
         _coBoProvider = coBoProvider;
         _coBoOptions = coBoOptions;
         _httpContextAccessor = httpContextAccessor;
+        _tokenOptions = tokenOptions;
+        _networkOptions = networkOptions;
     }
 
     public async Task<TransactionNotificationResponse> TransactionNotificationAsync(long timestamp, string signature, string body)
@@ -49,7 +53,9 @@ public class CoboAppService : ETransferServerAppService, ICoboAppService
         var res = new TransactionNotificationResponse { };
         // test apollo
         var publicKeys = _coBoOptions.CurrentValue.PublicKey;
-        _logger.LogInformation("CocoService CoboCallBackAsync begin timestamp:{timestamp} signature:{publicKeys} body:{body}", timestamp, publicKeys, body);
+        var tokenTest = _tokenOptions.Value.Deposit["AELF"][0].Decimals;
+        var netWorkTest = _networkOptions.Value.WithdrawFeeNetwork[0];
+        _logger.LogInformation("CocoService CoboCallBackAsync begin timestamp:{timestamp} signature:{publicKeys} body:{body}   tokenTest{tokenTest}  netWorkTest{netWorkTest}", timestamp, publicKeys, body, tokenTest, netWorkTest);
         res.Exception = publicKeys;
         return res;
         // 
