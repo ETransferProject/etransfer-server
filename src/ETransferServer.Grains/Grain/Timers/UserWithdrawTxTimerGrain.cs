@@ -31,10 +31,10 @@ public class UserWithdrawTxTimerGrain : AbstractTxTimerGrain<WithdrawOrderDto>, 
 
     public override async Task OnActivateAsync()
     {
-        _logger.LogDebug("UserDepositTxTimerGrain {Id} Activate", this.GetPrimaryKey().ToString());
+        _logger.LogDebug("UserWithdrawTxTimerGrain {Id} Activate", this.GetPrimaryKey().ToString());
         await base.OnActivateAsync();
 
-        _logger.LogDebug("UserDepositTxTimerGrain StartTimer {StartTime}", DateTime.UtcNow.ToUtc8String());
+        _logger.LogDebug("UserWithdrawTxTimerGrain StartTimer {StartTime}", DateTime.UtcNow.ToUtc8String());
         RegisterTimer(TimerCallback, State,
             TimeSpan.FromSeconds(_timerOptions.CurrentValue.WithdrawFromTimer.DelaySeconds),
             TimeSpan.FromSeconds(_timerOptions.CurrentValue.WithdrawFromTimer.PeriodSeconds));

@@ -28,7 +28,7 @@ public class DepositOrderRetryTimerGrain : AbstractOrderRetryTimerGrain<DepositO
 
     public override async Task OnActivateAsync()
     {
-        _logger.LogDebug("CoBoDepositQueryTimerGrain {Id} Activate", this.GetPrimaryKey().ToString());
+        _logger.LogDebug("DepositOrderRetryTimerGrain {Id} Activate", this.GetPrimaryKey().ToString());
 
         await base.OnActivateAsync();
 
