@@ -186,6 +186,7 @@ public class CoBoClientProvider : ICoBoClientProvider, ISingletonDependency
             ApiKey = _coBoOptions.ApiKey,
             PlainText = signatureContent
         };
+        _logger.LogInformation("GetHeadersAsync baseurl: ", _signatureOptions.BaseUrl);
 
         var url = _signatureOptions.BaseUrl.TrimEnd('/') + CommonConstant.ThirdPartSignUrl;
         var responseDto = await GetSignatureAsync(url, signDto);
