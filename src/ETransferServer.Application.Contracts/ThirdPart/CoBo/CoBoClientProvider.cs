@@ -25,7 +25,7 @@ public class CoBoClientProvider : ICoBoClientProvider, ISingletonDependency
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly ILogger<CoBoClientProvider> _logger;
-    private readonly SignatureServiceOption _signatureOptions;
+    private readonly IOptionsSnapshot<SignatureServiceOption> _signatureOptions;
     private readonly CoBoOptions _coBoOptions;
 
     public CoBoClientProvider(IHttpClientFactory httpClientFactory, IHttpContextAccessor httpContextAccessor,
@@ -35,7 +35,7 @@ public class CoBoClientProvider : ICoBoClientProvider, ISingletonDependency
         _httpClientFactory = httpClientFactory;
         _httpContextAccessor = httpContextAccessor;
         _logger = logger;
-        _signatureOptions = options.Value;
+        _signatureOptions = options;
         _coBoOptions = coBoOptions.Value;
     }
 
@@ -186,9 +186,9 @@ public class CoBoClientProvider : ICoBoClientProvider, ISingletonDependency
             ApiKey = _coBoOptions.ApiKey,
             PlainText = signatureContent
         };
-        _logger.LogInformation("GetHeadersAsync baseurl: ", _signatureOptions.BaseUrl);
+        _logger.LogInformation("GetHeadersAsync baseurl: ", _signatureOptions.Value.BaseUrl);
 
-        var url = _signatureOptions.BaseUrl.TrimEnd('/') + CommonConstant.ThirdPartSignUrl;
+        var url = _signatureOptions.Value.BaseUrl.TrimEnd('/') + CommonConstant.ThirdPartSignUrl;
         var responseDto = await GetSignatureAsync(url, signDto);
         headers.Add(CoBoConstant.SignatureName, responseDto.Signature);
 
