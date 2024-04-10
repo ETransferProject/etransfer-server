@@ -128,7 +128,7 @@ public class CoboAppService : ETransferServerAppService, ICoboAppService
         }
         try
         {
-            var orderInfoNew = await _coBoProvider.GetTransaction(new TransactionIdRequestDto
+            var orderInfoNew = await _coBoProvider.GetTransactionAsync(new TransactionIdRequestDto
                     {
                         Id = orderInfo.Id
                     });

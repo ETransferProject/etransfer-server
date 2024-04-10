@@ -84,7 +84,7 @@ public class CoBoProvider : ICoBoProvider, ISingletonDependency
         return result;
     }
     
-    public async Task<CoBoTransactionDto> GetTransaction(TransactionIdRequestDto input)
+    public async Task<CoBoTransactionDto> GetTransactionAsync(TransactionIdRequestDto input)
     {
         _logger.LogInformation("GetTransaction get transaction by time from cobo, id:{id}", input.Id);
 
