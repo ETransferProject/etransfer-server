@@ -137,6 +137,7 @@ public class CoboAppService : ETransferServerAppService, ICoboAppService
                 _logger.LogWarning("CoboService CustomCheckAndAdd order {Id} stream error, request to transaction fail.", orderInfo.Id);
                 return false;
             }
+            _logger.LogWarning("CoboService CustomCheckAndAdd order {Id}, request to transaction orderInfoNew{orderInfoNew}", orderInfo.Id, JsonConvert.SerializeObject(orderInfoNew));
             var idNew = new Guid(orderInfoNew.Id);
             await _clusterClient.GetGrain<ICoBoDepositQueryTimerGrain>(id).CreateDepositOrder(orderInfoNew);
         }
