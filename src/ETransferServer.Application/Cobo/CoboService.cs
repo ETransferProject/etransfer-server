@@ -51,14 +51,6 @@ public class CoboAppService : ETransferServerAppService, ICoboAppService
     public async Task<TransactionNotificationResponse> TransactionNotificationAsync(long timestamp, string signature, string body)
     {
         var res = new TransactionNotificationResponse { };
-        // test apollo
-        var publicKeys = _coBoOptions.CurrentValue.PublicKey;
-        var tokenTest = _tokenOptions.Value.Deposit["AELF"][0].Decimals;
-        var netWorkTest = _networkOptions.Value.WithdrawFeeNetwork[0];
-        _logger.LogInformation("CocoService CoboCallBackAsync begin timestamp:{timestamp} signature:{publicKeys} body:{body}   tokenTest{tokenTest}  netWorkTest{netWorkTest}", timestamp, publicKeys, body, tokenTest, netWorkTest);
-        res.Exception = publicKeys + tokenTest + netWorkTest;
-        return res;
-        // 
         bool verifyResult = false;
         try
         {
@@ -104,6 +96,7 @@ public class CoboAppService : ETransferServerAppService, ICoboAppService
             var ipAddress = _httpContextAccessor.HttpContext.Connection.RemoteIpAddress;
             if (ipAddress == null)
             {
+                _logger.LogInformation("CocoService RequestIpIllegal ipAddress null ");
                 return true;
             }
             if (ipAddress.IsIPv4MappedToIPv6)
@@ -114,10 +107,12 @@ public class CoboAppService : ETransferServerAppService, ICoboAppService
             var coboIps = _coBoOptions.CurrentValue.CoboIps;
             if (coboIps.Contains(ipAddress.ToString()))
             {
+                _logger.LogInformation("CocoService RequestIpIllegal success ip{ip}", ipAddress.ToString());
                 return false;
             }
+            _logger.LogInformation("CocoService RequestIpIllegal ip not in whitelist ip{ip}", ipAddress.ToString());
         }
-
+        _logger.LogInformation("CocoService RequestIpIllegal success _httpContextAccessor.HttpContext null ");
         return true;
     }
 
