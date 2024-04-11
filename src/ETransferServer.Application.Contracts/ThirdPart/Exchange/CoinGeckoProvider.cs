@@ -19,10 +19,10 @@ public class CoinGeckoProvider : IExchangeProvider
     private const string SimplePriceUri = "/simple/price";
 
     private readonly ILogger<CoinGeckoProvider> _logger;
-    private readonly IOptionsMonitor<CoinGeckoOptions> _coinGeckoOptions;
+    private readonly IOptionsSnapshot<CoinGeckoOptions> _coinGeckoOptions;
     private readonly IHttpProvider _httpProvider;
 
-    public CoinGeckoProvider(IOptionsMonitor<CoinGeckoOptions> coinGeckoOptions, IHttpProvider httpProvider,
+    public CoinGeckoProvider(IOptionsSnapshot<CoinGeckoOptions> coinGeckoOptions, IHttpProvider httpProvider,
         ILogger<CoinGeckoProvider> logger)
     {
         _coinGeckoOptions = coinGeckoOptions;
@@ -44,14 +44,14 @@ public class CoinGeckoProvider : IExchangeProvider
         {
             return TokenExchangeDto.One(fromSymbol, toSymbol, DateTime.UtcNow.ToUtcMilliSeconds());
         }
-        var url = _coinGeckoOptions.CurrentValue.BaseUrl + SimplePriceUri;
+        var url = _coinGeckoOptions.Value.BaseUrl + SimplePriceUri;
         _logger.LogDebug("CoinGecko url {Url}", url);
 
         var price = await _httpProvider.InvokeAsync<Price>(HttpMethod.Get,
-            _coinGeckoOptions.CurrentValue.BaseUrl + SimplePriceUri,
+            _coinGeckoOptions.Value.BaseUrl + SimplePriceUri,
             header: new Dictionary<string, string>
             {
-                ["x-cg-pro-api-key"] = _coinGeckoOptions.CurrentValue.ApiKey
+                ["x-cg-pro-api-key"] = _coinGeckoOptions.Value.ApiKey
             },
             param: new Dictionary<string, string>
             {
@@ -85,14 +85,14 @@ public class CoinGeckoProvider : IExchangeProvider
         fromSymbol = fromSymbol.ConvertAll(item => MappingSymbol(item).ToLower()).Distinct().ToList();
         var from = fromSymbol.JoinAsString(CommonConstant.Comma);
         var to = MappingSymbol(toSymbol);
-        var url = _coinGeckoOptions.CurrentValue.BaseUrl + SimplePriceUri;
+        var url = _coinGeckoOptions.Value.BaseUrl + SimplePriceUri;
         _logger.LogDebug("CoinGecko url {Url}", url);
 
         var price = await _httpProvider.InvokeAsync<Price>(HttpMethod.Get,
-            _coinGeckoOptions.CurrentValue.BaseUrl + SimplePriceUri,
+            _coinGeckoOptions.Value.BaseUrl + SimplePriceUri,
             header: new Dictionary<string, string>
             {
-                ["x-cg-pro-api-key"] = _coinGeckoOptions.CurrentValue.ApiKey
+                ["x-cg-pro-api-key"] = _coinGeckoOptions.Value.ApiKey
             },
             param: new Dictionary<string, string>
             {
@@ -119,7 +119,7 @@ public class CoinGeckoProvider : IExchangeProvider
 
     private string MappingSymbol(string sourceSymbol)
     {
-        return _coinGeckoOptions?.CurrentValue?.CoinIdMapping?.TryGetValue(sourceSymbol, out var result) ?? false
+        return _coinGeckoOptions?.Value?.CoinIdMapping?.TryGetValue(sourceSymbol, out var result) ?? false
             ? result
             : sourceSymbol;
     }

@@ -19,13 +19,13 @@ public interface ISignatureProvider
 public class SignatureProvider : ISignatureProvider, ISingletonDependency
 {
     private readonly ILogger<SignatureProvider> _logger;
-    private readonly ThirdPartKeyStoreOptions _thirdPartKeyStoreOptions;
+    private readonly IOptionsSnapshot<ThirdPartKeyStoreOptions> _thirdPartKeyStoreOptions;
 
     public SignatureProvider(ILogger<SignatureProvider> logger, 
         IOptionsSnapshot<ThirdPartKeyStoreOptions> thirdPartKeyStoreOptions)
     {
         _logger = logger;
-        _thirdPartKeyStoreOptions = thirdPartKeyStoreOptions.Value;
+        _thirdPartKeyStoreOptions = thirdPartKeyStoreOptions;
     }
 
     public SignResponseDto SignThirdPart(SignDto signDto)
@@ -56,7 +56,7 @@ public class SignatureProvider : ISignatureProvider, ISingletonDependency
     
     private string ReadThirdPartKeyStore(string key)
     {
-        var path = PathHelper.ResolvePath(_thirdPartKeyStoreOptions.Path  + "/" + key + ".json");
+        var path = PathHelper.ResolvePath(_thirdPartKeyStoreOptions.Value.Path  + "/" + key + ".json");
         if (!File.Exists(path))
         {
             throw new UserFriendlyException("Thirdpart keystore file not exits: " + path);

@@ -15,10 +15,10 @@ namespace ETransferServer.ThirdPart.Exchange;
 
 public class GateIoProvider : IExchangeProvider, ISingletonDependency
 {
-    private readonly IOptionsMonitor<ExchangeOptions> _exchangeOptions;
+    private readonly IOptionsSnapshot<ExchangeOptions> _exchangeOptions;
     private readonly IHttpProvider _httpProvider;
 
-    public GateIoProvider(IOptionsMonitor<ExchangeOptions> exchangeOptions, IHttpProvider httpProvider)
+    public GateIoProvider(IOptionsSnapshot<ExchangeOptions> exchangeOptions, IHttpProvider httpProvider)
     {
         _exchangeOptions = exchangeOptions;
         _httpProvider = httpProvider;
@@ -44,7 +44,7 @@ public class GateIoProvider : IExchangeProvider, ISingletonDependency
         {
             return TokenExchangeDto.One(fromSymbol, toSymbol, DateTime.UtcNow.ToUtcMilliSeconds());
         }
-        var resp = await _httpProvider.InvokeAsync<List<List<string>>>(_exchangeOptions.CurrentValue.GateIo.BaseUrl,
+        var resp = await _httpProvider.InvokeAsync<List<List<string>>>(_exchangeOptions.Value.GateIo.BaseUrl,
             Api.Candlesticks, param: new Dictionary<string, string>
             {
                 ["currency_pair"] = string.Join(CommonConstant.Underline, from, to),
@@ -83,7 +83,7 @@ public class GateIoProvider : IExchangeProvider, ISingletonDependency
         {
             return TokenExchangeDto.One(fromSymbol, toSymbol, timestamp);
         }
-        var resp = await _httpProvider.InvokeAsync<List<List<string>>>(_exchangeOptions.CurrentValue.GateIo.BaseUrl,
+        var resp = await _httpProvider.InvokeAsync<List<List<string>>>(_exchangeOptions.Value.GateIo.BaseUrl,
             Api.Candlesticks, param: new Dictionary<string, string>
             {
                 ["currency_pair"] = string.Join(CommonConstant.Underline, from, to),
@@ -103,7 +103,7 @@ public class GateIoProvider : IExchangeProvider, ISingletonDependency
 
     private string SymbolMapping(string standardSymbol)
     {
-        return _exchangeOptions.CurrentValue.GateIo.SymbolMapping.GetValueOrDefault(standardSymbol, standardSymbol);
+        return _exchangeOptions.Value.GateIo.SymbolMapping.GetValueOrDefault(standardSymbol, standardSymbol);
     }
 
     public class CandlesticksResponse

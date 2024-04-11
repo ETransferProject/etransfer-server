@@ -25,7 +25,7 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
     private readonly ILogger<WithdrawTimerGrain> _logger;
     private readonly TimerOptions _timerOptions;
     private readonly ICoBoProvider _coBoProvider;
-    private readonly WithdrawNetworkOptions _withdrawNetworkOptions;
+    private readonly IOptionsSnapshot<WithdrawNetworkOptions> _withdrawNetworkOptions;
 
     private const string SUCCESS = "success";
     private const string FAIL = "failed";
@@ -37,7 +37,7 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
     {
         _logger = logger;
         _coBoProvider = coBoProvider;
-        _withdrawNetworkOptions = withdrawNetworkOptions.Value;
+        _withdrawNetworkOptions = withdrawNetworkOptions;
         _timerOptions = timerOptions.Value;
     }
 
@@ -185,7 +185,7 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
             }
 
             var coin = GuidHelper.GenerateId(order.ToTransfer.Network, order.ToTransfer.Symbol);
-            var netWorkInfo = _withdrawNetworkOptions.NetworkInfos.FirstOrDefault(t =>
+            var netWorkInfo = _withdrawNetworkOptions.Value.NetworkInfos.FirstOrDefault(t =>
                 t.Coin.Equals(coin, StringComparison.OrdinalIgnoreCase));
             var requestTime = DateTime.UtcNow.AddMinutes(1).ToUtcSeconds();
             if (netWorkInfo != null)
@@ -344,7 +344,7 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
     {
         try
         {
-            var coinInfo = _withdrawNetworkOptions.GetNetworkInfo(orderDto.ToTransfer.Network, orderDto.ToTransfer.Symbol);
+            var coinInfo = _withdrawNetworkOptions.Value.GetNetworkInfo(orderDto.ToTransfer.Network, orderDto.ToTransfer.Symbol);
             var amount = BigCalculationHelper.CalculateAmount(orderDto.ToTransfer.Amount, coinInfo.Decimal);
             var requestDto = new WithdrawRequestDto
             {
@@ -390,7 +390,7 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
         var extensionKey = GetWithdrawErrorKey(withdrawRequest.Value.RetryCount);
         try
         {
-            var coinInfo = _withdrawNetworkOptions.GetNetworkInfo(orderDto.ToTransfer.Network, orderDto.ToTransfer.Symbol);
+            var coinInfo = _withdrawNetworkOptions.Value.GetNetworkInfo(orderDto.ToTransfer.Network, orderDto.ToTransfer.Symbol);
             var amount = BigCalculationHelper.CalculateAmount(orderDto.ToTransfer.Amount, coinInfo.Decimal);
             var requestDto = new WithdrawRequestDto
             {

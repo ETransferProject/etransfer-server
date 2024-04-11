@@ -21,11 +21,11 @@ public interface IUserDepositAddressGrain : IGrainWithStringKey
 public class UserDepositAddressGrain : Grain<TokenDepositAddressState>, IUserDepositAddressGrain
 {
     private readonly IUserAddressProvider _userAddressProvider;
-    private readonly IOptionsMonitor<DepositAddressOptions> _depositAddressOptions;
+    private readonly IOptionsSnapshot<DepositAddressOptions> _depositAddressOptions;
     private readonly IObjectMapper _objectMapper;
 
     public UserDepositAddressGrain(IUserAddressProvider userAddressProvider,
-        IOptionsMonitor<DepositAddressOptions> depositAddressOptions,
+        IOptionsSnapshot<DepositAddressOptions> depositAddressOptions,
         IObjectMapper objectMapper)
     {
         _userAddressProvider = userAddressProvider;
@@ -53,7 +53,7 @@ public class UserDepositAddressGrain : Grain<TokenDepositAddressState>, IUserDep
             return State.UserToken.Address;
         }
         
-        var evmCoins = _depositAddressOptions.CurrentValue.EVMCoins;
+        var evmCoins = _depositAddressOptions.Value.EVMCoins;
         if (evmCoins.Contains(GuidHelper.GenerateId(input.NetWork, input.Symbol)) && evmCoins.Count > 0)
         {
             foreach (var coin in evmCoins)

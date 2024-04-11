@@ -24,12 +24,12 @@ public class TokenExchangeGrain : Grain<TokenExchangeState>, ITokenExchangeGrain
 {
     private readonly ILogger<TokenExchangeGrain> _logger;
     private readonly Dictionary<string, IExchangeProvider> _exchangeProviders;
-    private readonly IOptionsMonitor<ExchangeOptions> _exchangeOptions;
-    private readonly IOptionsMonitor<NetWorkReflectionOptions> _netWorkReflectionOption;
+    private readonly IOptionsSnapshot<ExchangeOptions> _exchangeOptions;
+    private readonly IOptionsSnapshot<NetWorkReflectionOptions> _netWorkReflectionOption;
 
     public TokenExchangeGrain(IEnumerable<IExchangeProvider> exchangeProviders,
-        IOptionsMonitor<ExchangeOptions> exchangeOptions,
-        IOptionsMonitor<NetWorkReflectionOptions> netWorkReflectionOption, ILogger<TokenExchangeGrain> logger)
+        IOptionsSnapshot<ExchangeOptions> exchangeOptions,
+        IOptionsSnapshot<NetWorkReflectionOptions> netWorkReflectionOption, ILogger<TokenExchangeGrain> logger)
     {
         _exchangeOptions = exchangeOptions;
         _netWorkReflectionOption = netWorkReflectionOption;
@@ -66,7 +66,7 @@ public class TokenExchangeGrain : Grain<TokenExchangeState>, ITokenExchangeGrain
         }
 
         var usdToUsdtTask = isUsd != "none" ? ExchangeFromUsdtToUsd() : null;
-        var providerOption = _exchangeOptions.CurrentValue.GetSymbolProviders(fromSymbol, toSymbol);
+        var providerOption = _exchangeOptions.Value.GetSymbolProviders(fromSymbol, toSymbol);
         var providers = _exchangeProviders.Values.Where(provider => providerOption.Contains(provider.Name().ToString()))
             .ToList();
         foreach (var provider in providers)
@@ -101,7 +101,7 @@ public class TokenExchangeGrain : Grain<TokenExchangeState>, ITokenExchangeGrain
 
         var symbolPair = string.Join(CommonConstant.Underline, fromSymbol, toSymbol);
         _logger.LogWarning("Exchange empty, use bottom exchange {Pair}", symbolPair);
-        if (!_exchangeOptions.CurrentValue.BottomExchange.TryGetValue(symbolPair, out var bottomExchange))
+        if (!_exchangeOptions.Value.BottomExchange.TryGetValue(symbolPair, out var bottomExchange))
         {
             return result;
         }
@@ -161,13 +161,13 @@ public class TokenExchangeGrain : Grain<TokenExchangeState>, ITokenExchangeGrain
         var toSymbol = MappingSymbol(symbolValue[1].ToUpper());
 
         State.ExchangeInfos =
-            _exchangeOptions.CurrentValue.SymbolExchangeViaUSDT.Contains(fromSymbol) ||
-            _exchangeOptions.CurrentValue.SymbolExchangeViaUSDT.Contains(toSymbol)
+            _exchangeOptions.Value.SymbolExchangeViaUSDT.Contains(fromSymbol) ||
+            _exchangeOptions.Value.SymbolExchangeViaUSDT.Contains(toSymbol)
                 ? await GetViaUsdt(fromSymbol, toSymbol)
                 : await DoGetAsync(fromSymbol, toSymbol);
 
         State.LastModifyTime = now;
-        State.ExpireTime = now + _exchangeOptions.CurrentValue.DataExpireSeconds * 1000;
+        State.ExpireTime = now + _exchangeOptions.Value.DataExpireSeconds * 1000;
         await WriteStateAsync();
         return State.ExchangeInfos;
     }
@@ -215,7 +215,7 @@ public class TokenExchangeGrain : Grain<TokenExchangeState>, ITokenExchangeGrain
         var asyncTasks = await _exchangeProviders[name.ToString()].LatestAsync(symbolValue, symbol);
 
         State.LastModifyTime = now;
-        State.ExpireTime = now + _exchangeOptions.CurrentValue.DataExpireSeconds * 1000;
+        State.ExpireTime = now + _exchangeOptions.Value.DataExpireSeconds * 1000;
         State.ExchangeInfos = new Dictionary<string, TokenExchangeDto>();
         foreach (var item in asyncTasks)
         {
@@ -237,7 +237,7 @@ public class TokenExchangeGrain : Grain<TokenExchangeState>, ITokenExchangeGrain
 
     private string MappingSymbol(string sourceSymbol)
     {
-        return _netWorkReflectionOption.CurrentValue.SymbolItems.TryGetValue(sourceSymbol, out var targetSymbol)
+        return _netWorkReflectionOption.Value.SymbolItems.TryGetValue(sourceSymbol, out var targetSymbol)
             ? targetSymbol
             : sourceSymbol;
     }

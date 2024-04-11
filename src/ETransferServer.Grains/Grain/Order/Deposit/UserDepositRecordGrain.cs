@@ -21,11 +21,11 @@ public class UserDepositRecordGrain : Grain<DepositOrderState>, IUserDepositReco
 {
     private readonly IObjectMapper _objectMapper;
     private readonly ILogger<UserDepositRecordGrain> _logger;
-    private readonly IOptionsMonitor<ChainOptions> _chainOptions;
+    private readonly IOptionsSnapshot<ChainOptions> _chainOptions;
 
     public UserDepositRecordGrain(IObjectMapper objectMapper, 
         ILogger<UserDepositRecordGrain> logger, 
-        IOptionsMonitor<ChainOptions> chainOptions)
+        IOptionsSnapshot<ChainOptions> chainOptions)
     {
         _objectMapper = objectMapper;
         _logger = logger;
@@ -39,7 +39,7 @@ public class UserDepositRecordGrain : Grain<DepositOrderState>, IUserDepositReco
             var now = DateTime.UtcNow.ToUtcMilliSeconds();
             var createTime = State.CreateTime ?? DateTime.UtcNow.ToUtcMilliSeconds();
             var arrivalTime = State.ArrivalTime ?? DateTime.UtcNow.AddSeconds(
-                _chainOptions.CurrentValue.ChainInfos[orderDto.ToTransfer.ChainId].EstimatedArrivalTime).ToUtcMilliSeconds();
+                _chainOptions.Value.ChainInfos[orderDto.ToTransfer.ChainId].EstimatedArrivalTime).ToUtcMilliSeconds();
             
             _objectMapper.Map(orderDto, State);
             State.Id = this.GetPrimaryKey();

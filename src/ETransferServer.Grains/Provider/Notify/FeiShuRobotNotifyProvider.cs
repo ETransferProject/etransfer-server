@@ -14,10 +14,10 @@ public class FeiShuRobotNotifyProvider : INotifyProvider
 {
     private ILogger<FeiShuRobotNotifyProvider> _logger;
     private readonly HttpProvider _httpProvider;
-    private readonly IOptionsMonitor<NotifyTemplateOptions> _notifyTemplateOptions;
+    private readonly IOptionsSnapshot<NotifyTemplateOptions> _notifyTemplateOptions;
 
     public FeiShuRobotNotifyProvider(HttpProvider httpProvider,
-        IOptionsMonitor<NotifyTemplateOptions> notifyTemplateOptions)
+        IOptionsSnapshot<NotifyTemplateOptions> notifyTemplateOptions)
     {
         _httpProvider = httpProvider;
         _notifyTemplateOptions = notifyTemplateOptions;
@@ -42,7 +42,7 @@ public class FeiShuRobotNotifyProvider : INotifyProvider
     public async Task<bool> SendNotifyAsync(NotifyRequest notifyRequest)
     {
         var templateExists =
-            _notifyTemplateOptions.CurrentValue.Templates.TryGetValue(notifyRequest.Template, out var templates);
+            _notifyTemplateOptions.Value.Templates.TryGetValue(notifyRequest.Template, out var templates);
         AssertHelper.IsTrue(templateExists, "Template {} not found", notifyRequest.Template);
         AssertHelper.NotNull(templates.FeiShuGroup, "FeiShuGroup template not fount, template:{}",
             notifyRequest.Template);

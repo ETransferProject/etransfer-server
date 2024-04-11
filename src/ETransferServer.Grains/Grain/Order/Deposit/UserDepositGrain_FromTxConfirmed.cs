@@ -67,8 +67,8 @@ public partial class UserDepositGrain
             AssertHelper.IsTrue(isSuccess, error);
 
             var result = await _contractProvider.WaitTransactionResultAsync(toTransfer.ChainId, toTransfer.TxId,
-                _chainOptions.CurrentValue.Contract.WaitSecondsAfterSend * 1000,
-                _chainOptions.CurrentValue.Contract.RetryDelaySeconds * 1000);
+                _chainOptions.Value.Contract.WaitSecondsAfterSend * 1000,
+                _chainOptions.Value.Contract.RetryDelaySeconds * 1000);
 
             switch (result.Status)
             {
