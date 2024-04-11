@@ -26,7 +26,7 @@ public class CoBoClientProvider : ICoBoClientProvider, ISingletonDependency
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly ILogger<CoBoClientProvider> _logger;
     private readonly IOptionsSnapshot<SignatureServiceOption> _signatureOptions;
-    private readonly CoBoOptions _coBoOptions;
+    private readonly IOptionsSnapshot<CoBoOptions> _coBoOptions;
 
     public CoBoClientProvider(IHttpClientFactory httpClientFactory, IHttpContextAccessor httpContextAccessor,
         ILogger<CoBoClientProvider> logger, IOptionsSnapshot<SignatureServiceOption> options,
@@ -36,7 +36,7 @@ public class CoBoClientProvider : ICoBoClientProvider, ISingletonDependency
         _httpContextAccessor = httpContextAccessor;
         _logger = logger;
         _signatureOptions = options;
-        _coBoOptions = coBoOptions.Value;
+        _coBoOptions = coBoOptions;
     }
 
     public async Task<T> GetAsync<T>(string url)
@@ -183,12 +183,13 @@ public class CoBoClientProvider : ICoBoClientProvider, ISingletonDependency
 
         var signDto = new SignDto
         {
-            ApiKey = _coBoOptions.ApiKey,
+            ApiKey = _coBoOptions.Value.ApiKey,
             PlainText = signatureContent
         };
-        _logger.LogInformation("GetHeadersAsync baseurl: ", _signatureOptions.Value.BaseUrl);
-
         var url = _signatureOptions.Value.BaseUrl.TrimEnd('/') + CommonConstant.ThirdPartSignUrl;
+        var apiKey = _coBoOptions.Value.ApiKey;
+        _logger.LogInformation("GetHeadersAsync baseurl:{baseUrl} apiKey:{apiKey}", _signatureOptions.Value.BaseUrl, apiKey);
+
         var responseDto = await GetSignatureAsync(url, signDto);
         headers.Add(CoBoConstant.SignatureName, responseDto.Signature);
 
