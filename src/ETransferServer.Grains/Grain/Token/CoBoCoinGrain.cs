@@ -28,10 +28,10 @@ public class CoBoCoinGrain: Grain<CoBoCoinState>, ICoBoCoinGrain
 
     private readonly IObjectMapper _objectMapper;
     private readonly ICoBoProvider _coBoProvider;
-    private readonly IOptionsMonitor<CoBoOptions> _coBoOptions;
+    private readonly IOptionsSnapshot<CoBoOptions> _coBoOptions;
     
 
-    public CoBoCoinGrain(ICoBoProvider coBoProvider, IObjectMapper objectMapper, IOptionsMonitor<CoBoOptions> coBoOptions)
+    public CoBoCoinGrain(ICoBoProvider coBoProvider, IObjectMapper objectMapper, IOptionsSnapshot<CoBoOptions> coBoOptions)
     {
         _coBoProvider = coBoProvider;
         _objectMapper = objectMapper;
@@ -50,7 +50,7 @@ public class CoBoCoinGrain: Grain<CoBoCoinState>, ICoBoCoinGrain
         if (coinResp == null) return null; 
         
         State = _objectMapper.Map<CoBoCoinDetailDto, CoBoCoinState>(coinResp);
-        State.ExpireTime = now + _coBoOptions.CurrentValue.CoinExpireSeconds * 1000;
+        State.ExpireTime = now + _coBoOptions.Value.CoinExpireSeconds * 1000;
         State.LastModifyTime = now;
         await WriteStateAsync();
 

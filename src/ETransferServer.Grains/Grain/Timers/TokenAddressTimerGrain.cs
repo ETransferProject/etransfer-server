@@ -21,15 +21,15 @@ public class TokenAddressTimerGrain: Grain<TokenAddressState>, ITokenAddressTime
 
     private readonly IUserAddressProvider _userAddressProvider;
     private readonly ICoBoProvider _coBoProvider;
-    private readonly IOptionsMonitor<TimerOptions> _timerOptions;
-    private readonly IOptionsMonitor<DepositAddressOptions> _depositAddressOptions;
+    private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
+    private readonly IOptionsSnapshot<DepositAddressOptions> _depositAddressOptions;
     private readonly ILogger<TokenAddressTimerGrain> _logger;
     
 
     public TokenAddressTimerGrain(IUserAddressProvider userAddressProvider,
         ICoBoProvider coBoProvider,
-        IOptionsMonitor<TimerOptions> timerOptions,
-        IOptionsMonitor<DepositAddressOptions> depositAddressOptions,
+        IOptionsSnapshot<TimerOptions> timerOptions,
+        IOptionsSnapshot<DepositAddressOptions> depositAddressOptions,
         ILogger<TokenAddressTimerGrain> logger)
     {
         _userAddressProvider = userAddressProvider;
@@ -44,8 +44,8 @@ public class TokenAddressTimerGrain: Grain<TokenAddressState>, ITokenAddressTime
         _logger.LogDebug("TokenAddressTimerGrain {Id} Activate", this.GetPrimaryKey().ToString());
         await base.OnActivateAsync();
         
-        await StartTimer(TimeSpan.FromSeconds(_timerOptions.CurrentValue.TokenAddressTimer.PeriodSeconds),
-            TimeSpan.FromSeconds(_timerOptions.CurrentValue.TokenAddressTimer.DelaySeconds));
+        await StartTimer(TimeSpan.FromSeconds(_timerOptions.Value.TokenAddressTimer.PeriodSeconds),
+            TimeSpan.FromSeconds(_timerOptions.Value.TokenAddressTimer.DelaySeconds));
     }
 
     private Task StartTimer(TimeSpan timerPeriod, TimeSpan delayPeriod)
@@ -71,7 +71,7 @@ public class TokenAddressTimerGrain: Grain<TokenAddressState>, ITokenAddressTime
                 var split = item.Split(DepositAddressOptions.DefaultDelimiter);
                 if (split.Length < 2) continue;
                 _logger.LogDebug("CoBoProvider.GetAddressesAsync before.");
-                var addresses = await _coBoProvider.GetAddressesAsync(item, _depositAddressOptions.CurrentValue.MaxRequestNewAddressCount);
+                var addresses = await _coBoProvider.GetAddressesAsync(item, _depositAddressOptions.Value.MaxRequestNewAddressCount);
                 _logger.LogDebug("CoBoProvider.GetAddressesAsync after.");
                 var addressHits = new List<string>();
                 var filterAddressList = await _userAddressProvider.GetAddressListAsync(addresses.Addresses);

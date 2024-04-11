@@ -23,13 +23,13 @@ public class UserWithdrawRecordGrain : Grain<WithdrawOrderState>, IUserWithdrawR
 {
     private readonly IObjectMapper _objectMapper;
     private readonly ILogger<UserWithdrawRecordGrain> _logger;
-    private readonly IOptionsMonitor<ChainOptions> _chainOptions;
-    private readonly IOptionsMonitor<WithdrawNetworkOptions> _withdrawNetworkOptions;
+    private readonly IOptionsSnapshot<ChainOptions> _chainOptions;
+    private readonly IOptionsSnapshot<WithdrawNetworkOptions> _withdrawNetworkOptions;
 
     public UserWithdrawRecordGrain(IObjectMapper objectMapper, 
         ILogger<UserWithdrawRecordGrain> logger,
-        IOptionsMonitor<ChainOptions> chainOptions,
-        IOptionsMonitor<WithdrawNetworkOptions> withdrawNetworkOptions)
+        IOptionsSnapshot<ChainOptions> chainOptions,
+        IOptionsSnapshot<WithdrawNetworkOptions> withdrawNetworkOptions)
     {
         _objectMapper = objectMapper;
         _logger = logger;
@@ -50,11 +50,11 @@ public class UserWithdrawRecordGrain : Grain<WithdrawOrderState>, IUserWithdrawR
             State.LastModifyTime = now;
             if (!State.ArrivalTime.HasValue)
             {
-                var netWorkInfo = _withdrawNetworkOptions.CurrentValue.NetworkInfos.FirstOrDefault(t =>
+                var netWorkInfo = _withdrawNetworkOptions.Value.NetworkInfos.FirstOrDefault(t =>
                     t.Coin.Equals(GuidHelper.GenerateId(orderDto.ToTransfer.Network, 
                         orderDto.ToTransfer.Symbol), StringComparison.OrdinalIgnoreCase));
                 State.ArrivalTime = DateTime.UtcNow.AddSeconds(
-                        _chainOptions.CurrentValue.ChainInfos[orderDto.FromTransfer.ChainId].EstimatedArrivalTime)
+                        _chainOptions.Value.ChainInfos[orderDto.FromTransfer.ChainId].EstimatedArrivalTime)
                     .AddSeconds(netWorkInfo.EstimatedArrivalTime).ToUtcMilliSeconds();
             }
             if (orderDto.Status == OrderStatusEnum.Finish.ToString())

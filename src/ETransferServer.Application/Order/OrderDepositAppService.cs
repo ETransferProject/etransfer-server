@@ -28,7 +28,7 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
     private readonly INESTRepository<OrderIndex, Guid> _depositOrderIndexRepository;
     private readonly IObjectMapper _objectMapper;
     private readonly ILogger<OrderDepositAppService> _logger;
-    private readonly NetworkOptions _networkInfoOptions;
+    private readonly IOptionsSnapshot<NetworkOptions> _networkInfoOptions;
     private readonly IUserAddressService _userAddressService;
     private readonly INetworkAppService _networkAppService;
 
@@ -40,7 +40,7 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
         INetworkAppService networkAppService)
     {
         _depositOrderIndexRepository = depositOrderIndexRepository;
-        _networkInfoOptions = networkInfoOptions.Value;
+        _networkInfoOptions = networkInfoOptions;
         _objectMapper = objectMapper;
         _logger = logger;
         _userAddressService = userAddressService;
@@ -53,10 +53,10 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
         {
             AssertHelper.IsTrue(request.ChainId == ChainId.AELF || request.ChainId == ChainId.tDVV
                 || request.ChainId == ChainId.tDVW, "Param is invalid. Please refresh and try again.");
-            AssertHelper.IsTrue(_networkInfoOptions.NetworkMap.ContainsKey(request.Symbol), 
+            AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.Symbol), 
                 "Symbol is not exist. Please refresh and try again.");
             
-            var networkConfigs = _networkInfoOptions.NetworkMap[request.Symbol];
+            var networkConfigs = _networkInfoOptions.Value.NetworkMap[request.Symbol];
             var depositInfo = networkConfigs.Where(n => n.NetworkInfo.Network == request.Network)
                 .Select(n => n.DepositInfo).FirstOrDefault();
             AssertHelper.IsTrue(depositInfo != null, "Network is not exist. Please refresh and try again.");

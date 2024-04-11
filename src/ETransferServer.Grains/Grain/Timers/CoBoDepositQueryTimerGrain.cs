@@ -30,17 +30,17 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
     private DateTime? _lastCallbackTime;
 
     private readonly ILogger<CoBoDepositQueryTimerGrain> _logger;
-    private readonly IOptionsMonitor<TimerOptions> _timerOptions;
-    private readonly IOptionsMonitor<DepositOptions> _depositOption;
-    private readonly IOptionsMonitor<NetworkOptions> _networkOption;
+    private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
+    private readonly IOptionsSnapshot<DepositOptions> _depositOption;
+    private readonly IOptionsSnapshot<NetworkOptions> _networkOption;
     private readonly IUserAppService _userAppService;
     private readonly IUserAddressService _userAddressService;
 
     private readonly ICoBoProvider _coBoProvider;
 
     public CoBoDepositQueryTimerGrain(ILogger<CoBoDepositQueryTimerGrain> logger,
-        IOptionsMonitor<TimerOptions> timerOptions, ICoBoProvider coBoProvider,
-        IOptionsMonitor<DepositOptions> depositOption, IOptionsMonitor<NetworkOptions> networkOption,
+        IOptionsSnapshot<TimerOptions> timerOptions, ICoBoProvider coBoProvider,
+        IOptionsSnapshot<DepositOptions> depositOption, IOptionsSnapshot<NetworkOptions> networkOption,
         IUserAppService userAppService, IUserAddressService userAddressService)
     {
         _logger = logger;
@@ -63,8 +63,8 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
             State.ExistOrders = new List<string>();
         }
 
-        await StartTimer(TimeSpan.FromSeconds(_timerOptions.CurrentValue.CoBoDepositQueryTimer.PeriodSeconds),
-            TimeSpan.FromSeconds(_timerOptions.CurrentValue.CoBoDepositQueryTimer.DelaySeconds));
+        await StartTimer(TimeSpan.FromSeconds(_timerOptions.Value.CoBoDepositQueryTimer.PeriodSeconds),
+            TimeSpan.FromSeconds(_timerOptions.Value.CoBoDepositQueryTimer.DelaySeconds));
     }
 
     private Task StartTimer(TimeSpan timerPeriod, TimeSpan delayPeriod)
@@ -179,7 +179,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
 
     private async Task<DepositOrderDto> ConvertToDepositOrderDto(CoBoTransactionDto coBoTransaction)
     {
-        var coinInfo = CoBoHelper.MatchNetwork(coBoTransaction.Coin, _networkOption.CurrentValue.CoBo);
+        var coinInfo = CoBoHelper.MatchNetwork(coBoTransaction.Coin, _networkOption.Value.CoBo);
 
         var addressGrain = GrainFactory.GetGrain<IUserTokenDepositAddressGrain>(coBoTransaction.Address);
         var res = await addressGrain.Get();
@@ -197,9 +197,9 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         AssertHelper.NotNull(addressInfo, "addressInfo empty");
 
         var paymentAddressExists =
-            _depositOption.CurrentValue.PaymentAddresses?.ContainsKey(addressInfo.ChainId) ?? false;
+            _depositOption.Value.PaymentAddresses?.ContainsKey(addressInfo.ChainId) ?? false;
         AssertHelper.IsTrue(paymentAddressExists, "Payment address missing, ChainId={ChainId}", addressInfo.ChainId);
-        var paymentAddress = _depositOption.CurrentValue.PaymentAddresses.GetValueOrDefault(addressInfo.ChainId);
+        var paymentAddress = _depositOption.Value.PaymentAddresses.GetValueOrDefault(addressInfo.ChainId);
         AssertHelper.NotEmpty(paymentAddress, "Payment address empty, ChainId={ChainId}", addressInfo.ChainId);
 
         return new DepositOrderDto

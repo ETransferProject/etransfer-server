@@ -25,11 +25,11 @@ public class CoboAppService : ETransferServerAppService, ICoboAppService
     private readonly ILogger<CoboAppService> _logger;
     private readonly IClusterClient _clusterClient;
     private readonly ICoBoProvider _coBoProvider;
-    private readonly IOptionsMonitor<CoBoOptions> _coBoOptions;
+    private readonly IOptionsSnapshot<CoBoOptions> _coBoOptions;
     private readonly IHttpContextAccessor _httpContextAccessor;
 
     public CoboAppService(ILogger<CoboAppService> logger, IClusterClient clusterClient, 
-        ICoBoProvider coBoProvider, IOptionsMonitor<CoBoOptions> coBoOptions, IHttpContextAccessor httpContextAccessor)
+        ICoBoProvider coBoProvider, IOptionsSnapshot<CoBoOptions> coBoOptions, IHttpContextAccessor httpContextAccessor)
     {
         _logger = logger;
         _clusterClient = clusterClient;
@@ -77,7 +77,7 @@ public class CoboAppService : ETransferServerAppService, ICoboAppService
                 ipAddress = ipAddress.MapToIPv4();
             }
         
-            var coboIps = _coBoOptions.CurrentValue.CoboIps;
+            var coboIps = _coBoOptions.Value.CoboIps;
             if (coboIps.Contains(ipAddress.ToString()))
             {
                 _logger.LogInformation("CocoService RequestIpIllegal success ip{ip}", ipAddress.ToString());

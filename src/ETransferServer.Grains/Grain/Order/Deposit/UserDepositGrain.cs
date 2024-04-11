@@ -32,8 +32,8 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
     private readonly IUserDepositProvider _userDepositProvider;
     private readonly IOrderStatusFlowProvider _orderStatusFlowProvider;
 
-    private readonly IOptionsMonitor<ChainOptions> _chainOptions;
-    private readonly IOptionsMonitor<DepositOptions> _depositOptions;
+    private readonly IOptionsSnapshot<ChainOptions> _chainOptions;
+    private readonly IOptionsSnapshot<DepositOptions> _depositOptions;
 
     private IUserDepositRecordGrain _recordGrain;
     private IOrderStatusFlowGrain _orderStatusFlowGrain;
@@ -48,7 +48,7 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
 
     public UserDepositGrain(IUserDepositProvider userDepositProvider,
         ILogger<UserDepositGrain> logger, IContractProvider contractProvider,
-        IOptionsMonitor<ChainOptions> chainOptions, IOptionsMonitor<DepositOptions> depositOptions,
+        IOptionsSnapshot<ChainOptions> chainOptions, IOptionsSnapshot<DepositOptions> depositOptions,
         IOrderStatusFlowProvider orderStatusFlowProvider)
     {
         _userDepositProvider = userDepositProvider;
@@ -67,7 +67,7 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
         var streamProvider = GetStreamProvider(CommonConstant.StreamConstant.MessageStreamNameSpace);
         _orderChangeStream =
             streamProvider.GetStream<DepositOrderDto>(this.GetPrimaryKey(),
-                _depositOptions.CurrentValue.OrderChangeTopic);
+                _depositOptions.Value.OrderChangeTopic);
         await _orderChangeStream.SubscribeAsync(OnNextAsync, OnErrorAsync, OnCompletedAsync);
 
         // other grain

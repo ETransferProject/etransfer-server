@@ -36,7 +36,7 @@ public class SignatureGrantHandler : ITokenExtensionGrant
     private ContractOptions _contractOptions;
     private IClusterClient _clusterClient;
     private GraphQlOption _graphQlOptions;
-    private ChainOptions _chainOptions;
+    private IOptionsSnapshot<ChainOptions> _chainOptions;
     private readonly string _lockKeyPrefix = "ETransferServer:Auth:SignatureGrantHandler:";
     private readonly string _source_portkey = "portkey";
     private readonly string _source_nightaelf = "nightElf";
@@ -101,8 +101,7 @@ public class SignatureGrantHandler : ITokenExtensionGrant
         //Find manager by caHash
         _graphQlOptions = context.HttpContext.RequestServices.GetRequiredService<IOptionsSnapshot<GraphQlOption>>()
             .Value;
-        _chainOptions = context.HttpContext.RequestServices.GetRequiredService<IOptionsSnapshot<ChainOptions>>()
-            .Value;
+        _chainOptions = context.HttpContext.RequestServices.GetRequiredService<IOptionsSnapshot<ChainOptions>>();
         var caHash = string.Empty;
         if (source == _source_portkey)
         {
@@ -119,7 +118,7 @@ public class SignatureGrantHandler : ITokenExtensionGrant
 
         var managerCheck = await CheckAddressAsync(chainId,
    AuthConstant.PortKeyVersion2.Equals(version) ? _graphQlOptions.Url2 : _graphQlOptions.Url,
-            caHash, address, version, _chainOptions);
+            caHash, address, version, _chainOptions.Value);
         if (!managerCheck.HasValue || !managerCheck.Value)
         {
             _logger.LogError(
@@ -290,7 +289,7 @@ public class SignatureGrantHandler : ITokenExtensionGrant
             chainIds = holderInfoDto.CaHolderInfo.Select(t => t.ChainId).ToList();
         }
 
-        var chains = _chainOptions.ChainInfos.Select(key => _chainOptions.ChainInfos[key.Key])
+        var chains = _chainOptions.Value.ChainInfos.Select(key => _chainOptions.Value.ChainInfos[key.Key])
             .Select(chainOptionsChainInfo => chainOptionsChainInfo.ChainId).Where(t => !chainIds.Contains(t));
 
         foreach (var chainId in chains)
@@ -319,7 +318,7 @@ public class SignatureGrantHandler : ITokenExtensionGrant
 
         var output =
             await CallTransactionAsync<GetHolderInfoOutput>(chainId, AuthConstant.GetHolderInfo, version, 
-                param, false, _chainOptions);
+                param, false, _chainOptions.Value);
 
         return new AddressInfo()
         {

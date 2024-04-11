@@ -15,7 +15,7 @@ public class ETransferServerTestBase : ETransferServerTestBase<ETransferServerGr
     }
 
 
-    public IOptionsMonitor<TimerOptions> MockTimerOption()
+    public IOptionsSnapshot<TimerOptions> MockTimerOption()
     {
 
         var option = new TimerOptions
@@ -23,8 +23,8 @@ public class ETransferServerTestBase : ETransferServerTestBase<ETransferServerGr
             WithdrawTimer = new(60, 60)
         };
 
-        var mockOption = new Mock<IOptionsMonitor<TimerOptions>>();
-        mockOption.Setup(p => p.CurrentValue).Returns(option);
+        var mockOption = new Mock<IOptionsSnapshot<TimerOptions>>();
+        mockOption.Setup(p => p.Value).Returns(option);
         return mockOption.Object;
     }
 

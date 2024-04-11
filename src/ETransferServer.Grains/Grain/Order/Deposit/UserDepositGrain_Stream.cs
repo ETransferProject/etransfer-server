@@ -75,7 +75,7 @@ public partial class UserDepositGrain
                 var statusFlow = await _orderStatusFlowGrain.GetAsync();
                 var querySuccess = statusFlow?.Data != null;
                 var retryFrom = OrderStatusEnum.ToStartTransfer.ToString();
-                var maxRetry = _depositOptions.CurrentValue.ToTransferMaxRetry;
+                var maxRetry = _depositOptions.Value.ToTransferMaxRetry;
                 var maxRetryCountExceeded = querySuccess &&
                                             ((OrderStatusFlowDto)statusFlow.Data).StatusFlow.Count(s =>
                                                 s.Status == retryFrom) >= maxRetry;
