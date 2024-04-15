@@ -20,6 +20,7 @@ using ETransferServer.Auth.Dtos;
 using ETransferServer.Auth.Options;
 using ETransferServer.Grains.Grain.Users;
 using ETransferServer.User.Dtos;
+using NUglify.JavaScript.Syntax;
 using Volo.Abp.DistributedLocking;
 using Volo.Abp.Identity;
 using Volo.Abp.OpenIddict;
@@ -38,21 +39,18 @@ public class SignatureGrantHandler : ITokenExtensionGrant
     private GraphQlOption _graphQlOptions;
     private ChainOptions _chainOptions;
     private readonly string _lockKeyPrefix = "ETransferServer:Auth:SignatureGrantHandler:";
-    private readonly string _source_portkey = "portkey";
-    private readonly string _source_nightaelf = "nightElf";
 
     public async Task<IActionResult> HandleAsync(ExtensionGrantContext context)
     {
         var publicKeyVal = context.Request.GetParameter("pubkey").ToString();
         var signatureVal = context.Request.GetParameter("signature").ToString();
         var plainText = context.Request.GetParameter("plain_text").ToString();
-        // var caHash = context.Request.GetParameter("ca_hash").ToString();
+        var caHash = context.Request.GetParameter("ca_hash").ToString();
         var chainId = context.Request.GetParameter("chain_id").ToString();
-        var source = context.Request.GetParameter("source").ToString();
-        // var scope = context.Request.GetParameter("scope").ToString();
+        var scope = context.Request.GetParameter("scope").ToString();
         var version = context.Request.GetParameter("version")?.ToString();
 
-        var invalidParamResult = CheckParams(publicKeyVal, signatureVal, plainText, chainId, version, source);
+        var invalidParamResult = CheckParams(publicKeyVal, signatureVal, plainText, caHash, chainId, scope, version);
         if (invalidParamResult != null)
         {
             return invalidParamResult;
@@ -60,8 +58,8 @@ public class SignatureGrantHandler : ITokenExtensionGrant
 
         _logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<SignatureGrantHandler>>();
         _logger.LogInformation(
-            "publicKeyVal:{publicKeyVal}, signatureVal:{signatureVal}, plainText:{plainText}, chainId:{chainId}, version:{version}",
-            publicKeyVal, signatureVal, plainText, chainId, version);
+            "publicKeyVal:{publicKeyVal}, signatureVal:{signatureVal}, plainText:{plainText}, caHash:{caHash}, chainId:{chainId}, version:{version}",
+            publicKeyVal, signatureVal, plainText, caHash, chainId, version);
 
         var rawText = Encoding.UTF8.GetString(ByteArrayHelper.HexStringToByteArray(plainText));
         var nonce = rawText.TrimEnd().Substring(plainText.IndexOf("Nonce:") + 7);
@@ -69,12 +67,7 @@ public class SignatureGrantHandler : ITokenExtensionGrant
         var publicKey = ByteArrayHelper.HexStringToByteArray(publicKeyVal);
         var signature = ByteArrayHelper.HexStringToByteArray(signatureVal);
         var timestamp = long.Parse(nonce);
-        var address = string.Empty;
-        if (!string.IsNullOrWhiteSpace(publicKeyVal))
-        {
-            address = Address.FromPublicKey(publicKey).ToBase58();
-        }
-        // var address = Address.FromPublicKey(publicKey).ToBase58();
+        var address = Address.FromPublicKey(publicKey).ToBase58();
 
         var time = DateTime.UnixEpoch.AddMilliseconds(timestamp);
         var timeRangeConfig = context.HttpContext.RequestServices
@@ -103,19 +96,6 @@ public class SignatureGrantHandler : ITokenExtensionGrant
             .Value;
         _chainOptions = context.HttpContext.RequestServices.GetRequiredService<IOptionsSnapshot<ChainOptions>>()
             .Value;
-        var caHash = string.Empty;
-        if (source == _source_portkey)
-        {
-            caHash = context.Request.GetParameter("ca_hash").ToString();
-        }
-        else if(source == _source_nightaelf)
-        {
-            caHash = address;
-        }
-        else
-        {
-            caHash = context.Request.GetParameter("ca_hash").ToString();
-        }
 
         var managerCheck = await CheckAddressAsync(chainId,
    AuthConstant.PortKeyVersion2.Equals(version) ? _graphQlOptions.Url2 : _graphQlOptions.Url,
@@ -181,18 +161,14 @@ public class SignatureGrantHandler : ITokenExtensionGrant
         return new SignInResult(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme, claimsPrincipal);
     }
 
-    private ForbidResult CheckParams(string publicKeyVal, string signatureVal, string plainText,
-        string chainId, string version, string source)
+    private ForbidResult CheckParams(string publicKeyVal, string signatureVal, string plainText, string caHash,
+        string chainId, string scope, string version)
     {
         var errors = new List<string>();
-        // if (string.IsNullOrWhiteSpace(source))
-        // {
-        //     errors.Add("invalid parameter source.");
-        // }
-        // if (source != _source_portkey && string.IsNullOrWhiteSpace(publicKeyVal))
-        // {
-        //     errors.Add("invalid parameter pubkey.");
-        // }
+        if (string.IsNullOrWhiteSpace(publicKeyVal))
+        {
+            errors.Add("invalid parameter publish_key.");
+        }
 
         if (string.IsNullOrWhiteSpace(signatureVal))
         {
@@ -204,11 +180,21 @@ public class SignatureGrantHandler : ITokenExtensionGrant
             errors.Add("invalid parameter plainText.");
         }
 
+        if (string.IsNullOrWhiteSpace(caHash))
+        {
+            errors.Add("invalid parameter ca_hash.");
+        }
+
         if (string.IsNullOrWhiteSpace(chainId))
         {
             errors.Add("invalid parameter chain_id.");
         }
 
+        if (string.IsNullOrWhiteSpace(scope))
+        {
+            errors.Add("invalid parameter scope.");
+        }
+        
         if (!(string.IsNullOrWhiteSpace(version) || AuthConstant.PortKeyVersion.Equals(version) || 
               AuthConstant.PortKeyVersion2.Equals(version)))
         {
