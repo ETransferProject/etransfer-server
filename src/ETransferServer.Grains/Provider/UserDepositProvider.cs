@@ -7,6 +7,7 @@ namespace ETransferServer.Grains.Grain.Order.Deposit;
 public interface IUserDepositProvider
 {
     Task<bool> AddOrUpdateSync(DepositOrderDto dto);
+    Task<bool> ExistSync(DepositOrderDto dto);
 }
 
 public class UserDepositProvider : IUserDepositProvider, ISingletonDependency 
@@ -21,5 +22,10 @@ public class UserDepositProvider : IUserDepositProvider, ISingletonDependency
     public async Task<bool> AddOrUpdateSync(DepositOrderDto dto)
     {
         return await _orderDepositAppService.AddOrUpdateAsync(dto);
+    }
+    
+    public async Task<bool> ExistSync(DepositOrderDto dto)
+    {
+        return await _orderDepositAppService.ExistSync(dto);
     }
 }

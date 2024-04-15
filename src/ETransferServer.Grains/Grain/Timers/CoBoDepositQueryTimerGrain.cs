@@ -21,7 +21,8 @@ public interface ICoBoDepositQueryTimerGrain : IGrainWithGuidKey
     public Task<DateTime> GetLastCallbackTime();
 
     Task CreateDepositOrder(CoBoTransactionDto depositOrder);
-    Task<bool> GetDepositOrder(CoBoTransactionDto coBoTransaction);
+    Task AddAfter(CoBoTransactionDto depositOrder);
+    Task Remove(string transactionId);
 }
 
 public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQueryTimerGrain
@@ -37,6 +38,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
     private readonly IUserAddressService _userAddressService;
 
     private readonly ICoBoProvider _coBoProvider;
+    private IDepositOrderStatusReminderGrain _depositOrderStatusReminderGrain;
 
     public CoBoDepositQueryTimerGrain(ILogger<CoBoDepositQueryTimerGrain> logger,
         IOptionsMonitor<TimerOptions> timerOptions, ICoBoProvider coBoProvider,
@@ -65,6 +67,10 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
 
         await StartTimer(TimeSpan.FromSeconds(_timerOptions.CurrentValue.CoBoDepositQueryTimer.PeriodSeconds),
             TimeSpan.FromSeconds(_timerOptions.CurrentValue.CoBoDepositQueryTimer.DelaySeconds));
+        
+        _depositOrderStatusReminderGrain = 
+            GrainFactory.GetGrain<IDepositOrderStatusReminderGrain>(
+                GuidHelper.UniqGuid(nameof(IDepositOrderStatusReminderGrain)));
     }
 
     private Task StartTimer(TimeSpan timerPeriod, TimeSpan delayPeriod)
@@ -82,7 +88,6 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         var offset = 0;
         var now = DateTime.UtcNow.ToUtcMilliSeconds();
         var maxTime = State.LastTime;
-        var transIds = new List<string>();
 
         while (true)
         {
@@ -110,7 +115,6 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
             maxTime = list.Max(t => t.CreatedTime);
             foreach (var coBoTransaction in list)
             {
-                transIds.Add(coBoTransaction.Id);
                 if (State.ExistOrders.Contains(coBoTransaction.Id))
                 {
                     _logger.LogInformation("order already handle: {orderId}",
@@ -118,6 +122,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
                     continue;
                 }
 
+                await AddAfter(coBoTransaction);
                 _logger.LogInformation("create deposit order, orderInfo:{orderInfo}",
                     JsonConvert.SerializeObject(coBoTransaction));
                 await CreateDepositOrder(coBoTransaction);
@@ -126,8 +131,6 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
             if (list.Count < PageSize) break;
         }
 
-
-        State.ExistOrders = transIds;
         State.LastTime = maxTime;
         await WriteStateAsync();
     }
@@ -147,34 +150,21 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
             // Save the order, UserDepositGrain will process the database multi-write and put the order into the stream for processing.
             var userDepositGrain = GrainFactory.GetGrain<IUserDepositGrain>(orderDto.Id);
             await userDepositGrain.AddOrUpdateOrder(orderDto);
+            await AddCheckDepositOrder(GuidHelper.GenerateId(coBoTransaction.Id, orderDto.Id.ToString()));
         }
         catch (Exception e)
         {
+            await AddCheckDepositOrder(coBoTransaction.Id);
             _logger.LogError(e,
                 "Create deposit order error, coBoTransactionId={CoBoTxId}, requestId={CoBoRequestId}, coBoSymbol={Symbol}, amount={Amount}",
                 coBoTransaction.TxId, coBoTransaction.RequestId, coBoTransaction.Coin, coBoTransaction.AbsAmount);
         }
     }
-    public async Task<bool> GetDepositOrder(CoBoTransactionDto coBoTransaction)
+
+    public async Task Remove(string transactionId)
     {
-        try
-        {
-            var orderDto = await ConvertToDepositOrderDto(coBoTransaction);
-            var userDepositRecordGrain = GrainFactory.GetGrain<IUserDepositRecordGrain>(orderDto.Id);
-            var orderExists = await userDepositRecordGrain.GetAsync();
-            if (orderExists is { Success: true })
-            {
-                return true;
-            }
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e,
-                "GetDepositOrder get deposit order error, coBoTransactionId={CoBoTxId}, requestId={CoBoRequestId}, coBoSymbol={Symbol}, amount={Amount}",
-                coBoTransaction.TxId, coBoTransaction.RequestId, coBoTransaction.Coin, coBoTransaction.AbsAmount);
-        }
-    
-        return false;
+        State.ExistOrders.Remove(transactionId);
+        await WriteStateAsync();
     }
 
     private async Task<DepositOrderDto> ConvertToDepositOrderDto(CoBoTransactionDto coBoTransaction)
@@ -234,7 +224,21 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         };
     }
 
+    public async Task AddAfter(CoBoTransactionDto depositOrder)
+    {
+        if (State.ExistOrders.Count > _depositOption.CurrentValue.MaxListLength)
+            State.ExistOrders.RemoveAt(0);
+        State.ExistOrders.Add(depositOrder.Id);
+        
+        var coBoDepositGrain = GrainFactory.GetGrain<ICoBoDepositGrain>(depositOrder.Id);
+        await coBoDepositGrain.AddOrUpdate(depositOrder);
+    }
 
+    public async Task AddCheckDepositOrder(string id)
+    {
+        await _depositOrderStatusReminderGrain.AddReminder(id);
+    }
+    
     public Task<DateTime> GetLastCallbackTime()
     {
         return Task.FromResult(_lastCallbackTime ?? DateTime.MinValue);

@@ -97,6 +97,7 @@ public partial class UserDepositGrain
             case OrderStatusEnum.Failed:
                 _logger.LogInformation("Order {Id} stream end, current status={Status}", this.GetPrimaryKey(),
                     status.ToString());
+                await HandleDepositQueryGrain(orderDto.ThirdPartOrderId);
                 // await _orderChangeStream.OnCompletedAsync();
                 break;
 
@@ -127,5 +128,10 @@ public partial class UserDepositGrain
         _logger.LogError(ex, "Order {Id} stream OnError", this.GetPrimaryKey());
         return Task.CompletedTask;
     }
-    
+
+    private async Task HandleDepositQueryGrain(string transactionId)
+    {
+        await _depositQueryTimerGrain.Remove(transactionId);
+    }
+
 }

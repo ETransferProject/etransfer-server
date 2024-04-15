@@ -40,7 +40,8 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
     private IUserDepositTxTimerGrain _depositTxTimerGrain;
     private IDepositOrderRetryTimerGrain _depositOrderRetryTimerGrain;
     private IOrderStatusReminderGrain _orderStatusReminderGrain;
-
+    private ICoBoDepositQueryTimerGrain _depositQueryTimerGrain;
+    
     internal JsonSerializerSettings JsonSettings = JsonSettingsBuilder.New()
         .WithAElfTypesConverters()
         .WithCamelCasePropertyNamesResolver()
@@ -81,6 +82,9 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
         _orderStatusReminderGrain = 
             GrainFactory.GetGrain<IOrderStatusReminderGrain>(
                 GuidHelper.UniqGuid(nameof(IOrderStatusReminderGrain)));
+        _depositQueryTimerGrain = 
+            GrainFactory.GetGrain<ICoBoDepositQueryTimerGrain>(
+            GuidHelper.UniqGuid(nameof(ICoBoDepositQueryTimerGrain)));
     }
 
     public async Task AddOrUpdateOrder(DepositOrderDto orderDto, Dictionary<string, string> externalInfo = null)

@@ -13,6 +13,7 @@ using ETransferServer.Network;
 using ETransferServer.Options;
 using ETransferServer.Orders;
 using ETransferServer.User;
+using Nest;
 using Volo.Abp;
 using Volo.Abp.Application.Services;
 using Volo.Abp.Auditing;
@@ -130,5 +131,15 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
         }
 
         return true;
+    }
+    
+    public async Task<bool> ExistSync(DepositOrderDto dto)
+    {
+        var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+        mustQuery.Add(q => q.Term(i => i.Field(f => f.ThirdPartOrderId).Value(dto.ThirdPartOrderId)));
+
+        QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery));
+        var countResponse = await _depositOrderIndexRepository.CountAsync(Filter);
+        return countResponse.Count > 0;
     }
 }
