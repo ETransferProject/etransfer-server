@@ -12,10 +12,10 @@ namespace ETransferServer.Controllers;
 [ControllerName("Cobo")]
 [Route("api/app/")]
 [IgnoreAntiforgeryToken]
-public class CoboController : ETransferController
+public class TransactionController : ETransferController
 {
     private readonly ICoboAppService _coboAppService;
-    public CoboController(ICoboAppService coboAppService)
+    public TransactionController(ICoboAppService coboAppService)
     {
         _coboAppService = coboAppService;
     }
