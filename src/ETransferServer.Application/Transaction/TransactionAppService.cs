@@ -1,8 +1,10 @@
 using System;
+using System.IO;
 using System.Threading.Tasks;
 using ETransferServer.Common;
 using ETransferServer.Grains.Grain.Worker.Transaction;
 using ETransferServer.Options;
+using Microsoft.AspNetCore.Http;
 using Volo.Abp;
 using Volo.Abp.Auditing;
 using Microsoft.Extensions.Logging;
@@ -18,18 +20,20 @@ public class TransactionAppService : ETransferServerAppService, ITransactionAppS
     private readonly ILogger<TransactionAppService> _logger;
     private readonly IClusterClient _clusterClient;
     private readonly IOptionsMonitor<CoBoOptions> _options;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
     public TransactionAppService(ILogger<TransactionAppService> logger, IClusterClient clusterClient,
-        IOptionsMonitor<CoBoOptions> options)
+        IOptionsMonitor<CoBoOptions> options, IHttpContextAccessor httpContextAccessor)
     {
         _logger = logger;
         _clusterClient = clusterClient;
         _options = options;
+        _httpContextAccessor = httpContextAccessor;
     }
 
-    public async Task<string> TransactionNotificationAsync(string timestamp, string signature,
-        string body)
+    public async Task<string> TransactionNotificationAsync(string timestamp, string signature)
     {
+        var body = await GetBodyAsync();
         _logger.LogInformation(
             "receive transaction callback, timestamp:{timestamp}, signature:{signature}, body:{body}",
             timestamp, signature, body);
@@ -55,5 +59,13 @@ public class TransactionAppService : ETransferServerAppService, ITransactionAppS
         }
 
         return handleResult ? NotificationEnum.Ok.ToString().ToLower() : NotificationEnum.Deny.ToString().ToLower();
+    }
+
+    private async Task<string> GetBodyAsync()
+    {
+        var stream = new StreamReader(_httpContextAccessor.HttpContext.Request.Body);
+        var body = await stream.ReadToEndAsync();
+        stream.Close();
+        return body;
     }
 }

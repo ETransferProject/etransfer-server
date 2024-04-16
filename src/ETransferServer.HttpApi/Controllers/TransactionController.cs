@@ -19,9 +19,8 @@ public class TransactionController : ETransferController
     
     [HttpPost("callback")]
     public async Task<string> TransactionNotificationAsync([FromHeader(Name = "Biz-Timestamp")] string timestamp,
-        [FromHeader(Name = "Biz-Resp-Signature")] string signature,
-        [FromBody] string body)
+        [FromHeader(Name = "Biz-Resp-Signature")] string signature)
     {
-        return await _transactionAppService.TransactionNotificationAsync(timestamp, signature, body);
+        return await _transactionAppService.TransactionNotificationAsync(timestamp, signature);
     }
 }
