@@ -1,7 +1,5 @@
 using System.Threading.Tasks;
-using ETransferServer.Cobo;
-using ETransferServer.Network.Dtos;
-using Microsoft.AspNetCore.Http;
+using ETransferServer.Service.Transaction;
 using Microsoft.AspNetCore.Mvc;
 using Volo.Abp;
 
@@ -9,22 +7,21 @@ namespace ETransferServer.Controllers;
 
 [RemoteService]
 [Area("app")]
-[ControllerName("Cobo")]
-[Route("api/app/")]
-[IgnoreAntiforgeryToken]
+[ControllerName("Transaction")]
+[Route("api/app/transaction")]
 public class TransactionController : ETransferController
 {
-    private readonly ICoboAppService _coboAppService;
-    public TransactionController(ICoboAppService coboAppService)
+    private readonly ITransactionAppService _transactionAppService;
+    public TransactionController(ITransactionAppService transactionAppService)
     {
-        _coboAppService = coboAppService;
+        _transactionAppService = transactionAppService;
     }
     
-    [HttpPost("custody_callback/")]
-    public async Task<TransactionNotificationResponse> TransactionNotification([FromHeader(Name = "Biz-Timestamp")] long timestamp,
+    [HttpPost("callback")]
+    public async Task<string> TransactionNotificationAsync([FromHeader(Name = "Biz-Timestamp")] string timestamp,
         [FromHeader(Name = "Biz-Resp-Signature")] string signature,
         [FromBody] string body)
     {
-        return await _coboAppService.TransactionNotificationAsync(timestamp, signature, body);
+        return await _transactionAppService.TransactionNotificationAsync(timestamp, signature, body);
     }
 }

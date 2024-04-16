@@ -20,8 +20,7 @@ public interface ICoBoDepositQueryTimerGrain : IGrainWithGuidKey
 {
     public Task<DateTime> GetLastCallbackTime();
 
-    Task CreateDepositOrder(CoBoTransactionDto depositOrder);
-    Task AddAfter(CoBoTransactionDto depositOrder);
+    Task CreateDepositRecord(CoBoTransactionDto depositOrder);
     Task Remove(string transactionId);
 }
 
@@ -135,7 +134,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         await WriteStateAsync();
     }
 
-    public async Task CreateDepositOrder(CoBoTransactionDto coBoTransaction)
+    private async Task CreateDepositOrder(CoBoTransactionDto coBoTransaction)
     {
         try
         {
@@ -224,7 +223,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         };
     }
 
-    public async Task AddAfter(CoBoTransactionDto depositOrder)
+    private async Task AddAfter(CoBoTransactionDto depositOrder)
     {
         if (State.ExistOrders.Count > _depositOption.CurrentValue.MaxListLength)
             State.ExistOrders.RemoveAt(0);
@@ -242,5 +241,13 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
     public Task<DateTime> GetLastCallbackTime()
     {
         return Task.FromResult(_lastCallbackTime ?? DateTime.MinValue);
+    }
+
+    public async Task CreateDepositRecord(CoBoTransactionDto coBoTransaction)
+    {
+        await AddAfter(coBoTransaction);
+        _logger.LogInformation("create deposit record, recordInfo:{recordInfo}",
+            JsonConvert.SerializeObject(coBoTransaction));
+        await CreateDepositOrder(coBoTransaction);
     }
 }
