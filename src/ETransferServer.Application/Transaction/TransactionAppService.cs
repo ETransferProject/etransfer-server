@@ -3,7 +3,6 @@ using System.Threading.Tasks;
 using ETransferServer.Common;
 using ETransferServer.Grains.Grain.Worker.Transaction;
 using ETransferServer.Options;
-using ETransferServer.Service.Transaction.Dtos;
 using Volo.Abp;
 using Volo.Abp.Auditing;
 using Microsoft.Extensions.Logging;
