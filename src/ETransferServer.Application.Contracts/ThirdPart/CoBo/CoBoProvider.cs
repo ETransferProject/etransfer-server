@@ -83,18 +83,12 @@ public class CoBoProvider : ICoBoProvider, ISingletonDependency
 
         return result;
     }
-    
-    public async Task<CoBoTransactionDto> GetTransactionAsync(TransactionIdRequestDto input)
-    {
-        _logger.LogInformation("GetTransaction get transaction by time from cobo, id:{id}", input.Id);
 
-        var uriParam = ObjToUriParam(input);
-        var url = $"{CoBoConstant.GetTransaction}?id={input.Id}";
-        _logger.LogInformation("GetTransaction get transaction by time from cobo, id:{id} url:{url}", input.Id, url);
-        var result = await _proxyCoBoClientProvider.GetAsync<CoBoTransactionDto>(url);
-        _logger.LogInformation(
-            "GetTransaction get transaction by time from cobo, Id:{id} transaction", input.Id);
-        return result;
+    public async Task<CoBoTransactionDto> GetTransactionAsync(string id)
+    {
+        _logger.LogInformation("get transaction by id from cobo, id:{id}", id);
+        var url = $"{CoBoConstant.GetTransaction}?id={id}";
+        return await _proxyCoBoClientProvider.GetAsync<CoBoTransactionDto>(url);
     }
 
     public async Task<string> WithdrawAsync(WithdrawRequestDto input)

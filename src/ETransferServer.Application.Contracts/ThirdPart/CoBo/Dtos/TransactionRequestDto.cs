@@ -37,10 +37,3 @@ public class TransactionRequestDto
     /// Sorting order. <see cref="ETransferServer.Common.CoBoConstant.Order"/>
     public string Order { get; set; } = CoBoConstant.Order.Asc;
 }
-
-public class TransactionIdRequestDto
-{
-    
-    // Coin codes. Separated by commas
-    public string Id { get; set; }
-}
