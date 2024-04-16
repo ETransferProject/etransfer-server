@@ -67,7 +67,7 @@ namespace ETransferServer
             Configure<NetworkOptions>(configuration.GetSection("NetworkOptions"));
             Configure<WithdrawInfoOptions>(configuration.GetSection("WithdrawInfo"));
             Configure<CoinGeckoOptions>(configuration.GetSection("CoinGecko"));
-            Configure<CallbackOptions>(configuration.GetSection("Callback"));
+            Configure<CoBoOptions>(configuration.GetSection("CoBo"));
 
             ConfigureConventionalControllers();
             // ConfigureAuthentication(context, configuration);

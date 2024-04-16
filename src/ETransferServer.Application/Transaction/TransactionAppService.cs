@@ -17,10 +17,10 @@ public class TransactionAppService : ETransferServerAppService, ITransactionAppS
 {
     private readonly ILogger<TransactionAppService> _logger;
     private readonly IClusterClient _clusterClient;
-    private readonly IOptionsMonitor<CallbackOptions> _options;
+    private readonly IOptionsMonitor<CoBoOptions> _options;
 
     public TransactionAppService(ILogger<TransactionAppService> logger, IClusterClient clusterClient,
-        IOptionsMonitor<CallbackOptions> options)
+        IOptionsMonitor<CoBoOptions> options)
     {
         _logger = logger;
         _clusterClient = clusterClient;
