@@ -53,12 +53,12 @@ public class Program
             {
                 services.AddApplication<ETransferServerOrleansSiloModule>();
             })
-            .ConfigureAppConfiguration((h,c)=>c.AddJsonFile("network.json")) 
-            .UseOrleansSnapshot()
-            #if !DEBUG
+            .ConfigureAppConfiguration((h,c)=>c.AddJsonFile("network.json"))
+#if !DEBUG
             .ConfigureAppConfiguration((h, c) => c.AddJsonFile("apollosettings.json"))
             .UseApollo()
             #endif
+            .UseOrleansSnapshot()
             .UseAutofac()
             .UseSerilog();
 }
