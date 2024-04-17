@@ -32,6 +32,9 @@ public class Program
             var builder = WebApplication.CreateBuilder(args);
             builder.Host.AddAppSettingsSecretsJson()
                 .UseAutofac()
+#if !DEBUG
+                .UseApollo()
+#endif
                 .UseSerilog();
             await builder.AddApplicationAsync<ETransferAuthServerModule>();
             var app = builder.Build();

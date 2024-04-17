@@ -22,18 +22,7 @@ public class Program
         try
         {
             Log.Information("Starting ETransferServer.Silo");
-            var builder = WebApplication.CreateBuilder(args);
-            builder.Configuration.AddJsonFile("network.json");
-            builder.Configuration.AddJsonFile("notify.json");
-            builder.Host.AddAppSettingsSecretsJson()
-                .UseOrleansSnapshot()
-                .UseAutofac()
-                .UseSerilog();
-
-            await builder.AddApplicationAsync<ETransferServerOrleansSiloModule>();
-            var app = builder.Build();
-            await app.InitializeApplicationAsync();
-            await app.RunAsync();
+            await CreateHostBuilder(args).RunConsoleAsync();
             return 0;
         }
         catch (Exception ex)
@@ -54,7 +43,8 @@ public class Program
                 services.AddApplication<ETransferServerOrleansSiloModule>();
             })
             .ConfigureAppConfiguration((h,c)=>c.AddJsonFile("network.json"))
-#if !DEBUG
+            .ConfigureAppConfiguration((h,c)=>c.AddJsonFile("notify.json"))
+            #if !DEBUG
             .ConfigureAppConfiguration((h, c) => c.AddJsonFile("apollosettings.json"))
             .UseApollo()
             #endif
