@@ -40,18 +40,6 @@ public class SignatureGrantHandler : ITokenExtensionGrant
     private IOptionsSnapshot<ChainOptions> _chainOptions;
     private readonly string _lockKeyPrefix = "ETransferServer:Auth:SignatureGrantHandler:";
 
-    public SignatureGrantHandler(IOptionsSnapshot<GraphQlOption> graphQlOptions, ILogger<SignatureGrantHandler> logger, 
-        IAbpDistributedLock distributedLock, IOptionsSnapshot<ContractOptions> contractOptions, IClusterClient clusterClient, 
-        IOptionsSnapshot<ChainOptions> chainOptions)
-    {
-        _graphQlOptions = graphQlOptions;
-        _logger = logger;
-        _distributedLock = distributedLock;
-        _contractOptions = contractOptions;
-        _clusterClient = clusterClient;
-        _chainOptions = chainOptions;
-    }
-
     public async Task<IActionResult> HandleAsync(ExtensionGrantContext context)
     {
         var publicKeyVal = context.Request.GetParameter("pubkey").ToString();
