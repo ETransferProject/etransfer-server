@@ -66,8 +66,8 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
 
         await StartTimer(TimeSpan.FromSeconds(_timerOptions.Value.CoBoDepositQueryTimer.PeriodSeconds),
             TimeSpan.FromSeconds(_timerOptions.Value.CoBoDepositQueryTimer.DelaySeconds));
-        
-        _depositOrderStatusReminderGrain = 
+
+        _depositOrderStatusReminderGrain =
             GrainFactory.GetGrain<IDepositOrderStatusReminderGrain>(
                 GuidHelper.UniqGuid(nameof(IDepositOrderStatusReminderGrain)));
     }
@@ -175,7 +175,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         var userAddress = !res.Success || res.Data == null
             ? await _userAddressService.GetAssignedAddressAsync(coBoTransaction.Address)
             : res.Data as UserAddressDto;
-        
+
         AssertHelper.NotNull(userAddress, "user address empty");
         AssertHelper.NotEmpty(userAddress.UserId, "address user id empty");
 
@@ -228,7 +228,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         if (State.ExistOrders.Count > _depositOption.Value.MaxListLength)
             State.ExistOrders.RemoveAt(0);
         State.ExistOrders.Add(depositOrder.Id);
-        
+
         var coBoDepositGrain = GrainFactory.GetGrain<ICoBoDepositGrain>(depositOrder.Id);
         await coBoDepositGrain.AddOrUpdate(depositOrder);
     }
@@ -237,7 +237,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
     {
         await _depositOrderStatusReminderGrain.AddReminder(id);
     }
-    
+
     public Task<DateTime> GetLastCallbackTime()
     {
         return Task.FromResult(_lastCallbackTime ?? DateTime.MinValue);
@@ -245,9 +245,18 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
 
     public async Task CreateDepositRecord(CoBoTransactionDto coBoTransaction)
     {
+        if (State.ExistOrders.Contains(coBoTransaction.Id))
+        {
+            _logger.LogInformation("order already handle: {orderId}",
+                coBoTransaction.Id);
+            return;
+        }
+
         await AddAfter(coBoTransaction);
         _logger.LogInformation("create deposit record, recordInfo:{recordInfo}",
             JsonConvert.SerializeObject(coBoTransaction));
+        
         await CreateDepositOrder(coBoTransaction);
+        await WriteStateAsync();
     }
 }
