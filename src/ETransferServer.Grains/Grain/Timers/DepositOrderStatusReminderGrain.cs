@@ -24,7 +24,7 @@ public class DepositOrderStatusReminderGrain : Orleans.Grain, IDepositOrderStatu
     private const string DepositOrderLostAlarmTemplate = "DepositOrderLostAlarm";
     private readonly ILogger<DepositOrderStatusReminderGrain> _logger;
     private readonly IReminderRegistry _reminderRegistry;
-    private readonly IOptionsMonitor<TimerOptions> _timerOptions;
+    private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
     private readonly IUserDepositProvider _userDepositProvider;
     private readonly Dictionary<string, INotifyProvider> _notifyProvider;
     private readonly Dictionary<string, int> _reminderCountMap = new();
@@ -32,7 +32,7 @@ public class DepositOrderStatusReminderGrain : Orleans.Grain, IDepositOrderStatu
 
     public DepositOrderStatusReminderGrain(IReminderRegistry reminderRegistry, 
         ILogger<DepositOrderStatusReminderGrain> logger,
-        IOptionsMonitor<TimerOptions> timerOptions,
+        IOptionsSnapshot<TimerOptions> timerOptions,
         IUserDepositProvider userDepositProvider,
         IEnumerable<INotifyProvider> notifyProvider)
     {
@@ -46,12 +46,12 @@ public class DepositOrderStatusReminderGrain : Orleans.Grain, IDepositOrderStatu
     public async Task StartReminder(String id)
     {
         _logger.LogDebug("DepositOrderStatusReminderGrain Startup dueTimeSec={Due}, periodSec={Per}",
-            _timerOptions.CurrentValue.DepositOrderStatusReminder.DelaySeconds,
-            _timerOptions.CurrentValue.DepositOrderStatusReminder.PeriodSeconds);
+            _timerOptions.Value.DepositOrderStatusReminder.DelaySeconds,
+            _timerOptions.Value.DepositOrderStatusReminder.PeriodSeconds);
         await _reminderRegistry.RegisterOrUpdateReminder(
             reminderName: id,
-            dueTime: TimeSpan.FromSeconds(_timerOptions.CurrentValue.DepositOrderStatusReminder.DelaySeconds),
-            period: TimeSpan.FromSeconds(_timerOptions.CurrentValue.DepositOrderStatusReminder.PeriodSeconds));
+            dueTime: TimeSpan.FromSeconds(_timerOptions.Value.DepositOrderStatusReminder.DelaySeconds),
+            period: TimeSpan.FromSeconds(_timerOptions.Value.DepositOrderStatusReminder.PeriodSeconds));
     }
 
     public Task ReceiveReminder(string reminderName, TickStatus status)

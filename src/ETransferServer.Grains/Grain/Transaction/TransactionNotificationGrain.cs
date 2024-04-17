@@ -17,11 +17,11 @@ namespace ETransferServer.Grains.Grain.Worker.Transaction;
 public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificationGrain
 {
     private readonly ILogger<TransactionNotificationGrain> _logger;
-    private readonly IOptionsMonitor<NetworkOptions> _networkOption;
+    private readonly IOptionsSnapshot<NetworkOptions> _networkOption;
     private readonly ICoBoProvider _coBoProvider;
 
     public TransactionNotificationGrain(ILogger<TransactionNotificationGrain> logger,
-        IOptionsMonitor<NetworkOptions> networkOption, ICoBoProvider coBoProvider)
+        IOptionsSnapshot<NetworkOptions> networkOption, ICoBoProvider coBoProvider)
     {
         _logger = logger;
         _networkOption = networkOption;
@@ -67,7 +67,7 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
 
     private async Task<bool> HandleDeposit(CoBoTransactionDto coBoTransaction)
     {
-        var coinInfo = CoBoHelper.MatchNetwork(coBoTransaction.Coin, _networkOption.CurrentValue.CoBo);
+        var coinInfo = CoBoHelper.MatchNetwork(coBoTransaction.Coin, _networkOption.Value.CoBo);
         var recordGrainId = OrderIdHelper.DepositOrderId(coinInfo.Network, coinInfo.Symbol, coBoTransaction.TxId);
         var userDepositRecordGrain = GrainFactory.GetGrain<IUserDepositRecordGrain>(recordGrainId);
 

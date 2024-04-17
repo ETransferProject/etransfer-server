@@ -19,11 +19,11 @@ public class TransactionAppService : ETransferServerAppService, ITransactionAppS
 {
     private readonly ILogger<TransactionAppService> _logger;
     private readonly IClusterClient _clusterClient;
-    private readonly IOptionsMonitor<CoBoOptions> _options;
+    private readonly IOptionsSnapshot<CoBoOptions> _options;
     private readonly IHttpContextAccessor _httpContextAccessor;
 
     public TransactionAppService(ILogger<TransactionAppService> logger, IClusterClient clusterClient,
-        IOptionsMonitor<CoBoOptions> options, IHttpContextAccessor httpContextAccessor)
+        IOptionsSnapshot<CoBoOptions> options, IHttpContextAccessor httpContextAccessor)
     {
         _logger = logger;
         _clusterClient = clusterClient;
@@ -43,7 +43,7 @@ public class TransactionAppService : ETransferServerAppService, ITransactionAppS
         {
             var content = $"{body}|{timestamp}";
             var verifyResult =
-                SignatureHelper.VerifySignature(content, signature, publicKey: _options.CurrentValue.PublicKey);
+                SignatureHelper.VerifySignature(content, signature, publicKey: _options.Value.PublicKey);
             AssertHelper.IsTrue(verifyResult, reason: "valid signature fail.");
 
             var notificationGrain = _clusterClient.GetGrain<ITransactionNotificationGrain>(Guid.NewGuid());
