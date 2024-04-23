@@ -19,7 +19,7 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
     private readonly ILogger<TransactionNotificationGrain> _logger;
     private readonly IOptionsSnapshot<NetworkOptions> _networkOption;
     private readonly ICoBoProvider _coBoProvider;
-    private readonly IDepositOrderStatusReminderGrain _depositOrderStatusReminderGrain;
+    private IDepositOrderStatusReminderGrain _depositOrderStatusReminderGrain;
 
     public TransactionNotificationGrain(ILogger<TransactionNotificationGrain> logger,
         IOptionsSnapshot<NetworkOptions> networkOption, ICoBoProvider coBoProvider)
@@ -27,10 +27,14 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
         _logger = logger;
         _networkOption = networkOption;
         _coBoProvider = coBoProvider;
+    }
 
+    public override async Task OnActivateAsync()
+    {
         _depositOrderStatusReminderGrain =
             GrainFactory.GetGrain<IDepositOrderStatusReminderGrain>(
                 GuidHelper.UniqGuid(nameof(IDepositOrderStatusReminderGrain)));
+        await base.OnActivateAsync();
     }
 
     public async Task<bool> TransactionNotification(string timestamp, string signature, string body)
