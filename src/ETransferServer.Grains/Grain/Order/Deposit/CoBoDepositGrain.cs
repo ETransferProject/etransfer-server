@@ -40,6 +40,11 @@ public class CoBoDepositGrain : Grain<CoBoTransactionState>, ICoBoDepositGrain
 
     public async Task<CoBoTransactionDto> Get()
     {
+        if (State.Id.IsNullOrEmpty())
+        {
+            return null;
+        }
+        
         return _objectMapper.Map<CoBoTransactionState, CoBoTransactionDto>(State);
     }
 }
