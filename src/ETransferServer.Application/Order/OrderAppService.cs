@@ -4,10 +4,12 @@ using System.Threading.Tasks;
 using AElf.Indexing.Elasticsearch;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Order;
+using ETransferServer.Grains.Grain.Users;
 using ETransferServer.Options;
 using ETransferServer.Orders;
 using Microsoft.Extensions.Logging;
 using Nest;
+using Orleans;
 using Volo.Abp;
 using Volo.Abp.Application.Dtos;
 using Volo.Abp.Application.Services;
@@ -24,14 +26,17 @@ public class OrderAppService : ApplicationService, IOrderAppService
     private readonly INESTRepository<OrderIndex, Guid> _orderIndexRepository;
     private readonly IObjectMapper _objectMapper;
     private readonly ILogger<OrderAppService> _logger;
+    private readonly IClusterClient _clusterClient;
 
     public OrderAppService(INESTRepository<OrderIndex, Guid> orderIndexRepository,
         IObjectMapper objectMapper,
-        ILogger<OrderAppService> logger)
+        ILogger<OrderAppService> logger,
+        IClusterClient clusterClient)
     {
         _orderIndexRepository = orderIndexRepository;
         _objectMapper = objectMapper;
         _logger = logger;
+        _clusterClient = clusterClient;
     }
 
     public async Task<PagedResultDto<OrderIndexDto>> GetOrderRecordListAsync(GetOrderRecordRequestDto request)
@@ -139,14 +144,18 @@ public class OrderAppService : ApplicationService, IOrderAppService
             var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
             if (!userId.HasValue || userId == Guid.Empty) return new OrderStatusDto();
 
+            var userOrderActionGrain = _clusterClient.GetGrain<IUserOrderActionGrain>(userId.Value);
+            var lastTime = await userOrderActionGrain.Get();
+
             var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
             mustQuery.Add(q => q.Term(i =>
                 i.Field(f => f.UserId).Value(userId.ToString())));
             mustQuery.Add(q => q.Range(i =>
-                i.Field(f => f.CreateTime)
-                    .GreaterThanOrEquals(DateTime.UtcNow.AddDays(OrderOptions.ValidOrderThreshold).ToUtcMilliSeconds())));
+                i.Field(f => f.CreateTime).GreaterThan(lastTime == 0
+                    ? DateTime.UtcNow.AddDays(OrderOptions.ValidOrderThreshold).ToUtcMilliSeconds()
+                    : lastTime)));
 
-            mustQuery.Add(q => q.Terms(i => 
+            mustQuery.Add(q => q.Terms(i =>
                 i.Field(f => f.Status).Terms(new List<string>
                 {
                     OrderStatusEnum.Initialized.ToString(),
@@ -164,18 +173,33 @@ public class OrderAppService : ApplicationService, IOrderAppService
 
             QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery));
 
-            var (count, list) = await _orderIndexRepository.GetSortListAsync(Filter, null,
-                s => s.Descending(a => a.CreateTime) , 1);
+            var countResponse = await _orderIndexRepository.CountAsync(Filter);
             return new OrderStatusDto
             {
-                CreateTime = count > 0 ? list[0].CreateTime.ToString() : count.ToString(),
-                Status = count > 0
+                Status = countResponse.Count > 0
             };
         }
         catch (Exception e)
         {
             _logger.LogError(e, "Get order record status failed");
             return new OrderStatusDto();
+        }
+    }
+
+    public async Task OrderRecordReadAsync()
+    {
+        try
+        {
+            var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
+            if (!userId.HasValue || userId == Guid.Empty) throw new UserFriendlyException("Invalid User.");;
+
+            var userOrderActionGrain = _clusterClient.GetGrain<IUserOrderActionGrain>(userId.Value);
+            await userOrderActionGrain.AddOrUpdate();
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Order record read failed");
+            throw;
         }
     }
 
