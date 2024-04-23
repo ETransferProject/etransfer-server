@@ -19,6 +19,7 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
     private readonly ILogger<TransactionNotificationGrain> _logger;
     private readonly IOptionsSnapshot<NetworkOptions> _networkOption;
     private readonly ICoBoProvider _coBoProvider;
+    private readonly IDepositOrderStatusReminderGrain _depositOrderStatusReminderGrain;
 
     public TransactionNotificationGrain(ILogger<TransactionNotificationGrain> logger,
         IOptionsSnapshot<NetworkOptions> networkOption, ICoBoProvider coBoProvider)
@@ -26,6 +27,10 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
         _logger = logger;
         _networkOption = networkOption;
         _coBoProvider = coBoProvider;
+
+        _depositOrderStatusReminderGrain =
+            GrainFactory.GetGrain<IDepositOrderStatusReminderGrain>(
+                GuidHelper.UniqGuid(nameof(IDepositOrderStatusReminderGrain)));
     }
 
     public async Task<bool> TransactionNotification(string timestamp, string signature, string body)
@@ -67,7 +72,7 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
 
     private async Task<bool> HandleDeposit(CoBoTransactionDto coBoTransaction)
     {
-        var coinInfo = CoBoHelper.MatchNetwork(coBoTransaction.Coin, _networkOption.Value.CoBo);
+        var coinInfo = await GetCoinNetwork(coBoTransaction.Coin, coBoTransaction.Id);
         var recordGrainId = OrderIdHelper.DepositOrderId(coinInfo.Network, coinInfo.Symbol, coBoTransaction.TxId);
         var userDepositRecordGrain = GrainFactory.GetGrain<IUserDepositRecordGrain>(recordGrainId);
 
@@ -92,6 +97,20 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
     private Task<bool> HandleWithdraw(CoBoTransactionDto coBoTransaction)
     {
         return Task.FromResult(true);
+    }
+
+    private async Task<CoBoHelper.CoinNetwork> GetCoinNetwork(string coin, string transactionId)
+    {
+        try
+        {
+            return CoBoHelper.MatchNetwork(coin, _networkOption.Value.CoBo);
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "match network error, id:{id}, coin:{coin}", transactionId, coin);
+            await _depositOrderStatusReminderGrain.AddReminder(transactionId);
+            throw;
+        }
     }
 
     private async Task<bool> VerifyTransaction(CoBoTransactionDto coBoTransaction)
