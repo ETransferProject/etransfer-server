@@ -9,7 +9,6 @@ using Orleans.Runtime;
 using Orleans.Timers;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.Provider.Notify;
-using ETransferServer.ThirdPart.CoBo;
 using Newtonsoft.Json;
 
 namespace ETransferServer.Grains.Grain.Timers;
@@ -29,20 +28,18 @@ public class DepositOrderStatusReminderGrain : Orleans.Grain, IDepositOrderStatu
     private readonly IUserDepositProvider _userDepositProvider;
     private readonly Dictionary<string, INotifyProvider> _notifyProvider;
     private readonly Dictionary<string, int> _reminderCountMap = new();
-    private readonly ICoBoProvider _coBoProvider;
     private const int RetryCountMax = 3;
 
     public DepositOrderStatusReminderGrain(IReminderRegistry reminderRegistry, 
         ILogger<DepositOrderStatusReminderGrain> logger,
         IOptionsSnapshot<TimerOptions> timerOptions,
         IUserDepositProvider userDepositProvider,
-        IEnumerable<INotifyProvider> notifyProvider, ICoBoProvider coBoProvider)
+        IEnumerable<INotifyProvider> notifyProvider)
     {
         _reminderRegistry = reminderRegistry;
         _logger = logger;
         _timerOptions = timerOptions;
         _userDepositProvider = userDepositProvider;
-        _coBoProvider = coBoProvider;
         _notifyProvider = notifyProvider.ToDictionary(p => p.NotifyType().ToString());
     }
 
@@ -120,11 +117,7 @@ public class DepositOrderStatusReminderGrain : Orleans.Grain, IDepositOrderStatu
         
         var coBoDepositGrain = GrainFactory.GetGrain<ICoBoDepositGrain>(transactionId);
         var coBoTransaction = await coBoDepositGrain.Get();
-        if (coBoTransaction == null)
-        {
-            coBoTransaction = await _coBoProvider.GetTransactionAsync(transactionId);
-        }
-        
+
         var notifyRequest = new NotifyRequest
         {
             Template = DepositOrderLostAlarmTemplate,
