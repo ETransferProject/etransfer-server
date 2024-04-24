@@ -30,7 +30,7 @@ public class DepositOrderStatusReminderGrain : Orleans.Grain, IDepositOrderStatu
     private readonly Dictionary<string, int> _reminderCountMap = new();
     private const int RetryCountMax = 3;
 
-    public DepositOrderStatusReminderGrain(IReminderRegistry reminderRegistry, 
+    public DepositOrderStatusReminderGrain(IReminderRegistry reminderRegistry,
         ILogger<DepositOrderStatusReminderGrain> logger,
         IOptionsSnapshot<TimerOptions> timerOptions,
         IUserDepositProvider userDepositProvider,
@@ -54,10 +54,9 @@ public class DepositOrderStatusReminderGrain : Orleans.Grain, IDepositOrderStatu
             period: TimeSpan.FromSeconds(_timerOptions.Value.DepositOrderStatusReminder.PeriodSeconds));
     }
 
-    public Task ReceiveReminder(string reminderName, TickStatus status)
+    public async Task ReceiveReminder(string reminderName, TickStatus status)
     {
-        CheckDepositOrder(reminderName);
-        return Task.CompletedTask;
+        await CheckDepositOrder(reminderName);
     }
 
     public async Task CheckDepositOrder(String reminderName)
@@ -66,7 +65,8 @@ public class DepositOrderStatusReminderGrain : Orleans.Grain, IDepositOrderStatu
         try
         {
             _reminderCountMap.GetOrAdd(reminderName, _ => new());
-            _logger.LogInformation("DepositOrderStatusReminderGrain CheckOrder reminderName={reminderName}", reminderName);
+            _logger.LogInformation("DepositOrderStatusReminderGrain CheckOrder reminderName={reminderName}",
+                reminderName);
             var nameSplit = reminderName.Split(CommonConstant.Underline);
             var transactionId = nameSplit[0];
             var orderId = nameSplit.Length > 1 ? Guid.Parse(nameSplit[1]) : Guid.Empty;
@@ -74,7 +74,7 @@ public class DepositOrderStatusReminderGrain : Orleans.Grain, IDepositOrderStatu
             {
                 _logger.LogInformation("DepositOrderStatusReminderGrain CheckOrder txId={txId}", transactionId);
                 cancel = await _userDepositProvider.ExistSync(new DepositOrderDto { ThirdPartOrderId = transactionId })
-                    || await SendNotifyAsync(transactionId);
+                         || await SendNotifyAsync(transactionId);
             }
             else
             {
@@ -114,7 +114,7 @@ public class DepositOrderStatusReminderGrain : Orleans.Grain, IDepositOrderStatu
         _logger.LogInformation("DepositOrderStatusReminderGrain SendNotifyAsync txId={txId}", transactionId);
         var providerExists = _notifyProvider.TryGetValue(NotifyTypeEnum.FeiShuGroup.ToString(), out var provider);
         AssertHelper.IsTrue(providerExists, "Provider not found");
-        
+
         var coBoDepositGrain = GrainFactory.GetGrain<ICoBoDepositGrain>(transactionId);
         var coBoTransaction = await coBoDepositGrain.Get();
 
@@ -124,13 +124,15 @@ public class DepositOrderStatusReminderGrain : Orleans.Grain, IDepositOrderStatu
             Params = new Dictionary<string, string>
             {
                 [Keys.OrderType] = OrderTypeEnum.Deposit.ToString(),
-                [Keys.Message] = coBoTransaction == null ? string.Empty : JsonConvert.SerializeObject(coBoTransaction)
-                    .Replace("\"", string.Empty)
+                [Keys.Message] = coBoTransaction == null
+                    ? string.Empty
+                    : JsonConvert.SerializeObject(coBoTransaction)
+                        .Replace("\"", string.Empty)
             }
         };
         return await provider.SendNotifyAsync(notifyRequest);
     }
-    
+
     private async Task<bool> SendNotifyAsync(BaseOrderDto order)
     {
         _logger.LogInformation("DepositOrderStatusReminderGrain SendNotifyAsync orderId={orderId}", order.Id);
@@ -138,7 +140,7 @@ public class DepositOrderStatusReminderGrain : Orleans.Grain, IDepositOrderStatu
         AssertHelper.IsTrue(providerExists, "Provider not found");
         var createTime = 0l;
         if (order.CreateTime.HasValue)
-        { 
+        {
             createTime = order.CreateTime.Value;
         }
 
@@ -187,7 +189,7 @@ public class DepositOrderStatusReminderGrain : Orleans.Grain, IDepositOrderStatu
         }
         catch (Exception e)
         {
-            _logger.LogError(e,"DepositOrderStatusReminderGrain Exception, orderId={orderId}", orderId);
+            _logger.LogError(e, "DepositOrderStatusReminderGrain Exception, orderId={orderId}", orderId);
         }
 
         AssertHelper.NotNull(order, "order is null");
@@ -223,4 +225,3 @@ public class DepositOrderStatusReminderGrain : Orleans.Grain, IDepositOrderStatu
         public const string Message = "message";
     }
 }
-

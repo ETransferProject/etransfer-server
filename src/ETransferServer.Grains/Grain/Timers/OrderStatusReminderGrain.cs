@@ -48,10 +48,9 @@ public class OrderStatusReminderGrain : Orleans.Grain, IOrderStatusReminderGrain
             period: TimeSpan.FromSeconds(_timerOptions.Value.OrderStatusReminder.PeriodSeconds));
     }
 
-    public Task ReceiveReminder(string reminderName, TickStatus status)
+    public async Task ReceiveReminder(string reminderName, TickStatus status)
     {
-        CheckOrder(reminderName);
-        return Task.CompletedTask;
+        await CheckOrder(reminderName);
     }
 
     public async Task CheckOrder(String reminderName)
@@ -97,12 +96,13 @@ public class OrderStatusReminderGrain : Orleans.Grain, IOrderStatusReminderGrain
 
     private async Task<bool> SendNotifyAsync(BaseOrderDto order, string type)
     {
-        _logger.LogInformation("OrderStatusReminderGrain SendNotifyAsync orderId={orderId} type={type}", order.Id, type);
+        _logger.LogInformation("OrderStatusReminderGrain SendNotifyAsync orderId={orderId} type={type}", order.Id,
+            type);
         var providerExists = _notifyProvider.TryGetValue(NotifyTypeEnum.FeiShuGroup.ToString(), out var provider);
         AssertHelper.IsTrue(providerExists, "Provider not found");
         var createTime = 0l;
         if (order.CreateTime.HasValue)
-        { 
+        {
             createTime = order.CreateTime.Value;
         }
 
@@ -163,13 +163,16 @@ public class OrderStatusReminderGrain : Orleans.Grain, IOrderStatusReminderGrain
                     order = (await depositRecordGrain.GetAsync())?.Value;
                     break;
                 default:
-                    _logger.LogInformation("OrderStatusReminderGrain reminderName not right orderType={orderType} orderId={orderId}", orderType, orderId);
+                    _logger.LogInformation(
+                        "OrderStatusReminderGrain reminderName not right orderType={orderType} orderId={orderId}",
+                        orderType, orderId);
                     break;
             }
         }
         catch (Exception e)
         {
-            _logger.LogError(e,"OrderStatusReminderGrain Exception orderType={orderType} orderId={orderId}", orderType, orderId);
+            _logger.LogError(e, "OrderStatusReminderGrain Exception orderType={orderType} orderId={orderId}", orderType,
+                orderId);
         }
 
         AssertHelper.NotNull(order, "order is null");
