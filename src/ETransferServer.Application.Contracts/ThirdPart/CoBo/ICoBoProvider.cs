@@ -13,4 +13,5 @@ public interface ICoBoProvider
     Task<AddressesDto> GetAddressesAsync(string coin, int count, bool nativeSegwit = false);
     Task<string> WithdrawAsync(WithdrawRequestDto input);
     Task<WithdrawInfoDto> GetWithdrawInfoByRequestIdAsync(string requestId);
+    string GetResponseCoin(string coin);
 }

@@ -55,6 +55,7 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
     private async Task<bool> HandleTransaction(string body)
     {
         var coBoTransaction = JsonConvert.DeserializeObject<CoBoTransactionDto>(body);
+        coBoTransaction.Coin = _coBoProvider.GetResponseCoin(coBoTransaction.Coin);
         AssertHelper.NotNull(coBoTransaction, "DeserializeObject to CoBoTransactionDto fail, invalid body: {body}",
             body);
 

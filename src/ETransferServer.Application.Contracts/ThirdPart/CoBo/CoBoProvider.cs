@@ -88,7 +88,9 @@ public class CoBoProvider : ICoBoProvider, ISingletonDependency
     {
         _logger.LogInformation("get transaction by id from cobo, id:{id}", id);
         var url = $"{CoBoConstant.GetTransaction}?id={id}";
-        return await _proxyCoBoClientProvider.GetAsync<CoBoTransactionDto>(url);
+        var result = await _proxyCoBoClientProvider.GetAsync<CoBoTransactionDto>(url);
+        result.Coin = GetResponseCoin(result.Coin);
+        return result;
     }
 
     public async Task<string> WithdrawAsync(WithdrawRequestDto input)
@@ -175,7 +177,7 @@ public class CoBoProvider : ICoBoProvider, ISingletonDependency
         return _options.Value.ReflectionItems.ContainsKey(coin) ? _options.Value.ReflectionItems[coin] : coin;
     }
 
-    private string GetResponseCoin(string coin)
+    public string GetResponseCoin(string coin)
     {
         if (_options == null || _options.Value.ReflectionItems.IsNullOrEmpty())
         {
