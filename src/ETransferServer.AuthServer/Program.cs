@@ -30,8 +30,12 @@ public class Program
         {
             Log.Information("Starting ETransferServer.AuthServer.");
             var builder = WebApplication.CreateBuilder(args);
+            builder.Configuration.AddJsonFile("apollo.appsettings.json");
             builder.Host.AddAppSettingsSecretsJson()
                 .UseAutofac()
+#if !DEBUG
+                .UseApollo()
+#endif
                 .UseSerilog();
             await builder.AddApplicationAsync<ETransferAuthServerModule>();
             var app = builder.Build();

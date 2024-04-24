@@ -22,7 +22,7 @@ public class ExchangeTest : ETransferServerApplicationTestBase
     }
 
 
-    public IOptionsMonitor<ExchangeOptions> MockExchangeOptions()
+    public IOptionsSnapshot<ExchangeOptions> MockExchangeOptions()
     {
         var options = new ExchangeOptions
         {
@@ -48,8 +48,8 @@ public class ExchangeTest : ETransferServerApplicationTestBase
                 
             }
         };
-        var mock = new Mock<IOptionsMonitor<ExchangeOptions>>();
-        mock.Setup(options => options.CurrentValue).Returns(options);
+        var mock = new Mock<IOptionsSnapshot<ExchangeOptions>>();
+        mock.Setup(options => options.Value).Returns(options);
         return mock.Object;
     }
     

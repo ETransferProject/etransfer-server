@@ -23,13 +23,13 @@ public class OrderStatusReminderGrain : Orleans.Grain, IOrderStatusReminderGrain
     private const string AlarmNotifyTemplate = "OrderStatusAlarm";
     private readonly ILogger<OrderStatusReminderGrain> _logger;
     private readonly IReminderRegistry _reminderRegistry;
-    private readonly IOptionsMonitor<TimerOptions> _timerOptions;
+    private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
     private readonly Dictionary<string, INotifyProvider> _notifyProvider;
     private readonly Dictionary<string, int> _reminderCountMap = new();
     private const int RetryCountMax = 3;
 
     public OrderStatusReminderGrain(IReminderRegistry reminderRegistry, ILogger<OrderStatusReminderGrain> logger,
-        IOptionsMonitor<TimerOptions> timerOptions, IEnumerable<INotifyProvider> notifyProvider)
+        IOptionsSnapshot<TimerOptions> timerOptions, IEnumerable<INotifyProvider> notifyProvider)
     {
         _reminderRegistry = reminderRegistry;
         _logger = logger;
@@ -40,12 +40,12 @@ public class OrderStatusReminderGrain : Orleans.Grain, IOrderStatusReminderGrain
     public async Task StartReminder(String id)
     {
         _logger.LogDebug("OrderStatusReminderGrain Startup dueTimeSec={Due}, periodSec={Per}",
-            _timerOptions.CurrentValue.OrderStatusReminder.DelaySeconds,
-            _timerOptions.CurrentValue.OrderStatusReminder.PeriodSeconds);
+            _timerOptions.Value.OrderStatusReminder.DelaySeconds,
+            _timerOptions.Value.OrderStatusReminder.PeriodSeconds);
         await _reminderRegistry.RegisterOrUpdateReminder(
             reminderName: id,
-            dueTime: TimeSpan.FromSeconds(_timerOptions.CurrentValue.OrderStatusReminder.DelaySeconds),
-            period: TimeSpan.FromSeconds(_timerOptions.CurrentValue.OrderStatusReminder.PeriodSeconds));
+            dueTime: TimeSpan.FromSeconds(_timerOptions.Value.OrderStatusReminder.DelaySeconds),
+            period: TimeSpan.FromSeconds(_timerOptions.Value.OrderStatusReminder.PeriodSeconds));
     }
 
     public Task ReceiveReminder(string reminderName, TickStatus status)
@@ -117,7 +117,9 @@ public class OrderStatusReminderGrain : Orleans.Grain, IOrderStatusReminderGrain
                 [Keys.OrderType] = order.OrderType,
                 [Keys.OrderId] = order.Id.ToString(),
                 [Keys.CreateTime] = TimeHelper.GetDateTimeFromTimeStamp(createTime).ToUtc8String(),
-                [Keys.TxId] = toTransfer?.TxId,
+                [Keys.TxId] = OrderTypeEnum.Withdraw.ToString().Equals(order.OrderType)
+                    ? fromTransfer?.TxId
+                    : toTransfer?.TxId,
                 [Keys.Reason] = order.ExtensionInfo.IsNullOrEmpty() ? "" : order.ExtensionInfo.First().Value,
 
                 [Keys.AmountFrom] = GetAmount(fromTransfer),

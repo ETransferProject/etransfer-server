@@ -25,12 +25,12 @@ public static class BinanceApi
 
 public class BinanceProvider : IExchangeProvider
 {
-    private readonly IOptionsMonitor<ExchangeOptions> _exchangeOptions;
+    private readonly IOptionsSnapshot<ExchangeOptions> _exchangeOptions;
     private readonly IHttpProvider _httpProvider;
     private readonly IDistributedCache<string> _blockedCache;
     private readonly ILogger<BinanceProvider> _logger;
 
-    public BinanceProvider(IOptionsMonitor<ExchangeOptions> exchangeOptions, IHttpProvider httpProvider,
+    public BinanceProvider(IOptionsSnapshot<ExchangeOptions> exchangeOptions, IHttpProvider httpProvider,
         IDistributedCache<string> blocked, ILogger<BinanceProvider> logger)
     {
         _exchangeOptions = exchangeOptions;
@@ -42,7 +42,7 @@ public class BinanceProvider : IExchangeProvider
 
     public BinanceOptions BinanceOptions()
     {
-        return _exchangeOptions.CurrentValue.Binance;
+        return _exchangeOptions.Value.Binance;
     }
 
     public ExchangeProviderName Name()

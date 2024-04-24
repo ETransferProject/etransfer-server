@@ -10,6 +10,7 @@ using ETransferServer.Order;
 using ETransferServer.Withdraw.Dtos;
 using ETransferServer.WithdrawOrder.Dtos;
 using Volo.Abp;
+using Volo.Abp.Application.Dtos;
 
 namespace ETransferServer.Controllers;
 
@@ -23,13 +24,17 @@ public class OrderController : ETransferController
     private readonly IOrderWithdrawAppService _withdrawOrderAppService;
     private readonly IOrderDepositAppService _depositOrderAppService;
     private readonly INetworkAppService _networkAppService;
+    private readonly IOrderAppService _orderAppService;
 
     public OrderController(IOrderWithdrawAppService withdrawOrderAppService,
-        IOrderDepositAppService depositOrderAppService,INetworkAppService networkAppService)
+        IOrderDepositAppService depositOrderAppService,
+        INetworkAppService networkAppService,
+        IOrderAppService orderAppService)
     {
         _withdrawOrderAppService = withdrawOrderAppService;
         _depositOrderAppService = depositOrderAppService;
         _networkAppService = networkAppService;
+        _orderAppService = orderAppService;
     }
     
     [Authorize]
@@ -58,5 +63,19 @@ public class OrderController : ETransferController
     public async Task<CreateWithdrawOrderDto> CreateWithdrawOrderInfoAsync(GetWithdrawOrderRequestDto request)
     {
         return await _withdrawOrderAppService.CreateWithdrawOrderInfoAsync(request);
+    }
+    
+    [Authorize]
+    [HttpGet("record/list")]
+    public async Task<PagedResultDto<OrderIndexDto>> GetOrderRecordListAsync(GetOrderRecordRequestDto request)
+    {
+        return await _orderAppService.GetOrderRecordListAsync(request);
+    }
+
+    [Authorize]
+    [HttpGet("record/status")]
+    public async Task<OrderStatusDto> GetOrderRecordStatusAsync()
+    {
+        return await _orderAppService.GetOrderRecordStatusAsync();
     }
 }

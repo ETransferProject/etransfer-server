@@ -103,9 +103,9 @@ public class OrderWithdrawTest : ETransferServerApplicationTestBase
         }
     }
 
-    private IOptions<NetworkOptions> MockNetworkOptions()
+    private IOptionsSnapshot<NetworkOptions> MockNetworkOptions()
     {
-        var mockOptionsSnapshot = new Mock<IOptions<NetworkOptions>>();
+        var mockOptionsSnapshot = new Mock<IOptionsSnapshot<NetworkOptions>>();
         mockOptionsSnapshot.Setup(o => o.Value).Returns(
             new NetworkOptions
             {

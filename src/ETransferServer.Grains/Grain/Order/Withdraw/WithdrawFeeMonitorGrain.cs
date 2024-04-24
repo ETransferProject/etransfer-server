@@ -1,4 +1,3 @@
-using CAServer.Commons;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Notify;
 using ETransferServer.Dtos.Order;
@@ -8,7 +7,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Orleans;
-using Orleans.Streams;
 using Volo.Abp;
 
 namespace ETransferServer.Grains.Grain.Order.Withdraw;
@@ -29,11 +27,11 @@ public class WithdrawFeeMonitorGrain : Grain<WithdrawFeeMonitorDto>, IWithdrawFe
 
     private readonly ILogger<WithdrawFeeMonitorGrain> _logger;
     private readonly Dictionary<string, INotifyProvider> _notifyProvider;
-    private readonly IOptionsMonitor<WithdrawNetworkOptions> _withdrawNetworkOptions;
+    private readonly IOptionsSnapshot<WithdrawNetworkOptions> _withdrawNetworkOptions;
 
 
     public WithdrawFeeMonitorGrain(ILogger<WithdrawFeeMonitorGrain> logger,
-        IOptionsMonitor<WithdrawNetworkOptions> withdrawNetworkOptions, IEnumerable<INotifyProvider> notifyProvider)
+        IOptionsSnapshot<WithdrawNetworkOptions> withdrawNetworkOptions, IEnumerable<INotifyProvider> notifyProvider)
     {
         _logger = logger;
         _withdrawNetworkOptions = withdrawNetworkOptions;
@@ -55,7 +53,7 @@ public class WithdrawFeeMonitorGrain : Grain<WithdrawFeeMonitorDto>, IWithdrawFe
             AssertHelper.IsTrue(currentFee.Amount.SafeToDecimal() > 0, "Invalid thirdPartFee");
 
             var netWorkInfo =
-                _withdrawNetworkOptions.CurrentValue.NetworkInfos.FirstOrDefault(n =>
+                _withdrawNetworkOptions.Value.NetworkInfos.FirstOrDefault(n =>
                     n.Coin.StartsWith(string.Join(CommonConstant.Underline, network, CommonConstant.EmptyString)));
             AssertHelper.NotNull(netWorkInfo, "Network {} not found", network);
 

@@ -75,7 +75,7 @@ public partial class UserDepositGrain
                 var statusFlow = await _orderStatusFlowGrain.GetAsync();
                 var querySuccess = statusFlow?.Data != null;
                 var retryFrom = OrderStatusEnum.ToStartTransfer.ToString();
-                var maxRetry = _depositOptions.CurrentValue.ToTransferMaxRetry;
+                var maxRetry = _depositOptions.Value.ToTransferMaxRetry;
                 var maxRetryCountExceeded = querySuccess &&
                                             ((OrderStatusFlowDto)statusFlow.Data).StatusFlow.Count(s =>
                                                 s.Status == retryFrom) >= maxRetry;
@@ -97,6 +97,7 @@ public partial class UserDepositGrain
             case OrderStatusEnum.Failed:
                 _logger.LogInformation("Order {Id} stream end, current status={Status}", this.GetPrimaryKey(),
                     status.ToString());
+                await HandleDepositQueryGrain(orderDto.ThirdPartOrderId);
                 // await _orderChangeStream.OnCompletedAsync();
                 break;
 
@@ -127,5 +128,10 @@ public partial class UserDepositGrain
         _logger.LogError(ex, "Order {Id} stream OnError", this.GetPrimaryKey());
         return Task.CompletedTask;
     }
-    
+
+    private async Task HandleDepositQueryGrain(string transactionId)
+    {
+        await _depositQueryTimerGrain.Remove(transactionId);
+    }
+
 }

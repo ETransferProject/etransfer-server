@@ -48,9 +48,9 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
     private readonly ILogger<UserWithdrawGrain> _logger;
     private IAsyncStream<WithdrawOrderDto> _orderChangeStream;
 
-    private readonly IOptionsMonitor<ChainOptions> _chainOptions;
-    private readonly IOptionsMonitor<WithdrawOptions> _withdrawOptions;
-    private readonly IOptionsMonitor<WithdrawNetworkOptions> _withdrawNetworkOptions;
+    private readonly IOptionsSnapshot<ChainOptions> _chainOptions;
+    private readonly IOptionsSnapshot<WithdrawOptions> _withdrawOptions;
+    private readonly IOptionsSnapshot<WithdrawNetworkOptions> _withdrawNetworkOptions;
 
     private IUserWithdrawRecordGrain _recordGrain;
     private IOrderStatusFlowGrain _orderStatusFlowGrain;
@@ -67,10 +67,10 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
     private int _currentSteps = 0;
 
     public UserWithdrawGrain(IUserWithdrawProvider userWithdrawProvider,
-        ILogger<UserWithdrawGrain> logger, IOptionsMonitor<ChainOptions> chainOptions,
-        IOptionsMonitor<WithdrawOptions> withdrawOptions, IContractProvider contractProvider,
+        ILogger<UserWithdrawGrain> logger, IOptionsSnapshot<ChainOptions> chainOptions,
+        IOptionsSnapshot<WithdrawOptions> withdrawOptions, IContractProvider contractProvider,
         IOrderStatusFlowProvider orderStatusFlowProvider,
-        IOptionsMonitor<WithdrawNetworkOptions> withdrawNetworkOptions)
+        IOptionsSnapshot<WithdrawNetworkOptions> withdrawNetworkOptions)
     {
         _userWithdrawProvider = userWithdrawProvider;
         _logger = logger;
@@ -89,7 +89,7 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         var streamProvider = GetStreamProvider(CommonConstant.StreamConstant.MessageStreamNameSpace);
         _orderChangeStream =
             streamProvider.GetStream<WithdrawOrderDto>(this.GetPrimaryKey(),
-                _withdrawOptions.CurrentValue.OrderChangeTopic);
+                _withdrawOptions.Value.OrderChangeTopic);
         await _orderChangeStream.SubscribeAsync(OnNextAsync);
 
         // other grain
@@ -121,7 +121,7 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         AssertHelper.NotNull(withdrawOrderDto.ToTransfer.Symbol, ErrorResult.TransactionFailCode);
         AssertHelper.IsTrue(withdrawOrderDto.ToTransfer.Amount > 0, ErrorResult.TransactionFailCode);
         
-        var coinInfo = _withdrawNetworkOptions.CurrentValue.GetNetworkInfo(withdrawOrderDto.ToTransfer.Network,
+        var coinInfo = _withdrawNetworkOptions.Value.GetNetworkInfo(withdrawOrderDto.ToTransfer.Network,
             withdrawOrderDto.ToTransfer.Symbol);
         AssertHelper.IsTrue(coinInfo.Decimal >= 0, ErrorResult.TransactionFailCode);
         

@@ -41,7 +41,7 @@ public class ETransferServerDomainTestModule : AbpModule
     public override void OnApplicationShutdown(ApplicationShutdownContext context)
     {
         var elasticIndexService = context.ServiceProvider.GetRequiredService<IElasticIndexService>();
-        var modules = context.ServiceProvider.GetRequiredService<IOptions<IndexCreateOption>>().Value.Modules;
+        var modules = context.ServiceProvider.GetRequiredService<IOptionsSnapshot<IndexCreateOption>>().Value.Modules;
 
         modules.ForEach(m =>
         {

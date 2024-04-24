@@ -19,13 +19,13 @@ public class UniswapV3Provider : IExchangeProvider, ISingletonDependency
 
     private readonly ILogger<UniswapV3Provider> _logger;
     private readonly GraphQLHttpClient _client;
-    private readonly IOptionsMonitor<ExchangeOptions> _exchangeOptions;
+    private readonly IOptionsSnapshot<ExchangeOptions> _exchangeOptions;
     
-    public UniswapV3Provider(IOptionsMonitor<ExchangeOptions> exchangeOptions,
+    public UniswapV3Provider(IOptionsSnapshot<ExchangeOptions> exchangeOptions,
         ILogger<UniswapV3Provider> logger)
     {
         _exchangeOptions = exchangeOptions;
-        _client = new GraphQLHttpClient(_exchangeOptions.CurrentValue.UniswapV3.BaseUrl, new NewtonsoftJsonSerializer());
+        _client = new GraphQLHttpClient(_exchangeOptions.Value.UniswapV3.BaseUrl, new NewtonsoftJsonSerializer());
         _logger = logger;
     }
     
@@ -36,7 +36,7 @@ public class UniswapV3Provider : IExchangeProvider, ISingletonDependency
 
     private string MappingSymbol(string standardSymbol)
     {
-        return _exchangeOptions.CurrentValue.UniswapV3.SymbolMapping.GetValueOrDefault(standardSymbol, standardSymbol);
+        return _exchangeOptions.Value.UniswapV3.SymbolMapping.GetValueOrDefault(standardSymbol, standardSymbol);
     }
 
     public async Task<TokenExchangeDto> LatestAsync(string fromSymbol, string toSymbol)
@@ -49,7 +49,7 @@ public class UniswapV3Provider : IExchangeProvider, ISingletonDependency
         }
         
         var symbolPair = string.Join(CommonConstant.Underline, MappingSymbol(fromSymbol), MappingSymbol(toSymbol));
-        var poolId = _exchangeOptions.CurrentValue.UniswapV3.PoolId.GetValueOrDefault(symbolPair);
+        var poolId = _exchangeOptions.Value.UniswapV3.PoolId.GetValueOrDefault(symbolPair);
         AssertHelper.NotEmpty(poolId, "PoolId not found of {}", symbolPair);
         var resp = await _client.SendQueryAsync<ResponseWrapper<List<SwapResponse>>>(new GraphQLRequest
         {

@@ -48,9 +48,10 @@ public static class OrleansHostExtensions
         var configSection = configuration.GetSection("Orleans");
         if (configSection == null)
             throw new ArgumentNullException(nameof(configSection), "The OrleansServer node is missing");
-        return hostBuilder.UseOrleans(siloBuilder =>
+        return hostBuilder.UseOrleans((context, siloBuilder) =>
         {
             //Configure OrleansSnapshot
+            var configSection = context.Configuration.GetSection("Orleans");
             siloBuilder
                 .ConfigureEndpoints(advertisedIP: IPAddress.Parse(configSection.GetValue<string>("AdvertisedIP")),
                     siloPort: configSection.GetValue<int>("SiloPort"),
@@ -99,7 +100,7 @@ public static class OrleansHostExtensions
                 .UseLinuxEnvironmentStatistics()
                 .ConfigureLogging(logging => { logging.SetMinimumLevel(LogLevel.Debug).AddConsole(); })
                 .AddStartupTask<GrainStartupTask>()
-                .UseKafkaMqStreamProvider(configuration);
+            .UseKafkaMqStreamProvider(configuration);
             //.AddStartupTask<TestWithdraw>();
         });
     }

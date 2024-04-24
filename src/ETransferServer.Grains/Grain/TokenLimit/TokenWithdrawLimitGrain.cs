@@ -27,10 +27,10 @@ public interface ITokenWithdrawLimitGrain : IGrainWithStringKey
 
 public class TokenWithdrawLimitGrain : Grain<TokenLimitState>, ITokenWithdrawLimitGrain
 {
-    private readonly IOptionsMonitor<WithdrawOptions> _withdrawOptions;
+    private readonly IOptionsSnapshot<WithdrawOptions> _withdrawOptions;
     private readonly ILogger<TokenWithdrawLimitGrain> _logger;
 
-    public TokenWithdrawLimitGrain(IOptionsMonitor<WithdrawOptions> withdrawOptions, ILogger<TokenWithdrawLimitGrain> logger)
+    public TokenWithdrawLimitGrain(IOptionsSnapshot<WithdrawOptions> withdrawOptions, ILogger<TokenWithdrawLimitGrain> logger)
     {
         _withdrawOptions = withdrawOptions;
         _logger = logger;
@@ -38,10 +38,10 @@ public class TokenWithdrawLimitGrain : Grain<TokenLimitState>, ITokenWithdrawLim
 
     public async Task<bool> Acquire(decimal amount)
     {
-        if (!_withdrawOptions.CurrentValue.IsOpen || amount <= 0) return true;
+        if (!_withdrawOptions.Value.IsOpen || amount <= 0) return true;
         if (State.HasInit && State.RemainingLimit < amount) return false;
         State.RemainingLimit = !State.HasInit
-            ? _withdrawOptions.CurrentValue.WithdrawThreshold - amount
+            ? _withdrawOptions.Value.WithdrawThreshold - amount
             : State.RemainingLimit - amount;
         State.HasInit = true;
 
@@ -53,8 +53,8 @@ public class TokenWithdrawLimitGrain : Grain<TokenLimitState>, ITokenWithdrawLim
 
     public async Task Reverse(decimal amount)
     {
-        if (!_withdrawOptions.CurrentValue.IsOpen || amount <= 0 || !State.HasInit) return;
-        if (State.RemainingLimit + amount < _withdrawOptions.CurrentValue.WithdrawThreshold)
+        if (!_withdrawOptions.Value.IsOpen || amount <= 0 || !State.HasInit) return;
+        if (State.RemainingLimit + amount < _withdrawOptions.Value.WithdrawThreshold)
         {
             State.RemainingLimit += amount;
         }
@@ -66,14 +66,14 @@ public class TokenWithdrawLimitGrain : Grain<TokenLimitState>, ITokenWithdrawLim
     
     public async Task<TokenLimitGrainDto> GetLimit()
     {
-        if (!_withdrawOptions.CurrentValue.IsOpen)
+        if (!_withdrawOptions.Value.IsOpen)
         {
-            return new TokenLimitGrainDto { RemainingLimit = _withdrawOptions.CurrentValue.WithdrawThreshold };
+            return new TokenLimitGrainDto { RemainingLimit = _withdrawOptions.Value.WithdrawThreshold };
         }
 
         if (!State.HasInit)
         {
-            State.RemainingLimit = _withdrawOptions.CurrentValue.WithdrawThreshold;
+            State.RemainingLimit = _withdrawOptions.Value.WithdrawThreshold;
             State.HasInit = true;
             await WriteStateAsync();
         }

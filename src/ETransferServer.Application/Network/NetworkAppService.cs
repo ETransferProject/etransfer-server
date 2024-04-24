@@ -24,9 +24,9 @@ namespace ETransferServer.Network;
 public class NetworkAppService : ETransferServerAppService, INetworkAppService
 {
     private readonly ILogger<NetworkAppService> _logger;
-    private readonly NetworkOptions _networkOptions;
+    private readonly IOptionsSnapshot<NetworkOptions> _networkOptions;
     private readonly CoinGeckoOptions _coinGeckoOptions;
-    private readonly IOptionsMonitor<ExchangeOptions> _exchangeOptions;
+    private readonly IOptionsSnapshot<ExchangeOptions> _exchangeOptions;
     private readonly IObjectMapper _objectMapper;
     private readonly IClusterClient _clusterClient;
     private const int ThirdPartDigitals = 4;
@@ -35,10 +35,10 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
         IOptionsSnapshot<NetworkOptions> networkOptions,
         IOptionsSnapshot<CoinGeckoOptions> coinGeckoOptions,
         IObjectMapper objectMapper,
-        IClusterClient clusterClient, IOptionsMonitor<ExchangeOptions> exchangeOptions)
+        IClusterClient clusterClient, IOptionsSnapshot<ExchangeOptions> exchangeOptions)
     {
         _logger = logger;
-        _networkOptions = networkOptions.Value;
+        _networkOptions = networkOptions;
         _coinGeckoOptions = coinGeckoOptions.Value;
         _objectMapper = objectMapper;
         _clusterClient = clusterClient;
@@ -99,10 +99,10 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
         AssertHelper.IsTrue(request.Type == OrderTypeEnum.Deposit.ToString()
                             || request.Type == OrderTypeEnum.Withdraw.ToString(),
             "Invalid type value. Please refresh and try again.");
-        AssertHelper.IsTrue(_networkOptions.NetworkMap.ContainsKey(request.Symbol),
+        AssertHelper.IsTrue(_networkOptions.Value.NetworkMap.ContainsKey(request.Symbol),
             "Symbol is not exist. Please refresh and try again.");
 
-        var networkConfigs = _networkOptions.NetworkMap[request.Symbol].Where(a =>
+        var networkConfigs = _networkOptions.Value.NetworkMap[request.Symbol].Where(a =>
                 a.SupportType.Contains(request.Type) && a.SupportChain.Contains(request.ChainId))
             .ToList();
 
@@ -126,7 +126,7 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
 
         if (request.Address.IsNullOrEmpty()) return getNetworkListDto;
 
-        var networkByAddress = _networkOptions.NetworkPattern
+        var networkByAddress = _networkOptions.Value.NetworkPattern
             .Where(kv => request.Address.Match(kv.Key))
             .SelectMany(kv => kv.Value)
             .ToList();

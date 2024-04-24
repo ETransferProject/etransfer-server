@@ -29,11 +29,11 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
     private readonly IContractProvider _contractProvider;
     private readonly ITokenTransferProvider _transferProvider;
 
-    private readonly IOptionsMonitor<ChainOptions> _chainOptions;
-    private readonly IOptionsMonitor<TimerOptions> _timerOptions;
+    private readonly IOptionsSnapshot<ChainOptions> _chainOptions;
+    private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
 
     protected AbstractTxTimerGrain(ILogger<AbstractTxTimerGrain<TOrder>> logger, IContractProvider contractProvider,
-        IOptionsMonitor<ChainOptions> chainOptions, IOptionsMonitor<TimerOptions> timerOptions,
+        IOptionsSnapshot<ChainOptions> chainOptions, IOptionsSnapshot<TimerOptions> timerOptions,
         ITokenTransferProvider transferProvider)
     {
         _logger = logger;
@@ -159,7 +159,7 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
             // The following two cases directly from the node query results
             // 1. The order has been in the list for a long time.
             // 2. indexer services are highly backward and LIB is more
-            var queryNode = now > pendingTx.TxTime + _chainOptions.CurrentValue.TxResultFromNodeSecondsAfter * 1000;
+            var queryNode = now > pendingTx.TxTime + _chainOptions.Value.TxResultFromNodeSecondsAfter * 1000;
             if (queryNode || !IndexerAvailable(pendingTx.ChainId, chainStatusDict, indexerHeightDict))
             {
                 _logger.LogDebug("TxTimer use node result orderId={OrderId}, chainId={ChainId}, txId={TxId}", orderId,
@@ -221,7 +221,7 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
     internal async Task<bool> HandleOrderTransaction(TOrder order, TimerTransaction timerTx, ChainStatusDto chainStatus)
     {
         var txDateTime = TimeHelper.GetDateTimeFromTimeStamp(timerTx.TxTime ?? 0);
-        var txExpireTime = txDateTime.AddSeconds(_chainOptions.CurrentValue.Contract.TransactionTimerMaxSeconds);
+        var txExpireTime = txDateTime.AddSeconds(_chainOptions.Value.Contract.TransactionTimerMaxSeconds);
 
         TransferInfo transferInfo;
         bool isToTransfer;
@@ -341,7 +341,7 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
         var statusExists = chainStatus.TryGetValue(chainId, out var status);
         var heightExists = indexerBlockHeight.TryGetValue(chainId, out var indexerHeight);
         return statusExists && heightExists &&
-               status.LastIrreversibleBlockHeight - _chainOptions.CurrentValue.IndexerAvailableHeightBehind <
+               status.LastIrreversibleBlockHeight - _chainOptions.Value.IndexerAvailableHeightBehind <
                indexerHeight;
     }
 
@@ -370,7 +370,7 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
     // Transaction height less than LIB, or less than the specified number of blocks, is considered confirmed
     private bool IsTxConfirmed(long txBlockNumber, ChainStatusDto chainStatus)
     {
-        var confirmBlocks = _chainOptions.CurrentValue.Contract.SafeBlockHeight;
+        var confirmBlocks = _chainOptions.Value.Contract.SafeBlockHeight;
         return txBlockNumber < chainStatus.LastIrreversibleBlockHeight ||
                txBlockNumber < chainStatus.BestChainHeight - confirmBlocks;
     }

@@ -34,10 +34,10 @@ public class SignatureGrantHandler : ITokenExtensionGrant
 {
     private ILogger<SignatureGrantHandler> _logger;
     private IAbpDistributedLock _distributedLock;
-    private ContractOptions _contractOptions;
+    private IOptionsSnapshot<ContractOptions> _contractOptions;
     private IClusterClient _clusterClient;
-    private GraphQlOption _graphQlOptions;
-    private ChainOptions _chainOptions;
+    private IOptionsSnapshot<GraphQlOption> _graphQlOptions;
+    private IOptionsSnapshot<ChainOptions> _chainOptions;
     private readonly string _lockKeyPrefix = "ETransferServer:Auth:SignatureGrantHandler:";
 
     public async Task<IActionResult> HandleAsync(ExtensionGrantContext context)
@@ -72,8 +72,7 @@ public class SignatureGrantHandler : ITokenExtensionGrant
         var time = DateTime.UnixEpoch.AddMilliseconds(timestamp);
         var timeRangeConfig = context.HttpContext.RequestServices
             .GetRequiredService<IOptionsSnapshot<TimeRangeOption>>().Value;
-        _contractOptions = context.HttpContext.RequestServices.GetRequiredService<IOptionsSnapshot<ContractOptions>>()
-            .Value;
+        _contractOptions = context.HttpContext.RequestServices.GetRequiredService<IOptionsSnapshot<ContractOptions>>();
         _clusterClient = context.HttpContext.RequestServices.GetRequiredService<IClusterClient>();
 
         _distributedLock = context.HttpContext.RequestServices.GetRequiredService<IAbpDistributedLock>();
@@ -92,14 +91,12 @@ public class SignatureGrantHandler : ITokenExtensionGrant
         }
 
         //Find manager by caHash
-        _graphQlOptions = context.HttpContext.RequestServices.GetRequiredService<IOptionsSnapshot<GraphQlOption>>()
-            .Value;
-        _chainOptions = context.HttpContext.RequestServices.GetRequiredService<IOptionsSnapshot<ChainOptions>>()
-            .Value;
+        _graphQlOptions = context.HttpContext.RequestServices.GetRequiredService<IOptionsSnapshot<GraphQlOption>>();
+        _chainOptions = context.HttpContext.RequestServices.GetRequiredService<IOptionsSnapshot<ChainOptions>>();
 
         var managerCheck = await CheckAddressAsync(chainId,
-   AuthConstant.PortKeyVersion2.Equals(version) ? _graphQlOptions.Url2 : _graphQlOptions.Url,
-            caHash, address, version, _chainOptions);
+   AuthConstant.PortKeyVersion2.Equals(version) ? _graphQlOptions.Value.Url2 : _graphQlOptions.Value.Url,
+            caHash, address, version, _chainOptions.Value);
         if (!managerCheck.HasValue || !managerCheck.Value)
         {
             _logger.LogError(
@@ -266,7 +263,7 @@ public class SignatureGrantHandler : ITokenExtensionGrant
         var addressInfos = new List<AddressInfo>();
         var holderInfoDto =
             await GetHolderInfosAsync(
-                AuthConstant.PortKeyVersion2.Equals(version) ? _graphQlOptions.Url2 : _graphQlOptions.Url, caHash);
+                AuthConstant.PortKeyVersion2.Equals(version) ? _graphQlOptions.Value.Url2 : _graphQlOptions.Value.Url, caHash);
 
         var chainIds = new List<string>();
         if (holderInfoDto != null && !holderInfoDto.CaHolderInfo.IsNullOrEmpty())
@@ -276,7 +273,7 @@ public class SignatureGrantHandler : ITokenExtensionGrant
             chainIds = holderInfoDto.CaHolderInfo.Select(t => t.ChainId).ToList();
         }
 
-        var chains = _chainOptions.ChainInfos.Select(key => _chainOptions.ChainInfos[key.Key])
+        var chains = _chainOptions.Value.ChainInfos.Select(key => _chainOptions.Value.ChainInfos[key.Key])
             .Select(chainOptionsChainInfo => chainOptionsChainInfo.ChainId).Where(t => !chainIds.Contains(t));
 
         foreach (var chainId in chains)
@@ -305,7 +302,7 @@ public class SignatureGrantHandler : ITokenExtensionGrant
 
         var output =
             await CallTransactionAsync<GetHolderInfoOutput>(chainId, AuthConstant.GetHolderInfo, version, 
-                param, false, _chainOptions);
+                param, false, _chainOptions.Value);
 
         return new AddressInfo()
         {
@@ -380,7 +377,7 @@ public class SignatureGrantHandler : ITokenExtensionGrant
 
             var client = new AElfClient(chainInfo.BaseUrl);
             await client.IsConnectedAsync();
-            var address = client.GetAddressFromPrivateKey(_contractOptions.CommonPrivateKeyForCallTx);
+            var address = client.GetAddressFromPrivateKey(_contractOptions.Value.CommonPrivateKeyForCallTx);
 
             var contractAddress = isCrossChain
                 ? (await client.GetContractAddressByNameAsync(HashHelper.ComputeFrom(ContractName.CrossChain)))
@@ -391,7 +388,7 @@ public class SignatureGrantHandler : ITokenExtensionGrant
                 await client.GenerateTransactionAsync(address, contractAddress,
                     methodName, param);
 
-            var txWithSign = client.SignTransaction(_contractOptions.CommonPrivateKeyForCallTx, transaction);
+            var txWithSign = client.SignTransaction(_contractOptions.Value.CommonPrivateKeyForCallTx, transaction);
             var result = await client.ExecuteTransactionAsync(new ExecuteTransactionDto
             {
                 RawTransaction = txWithSign.ToByteArray().ToHex()

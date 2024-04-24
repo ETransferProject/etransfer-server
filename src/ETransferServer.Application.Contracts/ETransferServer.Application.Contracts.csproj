@@ -37,6 +37,7 @@
     <PackageReference Include="GraphQL.SystemTextJson" Version="7.4.1" />
 
     <PackageReference Include="CoinGeckoAsyncApi" Version="1.6.0" />
+    <PackageReference Include="NBitcoin" Version="7.0.31" />
   </ItemGroup>
 
   <ItemGroup>

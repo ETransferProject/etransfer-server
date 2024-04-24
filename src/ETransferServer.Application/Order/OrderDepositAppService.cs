@@ -13,6 +13,7 @@ using ETransferServer.Network;
 using ETransferServer.Options;
 using ETransferServer.Orders;
 using ETransferServer.User;
+using Nest;
 using Volo.Abp;
 using Volo.Abp.Application.Services;
 using Volo.Abp.Auditing;
@@ -25,14 +26,14 @@ namespace ETransferServer.Order;
 [DisableAuditing]
 public class OrderDepositAppService : ApplicationService, IOrderDepositAppService
 {
-    private readonly INESTRepository<DepositOrder, Guid> _depositOrderIndexRepository;
+    private readonly INESTRepository<OrderIndex, Guid> _depositOrderIndexRepository;
     private readonly IObjectMapper _objectMapper;
     private readonly ILogger<OrderDepositAppService> _logger;
-    private readonly NetworkOptions _networkInfoOptions;
+    private readonly IOptionsSnapshot<NetworkOptions> _networkInfoOptions;
     private readonly IUserAddressService _userAddressService;
     private readonly INetworkAppService _networkAppService;
 
-    public OrderDepositAppService(INESTRepository<DepositOrder, Guid> depositOrderIndexRepository,
+    public OrderDepositAppService(INESTRepository<OrderIndex, Guid> depositOrderIndexRepository,
         IObjectMapper objectMapper,
         ILogger<OrderDepositAppService> logger,
         IOptionsSnapshot<NetworkOptions> networkInfoOptions,
@@ -40,7 +41,7 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
         INetworkAppService networkAppService)
     {
         _depositOrderIndexRepository = depositOrderIndexRepository;
-        _networkInfoOptions = networkInfoOptions.Value;
+        _networkInfoOptions = networkInfoOptions;
         _objectMapper = objectMapper;
         _logger = logger;
         _userAddressService = userAddressService;
@@ -53,10 +54,10 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
         {
             AssertHelper.IsTrue(request.ChainId == ChainId.AELF || request.ChainId == ChainId.tDVV
                 || request.ChainId == ChainId.tDVW, "Param is invalid. Please refresh and try again.");
-            AssertHelper.IsTrue(_networkInfoOptions.NetworkMap.ContainsKey(request.Symbol), 
+            AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.Symbol), 
                 "Symbol is not exist. Please refresh and try again.");
             
-            var networkConfigs = _networkInfoOptions.NetworkMap[request.Symbol];
+            var networkConfigs = _networkInfoOptions.Value.NetworkMap[request.Symbol];
             var depositInfo = networkConfigs.Where(n => n.NetworkInfo.Network == request.Network)
                 .Select(n => n.DepositInfo).FirstOrDefault();
             AssertHelper.IsTrue(depositInfo != null, "Network is not exist. Please refresh and try again.");
@@ -106,7 +107,7 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
         try
         {
             await _depositOrderIndexRepository.BulkAddOrUpdateAsync(
-                _objectMapper.Map<List<DepositOrderDto>, List<DepositOrder>>(dtoList));
+                _objectMapper.Map<List<DepositOrderDto>, List<OrderIndex>>(dtoList));
         }
         catch (Exception ex)
         {
@@ -121,7 +122,7 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
     {
         try
         {
-            await _depositOrderIndexRepository.AddOrUpdateAsync(_objectMapper.Map<DepositOrderDto, DepositOrder>(dto));
+            await _depositOrderIndexRepository.AddOrUpdateAsync(_objectMapper.Map<DepositOrderDto, OrderIndex>(dto));
         }
         catch (Exception ex)
         {
@@ -130,5 +131,15 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
         }
 
         return true;
+    }
+    
+    public async Task<bool> ExistSync(DepositOrderDto dto)
+    {
+        var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+        mustQuery.Add(q => q.Term(i => i.Field(f => f.ThirdPartOrderId).Value(dto.ThirdPartOrderId)));
+
+        QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery));
+        var countResponse = await _depositOrderIndexRepository.CountAsync(Filter);
+        return countResponse.Count > 0;
     }
 }

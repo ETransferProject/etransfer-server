@@ -18,10 +18,10 @@ public interface IUserDepositTxTimerGrain : IBaseTxTimerGrain
 public class UserDepositTxTimerGrain : AbstractTxTimerGrain<DepositOrderDto>, IUserDepositTxTimerGrain
 {
     private readonly ILogger<UserDepositTxTimerGrain> _logger;
-    private readonly IOptionsMonitor<TimerOptions> _timerOptions;
+    private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
 
     public UserDepositTxTimerGrain(ILogger<UserDepositTxTimerGrain> logger, IContractProvider contractProvider,
-        IOptionsMonitor<ChainOptions> chainOptions, IOptionsMonitor<TimerOptions> timerOptions,
+        IOptionsSnapshot<ChainOptions> chainOptions, IOptionsSnapshot<TimerOptions> timerOptions,
         ITokenTransferProvider transferProvider) : base(logger, contractProvider, chainOptions, timerOptions, transferProvider)
     {
         _logger = logger;
@@ -35,8 +35,8 @@ public class UserDepositTxTimerGrain : AbstractTxTimerGrain<DepositOrderDto>, IU
 
         _logger.LogDebug("UserDepositTxTimerGrain StartTimer {StartTime}", DateTime.UtcNow.ToUtc8String());
         RegisterTimer(TimerCallback, State,
-            TimeSpan.FromSeconds(_timerOptions.CurrentValue.DepositTimer.DelaySeconds),
-            TimeSpan.FromSeconds(_timerOptions.CurrentValue.DepositTimer.PeriodSeconds)
+            TimeSpan.FromSeconds(_timerOptions.Value.DepositTimer.DelaySeconds),
+            TimeSpan.FromSeconds(_timerOptions.Value.DepositTimer.PeriodSeconds)
         );
     }
 

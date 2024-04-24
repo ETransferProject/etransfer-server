@@ -5,6 +5,7 @@ public class FeeInfo
     public string? Name { get; set; }
     public string Symbol { get; set; }
     public string Amount { get; set; }
+    public string Decimals { get; set; }
 
 
     public FeeInfo()
@@ -16,6 +17,14 @@ public class FeeInfo
     {
         Symbol = symbol;
         Amount = amount;
+        Name = name;
+    }
+    
+    public FeeInfo(string symbol, string amount, string decimals, string? name = null)
+    {
+        Symbol = symbol;
+        Amount = amount;
+        Decimals = decimals;
         Name = name;
     }
     

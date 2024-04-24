@@ -27,7 +27,7 @@ public class UserAddressService : ApplicationService, IUserAddressService
     private readonly INESTRepository<UserAddress, Guid> _userAddressIndexRepository;
     private readonly IClusterClient _clusterClient;
     private readonly IObjectMapper _objectMapper;
-    private readonly DepositAddressOptions _depositAddressOptions;
+    private readonly IOptionsSnapshot<DepositAddressOptions> _depositAddressOptions;
     private readonly ILogger<UserAddressService> _logger;
 
     public UserAddressService(INESTRepository<UserAddress, Guid> userAddressIndexRepository,
@@ -39,7 +39,7 @@ public class UserAddressService : ApplicationService, IUserAddressService
         _userAddressIndexRepository = userAddressIndexRepository;
         _clusterClient = clusterClient;
         _objectMapper = objectMapper;
-        _depositAddressOptions = depositAddressOptions.Value;
+        _depositAddressOptions = depositAddressOptions;
         _logger = logger;
     }
 
@@ -69,7 +69,7 @@ public class UserAddressService : ApplicationService, IUserAddressService
 
     public async Task<UserAddressDto> GetUnAssignedAddressAsync(GetUserDepositAddressInput input)
     {
-        var evmCoins = _depositAddressOptions.EVMCoins;
+        var evmCoins = _depositAddressOptions.Value.EVMCoins;
         if (evmCoins.Contains(GuidHelper.GenerateId(input.NetWork, input.Symbol)) && evmCoins.Count > 0)
         {
             // first get new address from non-first evm lists of the config, then get from first evm of the config.
@@ -84,7 +84,7 @@ public class UserAddressService : ApplicationService, IUserAddressService
         return await GetNewAddressAsync(new List<string>{ input.NetWork }, input.Symbol);
     }
 
-    public async Task<UserAddressDto> GetUnAssignedAddressAsync(string address)
+    public async Task<UserAddressDto> GetAssignedAddressAsync(string address)
     {
         if (address.IsNullOrWhiteSpace()) return null;
         var mustQuery = new List<Func<QueryContainerDescriptor<UserAddress>, QueryContainer>>();
@@ -143,9 +143,9 @@ public class UserAddressService : ApplicationService, IUserAddressService
     {
         var remainingList = new List<string>();
         var evmCount = 0L;
-        var evmCoins = _depositAddressOptions.EVMCoins;
+        var evmCoins = _depositAddressOptions.Value.EVMCoins;
         
-        foreach (var item in _depositAddressOptions.SupportCoins)
+        foreach (var item in _depositAddressOptions.Value.SupportCoins)
         {
             var split = item.Split(DepositAddressOptions.DefaultDelimiter);
             if (split.Length < 2) continue;
@@ -164,14 +164,14 @@ public class UserAddressService : ApplicationService, IUserAddressService
             }
 
             _logger.LogInformation("Remaining address count:{count}, coin:{coin}", countResponse.Count, item);
-            if (countResponse.Count < _depositAddressOptions.RemainingThreshold)
+            if (countResponse.Count < _depositAddressOptions.Value.RemainingThreshold)
             {
                 remainingList.Add(item);
             }
         }
 
         _logger.LogInformation("Remaining address count:{count}, coin:evms", evmCount);
-        if (evmCount < _depositAddressOptions.RemainingThreshold && evmCoins.Count > 0)
+        if (evmCount < _depositAddressOptions.Value.RemainingThreshold && evmCoins.Count > 0)
         {
             remainingList.Add(evmCoins.First());
         }
