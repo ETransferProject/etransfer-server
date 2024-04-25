@@ -77,6 +77,11 @@ public class WatchDogReminderGrain : Orleans.Grain, IWatchDogReminderGrain, IRem
                 GuidHelper.UniqGuid(nameof(IDepositOrderRetryTimerGrain)));
         depositOrderRetryGrain.GetLastCallBackTime();
         
+        var withdrawOrderRetryGrain =
+            GrainFactory.GetGrain<IWithdrawOrderRetryTimerGrain>(
+                GuidHelper.UniqGuid(nameof(IWithdrawOrderRetryTimerGrain)));
+        withdrawOrderRetryGrain.GetLastCallBackTime();
+        
         return Task.CompletedTask;
     }
 }

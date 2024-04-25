@@ -9,4 +9,5 @@ public class WithdrawOptions
     public decimal MinThirdPartFee { get; set; } = new (0.2);
     public decimal FeeFluctuationPercent { get; set; } = (decimal)0.1;
     public int ThirdPartFeeExpireSeconds { get; set; } = 180;
+    public int ToTransferMaxRetry { get; set; } = 5;
 }
