@@ -10,4 +10,5 @@ public class WithdrawOptions
     public decimal FeeFluctuationPercent { get; set; } = (decimal)0.1;
     public int ThirdPartFeeExpireSeconds { get; set; } = 180;
     public int ToTransferMaxRetry { get; set; } = 5;
+    public Dictionary<string, string> PaymentAddresses { get; set; } = new();
 }

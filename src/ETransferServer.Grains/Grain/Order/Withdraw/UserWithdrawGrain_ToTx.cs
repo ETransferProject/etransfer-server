@@ -29,6 +29,12 @@ public partial class UserWithdrawGrain
                     toTransfer.ChainId);
 
                 var amount = (long)(toTransfer.Amount * (decimal)Math.Pow(10, tokenInfo.Decimals));
+                var paymentAddressExists =
+                    _withdrawOptions.Value.PaymentAddresses?.ContainsKey(toTransfer.ChainId) ?? false;
+                AssertHelper.IsTrue(paymentAddressExists, "Payment address missing, ChainId={ChainId}", toTransfer.ChainId);
+                var paymentAddress = _withdrawOptions.Value.PaymentAddresses.GetValueOrDefault(toTransfer.ChainId);
+                AssertHelper.NotEmpty(paymentAddress, "Payment address empty, ChainId={ChainId}", toTransfer.ChainId);
+                toTransfer.FromAddress = paymentAddress;
                 var transferInput = new TransferInput
                 {
                     To = Address.FromBase58(toTransfer.ToAddress),
