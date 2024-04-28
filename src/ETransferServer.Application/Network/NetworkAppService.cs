@@ -12,6 +12,7 @@ using ETransferServer.Models;
 using ETransferServer.Options;
 using ETransferServer.Network.Dtos;
 using ETransferServer.ThirdPart.Exchange;
+using Newtonsoft.Json;
 using Orleans;
 using Volo.Abp;
 using Volo.Abp.Auditing;
@@ -52,12 +53,18 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
             var getNetworkListDto = await GetNetworkListWithLocalFeeAsync(request);
             if (request.Type == OrderTypeEnum.Deposit.ToString()) return getNetworkListDto;
             
+            var json = JsonConvert.SerializeObject(getNetworkListDto, Formatting.Indented);
+            _logger.LogInformation("json from config: " + json);
+            
             // fill withdraw fee
             foreach (var networkDto in getNetworkListDto.NetworkList)
             {
                 networkDto.WithdrawFee = await GetCacheFeeAsync(networkDto.Network, request.Symbol) ??
                                          networkDto.WithdrawFee;
             }
+            
+            json = JsonConvert.SerializeObject(getNetworkListDto, Formatting.Indented);
+            _logger.LogInformation("json after cache: " + json);
 
             try
             {
@@ -74,6 +81,12 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
                 }
                 _logger.LogError(e, "Get withdraw fee failed by exchange.");
             }
+            
+            getNetworkListDto = FilterByChainId(getNetworkListDto, request.ChainId);
+            
+            json = JsonConvert.SerializeObject(getNetworkListDto, Formatting.Indented);
+            _logger.LogInformation("json before return: " + json);
+            
             return getNetworkListDto;
         }
         catch (UserFriendlyException e)
@@ -88,6 +101,22 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
                 request.Type, request.ChainId, request.Address, request.Symbol);
             throw;
         }
+    }
+    
+    private GetNetworkListDto FilterByChainId(GetNetworkListDto networkListDto, string chainId)
+    {
+        if (networkListDto.NetworkList.Any())
+        {
+            networkListDto = new GetNetworkListDto
+            {
+                ChainId = chainId,
+                NetworkList = networkListDto.NetworkList
+                    .Where(networkDto => !networkDto.Network.Equals(chainId))
+                    .ToList()
+            };
+        }
+
+        return networkListDto;
     }
 
     public async Task<GetNetworkListDto> GetNetworkListWithLocalFeeAsync(GetNetworkListRequestDto request)
