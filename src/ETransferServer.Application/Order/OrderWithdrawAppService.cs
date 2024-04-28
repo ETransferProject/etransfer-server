@@ -133,7 +133,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             var decimals = DecimalHelper.GetDecimals(request.Symbol);
             var (feeAmount, expireAt) = (0M, DateTime.UtcNow.AddSeconds(_coBoOptions.Value.CoinExpireSeconds).ToUtcMilliSeconds());
             withdrawInfoDto.TransactionFee = feeAmount.ToString();
-            if (!VerifyAElfChain(request.Network))
+            if (!string.IsNullOrEmpty(request.Network) && !VerifyAElfChain(request.Network))
             {
                 var thirdPartFeeTask = request.Network.IsNullOrEmpty()
                     ? CalculateThirdPartFeesWithCacheAsync(userId, request.Symbol)
