@@ -9,6 +9,7 @@ using ETransferServer.Grains.Grain.Timers;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.Provider;
 using ETransferServer.Options;
+using Newtonsoft.Json;
 
 namespace ETransferServer.Grains.Grain.Order.Withdraw;
 
@@ -55,6 +56,7 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
     private IUserWithdrawRecordGrain _recordGrain;
     private IOrderStatusFlowGrain _orderStatusFlowGrain;
     private IUserWithdrawTxTimerGrain _withdrawTimerGrain;
+    private IWithdrawOrderRetryTimerGrain _withdrawOrderRetryTimerGrain;
     private IWithdrawTimerGrain _withdrawQueryTimerGrain;
     private IOrderStatusReminderGrain _orderStatusReminderGrain;
 
@@ -62,6 +64,10 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
     private readonly IUserWithdrawProvider _userWithdrawProvider;
     private readonly IOrderStatusFlowProvider _orderStatusFlowProvider;
 
+    internal JsonSerializerSettings JsonSettings = JsonSettingsBuilder.New()
+        .WithAElfTypesConverters()
+        .WithCamelCasePropertyNamesResolver()
+        .Build();
 
     private const int MaxStreamSteps = 100;
     private int _currentSteps = 0;
@@ -99,6 +105,9 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         _withdrawTimerGrain =
             GrainFactory.GetGrain<IUserWithdrawTxTimerGrain>(
                 GuidHelper.UniqGuid(nameof(IUserWithdrawTxTimerGrain)));
+        _withdrawOrderRetryTimerGrain =
+            GrainFactory.GetGrain<IWithdrawOrderRetryTimerGrain>(
+                GuidHelper.UniqGuid(nameof(IWithdrawOrderRetryTimerGrain)));
         _withdrawQueryTimerGrain =
             GrainFactory.GetGrain<IWithdrawTimerGrain>(
                 GuidHelper.UniqGuid(nameof(IWithdrawTimerGrain)));
