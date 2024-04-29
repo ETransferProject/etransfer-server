@@ -19,7 +19,7 @@ public class TimerOptions
     public TimerOption TokenAddressTimer { get; set; } = new();
     public TimerOption WithdrawTimer { get; set; } = new();
     public TimerOption DepositRetryTimer { get; set; } = new();
-    
+    public TimerOption WithdrawRetryTimer { get; set; } = new();
 }
 
 

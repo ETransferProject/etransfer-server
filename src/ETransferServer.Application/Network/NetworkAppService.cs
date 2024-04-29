@@ -12,6 +12,7 @@ using ETransferServer.Models;
 using ETransferServer.Options;
 using ETransferServer.Network.Dtos;
 using ETransferServer.ThirdPart.Exchange;
+using Newtonsoft.Json;
 using Orleans;
 using Volo.Abp;
 using Volo.Abp.Auditing;
@@ -51,7 +52,7 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
         {
             var getNetworkListDto = await GetNetworkListWithLocalFeeAsync(request);
             if (request.Type == OrderTypeEnum.Deposit.ToString()) return getNetworkListDto;
-            
+
             // fill withdraw fee
             foreach (var networkDto in getNetworkListDto.NetworkList)
             {
@@ -74,6 +75,9 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
                 }
                 _logger.LogError(e, "Get withdraw fee failed by exchange.");
             }
+            
+            getNetworkListDto = FilterByChainId(getNetworkListDto, request.ChainId);
+
             return getNetworkListDto;
         }
         catch (UserFriendlyException e)
@@ -88,6 +92,22 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
                 request.Type, request.ChainId, request.Address, request.Symbol);
             throw;
         }
+    }
+    
+    private GetNetworkListDto FilterByChainId(GetNetworkListDto networkListDto, string chainId)
+    {
+        if (networkListDto.NetworkList.Any())
+        {
+            networkListDto = new GetNetworkListDto
+            {
+                ChainId = chainId,
+                NetworkList = networkListDto.NetworkList
+                    .Where(networkDto => !networkDto.Network.Equals(chainId))
+                    .ToList()
+            };
+        }
+
+        return networkListDto;
     }
 
     public async Task<GetNetworkListDto> GetNetworkListWithLocalFeeAsync(GetNetworkListRequestDto request)
@@ -122,6 +142,8 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
                 !withdrawInfo.TryGetValue(networkDto.Network, out var withdraw)) continue;
             networkDto.WithdrawFeeUnit = withdraw.WithdrawLocalFeeUnit;
             networkDto.WithdrawFee = withdraw.WithdrawLocalFee.ToString(CultureInfo.InvariantCulture);
+            networkDto.SpecialWithdrawFeeDisplay = withdraw.SpecialWithdrawFeeDisplay;
+            networkDto.SpecialWithdrawFee = withdraw.SpecialWithdrawFee;
         }
 
         if (request.Address.IsNullOrEmpty()) return getNetworkListDto;
@@ -181,21 +203,41 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
 
         foreach (var network in networkList)
         {
-            network.WithdrawFee = (network.WithdrawFee.SafeToDecimal() * exchange[_coinGeckoOptions.CoinIdMapping[network.WithdrawFeeUnit]].Exchange)
-                .ToString(ThirdPartDigitals, DecimalHelper.GetDecimals(symbol), DecimalHelper.RoundingOption.Ceiling);
+            if (network.SpecialWithdrawFeeDisplay)
+            {
+                network.WithdrawFee = network.SpecialWithdrawFee;
+            }
+            else
+            {
+                network.WithdrawFee = (network.WithdrawFee.SafeToDecimal() *
+                                       exchange[_coinGeckoOptions.CoinIdMapping[network.WithdrawFeeUnit]].Exchange)
+                    .ToString(ThirdPartDigitals, DecimalHelper.GetDecimals(symbol),
+                        DecimalHelper.RoundingOption.Ceiling);
+            }
+
             network.WithdrawFeeUnit = symbol;
         }
 
         return networkList;
     }
     
+
     private async Task<List<NetworkDto>> CalculateAvgNetworkFeeListAsync(List<NetworkDto> networkList, string symbol)
     {
         foreach (var network in networkList)
         {
-            var avgExchange = await GetAvgExchangeAsync(network.Network, symbol);
-            network.WithdrawFee = (network.WithdrawFee.SafeToDecimal() * avgExchange)
+            if (network.SpecialWithdrawFeeDisplay)
+            {
+                network.WithdrawFee = network.SpecialWithdrawFee;
+            }
+            else {
+                
+                var avgExchange = await GetAvgExchangeAsync(network.Network, symbol);
+
+                network.WithdrawFee = (network.WithdrawFee.SafeToDecimal() * avgExchange)
                 .ToString(ThirdPartDigitals, DecimalHelper.GetDecimals(symbol), DecimalHelper.RoundingOption.Ceiling);
+            }
+
             network.WithdrawFeeUnit = symbol;
         }
 

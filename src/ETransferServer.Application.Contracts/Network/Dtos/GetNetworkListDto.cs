@@ -20,4 +20,7 @@ public class NetworkDto
     public string Status { get; set; }
     [CanBeNull] public string WithdrawFee { get; set; }
     [CanBeNull] public string WithdrawFeeUnit { get; set; }
+    public bool SpecialWithdrawFeeDisplay { get; set; }
+    public string SpecialWithdrawFee { get; set; }
+    
 }

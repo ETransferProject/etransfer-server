@@ -21,6 +21,7 @@ public partial class UserWithdrawGrain
         _logger.LogInformation("withdraw order in stream, orderId:{orderId}, status:{status}", orderDto.Id,
             orderDto.Status);
 
+        var isAElf = orderDto.ToTransfer.Network == CommonConstant.Network.AElf;
         var status = Enum.Parse<OrderStatusEnum>(orderDto.Status);
         switch (status)
         {
@@ -64,13 +65,14 @@ public partial class UserWithdrawGrain
 
             case OrderStatusEnum.ToStartTransfer:
                 _logger.LogInformation("withdraw before add to request, orderId:{orderId}", orderDto.Id);
-                await _withdrawQueryTimerGrain.AddToRequest(orderDto);
+                await AddToStartTransfer(orderDto, isAElf);
                 break;
             case OrderStatusEnum.ToTransferring:
                 _logger.LogInformation("withdraw before add to query, orderId:{orderId}", orderDto.Id);
-                await _withdrawQueryTimerGrain.AddToQuery(orderDto);
+                await AddToTransferring(orderDto, isAElf);
                 break;
             case OrderStatusEnum.ToTransferred:
+                await AddToPendingList(orderDto);
                 break;
             case OrderStatusEnum.ToTransferConfirmed:
                 orderDto.Status = OrderStatusEnum.Finish.ToString();
@@ -78,9 +80,8 @@ public partial class UserWithdrawGrain
                 break;
             case OrderStatusEnum.ToTransferFailed:
                 _logger.LogError("Order {Id} ToTransferFailed, invalid status, current status={Status}",
-                    this.GetPrimaryKey(),
-                    status.ToString());
-                await ReverseTokenLimitAsync(orderDto.Id, orderDto.ToTransfer.Symbol, orderDto.AmountUsd);
+                    this.GetPrimaryKey(), status.ToString());
+                await AddToRetryTx(orderDto);
                 break;
             
             // To completed stream
@@ -116,6 +117,62 @@ public partial class UserWithdrawGrain
         return Task.CompletedTask;
     }
 
+    private async Task AddToStartTransfer(WithdrawOrderDto orderDto, bool isAElf)
+    {
+        if (isAElf)
+        {
+            var order = await OnToStartTransfer(orderDto);
+            await AddOrUpdateOrder(order.WithdrawOrder, order.ExtensionData);
+        }
+        else
+        {
+            await _withdrawQueryTimerGrain.AddToRequest(orderDto);
+        }
+    }
+    
+    private async Task AddToTransferring(WithdrawOrderDto orderDto, bool isAElf)
+    {
+        if (isAElf)
+        {
+            await AddToPendingList(orderDto);
+        }
+        else
+        {
+            await _withdrawQueryTimerGrain.AddToQuery(orderDto);
+        }
+    }
+
+    private async Task AddToPendingList(WithdrawOrderDto orderDto)
+    {
+        await _withdrawTimerGrain.AddToPendingList(orderDto.Id, new TimerTransaction
+        {
+            TxId = orderDto.ToTransfer.TxId,
+            TxTime = orderDto.ToTransfer.TxTime,
+            ChainId = orderDto.ToTransfer.ChainId,
+            TransferType = TransferTypeEnum.ToTransfer.ToString()
+        });
+    }
+
+    private async Task AddToRetryTx(WithdrawOrderDto orderDto)
+    {
+        var statusFlow = await _orderStatusFlowGrain.GetAsync();
+        var querySuccess = statusFlow?.Data != null;
+        var retryFrom = OrderStatusEnum.ToStartTransfer.ToString();
+        var maxRetry = _withdrawOptions.Value.ToTransferMaxRetry;
+        var maxRetryCountExceeded = querySuccess &&
+                                    ((OrderStatusFlowDto)statusFlow.Data).StatusFlow.Count(s =>
+                                        s.Status == retryFrom) >= maxRetry;
+        if (maxRetryCountExceeded)
+        {
+            orderDto.Status = OrderStatusEnum.Failed.ToString();
+            await AddOrUpdateOrder(orderDto);
+        }
+        else
+        {
+            await _withdrawOrderRetryTimerGrain.AddToPendingList(orderDto.Id, retryFrom);
+        }
+    }
+
     private async Task ReverseTokenLimitAsync(Guid orderId, string symbol, decimal amount)
     {
         var orderCreateTime = await GetOrderCreateTime(orderId);
@@ -127,7 +184,7 @@ public partial class UserWithdrawGrain
         var limitGrainId = ITokenWithdrawLimitGrain.GenerateGrainId(symbol, orderCreateTime);
         var tokenLimitGrain = GrainFactory.GetGrain<ITokenWithdrawLimitGrain>(limitGrainId);
         await tokenLimitGrain.Reverse(amount);
-        _logger.LogInformation("set token limit, orderId:{orderId}, grainId:{grainId}, amount:{amount}", orderId,
+        _logger.LogInformation("Set token limit, orderId:{orderId}, grainId:{grainId}, amount:{amount}", orderId,
             limitGrainId, -amount);
     }
     
