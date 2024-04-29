@@ -35,6 +35,7 @@ using Volo.Abp.Caching.StackExchangeRedis;
 using Volo.Abp.EventBus.RabbitMq;
 using Volo.Abp.Localization;
 using Volo.Abp.Modularity;
+using Volo.Abp.OpenIddict.Tokens;
 using Volo.Abp.Swashbuckle;
 using Volo.Abp.Threading;
 using Volo.Abp.VirtualFileSystem;
@@ -60,10 +61,13 @@ namespace ETransferServer
             Configure<AbpAutoMapperOptions>(options => { options.AddMaps<ETransferServerHttpApiHostModule>(); });
             var configuration = context.Services.GetConfiguration();
             var hostingEnvironment = context.Services.GetHostingEnvironment();
+            Configure<SignatureServiceOption>(configuration.GetSection("SignatureService"));
             Configure<ChainOptions>(configuration.GetSection("Chains"));
             Configure<TokenOptions>(configuration.GetSection("TokenOptions"));
             Configure<NetworkOptions>(configuration.GetSection("NetworkOptions"));
             Configure<WithdrawInfoOptions>(configuration.GetSection("WithdrawInfo"));
+            Configure<CoinGeckoOptions>(configuration.GetSection("CoinGecko"));
+            Configure<CoBoOptions>(configuration.GetSection("CoBo"));
 
             ConfigureConventionalControllers();
             // ConfigureAuthentication(context, configuration);
@@ -73,6 +77,7 @@ namespace ETransferServer
             ConfigureRedis(context, configuration, hostingEnvironment);
             ConfigureCors(context, configuration);
             ConfigureSwaggerServices(context, configuration);
+            ConfigureTokenCleanupService();
             ConfigureOrleans(context, configuration);
             ConfigureGraphQl(context, configuration);
             context.Services.AddAutoResponseWrapper();
@@ -215,6 +220,11 @@ namespace ETransferServer
                         .AllowCredentials();
                 });
             });
+        }
+
+        private void ConfigureTokenCleanupService()
+        {
+            Configure<TokenCleanupOptions>(x => x.IsCleanupEnabled = false);
         }
 
         private static void ConfigureOrleans(ServiceConfigurationContext context, IConfiguration configuration)

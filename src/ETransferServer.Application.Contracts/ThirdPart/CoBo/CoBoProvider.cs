@@ -17,14 +17,14 @@ public class CoBoProvider : ICoBoProvider, ISingletonDependency
 {
     private readonly IProxyCoBoClientProvider _proxyCoBoClientProvider;
     private readonly ILogger<CoBoProvider> _logger;
-    private readonly NetWorkReflectionOptions _options;
+    private readonly IOptionsSnapshot<NetWorkReflectionOptions> _options;
 
     public CoBoProvider(IProxyCoBoClientProvider proxyCoBoClientProvider, ILogger<CoBoProvider> logger,
         IOptionsSnapshot<NetWorkReflectionOptions> options)
     {
         _proxyCoBoClientProvider = proxyCoBoClientProvider;
         _logger = logger;
-        _options = options.Value;
+        _options = options;
     }
 
     public async Task<CoBoCoinDetailDto> GetCoinDetailAsync(string coin)
@@ -81,6 +81,15 @@ public class CoBoProvider : ICoBoProvider, ISingletonDependency
             coBoTransaction.Coin = GetResponseCoin(coBoTransaction.Coin);
         }
 
+        return result;
+    }
+
+    public async Task<CoBoTransactionDto> GetTransactionAsync(string id)
+    {
+        _logger.LogInformation("get transaction by id from cobo, id:{id}", id);
+        var url = $"{CoBoConstant.GetTransaction}?id={id}";
+        var result = await _proxyCoBoClientProvider.GetAsync<CoBoTransactionDto>(url);
+        result.Coin = GetResponseCoin(result.Coin);
         return result;
     }
 
@@ -160,22 +169,22 @@ public class CoBoProvider : ICoBoProvider, ISingletonDependency
 
     private string GetRequestCoin(string coin)
     {
-        if (_options == null || _options.ReflectionItems.IsNullOrEmpty())
+        if (_options == null || _options.Value.ReflectionItems.IsNullOrEmpty())
         {
             return coin;
         }
 
-        return _options.ReflectionItems.ContainsKey(coin) ? _options.ReflectionItems[coin] : coin;
+        return _options.Value.ReflectionItems.ContainsKey(coin) ? _options.Value.ReflectionItems[coin] : coin;
     }
 
-    private string GetResponseCoin(string coin)
+    public string GetResponseCoin(string coin)
     {
-        if (_options == null || _options.ReflectionItems.IsNullOrEmpty())
+        if (_options == null || _options.Value.ReflectionItems.IsNullOrEmpty())
         {
             return coin;
         }
 
-        var coinInfo = _options.ReflectionItems.FirstOrDefault(t => t.Value == coin);
+        var coinInfo = _options.Value.ReflectionItems.FirstOrDefault(t => t.Value == coin);
         return coinInfo.Key ?? coin;
     }
 }

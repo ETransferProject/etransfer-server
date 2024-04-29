@@ -32,6 +32,7 @@ public class ChainOptions
         public string BaseUrl { get; set; }
         public bool IsMainChain { get; set; }
         public decimal TransactionFee { get; set; } = 0.0041M;
+        public int EstimatedArrivalTime { get; set; } = 160;
         public Dictionary<string, string> ContractAddress { get; set; } = new();
     }
 }

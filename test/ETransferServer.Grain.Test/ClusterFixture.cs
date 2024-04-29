@@ -310,7 +310,7 @@ public class ClusterFixture : IDisposable, ISingletonDependency
         protected IServiceScopeFactory ServiceScopeFactory { get; }
 
         public DistributedCache(
-            IOptions<AbpDistributedCacheOptions> distributedCacheOption,
+            IOptionsSnapshot<AbpDistributedCacheOptions> distributedCacheOption,
             IDistributedCache cache,
             ICancellationTokenProvider cancellationTokenProvider,
             IDistributedCacheSerializer serializer,

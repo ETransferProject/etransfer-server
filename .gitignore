@@ -280,6 +280,7 @@ scripts/contract_csharp_plugin
 scripts/patcher
 *.c.cs
 *.g.cs
+*TempTest.cs
 
 #appsettings.json
 *.Development.json

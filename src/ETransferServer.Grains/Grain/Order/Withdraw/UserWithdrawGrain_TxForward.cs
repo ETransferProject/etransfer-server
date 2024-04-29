@@ -9,7 +9,6 @@ namespace ETransferServer.Grains.Grain.Order.Withdraw;
 
 public partial class UserWithdrawGrain
 {
-
     public async Task<WithdrawOrderDto> TransferForward(WithdrawOrderDto orderDto)
     {
         // verify transaction signature
@@ -38,8 +37,8 @@ public partial class UserWithdrawGrain
 
             var result = await _contractProvider.WaitTransactionResultAsync(orderDto.FromTransfer.ChainId,
                 orderDto.FromTransfer.TxId,
-                _chainOptions.CurrentValue.Contract.WaitSecondsAfterSend * 1000,
-                _chainOptions.CurrentValue.Contract.RetryDelaySeconds * 1000);
+                _chainOptions.Value.Contract.WaitSecondsAfterSend * 1000,
+                _chainOptions.Value.Contract.RetryDelaySeconds * 1000);
 
             switch (result.Status)
             {

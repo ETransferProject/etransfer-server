@@ -25,12 +25,12 @@ public static class BinanceApi
 
 public class BinanceProvider : IExchangeProvider
 {
-    private readonly IOptionsMonitor<ExchangeOptions> _exchangeOptions;
+    private readonly IOptionsSnapshot<ExchangeOptions> _exchangeOptions;
     private readonly IHttpProvider _httpProvider;
     private readonly IDistributedCache<string> _blockedCache;
     private readonly ILogger<BinanceProvider> _logger;
 
-    public BinanceProvider(IOptionsMonitor<ExchangeOptions> exchangeOptions, IHttpProvider httpProvider,
+    public BinanceProvider(IOptionsSnapshot<ExchangeOptions> exchangeOptions, IHttpProvider httpProvider,
         IDistributedCache<string> blocked, ILogger<BinanceProvider> logger)
     {
         _exchangeOptions = exchangeOptions;
@@ -42,7 +42,7 @@ public class BinanceProvider : IExchangeProvider
 
     public BinanceOptions BinanceOptions()
     {
-        return _exchangeOptions.CurrentValue.Binance;
+        return _exchangeOptions.Value.Binance;
     }
 
     public ExchangeProviderName Name()
@@ -52,6 +52,10 @@ public class BinanceProvider : IExchangeProvider
 
     public async Task<TokenExchangeDto> LatestAsync(string fromToken, string toToken)
     {
+        if (fromToken == toToken)
+        {
+            return TokenExchangeDto.One(fromToken, toToken, DateTime.UtcNow.ToUtcMilliSeconds());
+        }
         return await BlockDetectAsync(async () =>
         {
             var res = await _httpProvider.InvokeAsync<BinanceTickerPrice>(
@@ -69,9 +73,17 @@ public class BinanceProvider : IExchangeProvider
         });
     }
 
+    public async Task<List<TokenExchangeDto>> LatestAsync(List<string> fromSymbol, string toSymbol)
+    {
+        throw new NotSupportedException();
+    }
 
     public async Task<TokenExchangeDto> HistoryAsync(string fromToken, string toToken, long timestamp)
     {
+        if (fromToken == toToken)
+        {
+            return TokenExchangeDto.One(fromToken, toToken, timestamp);
+        }
         return await BlockDetectAsync(async () =>
         {
             var time = TimeHelper.GetDateTimeFromTimeStamp(timestamp)

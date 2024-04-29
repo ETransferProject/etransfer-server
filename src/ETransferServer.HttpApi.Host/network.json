@@ -1,7 +1,7 @@
 {
   "NetworkOptions": {
     "NetworkPattern": {
-      "^0x[a-fA-F0-9]{40}$": ["ETH", "BSC", "ARBITRUM", "MATIC", "OPTIMISM", "AVAXC"],
+      "^0x[a-fA-F0-9]{40}$": ["SETH", "ETH", "BSC", "ARBITRUM", "MATIC", "OPTIMISM", "AVAXC"],
       "^T[1-9A-HJ-NP-Za-km-z]{33}$": ["TRX"],
       "^[1-9A-HJ-NP-Za-km-z]{32,44}$": ["Solana"],
       "^addr1[a-fA-F0-9]{58,100}$": ["Cardano"],
@@ -24,7 +24,7 @@
         {
           "NetworkInfo": {
             "Network": "SETH",
-            "Name": "Ethereum (ERC20)",
+            "Name": "SEthereum (ERC20)",
             "MultiConfirm": "64 confirmations",
             "ConfirmationsWithdraw": "0",
             "MultiConfirmSeconds": 783,
@@ -35,6 +35,7 @@
             "Status": "Health"
           },
           "DepositInfo": {
+            "IsOpen": true,
             "MinDeposit": "0.01",
             "MultiConfirm": "64 confirmations",
             "MultiConfirmSeconds": 942,
@@ -45,8 +46,11 @@
             ]
           },
           "WithdrawInfo": {
+            "IsOpen": true,
             "MinWithdraw": "13",
             "WithdrawFee": 12.61,
+            "WithdrawLocalFee": 0.004,
+            "WithdrawLocalFeeUnit": "ETH",
             "WithdrawLimit24h": "100000",
             "MultiConfirmSeconds": 178,
             "Decimals": 6
@@ -74,6 +78,7 @@
             "Status": "Health"
           },
           "DepositInfo": {
+            "IsOpen": true,
             "MinDeposit": "0.01",
             "MultiConfirm": "64 confirmations",
             "MultiConfirmSeconds": 942,
@@ -84,8 +89,11 @@
             ]
           },
           "WithdrawInfo": {
+            "IsOpen": true,
             "MinWithdraw": "13",
             "WithdrawFee": 12.61,
+            "WithdrawLocalFee": 0.004,
+            "WithdrawLocalFeeUnit": "ETH",
             "WithdrawLimit24h": "100000",
             "MultiConfirmSeconds": 178,
             "Decimals": 6
@@ -113,6 +121,7 @@
             "Status": "Health"
           },
           "DepositInfo": {
+            "IsOpen": true,
             "MinDeposit": "0.01",
             "MultiConfirmSeconds": 244,
             "ContractAddress": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
@@ -122,8 +131,11 @@
             ]
           },
           "WithdrawInfo": {
+            "IsOpen": true,
             "MinWithdraw": "3",
             "WithdrawFee": 2.57,
+            "WithdrawLocalFee": 20,
+            "WithdrawLocalFeeUnit": "TRX",
             "WithdrawLimit24h": "100000",
             "MultiConfirmSeconds": 167,
             "Decimals": 6
@@ -151,6 +163,7 @@
             "Status": "Health"
           },
           "DepositInfo": {
+            "IsOpen": true,
             "MinDeposit": "0",
             "MultiConfirmSeconds": 208,
             "ContractAddress": "0x55d398326f99059ff775485246999027b3197955",
@@ -160,8 +173,11 @@
             ]
           },
           "WithdrawInfo": {
+            "IsOpen": true,
             "MinWithdraw": "1",
             "WithdrawFee": 0.47,
+            "WithdrawLocalFee": 0.001795,
+            "WithdrawLocalFeeUnit": "BSC",
             "WithdrawLimit24h": "100000",
             "MultiConfirmSeconds": 167,
             "Decimals": 18
@@ -189,6 +205,7 @@
             "Status": "Health"
           },
           "DepositInfo": {
+            "IsOpen": true,
             "MinDeposit": "0",
             "MultiConfirmSeconds": 186,
             "ContractAddress": "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9",
@@ -199,8 +216,11 @@
             ]
           },
           "WithdrawInfo": {
+            "IsOpen": true,
             "MinWithdraw": "1",
             "WithdrawFee": 1,
+            "WithdrawLocalFee": 0.0006,
+            "WithdrawLocalFeeUnit": "ETH",
             "WithdrawLimit24h": "100000",
             "MultiConfirmSeconds": 165,
             "Decimals": 6
@@ -228,6 +248,7 @@
             "Status": "Health"
           },
           "DepositInfo": {
+            "IsOpen": true,
             "MinDeposit": "0",
             "MultiConfirmSeconds": 161.4,
             "ContractAddress": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
@@ -237,8 +258,11 @@
             ]
           },
           "WithdrawInfo": {
+            "IsOpen": true,
             "MinWithdraw": "1",
             "WithdrawFee": 0.89,
+            "WithdrawLocalFee": 0.01,
+            "WithdrawLocalFeeUnit": "Solana",
             "WithdrawLimit24h": "100000",
             "MultiConfirmSeconds": 165,
             "Decimals": 6
@@ -266,6 +290,7 @@
             "Status": "Health"
           },
           "DepositInfo": {
+            "IsOpen": true,
             "MinDeposit": "0",
             "MultiConfirmSeconds": 418,
             "ContractAddress": "0xc2132D05D31c914a87C6611C10748AEb04B58e8F",
@@ -276,8 +301,11 @@
             ]
           },
           "WithdrawInfo": {
+            "IsOpen": true,
             "MinWithdraw": "1",
             "WithdrawFee": 0.66,
+            "WithdrawLocalFee": 0.6,
+            "WithdrawLocalFeeUnit": "MATIC",
             "WithdrawLimit24h": "100000",
             "MultiConfirmSeconds": 166,
             "Decimals": 6
@@ -305,6 +333,7 @@
             "Status": "Health"
           },
           "DepositInfo": {
+            "IsOpen": true,
             "MinDeposit": "0",
             "MultiConfirmSeconds": 362,
             "ContractAddress": "0x94b008aa00579c1307b0ef2c499ad98a8ce58e58",
@@ -315,8 +344,11 @@
             ]
           },
           "WithdrawInfo": {
+            "IsOpen": true,
             "MinWithdraw": "1",
             "WithdrawFee": 0.48,
+            "WithdrawLocalFee": 0.0001,
+            "WithdrawLocalFeeUnit": "ETH",
             "WithdrawLimit24h": "100000",
             "MultiConfirmSeconds": 166,
             "Decimals": 6
@@ -344,6 +376,7 @@
             "Status": "Health"
           },
           "DepositInfo": {
+            "IsOpen": true,
             "MinDeposit": "0.01",
             "MultiConfirmSeconds": 198.54,
             "ContractAddress": "0x9702230a8ea53601f5cd2dc00fdbc13d4df4a8c7",
@@ -353,10 +386,58 @@
             ]
           },
           "WithdrawInfo": {
+            "IsOpen": true,
             "MinWithdraw": "1",
             "WithdrawFee": 0.38,
+            "WithdrawLocalFee": 0.01,
+            "WithdrawLocalFeeUnit": "AVAXC",
             "WithdrawLimit24h": "100000",
             "MultiConfirmSeconds": 166,
+            "Decimals": 6
+          },
+          "SupportType": [
+            "Deposit",
+            "Withdraw"
+          ],
+          "SupportChain": [
+            "AELF",
+            "tDVV"
+          ]
+        }
+      ],
+      "SGR-1": [
+        {
+          "NetworkInfo": {
+            "Network": "ETH",
+            "Name": "Ethereum (ERC20)",
+            "MultiConfirm": "64 confirmations",
+            "ConfirmationsWithdraw": "0",
+            "MultiConfirmSeconds": 783,
+            "ContractAddress": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "BlockGenerationSeconds": 12,
+            "AveragePendingSeconds": 14,
+            "ExplorerUrl": "https://etherscan.io/address/0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "Status": "Health"
+          },
+          "DepositInfo": {
+            "IsOpen": true,
+            "MinDeposit": "0.01",
+            "MultiConfirm": "64 confirmations",
+            "MultiConfirmSeconds": 942,
+            "ContractAddress": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "ExtraNotes": [
+              "Deposits will be unlocked and available for withdrawal/other activities after 64 network confirmations.",
+              "To avoid potential losses, please don't deposit tokens other than SGR."
+            ]
+          },
+          "WithdrawInfo": {
+            "IsOpen": true,
+            "MinWithdraw": "13",
+            "WithdrawFee": 12.61,
+            "WithdrawLocalFee": 0.004,
+            "WithdrawLocalFeeUnit": "ETH",
+            "WithdrawLimit24h": "100000",
+            "MultiConfirmSeconds": 178,
             "Decimals": 6
           },
           "SupportType": [

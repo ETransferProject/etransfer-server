@@ -9,7 +9,9 @@ public interface ICoBoProvider
     Task<CoBoCoinDetailDto> GetCoinDetailAsync(string coin);
     Task<AccountDetailDto> GetAccountDetailAsync();
     Task<List<CoBoTransactionDto>> GetTransactionsByTimeExAsync(TransactionRequestDto input);
+    Task<CoBoTransactionDto> GetTransactionAsync(string id);
     Task<AddressesDto> GetAddressesAsync(string coin, int count, bool nativeSegwit = false);
     Task<string> WithdrawAsync(WithdrawRequestDto input);
     Task<WithdrawInfoDto> GetWithdrawInfoByRequestIdAsync(string requestId);
+    string GetResponseCoin(string coin);
 }

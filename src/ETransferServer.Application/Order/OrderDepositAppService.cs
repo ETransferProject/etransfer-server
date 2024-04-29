@@ -5,14 +5,15 @@ using System.Threading.Tasks;
 using AElf.Indexing.Elasticsearch;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans;
 using ETransferServer.Common;
 using ETransferServer.Deposit.Dtos;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Models;
+using ETransferServer.Network;
 using ETransferServer.Options;
 using ETransferServer.Orders;
 using ETransferServer.User;
+using Nest;
 using Volo.Abp;
 using Volo.Abp.Application.Services;
 using Volo.Abp.Auditing;
@@ -25,24 +26,26 @@ namespace ETransferServer.Order;
 [DisableAuditing]
 public class OrderDepositAppService : ApplicationService, IOrderDepositAppService
 {
-    private readonly INESTRepository<DepositOrder, Guid> _depositOrderIndexRepository;
+    private readonly INESTRepository<OrderIndex, Guid> _depositOrderIndexRepository;
     private readonly IObjectMapper _objectMapper;
     private readonly ILogger<OrderDepositAppService> _logger;
-    private readonly NetworkOptions _networkInfoOptions;
+    private readonly IOptionsSnapshot<NetworkOptions> _networkInfoOptions;
     private readonly IUserAddressService _userAddressService;
-    private readonly IClusterClient _clusterClient;
+    private readonly INetworkAppService _networkAppService;
 
-    public OrderDepositAppService(INESTRepository<DepositOrder, Guid> depositOrderIndexRepository,
+    public OrderDepositAppService(INESTRepository<OrderIndex, Guid> depositOrderIndexRepository,
         IObjectMapper objectMapper,
-        ILogger<OrderDepositAppService> logger, IOptionsSnapshot<NetworkOptions> networkInfoOptions,
-        IUserAddressService userAddressService, IClusterClient clusterClient)
+        ILogger<OrderDepositAppService> logger,
+        IOptionsSnapshot<NetworkOptions> networkInfoOptions,
+        IUserAddressService userAddressService,
+        INetworkAppService networkAppService)
     {
         _depositOrderIndexRepository = depositOrderIndexRepository;
-        _networkInfoOptions = networkInfoOptions.Value;
+        _networkInfoOptions = networkInfoOptions;
         _objectMapper = objectMapper;
         _logger = logger;
         _userAddressService = userAddressService;
-        _clusterClient = clusterClient;
+        _networkAppService = networkAppService;
     }
 
     public async Task<GetDepositInfoDto> GetDepositInfoAsync(GetDepositRequestDto request)
@@ -51,20 +54,13 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
         {
             AssertHelper.IsTrue(request.ChainId == ChainId.AELF || request.ChainId == ChainId.tDVV
                 || request.ChainId == ChainId.tDVW, "Param is invalid. Please refresh and try again.");
-
-            if (!_networkInfoOptions.NetworkMap.ContainsKey(request.Symbol))
-            {
-                throw new UserFriendlyException("Symbol is not exist. Please refresh and try again.");
-            }
+            AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.Symbol), 
+                "Symbol is not exist. Please refresh and try again.");
             
-            var networkConfigs = _networkInfoOptions.NetworkMap[request.Symbol];
+            var networkConfigs = _networkInfoOptions.Value.NetworkMap[request.Symbol];
             var depositInfo = networkConfigs.Where(n => n.NetworkInfo.Network == request.Network)
                 .Select(n => n.DepositInfo).FirstOrDefault();
-
-            if (depositInfo == null)
-            {
-                throw new UserFriendlyException("Network is not exist. Please refresh and try again.");
-            }
+            AssertHelper.IsTrue(depositInfo != null, "Network is not exist. Please refresh and try again.");
 
             var getUserDepositAddressInput = new GetUserDepositAddressInput()
             {
@@ -82,7 +78,19 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
                 MinAmount = depositInfo.MinDeposit,
                 ExtraNotes = depositInfo.ExtraNotes
             };
-
+            try
+            {
+                var avgExchange =
+                    await _networkAppService.GetAvgExchangeAsync(request.Symbol, CommonConstant.Symbol.USD);
+                getDepositInfoDto.DepositInfo.MinAmountUsd =
+                    (depositInfo.MinDeposit.SafeToDecimal() * avgExchange).ToString(
+                        DecimalHelper.GetDecimals(request.Symbol),
+                        DecimalHelper.RoundingOption.Ceiling);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "Get deposit avg exchange failed.");
+            }
 
             return getDepositInfoDto;
         }
@@ -99,7 +107,7 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
         try
         {
             await _depositOrderIndexRepository.BulkAddOrUpdateAsync(
-                _objectMapper.Map<List<DepositOrderDto>, List<DepositOrder>>(dtoList));
+                _objectMapper.Map<List<DepositOrderDto>, List<OrderIndex>>(dtoList));
         }
         catch (Exception ex)
         {
@@ -114,7 +122,7 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
     {
         try
         {
-            await _depositOrderIndexRepository.AddOrUpdateAsync(_objectMapper.Map<DepositOrderDto, DepositOrder>(dto));
+            await _depositOrderIndexRepository.AddOrUpdateAsync(_objectMapper.Map<DepositOrderDto, OrderIndex>(dto));
         }
         catch (Exception ex)
         {
@@ -123,5 +131,15 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
         }
 
         return true;
+    }
+    
+    public async Task<bool> ExistSync(DepositOrderDto dto)
+    {
+        var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+        mustQuery.Add(q => q.Term(i => i.Field(f => f.ThirdPartOrderId).Value(dto.ThirdPartOrderId)));
+
+        QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery));
+        var countResponse = await _depositOrderIndexRepository.CountAsync(Filter);
+        return countResponse.Count > 0;
     }
 }

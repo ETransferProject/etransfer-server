@@ -17,6 +17,7 @@ public class BaseOrderDto
     public long? LastModifyTime { get; set; }
     public long? CreateTime { get; set; }
     public long? ExpireTime { get; set; }
+    public long? ArrivalTime { get; set; }
     public string Status { get; set; }
     public Dictionary<string, string> ExtensionInfo { get; set; }
 }

@@ -32,6 +32,11 @@ public static class TimeHelper
         return (long)timeSpan.TotalMilliseconds;
     }
 
+    public static int GetHourDiff(DateTime startTime, DateTime endTime)
+    {
+        return (endTime - startTime).Hours;
+    }
+    
     public static string ToUtcString(this DateTime dateTime)
     {
         return dateTime.ToString("o");

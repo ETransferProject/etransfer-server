@@ -18,11 +18,11 @@ public interface IUserWithdrawTxTimerGrain : IBaseTxTimerGrain
 public class UserWithdrawTxTimerGrain : AbstractTxTimerGrain<WithdrawOrderDto>, IUserWithdrawTxTimerGrain
 {
     private readonly ILogger<UserWithdrawTxTimerGrain> _logger;
-    private readonly IOptionsMonitor<TimerOptions> _timerOptions;
+    private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
 
     public UserWithdrawTxTimerGrain(ILogger<UserWithdrawTxTimerGrain> logger,
-        IContractProvider contractProvider, IOptionsMonitor<ChainOptions> chainOptions,
-        IOptionsMonitor<TimerOptions> timerOptions, ITokenTransferProvider transferProvider) : base(logger,
+        IContractProvider contractProvider, IOptionsSnapshot<ChainOptions> chainOptions,
+        IOptionsSnapshot<TimerOptions> timerOptions, ITokenTransferProvider transferProvider) : base(logger,
         contractProvider, chainOptions, timerOptions, transferProvider)
     {
         _logger = logger;
@@ -31,13 +31,13 @@ public class UserWithdrawTxTimerGrain : AbstractTxTimerGrain<WithdrawOrderDto>, 
 
     public override async Task OnActivateAsync()
     {
-        _logger.LogDebug("UserDepositTxTimerGrain {Id} Activate", this.GetPrimaryKey().ToString());
+        _logger.LogDebug("UserWithdrawTxTimerGrain {Id} Activate", this.GetPrimaryKey().ToString());
         await base.OnActivateAsync();
 
-        _logger.LogDebug("UserDepositTxTimerGrain StartTimer {StartTime}", DateTime.UtcNow.ToUtc8String());
+        _logger.LogDebug("UserWithdrawTxTimerGrain StartTimer {StartTime}", DateTime.UtcNow.ToUtc8String());
         RegisterTimer(TimerCallback, State,
-            TimeSpan.FromSeconds(_timerOptions.CurrentValue.WithdrawFromTimer.DelaySeconds),
-            TimeSpan.FromSeconds(_timerOptions.CurrentValue.WithdrawFromTimer.PeriodSeconds));
+            TimeSpan.FromSeconds(_timerOptions.Value.WithdrawFromTimer.DelaySeconds),
+            TimeSpan.FromSeconds(_timerOptions.Value.WithdrawFromTimer.PeriodSeconds));
     }
 
     internal override async Task SaveOrder(WithdrawOrderDto order, Dictionary<string, string> externalInfo)

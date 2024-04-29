@@ -59,10 +59,10 @@ public class ContractProvider : IContractProvider, ISingletonDependency
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, string>> _contractAddress = new();
     private readonly SignatureProvider _signatureProvider;
 
-    private readonly IOptionsMonitor<ChainOptions> _chainOption;
+    private readonly IOptionsSnapshot<ChainOptions> _chainOption;
     private readonly ILogger<ContractProvider> _logger;
 
-    public ContractProvider(IOptionsMonitor<ChainOptions> chainOption, ILogger<ContractProvider> logger,
+    public ContractProvider(IOptionsSnapshot<ChainOptions> chainOption, ILogger<ContractProvider> logger,
         SignatureProvider signatureProvider)
     {
         _logger = logger;
@@ -76,12 +76,12 @@ public class ContractProvider : IContractProvider, ISingletonDependency
 
     private void InitAElfClient()
     {
-        if (_chainOption.CurrentValue.ChainInfos.IsNullOrEmpty())
+        if (_chainOption.Value.ChainInfos.IsNullOrEmpty())
         {
             return;
         }
 
-        foreach (var node in _chainOption.CurrentValue.ChainInfos)
+        foreach (var node in _chainOption.Value.ChainInfos)
         {
             _clients[node.Key] = new AElfClient(node.Value.BaseUrl);
             _logger.LogInformation("init AElfClient: {ChainId}, {Node}", node.Key, node.Value.BaseUrl);
@@ -98,7 +98,7 @@ public class ContractProvider : IContractProvider, ISingletonDependency
     {
         var contractAddress = _contractAddress.GetOrAdd(chainId, _ => new ConcurrentDictionary<string, string>());
         var addressResult = contractAddress.GetOrAdd<string, string>(contractName, name => new Lazy<string>(() => {
-            var chainInfoExists = _chainOption.CurrentValue.ChainInfos.TryGetValue(chainId, out var chainInfo);
+            var chainInfoExists = _chainOption.Value.ChainInfos.TryGetValue(chainId, out var chainInfo);
             AssertHelper.IsTrue(chainInfoExists, "ChainId {ChainId} not exists in option");
             var address = chainInfo?.ContractAddress.GetValueOrDefault(contractName, CommonConstant.EmptyString);
             if (address.IsNullOrEmpty() && SystemContractName.All.Contains(name))
@@ -247,9 +247,8 @@ public class ContractProvider : IContractProvider, ISingletonDependency
 
                 rawTxResult = await QueryTransactionResultAsync(chainId, transactionId);
                 _logger.LogDebug(
-                    "WaitTransactionResultAsync chainId={ChainId}, transactionId={TransactionId}, status={Status}",
-                    chainId,
-                    transactionId, rawTxResult.Status);
+                    "WaitTransactionResultAsync chainId={ChainId}, transactionId={TransactionId}, status={Status}" +
+                    ", error={Error}", chainId, transactionId, rawTxResult.Status, rawTxResult.Error);
             }
         }
         catch (Exception e)

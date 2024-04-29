@@ -38,6 +38,11 @@ public static class AssertHelper
         IsTrue(guid != Guid.Empty, reason, args);
     }
     
+    public static void NotEmpty([CanBeNull] string str, int code, [ItemCanBeNull] params object[] args)
+    {
+        IsTrue(!str.IsNullOrEmpty(), code, ErrorResult.GetMessage(code), args);
+    }
+    
     public static void IsEmpty<T>([CanBeNull] IEnumerable<T> collection, [CanBeNull] string reason, [ItemCanBeNull] params object[] args)
     {
         IsTrue(collection.IsNullOrEmpty(), reason, args);
@@ -46,6 +51,11 @@ public static class AssertHelper
     public static void NotEmpty<T>([CanBeNull] IEnumerable<T> collection, [CanBeNull] string reason, [ItemCanBeNull] params object[] args)
     {
         IsTrue(!collection.IsNullOrEmpty(), reason, args);
+    }
+    
+    public static void NotEmpty<T>([CanBeNull] IEnumerable<T> collection,int code, [ItemCanBeNull] params object[] args)
+    {
+        IsTrue(!collection.IsNullOrEmpty(), code, ErrorResult.GetMessage(code), args);
     }
 
     public static void IsNull(object obj, [CanBeNull] string reason, [ItemCanBeNull] params object[] args)
@@ -57,12 +67,17 @@ public static class AssertHelper
     {
         IsTrue(obj != null, reason, args);
     }
+    
+    public static void NotNull(object obj, int code, [ItemCanBeNull] params object[] args)
+    {
+        IsTrue(obj != null, code, ErrorResult.GetMessage(code), args);
+    }
 
     public static void IsTrue(bool expression, int code = DefaultErrorCode, [CanBeNull] string reason = DefaultErrorReason, [ItemCanBeNull] params object[] args)
     {
         if (!expression)
         {
-            throw new UserFriendlyException(Format(reason, args), code.ToString());
+            throw new UserFriendlyException(Format(code != DefaultErrorCode  ? ErrorResult.GetMessage(code) : reason, args), code.ToString());
         }
     }
     

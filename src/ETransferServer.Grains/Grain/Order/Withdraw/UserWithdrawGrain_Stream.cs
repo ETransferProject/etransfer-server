@@ -50,6 +50,7 @@ public partial class UserWithdrawGrain
             // After the multiple confirmation of the transaction is successful,
             // call the three-party service to transfer the currency to the user's address.
             case OrderStatusEnum.FromTransferConfirmed:
+                await AddCheckOrder(orderDto);
                 orderDto.Status = OrderStatusEnum.ToStartTransfer.ToString();
                 await AddOrUpdateOrder(orderDto);
                 break;
@@ -79,7 +80,7 @@ public partial class UserWithdrawGrain
                 _logger.LogError("Order {Id} ToTransferFailed, invalid status, current status={Status}",
                     this.GetPrimaryKey(),
                     status.ToString());
-                await ReverseTokenLimitAsync(orderDto.Id.ToString(), orderDto.ToTransfer.Symbol, orderDto.FromTransfer.Amount);
+                await ReverseTokenLimitAsync(orderDto.Id, orderDto.ToTransfer.Symbol, orderDto.AmountUsd);
                 break;
             
             // To completed stream
@@ -91,7 +92,7 @@ public partial class UserWithdrawGrain
             case OrderStatusEnum.Failed:
                 _logger.LogInformation("Order {Id} stream end, current status={Status}", this.GetPrimaryKey(),
                     status.ToString());
-                await ReverseTokenLimitAsync(orderDto.Id.ToString(), orderDto.ToTransfer.Symbol, orderDto.FromTransfer.Amount);
+                await ReverseTokenLimitAsync(orderDto.Id, orderDto.ToTransfer.Symbol, orderDto.AmountUsd);
                 break;
 
             // Invalid status
@@ -115,12 +116,30 @@ public partial class UserWithdrawGrain
         return Task.CompletedTask;
     }
 
-    private async Task ReverseTokenLimitAsync(string orderId, string symbol, decimal amount)
+    private async Task ReverseTokenLimitAsync(Guid orderId, string symbol, decimal amount)
     {
-        var limitGrainId = ITokenWithdrawLimitGrain.GenerateGrainId(symbol);
+        var orderCreateTime = await GetOrderCreateTime(orderId);
+        if (orderCreateTime == 0)
+        {
+            _logger.LogInformation("Withdraw createTime is null, orderId:{OrderId}", orderId);
+            return;
+        }
+        var limitGrainId = ITokenWithdrawLimitGrain.GenerateGrainId(symbol, orderCreateTime);
         var tokenLimitGrain = GrainFactory.GetGrain<ITokenWithdrawLimitGrain>(limitGrainId);
         await tokenLimitGrain.Reverse(amount);
         _logger.LogInformation("set token limit, orderId:{orderId}, grainId:{grainId}, amount:{amount}", orderId,
             limitGrainId, -amount);
+    }
+    
+    private async Task<long> GetOrderCreateTime(Guid orderId)
+    {
+        var recordGrain = GrainFactory.GetGrain<IUserWithdrawRecordGrain>(orderId);
+        var res = await recordGrain.GetAsync();
+        if (!res.Success)
+        {
+            _logger.LogWarning("Withdraw order {OrderId} not found when revert token limit", orderId);
+            return 0;
+        }
+        return (res.Data as WithdrawOrderDto)?.CreateTime ?? 0;
     }
 }

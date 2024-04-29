@@ -85,9 +85,9 @@ public class UserAddressServiceTest : ETransferServerApplicationTestBase
         addressDto.ShouldBeNull();
         var list1 = await _userAddressService.GetRemainingAddressListAsync();
         list1.Count.ShouldBe(2);
-        var address = await _userAddressService.GetUnAssignedAddressAsync("Test2");
+        var address = await _userAddressService.GetAssignedAddressAsync("Test2");
         address.ChainId.ShouldBe("AELF");
-        address = await _userAddressService.GetUnAssignedAddressAsync("");
+        address = await _userAddressService.GetAssignedAddressAsync("");
         address.ShouldBeNull();
         var inputList = new List<string>();
         var list2 = await _userAddressService.GetAddressListAsync(inputList);

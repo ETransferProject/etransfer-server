@@ -20,4 +20,7 @@ public class WithdrawInfoDto
     public string AelfTransactionFee { get; set; }
     public string AelfTransactionUnit { get; set; }
     public string ExpiredTimestamp { get; set; }
+    public string AmountUsd { get; set; }
+    public string ReceiveAmountUsd { get; set; }
+    public string FeeUsd { get; set; }
 }

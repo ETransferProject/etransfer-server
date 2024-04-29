@@ -68,6 +68,11 @@ public static class StringHelper
         return long.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var result) ? result : defaultValue;
     }
     
+    public static bool SafeToBool(this string s, bool defaultValue = false)
+    {
+        return bool.TryParse(s, out var result) ? result : defaultValue;
+    }
+    
     /// replace all {param.key} in string
     public static string ReplaceWithDict(this string input, Dictionary<string, string> replacements, bool throwErrorIfNotFound = true, string defaultValue = "")
     {

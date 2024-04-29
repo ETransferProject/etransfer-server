@@ -3,7 +3,16 @@ namespace ETransferServer.Grains.Options;
 public class TimerOptions
 {
     public TimerOption WatchDogReminder { get; set; } = new(60);
-    
+    public TimerOption OrderStatusReminder { get; set; } = new()
+    {
+        PeriodSeconds = 60,
+        DelaySeconds = 60 * 60
+    };
+    public TimerOption DepositOrderStatusReminder { get; set; } = new()
+    {
+        PeriodSeconds = 60,
+        DelaySeconds = 60 * 10
+    };
     public TimerOption DepositTimer { get; set; } = new();
     public TimerOption WithdrawFromTimer { get; set; } = new();
     public TimerOption CoBoDepositQueryTimer { get; set; } = new(60);

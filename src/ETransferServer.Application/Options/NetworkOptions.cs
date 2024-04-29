@@ -35,6 +35,7 @@ public class NetworkInfo
 
 public class DepositInfo
 {
+    public bool IsOpen { get; set; } = true;
     public string MinDeposit { get; set; }
     public string MaxDeposit { get; set; }
     public string MultiConfirm { get; set; }
@@ -45,8 +46,11 @@ public class DepositInfo
 
 public class WithdrawInfo
 {
+    public bool IsOpen { get; set; } = true;
     public string MinWithdraw { get; set; }
     public decimal WithdrawFee { get; set; }
+    public decimal WithdrawLocalFee { get; set; }
+    public string WithdrawLocalFeeUnit { get; set; }
     public string WithdrawLimit24h { get; set; }
     public decimal MultiConfirmSeconds { get; set; }
     public int Decimals { get; set; }

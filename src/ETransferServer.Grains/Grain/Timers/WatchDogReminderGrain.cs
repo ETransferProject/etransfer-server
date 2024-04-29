@@ -20,11 +20,11 @@ public class WatchDogReminderGrain : Orleans.Grain, IWatchDogReminderGrain, IRem
     private readonly ILogger<WatchDogReminderGrain> _logger;
     private readonly IReminderRegistry _reminderRegistry;
     private IGrainReminder _reminder;
-    private readonly IOptionsMonitor<TimerOptions> _timerOptions;
+    private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
 
 
     public WatchDogReminderGrain(IReminderRegistry reminderRegistry, ILogger<WatchDogReminderGrain> logger,
-        IOptionsMonitor<TimerOptions> timerOptions)
+        IOptionsSnapshot<TimerOptions> timerOptions)
     {
         _reminderRegistry = reminderRegistry;
         _logger = logger;
@@ -35,12 +35,12 @@ public class WatchDogReminderGrain : Orleans.Grain, IWatchDogReminderGrain, IRem
     public async Task StartReminder()
     {
         _logger.LogDebug("Startup dueTimeSec={Due}, periodSec={Per}",
-            _timerOptions.CurrentValue.WatchDogReminder.DelaySeconds,
-            _timerOptions.CurrentValue.WatchDogReminder.PeriodSeconds);
+            _timerOptions.Value.WatchDogReminder.DelaySeconds,
+            _timerOptions.Value.WatchDogReminder.PeriodSeconds);
         _reminder = await _reminderRegistry.RegisterOrUpdateReminder(
             reminderName: nameof(WatchDogReminderGrain),
-            dueTime: TimeSpan.FromSeconds(_timerOptions.CurrentValue.WatchDogReminder.DelaySeconds),
-            period: TimeSpan.FromSeconds(_timerOptions.CurrentValue.WatchDogReminder.PeriodSeconds));
+            dueTime: TimeSpan.FromSeconds(_timerOptions.Value.WatchDogReminder.DelaySeconds),
+            period: TimeSpan.FromSeconds(_timerOptions.Value.WatchDogReminder.PeriodSeconds));
     }
 
     public Task ReceiveReminder(string reminderName, TickStatus status)

@@ -18,14 +18,14 @@ namespace ETransferServer.token;
 public class TokenAppService : ETransferServerAppService, ITokenAppService
 {
     private readonly ILogger<TokenAppService> _logger;
-    private readonly TokenOptions _tokenOptions;
+    private readonly IOptionsSnapshot<TokenOptions> _tokenOptions;
     private readonly IObjectMapper _objectMapper;
 
-    public TokenAppService(ILogger<TokenAppService> logger, IOptions<TokenOptions> tokenOptions,
+    public TokenAppService(ILogger<TokenAppService> logger, IOptionsSnapshot<TokenOptions> tokenOptions,
         IObjectMapper objectMapper)
     {
         _logger = logger;
-        _tokenOptions = tokenOptions.Value;
+        _tokenOptions = tokenOptions;
         _objectMapper = objectMapper;
     }
 
@@ -45,11 +45,11 @@ public class TokenAppService : ETransferServerAppService, ITokenAppService
             var configs = new List<TokenConfig>();
             if (request.Type == OrderTypeEnum.Deposit.ToString())
             {
-                configs = _tokenOptions.Deposit[request.ChainId];
+                configs = _tokenOptions.Value.Deposit[request.ChainId];
             }
             else
             {
-                configs = _tokenOptions.Withdraw[request.ChainId];
+                configs = _tokenOptions.Value.Withdraw[request.ChainId];
             }
 
             var tokenDtos = _objectMapper.Map<List<TokenConfig>, List<TokenConfigDto>>(configs);

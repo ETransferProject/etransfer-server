@@ -2,7 +2,7 @@ namespace ETransferServer.Common;
 
 public static class CommonConstant
 {
-
+    public const string Space = " ";
     public const string EmptyString = "";
     public const string Dot = ".";
     public const string Hyphen = "-";
@@ -15,7 +15,9 @@ public static class CommonConstant
     public const string WithdrawThirdPartErrorKey = "WithdrawThirdPartError";
     public const string SignatureClientName = "Signature";
     public const string ThirdPartSignUrl = "/api/app/signature/thirdPart";
-
+    public const string SuccessStatus = "success";
+    public const string Withdraw = "withdraw";
+    public const string Deposit = "deposit";
     
     public static class ChainId
     {
@@ -28,10 +30,17 @@ public static class CommonConstant
         public const string AElf = "AELF";
         public const string ETH = "ETH";
     }
+    
+    public static class NetworkStatus
+    {
+        public const string Health = "Health";
+        public const string Offline = "Offline";
+    }
 
     public static class Symbol
     {
         public const string Elf = "ELF";
+        public const string USD = "USD";
         public const string USDT = "USDT";
         
     }

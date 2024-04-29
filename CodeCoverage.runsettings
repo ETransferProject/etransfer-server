@@ -29,6 +29,7 @@
           ,**/src/ETransferServer.Application/User/UserAddressOptions.cs
           ,**/src/ETransferServer.Application/User/UserAppService.cs
           ,**/src/ETransferServer.Application/Order/OrderWithdrawAppService.cs
+          ,**/src/ETransferServer.Application/Network/NetworkAppService.cs
           </ExcludeByFile>
           <ExcludeByAttribute>Obsolete,GeneratedCodeAttribute</ExcludeByAttribute>
           <SingleHit>false</SingleHit>

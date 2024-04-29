@@ -54,9 +54,12 @@ public class ETransferServerOrleansSiloModule : AbpModule
         context.Services.AddTransient<IUserWithdrawProvider, UserWithdrawProvider>();
 
         context.Services.AddTransient<INotifyProvider, FeiShuRobotNotifyProvider>();
+        
         context.Services.AddTransient<IExchangeProvider, OkxProvider>();
         context.Services.AddTransient<IExchangeProvider, BinanceProvider>();
         context.Services.AddTransient<IExchangeProvider, CoinGeckoProvider>();
+        context.Services.AddTransient<IExchangeProvider, GateIoProvider>();
+        context.Services.AddTransient<IExchangeProvider, UniswapV3Provider>();
 
         ConfigureGraphQl(context, configuration);
     } 

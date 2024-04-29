@@ -20,10 +20,10 @@ public static class OkxApi
 
 public class OkxProvider : IExchangeProvider
 {
-    private readonly IOptionsMonitor<ExchangeOptions> _exchangeOptions;
+    private readonly IOptionsSnapshot<ExchangeOptions> _exchangeOptions;
     private readonly IHttpProvider _httpProvider;
 
-    public OkxProvider(IOptionsMonitor<ExchangeOptions> exchangeOptions, IHttpProvider httpProvider)
+    public OkxProvider(IOptionsSnapshot<ExchangeOptions> exchangeOptions, IHttpProvider httpProvider)
     {
         _exchangeOptions = exchangeOptions;
         _httpProvider = httpProvider;
@@ -31,7 +31,7 @@ public class OkxProvider : IExchangeProvider
 
     public string BaseUrl()
     {
-        return _exchangeOptions.CurrentValue.Okx.BaseUrl;
+        return _exchangeOptions.Value.Okx.BaseUrl;
     }
 
 
@@ -42,6 +42,11 @@ public class OkxProvider : IExchangeProvider
 
     public async Task<TokenExchangeDto> LatestAsync(string fromSymbol, string toSymbol)
     {
+        if (fromSymbol == toSymbol)
+        {
+            return TokenExchangeDto.One(fromSymbol, toSymbol, DateTime.UtcNow.ToUtcMilliSeconds());
+        }
+
         // The first k-line after one minute of inquiry returns the latest price.
         var req = new OkxKLineReq()
         {
@@ -72,8 +77,18 @@ public class OkxProvider : IExchangeProvider
         };
     }
 
+    public async Task<List<TokenExchangeDto>> LatestAsync(List<string> fromSymbol, string toSymbol)
+    {
+        throw new NotSupportedException();
+    }
+
     public async Task<TokenExchangeDto> HistoryAsync(string fromSymbol, string toSymbol, long timestamp)
     {
+        if (fromSymbol == toSymbol)
+        {
+            return TokenExchangeDto.One(fromSymbol, toSymbol, timestamp);
+        }
+        
         // The first k-line after one minute of inquiry returns the latest price.
         var req = new OkxKLineReq()
         {

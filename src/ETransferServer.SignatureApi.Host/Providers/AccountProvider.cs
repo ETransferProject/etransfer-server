@@ -19,11 +19,11 @@ public class AccountProvider : ISingletonDependency
 {
     private readonly ILogger<AccountProvider> _logger;
     private readonly Dictionary<string, AccountHolder> _accountHolders = new();
-    private readonly IOptions<KeyStoreOptions> _keyStoreOptions;
-    private readonly IOptions<KeyPairInfoOptions> _keyPairInfoOptions;
+    private readonly IOptionsSnapshot<KeyStoreOptions> _keyStoreOptions;
+    private readonly IOptionsSnapshot<KeyPairInfoOptions> _keyPairInfoOptions;
     private static readonly KeyStoreService KeyStoreService = new();
 
-    public AccountProvider(IOptions<KeyStoreOptions> keyStoreOptions, IOptions<KeyPairInfoOptions> keyPairInfoOptions,
+    public AccountProvider(IOptionsSnapshot<KeyStoreOptions> keyStoreOptions, IOptionsSnapshot<KeyPairInfoOptions> keyPairInfoOptions,
         ILogger<AccountProvider> logger)
     {
         _keyStoreOptions = keyStoreOptions;

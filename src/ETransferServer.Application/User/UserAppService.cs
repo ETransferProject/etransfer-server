@@ -24,7 +24,7 @@ public class UserAppService : ApplicationService, IUserAppService
         _userIndexRepository = userIndexRepository;
     }
 
-    public async Task CreateUserAsync(UserDto user)
+    public async Task AddOrUpdateUserAsync(UserDto user)
     {
         try
         {

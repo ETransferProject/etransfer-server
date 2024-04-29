@@ -17,10 +17,10 @@ public interface IDepositOrderRetryTimerGrain: IGrainWithGuidKey
 public class DepositOrderRetryTimerGrain : AbstractOrderRetryTimerGrain<DepositOrderDto>, IDepositOrderRetryTimerGrain
 {
     private readonly ILogger<DepositOrderRetryTimerGrain> _logger;
-    private readonly IOptionsMonitor<TimerOptions> _timerOptions;
+    private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
 
 
-    public DepositOrderRetryTimerGrain(ILogger<DepositOrderRetryTimerGrain> logger, IOptionsMonitor<TimerOptions> timerOptions) : base(logger)
+    public DepositOrderRetryTimerGrain(ILogger<DepositOrderRetryTimerGrain> logger, IOptionsSnapshot<TimerOptions> timerOptions) : base(logger)
     {
         _logger = logger;
         _timerOptions = timerOptions;
@@ -28,13 +28,13 @@ public class DepositOrderRetryTimerGrain : AbstractOrderRetryTimerGrain<DepositO
 
     public override async Task OnActivateAsync()
     {
-        _logger.LogDebug("CoBoDepositQueryTimerGrain {Id} Activate", this.GetPrimaryKey().ToString());
+        _logger.LogDebug("DepositOrderRetryTimerGrain {Id} Activate", this.GetPrimaryKey().ToString());
 
         await base.OnActivateAsync();
 
         RegisterTimer(TimerCallBack, State,
-            TimeSpan.FromSeconds(_timerOptions.CurrentValue.DepositRetryTimer.DelaySeconds), 
-            TimeSpan.FromSeconds(_timerOptions.CurrentValue.DepositRetryTimer.PeriodSeconds));
+            TimeSpan.FromSeconds(_timerOptions.Value.DepositRetryTimer.DelaySeconds), 
+            TimeSpan.FromSeconds(_timerOptions.Value.DepositRetryTimer.PeriodSeconds));
     }
 
     protected override async Task SaveOrder(DepositOrderDto order, Dictionary<string, string> externalInfo)
