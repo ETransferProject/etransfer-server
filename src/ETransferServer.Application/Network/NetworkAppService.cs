@@ -52,19 +52,13 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
         {
             var getNetworkListDto = await GetNetworkListWithLocalFeeAsync(request);
             if (request.Type == OrderTypeEnum.Deposit.ToString()) return getNetworkListDto;
-            
-            var json = JsonConvert.SerializeObject(getNetworkListDto, Formatting.Indented);
-            _logger.LogInformation("json from config: " + json);
-            
+
             // fill withdraw fee
             foreach (var networkDto in getNetworkListDto.NetworkList)
             {
                 networkDto.WithdrawFee = await GetCacheFeeAsync(networkDto.Network, request.Symbol) ??
                                          networkDto.WithdrawFee;
             }
-            
-            json = JsonConvert.SerializeObject(getNetworkListDto, Formatting.Indented);
-            _logger.LogInformation("json after cache: " + json);
 
             try
             {
@@ -83,10 +77,7 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
             }
             
             getNetworkListDto = FilterByChainId(getNetworkListDto, request.ChainId);
-            
-            json = JsonConvert.SerializeObject(getNetworkListDto, Formatting.Indented);
-            _logger.LogInformation("json before return: " + json);
-            
+
             return getNetworkListDto;
         }
         catch (UserFriendlyException e)
