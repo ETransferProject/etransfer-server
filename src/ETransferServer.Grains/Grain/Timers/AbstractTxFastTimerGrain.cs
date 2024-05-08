@@ -154,8 +154,8 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> 
             {
                 _logger.LogDebug("TxFastTimer use node result orderId={OrderId}, chainId={ChainId}, txId={TxId}", orderId,
                     pendingTx.ChainId, pendingTx.TxId);
-                await HandleOrderTransaction(order, pendingTx, chainStatusDict[pendingTx.ChainId]);
-                await AddToPendingList(order, pendingTx);
+                var status = await HandleOrderTransaction(order, pendingTx, chainStatusDict[pendingTx.ChainId]);
+                await AddToPendingList(order, pendingTx, status);
                 result[orderId] = true;
                 continue;
             }
@@ -164,7 +164,9 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> 
                 pendingTx.ChainId, pendingTx.TxId);
             // When the transaction is just sent to the node,
             // the query may appear NotExisted status immediately, so this is to skip this period of time
-            if (order.ToTransfer.TxTime > DateTime.UtcNow.AddSeconds(2).ToUtcMilliSeconds())
+            var isToTransfer = pendingTx.TransferType == TransferTypeEnum.ToTransfer.ToString();
+            var transferInfo = isToTransfer ? order.ToTransfer : order.FromTransfer;
+            if (transferInfo.TxTime > DateTime.UtcNow.AddSeconds(2).ToUtcMilliSeconds())
             {
                 result[orderId] = false;
                 continue;
@@ -200,13 +202,14 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> 
             await SaveOrder(order, ExtensionBuilder.New()
                 .Add(ExtensionKey.TransactionStatus, transfer.Status)
                 .Build());
+            await AddToPendingList(order, pendingTx, true);
             result[orderId] = true;
         }
 
         return result;
     }
 
-    private async Task AddToPendingList(TOrder order, TimerTransaction pendingTx)
+    private async Task AddToPendingList(TOrder order, TimerTransaction pendingTx, bool status)
     {
         try
         {
@@ -221,7 +224,7 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> 
                 TxTime = transferInfo.TxTime,
                 ChainId = transferInfo.ChainId,
                 TransferType = pendingTx.TransferType,
-                IsForward = false
+                IsForward = !status
             });
         }
         catch (Exception e)
@@ -423,8 +426,8 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> 
             ? order.ToTransfer.Symbol
             : order.FromTransfer.Symbol;
         var thresholdExists = _withdrawOptions.Value.Homogeneous.TryGetValue(symbol, out var threshold);
-        AssertHelper.IsTrue(thresholdExists, "Homogeneous chainId {} not found", pendingTx.ChainId);
-        AssertHelper.NotNull(threshold, "Homogeneous threshold not fount, chainId:{}", pendingTx.ChainId);
+        AssertHelper.IsTrue(thresholdExists, "Homogeneous symbol {} not found", symbol);
+        AssertHelper.NotNull(threshold, "Homogeneous threshold not fount, symbol:{}", symbol);
 
         var amountThreshold = threshold.AmountThreshold;
         var blockHeightUpperThreshold = threshold.BlockHeightUpperThreshold;

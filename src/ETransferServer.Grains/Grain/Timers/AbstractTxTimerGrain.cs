@@ -180,7 +180,9 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
                 pendingTx.ChainId, pendingTx.TxId);
             // When the transaction is just sent to the node,
             // the query may appear NotExisted status immediately, so this is to skip this period of time
-            if (order.ToTransfer.TxTime > DateTime.UtcNow.AddSeconds(5).ToUtcMilliSeconds())
+            var isToTransfer = pendingTx.TransferType == TransferTypeEnum.ToTransfer.ToString();
+            var transferInfo = isToTransfer ? order.ToTransfer : order.FromTransfer;
+            if (transferInfo.TxTime > DateTime.UtcNow.AddSeconds(5).ToUtcMilliSeconds())
             {
                 result[orderId] = false;
                 continue;
