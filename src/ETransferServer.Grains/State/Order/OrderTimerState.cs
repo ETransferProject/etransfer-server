@@ -1,5 +1,3 @@
-using System.Collections.Concurrent;
-
 namespace ETransferServer.Grains.State.Order;
 
 public class OrderTimerState
@@ -16,6 +14,7 @@ public class TimerTransaction
     public string TxId { get; set; }
     public long? TxTime { get; set; }
     public string TransferType { get; set; }
+    public bool IsForward { get; set; } = true;
 }
 
 public enum TransferTypeEnum

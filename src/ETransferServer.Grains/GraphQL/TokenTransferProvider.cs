@@ -1,8 +1,6 @@
-using System.Reflection;
 using GraphQL;
 using Microsoft.Extensions.Logging;
 using ETransferServer.Common;
-using ETransferServer.Common.Dtos;
 using ETransferServer.Dtos.GraphQL;
 using ETransferServer.Samples.GraphQL;
 using Volo.Abp.Application.Dtos;
@@ -12,11 +10,10 @@ namespace ETransferServer.Grains.GraphQL;
 
 public interface ITokenTransferProvider
 {
-
-    Task<LatestBlockDto> GetLatestBlock(string chainId);
-    Task<PagedResultDto<TransferDto>> GetTokenTransferInfoByTxIds(List<string> txIds);
-    Task<PagedResultDto<TransferDto>> GetTokenTransferInfoByBlockHeight(int startHeight, int endHeight, int pageSize, int skipCount);
-    
+    Task<long> GetIndexBlockHeightAsync(string chainId);
+    Task<LatestBlockDto> GetLatestBlockAsync(string chainId);
+    Task<PagedResultDto<TransferDto>> GetTokenTransferInfoByTxIdsAsync(List<string> txIds, long endHeight);
+    Task<PagedResultDto<TransferDto>> GetTokenTransferInfoByBlockHeightAsync(int startHeight, int endHeight, int pageSize, int skipCount);
 }
 
 public class TokenTransferProvider : ITokenTransferProvider, ISingletonDependency
@@ -29,8 +26,34 @@ public class TokenTransferProvider : ITokenTransferProvider, ISingletonDependenc
         _graphQlHelper = graphQlHelper;
         _logger = logger;
     }
+    
+    public async Task<long> GetIndexBlockHeightAsync(string chainId)
+    {
+        try
+        {
+            var res = await _graphQlHelper.QueryAsync<GraphQLResponse<SyncStateDto>>(new GraphQLRequest
+            {
+                Query = @"
+			    query($chainId:String,$filterType:BlockFilterType!) {
+                    data:syncState(input: {chainId:$chainId,filterType:$filterType}){
+                        confirmedBlockHeight}
+                    }",
+                Variables = new
+                {
+                    chainId,
+                    filterType = BlockFilterType.TRANSACTION
+                }
+            });
+            return res.Data.ConfirmedBlockHeight;
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Query syncState error");
+            return 0;
+        }
+    }
 
-    public async Task<LatestBlockDto> GetLatestBlock(string chainId)
+    public async Task<LatestBlockDto> GetLatestBlockAsync(string chainId)
     {
         try
         {
@@ -65,21 +88,21 @@ public class TokenTransferProvider : ITokenTransferProvider, ISingletonDependenc
     }
 
     
-    public async Task<PagedResultDto<TransferDto>> GetTokenTransferInfoByTxIds(List<string> txIds)
+    public async Task<PagedResultDto<TransferDto>> GetTokenTransferInfoByTxIdsAsync(List<string> txIds, long endHeight)
     {
         if (txIds.IsNullOrEmpty())
             return new PagedResultDto<TransferDto>();
         
-        return await GetTokenTransferInfo(txIds, 0, 0, txIds.Count, 0);
+        return await GetTokenTransferInfoAsync(txIds, 0, endHeight, txIds.Count, 0);
     }
 
-    public async Task<PagedResultDto<TransferDto>> GetTokenTransferInfoByBlockHeight(int startHeight, int endHeight, int resultCount, int skipCount)
+    public async Task<PagedResultDto<TransferDto>> GetTokenTransferInfoByBlockHeightAsync(int startHeight, int endHeight, int resultCount, int skipCount)
     {
-        return await GetTokenTransferInfo(null, startHeight, endHeight, resultCount, skipCount);
+        return await GetTokenTransferInfoAsync(null, startHeight, endHeight, resultCount, skipCount);
     }
 
 
-    private async Task<PagedResultDto<TransferDto>> GetTokenTransferInfo(List<string> txIds, long startBlockHeight,
+    private async Task<PagedResultDto<TransferDto>> GetTokenTransferInfoAsync(List<string> txIds, long startBlockHeight,
         long endBlockHeight, int inputMaxResultCount, int inputSkipCount = 0)
     {
         try

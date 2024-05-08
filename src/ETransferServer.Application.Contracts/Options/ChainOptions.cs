@@ -6,10 +6,12 @@ public class ChainOptions
 {
 
     // Indexer block height is available within how many lags
-    public int IndexerAvailableHeightBehind { get; set; } = 1000;
+    public int IndexerAvailableHeightBehind { get; set; } = 1300;
     
     // After these times, the trading results are queried directly from the node
     public int TxResultFromNodeSecondsAfter { get; set; } = 900;
+    
+    public int TxResultFastFromNodeSecondsAfter { get; set; } = 180;
     
     public ContractOption Contract { get; set; }
     public Dictionary<string, ChainInfo> ChainInfos { get; set; } = new();

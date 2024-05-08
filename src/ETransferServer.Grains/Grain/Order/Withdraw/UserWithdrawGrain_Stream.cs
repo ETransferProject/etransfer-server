@@ -39,13 +39,7 @@ public partial class UserWithdrawGrain
             // are registered to the timer query.
             case OrderStatusEnum.FromTransferring:
             case OrderStatusEnum.FromTransferred:
-                await _withdrawTimerGrain.AddToPendingList(orderDto.Id, new TimerTransaction
-                {
-                    TxId = orderDto.FromTransfer.TxId,
-                    TxTime = orderDto.FromTransfer.TxTime,
-                    ChainId = orderDto.FromTransfer.ChainId,
-                    TransferType = TransferTypeEnum.FromTransfer.ToString()
-                });
+                await AddToPendingList(orderDto, TransferTypeEnum.FromTransfer, isAElf);
                 break;
 
             // After the multiple confirmation of the transaction is successful,
@@ -72,7 +66,7 @@ public partial class UserWithdrawGrain
                 await AddToTransferring(orderDto, isAElf);
                 break;
             case OrderStatusEnum.ToTransferred:
-                await AddToPendingList(orderDto);
+                await AddToPendingList(orderDto, TransferTypeEnum.ToTransfer, isAElf);
                 break;
             case OrderStatusEnum.ToTransferConfirmed:
                 orderDto.Status = OrderStatusEnum.Finish.ToString();
@@ -134,7 +128,7 @@ public partial class UserWithdrawGrain
     {
         if (isAElf)
         {
-            await AddToPendingList(orderDto);
+            await AddToPendingList(orderDto, TransferTypeEnum.ToTransfer, isAElf);
         }
         else
         {
@@ -142,15 +136,24 @@ public partial class UserWithdrawGrain
         }
     }
 
-    private async Task AddToPendingList(WithdrawOrderDto orderDto)
+    private async Task AddToPendingList(WithdrawOrderDto orderDto, TransferTypeEnum TransferType, bool isAElf)
     {
-        await _withdrawTimerGrain.AddToPendingList(orderDto.Id, new TimerTransaction
+        var transferInfo = TransferType == TransferTypeEnum.ToTransfer ? orderDto.ToTransfer : orderDto.FromTransfer;
+        (var id, var tx) = (orderDto.Id, new TimerTransaction
         {
-            TxId = orderDto.ToTransfer.TxId,
-            TxTime = orderDto.ToTransfer.TxTime,
-            ChainId = orderDto.ToTransfer.ChainId,
-            TransferType = TransferTypeEnum.ToTransfer.ToString()
+            TxId = transferInfo.TxId,
+            TxTime = transferInfo.TxTime,
+            ChainId = transferInfo.ChainId,
+            TransferType = TransferType.ToString()
         });
+        if (isAElf)
+        {
+            await _withdrawFastTimerGrain.AddToPendingList(id, tx);
+        }
+        else
+        {
+            await _withdrawTimerGrain.AddToPendingList(id, tx);
+        }
     }
 
     private async Task AddToRetryTx(WithdrawOrderDto orderDto)
