@@ -25,4 +25,5 @@ public class NetWorkInfo
     public int Decimal { get; set; }
     public decimal FeeAlarmPercent { get; set; } = 10;
     public int EstimatedArrivalTime { get; set; } = 1000;
+    public int EstimatedArrivalFastTime { get; set; } = 10;
 }

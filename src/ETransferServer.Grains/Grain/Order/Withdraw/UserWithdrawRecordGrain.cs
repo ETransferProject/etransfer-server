@@ -51,11 +51,15 @@ public class UserWithdrawRecordGrain : Grain<WithdrawOrderState>, IUserWithdrawR
             if (!State.ArrivalTime.HasValue)
             {
                 var netWorkInfo = _withdrawNetworkOptions.Value.NetworkInfos.FirstOrDefault(t =>
-                    t.Coin.Equals(GuidHelper.GenerateId(orderDto.ToTransfer.Network, 
+                    t.Coin.Equals(GuidHelper.GenerateId(orderDto.ToTransfer.Network,
                         orderDto.ToTransfer.Symbol), StringComparison.OrdinalIgnoreCase));
-                State.ArrivalTime = DateTime.UtcNow.AddSeconds(
-                        _chainOptions.Value.ChainInfos[orderDto.FromTransfer.ChainId].EstimatedArrivalTime)
-                    .AddSeconds(netWorkInfo.EstimatedArrivalTime).ToUtcMilliSeconds();
+                State.ArrivalTime = orderDto.ToTransfer.Network == CommonConstant.Network.AElf
+                    ? DateTime.UtcNow.AddSeconds(
+                            _chainOptions.Value.ChainInfos[orderDto.FromTransfer.ChainId].EstimatedArrivalFastTime)
+                        .AddSeconds(netWorkInfo.EstimatedArrivalFastTime).ToUtcMilliSeconds()
+                    : DateTime.UtcNow.AddSeconds(
+                            _chainOptions.Value.ChainInfos[orderDto.FromTransfer.ChainId].EstimatedArrivalTime)
+                        .AddSeconds(netWorkInfo.EstimatedArrivalTime).ToUtcMilliSeconds();
             }
             if (orderDto.Status == OrderStatusEnum.Finish.ToString())
             {

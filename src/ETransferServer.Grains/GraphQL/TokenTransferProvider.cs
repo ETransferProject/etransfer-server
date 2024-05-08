@@ -128,7 +128,7 @@ public class TokenTransferProvider : ITokenTransferProvider, ISingletonDependenc
                     ){
                         items:data{
                             id,transactionId,methodName,timestamp,chainId,
-                            blockHash,amount,symbol,fromAddress,from,
+                            blockHash,blockHeight,amount,symbol,fromAddress,from,
                             toAddress,to,params,signature,index,
                             status
                         },
