@@ -159,6 +159,13 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
     public async Task<CalculateDepositRateDto> CalculateDepositRateAsync(GetCalculateDepositRateRequestDto request)
     {
         // raymond.zhang: calculate deposit rate
-        return null;
+        CalculateDepositRateDto calculateDepositRateDto = new CalculateDepositRateDto();
+        calculateDepositRateDto.ConversionRate = new ConversionRate();
+        calculateDepositRateDto.ConversionRate.FromSymbol = "USDT";
+        calculateDepositRateDto.ConversionRate.ToSymbol = "SGR-1";
+        calculateDepositRateDto.ConversionRate.FromAmount = Convert.ToDecimal(1.00);
+        calculateDepositRateDto.ConversionRate.ToAmount = Convert.ToDecimal(0.88);
+        calculateDepositRateDto.ConversionRate.MinimumReceiveAmount = Convert.ToDecimal(0.80);
+        return calculateDepositRateDto;
     }
 }
