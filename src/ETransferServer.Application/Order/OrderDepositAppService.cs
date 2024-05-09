@@ -60,7 +60,10 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
                 "Symbol is not exist. Please refresh and try again.");
             AssertHelper.IsTrue(request.ToSymbol.IsNullOrEmpty() || _networkInfoOptions.Value.NetworkMap.ContainsKey(request.ToSymbol), 
                 "ToSymbol is not null but does not exist. Please refresh and try again.");
-            AssertHelper.IsTrue(request.ToSymbol.IsNullOrEmpty() || InputHelper.NoDepositSwap(request.Symbol, request.ToSymbol)|| _tokenAppService.IsValidSwapAsync(request.Symbol, request.ToSymbol));
+            AssertHelper.IsTrue(
+                request.ToSymbol.IsNullOrEmpty() || InputHelper.NoDepositSwap(request.Symbol, request.ToSymbol) ||
+                _tokenAppService.IsValidSwapAsync(request.Symbol, request.ToSymbol),
+                "Must be a valid Swap Deposit. Please refresh and try again.");
             
             var networkConfigs = _networkInfoOptions.Value.NetworkMap[request.Symbol];
             var depositInfo = networkConfigs.Where(n => n.NetworkInfo.Network == request.Network)
