@@ -192,7 +192,7 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> 
             await SaveOrder(order, ExtensionBuilder.New()
                 .Add(ExtensionKey.TransactionStatus, transfer.Status)
                 .Build());
-            await AddToPendingList(order, pendingTx, false);
+            await AddToPendingList(order, pendingTx, pendingTx.TransferType == TransferTypeEnum.FromTransfer.ToString());
             result[orderId] = true;
         }
 
