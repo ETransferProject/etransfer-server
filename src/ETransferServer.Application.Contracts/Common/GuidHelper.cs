@@ -33,15 +33,4 @@ public static class GuidHelper
     {
         return ids.JoinAsString("-");
     }
-    
-    public static string GenerateGrainId(GetUserDepositAddressInput input)
-    {
-        if (InputHelper.NoDepositSwap(input.Symbol, input.ToSymbol))
-        {
-            return GenerateGrainId(input.UserId, input.ChainId,
-                input.NetWork, input.Symbol);
-        }
-        return GenerateGrainId(input.UserId, input.ChainId,
-            input.NetWork, input.Symbol, input.ToSymbol);
-    }
 }

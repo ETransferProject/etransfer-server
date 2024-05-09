@@ -52,8 +52,7 @@ public class UserAddressService : ApplicationService, IUserAddressService
 
         input.UserId = CurrentUser.GetId().ToString();
         var userGrain =
-            _clusterClient.GetGrain<IUserDepositAddressGrain>(GuidHelper.GenerateGrainId(input.UserId, input.ChainId,
-                input.NetWork, input.Symbol));
+            _clusterClient.GetGrain<IUserDepositAddressGrain>(GenerateGrainId(input));
         var address = await userGrain.GetUserAddress(input);
         if (string.IsNullOrEmpty(address))
         {
@@ -65,6 +64,17 @@ public class UserAddressService : ApplicationService, IUserAddressService
         _logger.LogInformation("Assign address: {userId},{chainId},{netWork},{symbol},{address}", input.UserId, 
             input.ChainId, input.NetWork, input.Symbol, address);
         return address;
+    }
+    
+    private string GenerateGrainId(GetUserDepositAddressInput input)
+    {
+        if (InputHelper.NoDepositSwap(input.Symbol, input.ToSymbol))
+        {
+            return GuidHelper.GenerateGrainId(input.UserId, input.ChainId,
+                input.NetWork, input.Symbol);
+        }
+        return GuidHelper.GenerateGrainId(input.UserId, input.ChainId,
+            input.NetWork, input.Symbol, input.ToSymbol);
     }
 
     public async Task<UserAddressDto> GetUnAssignedAddressAsync(GetUserDepositAddressInput input)
