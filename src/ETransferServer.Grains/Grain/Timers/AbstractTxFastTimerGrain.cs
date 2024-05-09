@@ -160,18 +160,8 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> 
                 continue;
             }
 
-            _logger.LogDebug("TxFastTimer use indexer result orderId={OrderId}, chainId={ChainId}, txId={TxId}", orderId,
-                pendingTx.ChainId, pendingTx.TxId);
-            // When the transaction is just sent to the node,
-            // the query may appear NotExisted status immediately, so this is to skip this period of time
-            var isToTransfer = pendingTx.TransferType == TransferTypeEnum.ToTransfer.ToString();
-            var transferInfo = isToTransfer ? order.ToTransfer : order.FromTransfer;
-            if (transferInfo.TxTime > DateTime.UtcNow.AddSeconds(2).ToUtcMilliSeconds())
-            {
-                result[orderId] = false;
-                continue;
-            }
-
+            _logger.LogDebug("TxFastTimer use indexer result orderId={OrderId}, chainId={ChainId}, txId={TxId}, " +
+                "indexerTxCount={Count}", orderId, pendingTx.ChainId, pendingTx.TxId, indexerTx.Count);
             if (!indexerTx.ContainsKey(pendingTx.TxId))
             {
                 result[orderId] = false;
