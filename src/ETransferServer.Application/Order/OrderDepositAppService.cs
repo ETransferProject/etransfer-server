@@ -88,7 +88,7 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
                 
                 getDepositInfoDto.DepositInfo.ExtraInfo = new ExtraInfo();
                 // raymond.zhang: set slippage
-                // getDepositInfoDto.DepositInfo.ExtraInfo.Slippage;
+                getDepositInfoDto.DepositInfo.ExtraInfo.Slippage = Convert.ToDecimal(0.05);
             }
 
             try
