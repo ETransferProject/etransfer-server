@@ -71,13 +71,16 @@ public class OrderAppService : ApplicationService, IOrderAppService
                                 OrderStatusEnum.FromTransferConfirmed.ToString(),
                                 OrderStatusEnum.ToStartTransfer.ToString(),
                                 OrderStatusEnum.ToTransferring.ToString(),
-                                OrderStatusEnum.ToTransferred.ToString(),
-                                OrderStatusEnum.ToTransferConfirmed.ToString()
+                                OrderStatusEnum.ToTransferred.ToString()
                             })));
                         break;
                     case OrderStatusResponseEnum.Succeed:
-                        mustQuery.Add(q => q.Term(i =>
-                            i.Field(f => f.Status).Value(OrderStatusEnum.Finish.ToString())));
+                        mustQuery.Add(q => q.Terms(i =>
+                            i.Field(f => f.Status).Terms(new List<string>
+                            {
+                                OrderStatusEnum.ToTransferConfirmed.ToString(),
+                                OrderStatusEnum.Finish.ToString()
+                            })));
                         break;
                     case OrderStatusResponseEnum.Failed:
                         mustQuery.Add(q => q.Terms(i =>
@@ -158,8 +161,7 @@ public class OrderAppService : ApplicationService, IOrderAppService
                     OrderStatusEnum.FromTransferConfirmed.ToString(),
                     OrderStatusEnum.ToStartTransfer.ToString(),
                     OrderStatusEnum.ToTransferring.ToString(),
-                    OrderStatusEnum.ToTransferred.ToString(),
-                    OrderStatusEnum.ToTransferConfirmed.ToString()
+                    OrderStatusEnum.ToTransferred.ToString()
                 })));
 
             QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery));

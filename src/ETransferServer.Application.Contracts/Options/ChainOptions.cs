@@ -24,7 +24,7 @@ public class ChainOptions
         public int DelaySeconds { get; set; } = 3;
         public int RetryDelaySeconds { get; set; } = 1;
         public int RetryTimes { get; set; } = 0;
-        public int SafeBlockHeight { get; set; } = 100;
+        public int SafeBlockHeight { get; set; } = 300;
         public int TransactionTimerMaxSeconds { get; set; } = 3600;
     }
     
