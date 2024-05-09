@@ -38,6 +38,7 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
     private IUserDepositRecordGrain _recordGrain;
     private IOrderStatusFlowGrain _orderStatusFlowGrain;
     private IUserDepositTxTimerGrain _depositTxTimerGrain;
+    private ISwapTxTimerGrain _swapTxTimerGrain;
     private IDepositOrderRetryTimerGrain _depositOrderRetryTimerGrain;
     private IOrderStatusReminderGrain _orderStatusReminderGrain;
     private ICoBoDepositQueryTimerGrain _depositQueryTimerGrain;
@@ -76,6 +77,8 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
         _orderStatusFlowGrain = GrainFactory.GetGrain<IOrderStatusFlowGrain>(this.GetPrimaryKey());
         _depositTxTimerGrain =
             GrainFactory.GetGrain<IUserDepositTxTimerGrain>(GuidHelper.UniqGuid(nameof(IUserDepositTxTimerGrain)));
+        _swapTxTimerGrain =
+            GrainFactory.GetGrain<ISwapTxTimerGrain>(GuidHelper.UniqGuid(nameof(ISwapTxTimerGrain)));
         _depositOrderRetryTimerGrain =
             GrainFactory.GetGrain<IDepositOrderRetryTimerGrain>(
                 GuidHelper.UniqGuid(nameof(IDepositOrderRetryTimerGrain)));

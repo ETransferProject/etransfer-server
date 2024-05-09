@@ -4,7 +4,7 @@ using JetBrains.Annotations;
 
 namespace ETransferServer.Common;
 
-public static class InputHelper
+public static class DepositSwapHelper
 {
     public static bool IsDepositSwap(string fromSymbol, [CanBeNull] string toSymbol)
     {

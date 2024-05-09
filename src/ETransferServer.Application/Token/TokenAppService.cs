@@ -91,7 +91,7 @@ public class TokenAppService : ETransferServerAppService, ITokenAppService
 
     public bool IsValidSwapAsync(string fromSymbol, [CanBeNull] string toSymbol)
     {
-        return InputHelper.IsDepositSwap(fromSymbol, toSymbol) && _tokenOptions.Value.DepositSwap
+        return DepositSwapHelper.IsDepositSwap(fromSymbol, toSymbol) && _tokenOptions.Value.DepositSwap
             .Any(config => config.Symbol == fromSymbol && config.ToTokenList.Any(token => token.Symbol == toSymbol));
     }
     

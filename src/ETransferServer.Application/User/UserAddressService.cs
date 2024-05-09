@@ -68,7 +68,7 @@ public class UserAddressService : ApplicationService, IUserAddressService
     
     private string GenerateGrainId(GetUserDepositAddressInput input)
     {
-        if (InputHelper.NoDepositSwap(input.Symbol, input.ToSymbol))
+        if (DepositSwapHelper.NoDepositSwap(input.Symbol, input.ToSymbol))
         {
             return GuidHelper.GenerateGrainId(input.UserId, input.ChainId,
                 input.NetWork, input.Symbol);
