@@ -1,17 +1,18 @@
 using System;
 using ETransferServer.User;
+using JetBrains.Annotations;
 
 namespace ETransferServer.Common;
 
 public static class InputHelper
 {
-    public static bool IsDepositSwap(GetUserDepositAddressInput input)
+    public static bool IsDepositSwap(string fromSymbol, [CanBeNull] string toSymbol)
     {
-        return !NoDepositSwap(input);
+        return !NoDepositSwap(fromSymbol, toSymbol);
     }
-    
-    public static bool NoDepositSwap(GetUserDepositAddressInput input)
+
+    public static bool NoDepositSwap(string fromSymbol, [CanBeNull] string toSymbol)
     {
-        return input.ToSymbol.IsNullOrEmpty() || input.Symbol.Equals(input.ToSymbol);
+        return toSymbol.IsNullOrEmpty() || fromSymbol.Equals(toSymbol);
     }
 }

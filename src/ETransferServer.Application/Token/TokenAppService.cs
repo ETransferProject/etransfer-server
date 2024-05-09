@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 using ETransferServer.Models;
 using ETransferServer.Options;
 using ETransferServer.token.Dtos;
+using JetBrains.Annotations;
 using Volo.Abp;
 using Volo.Abp.Auditing;
 using Volo.Abp.ObjectMapping;
@@ -87,4 +88,16 @@ public class TokenAppService : ETransferServerAppService, ITokenAppService
             throw;
         }
     }
+
+    public bool IsValidSwapAsync(string fromSymbol, [CanBeNull] string toSymbol)
+    {
+        if (string.IsNullOrEmpty(toSymbol) || fromSymbol == toSymbol)
+        {
+            return false;
+        }
+
+        return _tokenOptions.Value.DepositSwap
+            .Any(config => config.Name == fromSymbol && config.ToTokenList.Any(token => token.Name == toSymbol));
+    }
+    
 }
