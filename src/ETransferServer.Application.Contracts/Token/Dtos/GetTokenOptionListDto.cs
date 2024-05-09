@@ -19,6 +19,7 @@ public class TokenOptionConfigDto
 
 public class ToTokenOptionConfigDto
 {
+    public string Name { get; set; }
     public string Symbol { get; set; }
     public List<string> ChainIdList { get; set; }
     public int Decimals { get; set; }
