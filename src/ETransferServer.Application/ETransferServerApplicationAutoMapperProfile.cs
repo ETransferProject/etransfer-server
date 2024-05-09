@@ -28,6 +28,7 @@ public class ETransferServerApplicationAutoMapperProfile : Profile
         CreateMap<OrderIndex, OrderIndexDto>().ReverseMap();
         CreateMap<Transfer, TransferInfoDto>().ReverseMap();
         CreateMap<TokenConfig, TokenConfigDto>().ReverseMap();
+        CreateMap<TokenSwapConfig, TokenOptionConfigDto>().ReverseMap();
         CreateMap<NetworkInfo, NetworkDto>()
             .ForMember(des => des.MultiConfirmTime, opt =>
                 opt.MapFrom(src => TimeHelper.SecondsToMinute((int)src.MultiConfirmSeconds)))
