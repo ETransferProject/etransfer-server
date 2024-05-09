@@ -106,6 +106,7 @@ public class UserWithdrawRecordGrain : Grain<WithdrawOrderState>, IUserWithdrawR
 
     private bool IsReservedInAElf(WithdrawOrderDto orderDto)
     {
+        if (State.Id == Guid.Empty) return false;
         var isAElf = orderDto.ToTransfer.Network == CommonConstant.Network.AElf;
         var fromStatus = State.FromTransfer.Status == OrderTransferStatusEnum.Transferred.ToString()
                          && (State.Status == OrderStatusEnum.FromTransferConfirmed.ToString()
