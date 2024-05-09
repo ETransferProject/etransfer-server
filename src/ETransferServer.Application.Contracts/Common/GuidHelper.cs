@@ -36,7 +36,7 @@ public static class GuidHelper
     
     public static string GenerateGrainId(GetUserDepositAddressInput input)
     {
-        if (InputHelper.NoDepositSwap(input))
+        if (InputHelper.NoDepositSwap(input.Symbol, input.ToSymbol))
         {
             return GenerateGrainId(input.UserId, input.ChainId,
                 input.NetWork, input.Symbol);
