@@ -15,6 +15,7 @@ public class TimerOptions
     };
     public TimerOption DepositTimer { get; set; } = new();
     public TimerOption WithdrawFromTimer { get; set; } = new();
+    public TimerOption WithdrawFromFastTimer { get; set; } = new(3);
     public TimerOption CoBoDepositQueryTimer { get; set; } = new(60);
     public TimerOption TokenAddressTimer { get; set; } = new();
     public TimerOption WithdrawTimer { get; set; } = new();
