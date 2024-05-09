@@ -12,6 +12,7 @@ using ETransferServer.Models;
 using ETransferServer.Network;
 using ETransferServer.Options;
 using ETransferServer.Orders;
+using ETransferServer.token;
 using ETransferServer.User;
 using Nest;
 using Volo.Abp;
@@ -32,13 +33,13 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
     private readonly IOptionsSnapshot<NetworkOptions> _networkInfoOptions;
     private readonly IUserAddressService _userAddressService;
     private readonly INetworkAppService _networkAppService;
-
+    private readonly ITokenAppService _tokenAppService;
     public OrderDepositAppService(INESTRepository<OrderIndex, Guid> depositOrderIndexRepository,
         IObjectMapper objectMapper,
         ILogger<OrderDepositAppService> logger,
         IOptionsSnapshot<NetworkOptions> networkInfoOptions,
         IUserAddressService userAddressService,
-        INetworkAppService networkAppService)
+        INetworkAppService networkAppService, ITokenAppService tokenAppService)
     {
         _depositOrderIndexRepository = depositOrderIndexRepository;
         _networkInfoOptions = networkInfoOptions;
@@ -46,6 +47,7 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
         _logger = logger;
         _userAddressService = userAddressService;
         _networkAppService = networkAppService;
+        _tokenAppService = tokenAppService;
     }
 
     public async Task<GetDepositInfoDto> GetDepositInfoAsync(GetDepositRequestDto request)
@@ -58,6 +60,7 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
                 "Symbol is not exist. Please refresh and try again.");
             AssertHelper.IsTrue(request.ToSymbol.IsNullOrEmpty() || _networkInfoOptions.Value.NetworkMap.ContainsKey(request.ToSymbol), 
                 "ToSymbol is not null but does not exist. Please refresh and try again.");
+            AssertHelper.IsTrue(request.ToSymbol.IsNullOrEmpty() || InputHelper.NoDepositSwap(request.Symbol, request.ToSymbol)|| _tokenAppService.IsValidSwapAsync(request.Symbol, request.ToSymbol));
             
             var networkConfigs = _networkInfoOptions.Value.NetworkMap[request.Symbol];
             var depositInfo = networkConfigs.Where(n => n.NetworkInfo.Network == request.Network)
@@ -82,7 +85,7 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
                 ExtraNotes = depositInfo.ExtraNotes,
             };
 
-            if (InputHelper.IsDepositSwap(getUserDepositAddressInput))
+            if (InputHelper.IsDepositSwap(request.Symbol, request.ToSymbol))
             {
                 getDepositInfoDto.DepositInfo.ExtraNotes = depositInfo.SwapExtraNotes;
                 
