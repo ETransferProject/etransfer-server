@@ -203,11 +203,13 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> 
     {
         try
         {
-            var withdrawTimerGrain =
-                GrainFactory.GetGrain<IUserWithdrawTxTimerGrain>(
-                    GuidHelper.UniqGuid(nameof(IUserWithdrawTxTimerGrain)));
             var isToTransfer = pendingTx.TransferType == TransferTypeEnum.ToTransfer.ToString();
             var transferInfo = isToTransfer ? order.ToTransfer : order.FromTransfer;
+            var timerKey = isToTransfer
+                ? GuidHelper.UniqGuid(nameof(IUserWithdrawTxTimerGrain), pendingTx.TransferType)
+                : GuidHelper.UniqGuid(nameof(IUserWithdrawTxTimerGrain));
+            var withdrawTimerGrain =
+                GrainFactory.GetGrain<IUserWithdrawTxTimerGrain>(timerKey);
             await withdrawTimerGrain.AddToPendingList(order.Id, new TimerTransaction
             {
                 TxId = transferInfo.TxId,
