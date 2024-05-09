@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
+using ETransferServer.User;
 
 namespace ETransferServer.Common;
 
@@ -31,5 +32,16 @@ public static class GuidHelper
     public static string GenerateGrainId(params object[] ids)
     {
         return ids.JoinAsString("-");
+    }
+    
+    public static string GenerateGrainId(GetUserDepositAddressInput input)
+    {
+        if (InputHelper.NoDepositSwap(input))
+        {
+            return GenerateGrainId(input.UserId, input.ChainId,
+                input.NetWork, input.Symbol);
+        }
+        return GenerateGrainId(input.UserId, input.ChainId,
+            input.NetWork, input.Symbol, input.ToSymbol);
     }
 }
