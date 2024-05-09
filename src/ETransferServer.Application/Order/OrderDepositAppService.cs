@@ -56,6 +56,8 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
                 || request.ChainId == ChainId.tDVW, "Param is invalid. Please refresh and try again.");
             AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.Symbol), 
                 "Symbol is not exist. Please refresh and try again.");
+            AssertHelper.IsTrue(request.ToSymbol.IsNullOrEmpty() || _networkInfoOptions.Value.NetworkMap.ContainsKey(request.ToSymbol), 
+                "ToSymbol is not null but does not exist. Please refresh and try again.");
             
             var networkConfigs = _networkInfoOptions.Value.NetworkMap[request.Symbol];
             var depositInfo = networkConfigs.Where(n => n.NetworkInfo.Network == request.Network)
@@ -67,7 +69,8 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
                 UserId = CurrentUser.GetId().ToString(),
                 ChainId = request.ChainId,
                 NetWork = request.Network,
-                Symbol = request.Symbol
+                Symbol = request.Symbol,
+                ToSymbol = request.ToSymbol
             };
 
             var getDepositInfoDto = new GetDepositInfoDto();
@@ -76,8 +79,18 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
             {
                 DepositAddress = userAddressAsync,
                 MinAmount = depositInfo.MinDeposit,
-                ExtraNotes = depositInfo.ExtraNotes
+                ExtraNotes = depositInfo.ExtraNotes,
             };
+
+            if (InputHelper.IsDepositSwap(getUserDepositAddressInput))
+            {
+                getDepositInfoDto.DepositInfo.ExtraNotes = depositInfo.SwapExtraNotes;
+                
+                getDepositInfoDto.DepositInfo.ExtraInfo = new ExtraInfo();
+                // raymond.zhang: set slippage
+                // getDepositInfoDto.DepositInfo.ExtraInfo.Slippage;
+            }
+
             try
             {
                 var avgExchange =
@@ -141,5 +154,11 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
         QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery));
         var countResponse = await _depositOrderIndexRepository.CountAsync(Filter);
         return countResponse.Count > 0;
+    }
+
+    public async Task<CalculateDepositRateDto> CalculateDepositRateAsync(GetCalculateDepositRateRequestDto request)
+    {
+        // raymond.zhang: calculate deposit rate
+        return null;
     }
 }

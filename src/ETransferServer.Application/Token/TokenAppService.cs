@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using ETransferServer.Common;
 using Microsoft.Extensions.Logging;
@@ -60,6 +61,29 @@ public class TokenAppService : ETransferServerAppService, ITokenAppService
         catch (Exception e)
         {
             _logger.LogError(e, "GetTokenList error");
+            throw;
+        }
+    }
+    
+    public async Task<GetTokenOptionListDto> GetTokenOptionListAsync(GetTokenOptionListRequestDto request)
+    {
+        try
+        {
+            AssertHelper.NotNull(request, "Request empty. Please refresh and try again.");
+            AssertHelper.NotEmpty(request.Type, "Invalid type. Please refresh and try again.");
+            AssertHelper.IsTrue(request.Type == OrderTypeEnum.Deposit.ToString(), "Invalid type value. Please refresh and try again.");
+
+            var getTokenOptionListDto = new GetTokenOptionListDto();
+            var depositSwapConfigs = _tokenOptions.Value.DepositSwap;
+            
+            var tokenOptionDtos = _objectMapper.Map<List<TokenSwapConfig>, List<TokenOptionConfigDto>>(depositSwapConfigs);
+
+            getTokenOptionListDto.TokenList = tokenOptionDtos;
+            return getTokenOptionListDto;
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "GetTokenOptionList error");
             throw;
         }
     }
