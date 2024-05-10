@@ -57,6 +57,9 @@
     <ContractReference Include="..\..\protobuf\ca_contract.proto">
       <Link>Protobuf\Proto\ca_contract.proto</Link>
     </ContractReference>
+    <ContractReference Include="..\..\protobuf\awaken_swap_contract.proto">
+      <Link>Protobuf\Proto\awaken_swap_contract.proto</Link>
+    </ContractReference>
   </ItemGroup>
 
 
