@@ -12,6 +12,7 @@ using ETransferServer.Models;
 using ETransferServer.Network;
 using ETransferServer.Options;
 using ETransferServer.Orders;
+using ETransferServer.Swap;
 using ETransferServer.token;
 using ETransferServer.User;
 using Nest;
@@ -34,12 +35,14 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
     private readonly IUserAddressService _userAddressService;
     private readonly INetworkAppService _networkAppService;
     private readonly ITokenAppService _tokenAppService;
+    private readonly ISwapAppService _swapAppService;
+
     public OrderDepositAppService(INESTRepository<OrderIndex, Guid> depositOrderIndexRepository,
         IObjectMapper objectMapper,
         ILogger<OrderDepositAppService> logger,
         IOptionsSnapshot<NetworkOptions> networkInfoOptions,
         IUserAddressService userAddressService,
-        INetworkAppService networkAppService, ITokenAppService tokenAppService)
+        INetworkAppService networkAppService, ITokenAppService tokenAppService, ISwapAppService swapAppService)
     {
         _depositOrderIndexRepository = depositOrderIndexRepository;
         _networkInfoOptions = networkInfoOptions;
@@ -48,6 +51,7 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
         _userAddressService = userAddressService;
         _networkAppService = networkAppService;
         _tokenAppService = tokenAppService;
+        _swapAppService = swapAppService;
     }
 
     public async Task<GetDepositInfoDto> GetDepositInfoAsync(GetDepositRequestDto request)
@@ -91,10 +95,10 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
             if (DepositSwapHelper.IsDepositSwap(request.Symbol, request.ToSymbol))
             {
                 getDepositInfoDto.DepositInfo.ExtraNotes = depositInfo.SwapExtraNotes;
-                
-                getDepositInfoDto.DepositInfo.ExtraInfo = new ExtraInfo();
-                // raymond.zhang: set slippage
-                getDepositInfoDto.DepositInfo.ExtraInfo.Slippage = Convert.ToDecimal(0.05);
+                getDepositInfoDto.DepositInfo.ExtraInfo = new ExtraInfo
+                {
+                    Slippage = _swapAppService.GetSlippage(request.Symbol, request.ToSymbol)
+                };
             }
 
             try
@@ -166,21 +170,26 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
     {
         
         AssertHelper.IsTrue(request.ToChainId == ChainId.tDVV
-                                                            || request.ToChainId == ChainId.tDVW, "Param [ToChainId] is invalid. Please refresh and try again.");
+                            || request.ToChainId == ChainId.tDVW, "Param [ToChainId] is invalid. Please refresh and try again.");
         AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.FromSymbol), 
             "FromSymbol is not exist. Please refresh and try again.");
         AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.ToSymbol), 
             "ToSymbol is not exist. Please refresh and try again.");
-        AssertHelper.IsTrue(request.FromAmount.CompareTo(0m) > 0, "Param [FromAmount] is invalid. Please refresh and try again.");
+        AssertHelper.IsTrue(DepositSwapAmountHelper.IsValidRange(request.FromAmount), "Param [FromAmount] is invalid. Please refresh and try again.");
+        AssertHelper.IsTrue(_tokenAppService.IsValidSwapAsync(request.FromSymbol, request.ToSymbol), "Must be a valid Swap Deposit. Please refresh and try again.");
 
-        // raymond.zhang: calculate deposit rate
-        CalculateDepositRateDto calculateDepositRateDto = new CalculateDepositRateDto();
-        calculateDepositRateDto.ConversionRate = new ConversionRate();
-        calculateDepositRateDto.ConversionRate.FromSymbol = "USDT";
-        calculateDepositRateDto.ConversionRate.ToSymbol = "SGR-1";
-        calculateDepositRateDto.ConversionRate.FromAmount = Convert.ToDecimal(1.00);
-        calculateDepositRateDto.ConversionRate.ToAmount = Convert.ToDecimal(0.88);
-        calculateDepositRateDto.ConversionRate.MinimumReceiveAmount = Convert.ToDecimal(0.80);
-        return calculateDepositRateDto;
+        var calculateAmountsOut = await _swapAppService.CalculateAmountsOut(request.ToChainId, request.FromSymbol, request.ToSymbol, request.FromAmount);
+        return new CalculateDepositRateDto()
+        {
+            ConversionRate = new ConversionRate()
+            {
+                FromSymbol = request.FromSymbol,
+                ToSymbol = request.ToSymbol,
+                FromAmount = request.FromAmount,
+                ToAmount = calculateAmountsOut.AmountOut,
+                // raymond.zhang
+                MinimumReceiveAmount = 0m
+            }
+        };
     }
 }

@@ -27,7 +27,7 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
     private readonly IOptionsSnapshot<ChainOptions> _chainOptions;
     private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
     
-    protected SwapTxTimerGrain(ILogger<SwapTxTimerGrain> logger, IContractProvider contractProvider, IOptionsSnapshot<ChainOptions> chainOptions, IOptionsSnapshot<TimerOptions> timerOptions)
+    public SwapTxTimerGrain(ILogger<SwapTxTimerGrain> logger, IContractProvider contractProvider, IOptionsSnapshot<ChainOptions> chainOptions, IOptionsSnapshot<TimerOptions> timerOptions)
     {
         _logger = logger;
         _contractProvider = contractProvider;
