@@ -164,6 +164,15 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
 
     public async Task<CalculateDepositRateDto> CalculateDepositRateAsync(GetCalculateDepositRateRequestDto request)
     {
+        
+        AssertHelper.IsTrue(request.ToChainId == ChainId.tDVV
+                                                            || request.ToChainId == ChainId.tDVW, "Param [ToChainId] is invalid. Please refresh and try again.");
+        AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.FromSymbol), 
+            "FromSymbol is not exist. Please refresh and try again.");
+        AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.ToSymbol), 
+            "ToSymbol is not exist. Please refresh and try again.");
+        AssertHelper.IsTrue(request.FromAmount.CompareTo(0m) > 0, "Param [FromAmount] is invalid. Please refresh and try again.");
+
         // raymond.zhang: calculate deposit rate
         CalculateDepositRateDto calculateDepositRateDto = new CalculateDepositRateDto();
         calculateDepositRateDto.ConversionRate = new ConversionRate();
