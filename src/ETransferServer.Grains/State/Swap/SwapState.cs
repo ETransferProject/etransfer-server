@@ -16,9 +16,7 @@ public class SwapState
     public decimal AmountOutNow { get; set; }
     // If project has subsidy.
     public decimal Subsidy { get; set; }
+    public decimal SubsidyMax { get; set; }
     // After swap transaction completed，amount out.
     public decimal ActualSwappedAmountOut { get; set; }
-
-
-
 }

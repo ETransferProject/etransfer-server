@@ -7,4 +7,5 @@ public interface ISwapGrain : IGrainWithGuidKey
 {
     Task<GrainResultDto<DepositOrderChangeDto>> SwapAsync(DepositOrderDto dto);
     // Task<GrainResultDto<DepositOrderChangeDto>> SubsidyTransferAsync(DepositOrderDto dto，string returnValue);
+    Task<decimal> ParseReturnValue(string returnValue);
 }

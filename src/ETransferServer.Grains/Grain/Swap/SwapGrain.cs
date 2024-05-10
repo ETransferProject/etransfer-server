@@ -10,5 +10,9 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
     {
         throw new NotImplementedException();
     }
-    
+
+    public Task<decimal> ParseReturnValue(string returnValue)
+    {
+        throw new NotImplementedException();
+    }
 }
