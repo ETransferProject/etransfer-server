@@ -66,7 +66,7 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
                 "ToSymbol is not null but does not exist. Please refresh and try again.");
             AssertHelper.IsTrue(
                 request.ToSymbol.IsNullOrEmpty() || DepositSwapHelper.NoDepositSwap(request.Symbol, request.ToSymbol) ||
-                _tokenAppService.IsValidSwapAsync(request.Symbol, request.ToSymbol),
+                _tokenAppService.IsValidSwapAsync(request.ChainId, request.Symbol, request.ToSymbol),
                 "Must be a valid Swap Deposit. Please refresh and try again.");
             
             var networkConfigs = _networkInfoOptions.Value.NetworkMap[request.Symbol];
@@ -178,7 +178,7 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
         AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.ToSymbol), 
             "ToSymbol is not exist. Please refresh and try again.");
         AssertHelper.IsTrue(DepositSwapAmountHelper.IsValidRange(request.FromAmount), "Param [FromAmount] is invalid. Please refresh and try again.");
-        AssertHelper.IsTrue(_tokenAppService.IsValidSwapAsync(request.FromSymbol, request.ToSymbol), "Must be a valid Swap Deposit. Please refresh and try again.");
+        AssertHelper.IsTrue(_tokenAppService.IsValidSwapAsync(request.ToChainId, request.FromSymbol, request.ToSymbol), "Must be a valid Swap Deposit. Please refresh and try again.");
 
         return new CalculateDepositRateDto()
         {
