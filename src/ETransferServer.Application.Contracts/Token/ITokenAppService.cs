@@ -10,5 +10,5 @@ public interface ITokenAppService : IApplicationService
 {
     Task<GetTokenListDto> GetTokenListAsync(GetTokenListRequestDto request);
     Task<GetTokenOptionListDto> GetTokenOptionListAsync(GetTokenOptionListRequestDto request);
-    bool IsValidSwapAsync(string fromSymbol, [CanBeNull] string toSymbol);
+    bool IsValidSwapAsync(string chainId, string fromSymbol, [CanBeNull] string toSymbol);
 }

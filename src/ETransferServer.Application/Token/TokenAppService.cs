@@ -89,10 +89,10 @@ public class TokenAppService : ETransferServerAppService, ITokenAppService
         }
     }
 
-    public bool IsValidSwapAsync(string fromSymbol, [CanBeNull] string toSymbol)
+    public bool IsValidSwapAsync(string toChainId, string fromSymbol, [CanBeNull] string toSymbol)
     {
         return DepositSwapHelper.IsDepositSwap(fromSymbol, toSymbol) && _tokenOptions.Value.DepositSwap
-            .Any(config => config.Symbol == fromSymbol && config.ToTokenList.Any(token => token.Symbol == toSymbol));
+            .Any(config => config.Symbol == fromSymbol && config.ToTokenList.Any(token => token.Symbol == toSymbol && token.ChainIdList.Any(chainId => chainId == toChainId)));
     }
     
 }
