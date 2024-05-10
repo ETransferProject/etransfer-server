@@ -9,7 +9,6 @@ using ETransferServer.Common.AElfSdk.Dtos;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Grains.Grain.Token;
 using Google.Protobuf;
-using Microsoft.IdentityModel.Tokens;
 
 namespace ETransferServer.Grains.Grain.Order.Deposit;
 
@@ -17,7 +16,27 @@ public partial class UserDepositGrain
 {
     private readonly IContractProvider _contractProvider;
 
-    public async Task<DepositOrderChangeDto> OnToStartTransfer(DepositOrderDto orderDto, bool withNewTx = false)
+    private async Task<DepositOrderChangeDto> OnToStartTransfer(DepositOrderDto orderDto)
+    {
+        if (IsSwapTx(orderDto))
+        {
+            // raymond.zhang
+            // return await ToStartSwapTx(orderDto);
+            // if (fail)
+            // {
+            //     return await ToStartTransfer(orderDto);
+            // }
+
+        } else if (IsSwapSubsidy(orderDto))
+        {
+            // raymond.zhang
+            // return await ToStartSwapSubsidy(orderDto);
+        }  
+        
+        return await ToStartTransfer(orderDto);
+    }
+
+    private async Task<DepositOrderChangeDto> ToStartTransfer(DepositOrderDto orderDto, bool withNewTx = false)
     {
         try
         {
@@ -110,5 +129,45 @@ public partial class UserDepositGrain
                     .Build()
             };
         }
+    }
+
+    private async Task<DepositOrderChangeDto> ToStartSwapTx(DepositOrderDto orderDto)
+    {
+        // raymond.zhang
+        // Task<GrainResultDto<DepositOrderChangeDto>> SwapAsync(DepositOrderDto dto);
+        return null;
+    }
+    
+    private async Task<DepositOrderChangeDto> ToStartSwapSubsidy(DepositOrderDto orderDto)
+    {
+        // raymond.zhang
+        // Task<GrainResultDto<DepositOrderChangeDto>> SubsidyTransferAsync(DepositOrderDto dto，string returnValue);
+        return null;
+    }
+
+    private bool NeedSwap(DepositOrderDto orderDto)
+    {
+        return orderDto.ExtensionInfo.ContainsKey(ExtensionKey.NeedSwap) &&
+               orderDto.ExtensionInfo[ExtensionKey.NeedSwap].Equals(Boolean.TrueString);
+    }
+    
+    private bool IsSwapTx(DepositOrderDto orderDto)
+    {
+        if (NeedSwap(orderDto))
+        {
+            return orderDto.ExtensionInfo.ContainsKey(ExtensionKey.SwapStage) &&
+                   orderDto.ExtensionInfo[ExtensionKey.SwapStage].Equals(SwapStage.SwapTx);
+        }
+        return false;
+    }
+    
+    private bool IsSwapSubsidy(DepositOrderDto orderDto)
+    {
+        if (NeedSwap(orderDto))
+        {
+            return orderDto.ExtensionInfo.ContainsKey(ExtensionKey.SwapStage) &&
+                   orderDto.ExtensionInfo[ExtensionKey.SwapStage].Equals(SwapStage.SwapSubsidy);
+        }
+        return false;
     }
 }

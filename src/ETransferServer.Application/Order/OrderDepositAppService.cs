@@ -61,7 +61,7 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
             AssertHelper.IsTrue(request.ToSymbol.IsNullOrEmpty() || _networkInfoOptions.Value.NetworkMap.ContainsKey(request.ToSymbol), 
                 "ToSymbol is not null but does not exist. Please refresh and try again.");
             AssertHelper.IsTrue(
-                request.ToSymbol.IsNullOrEmpty() || InputHelper.NoDepositSwap(request.Symbol, request.ToSymbol) ||
+                request.ToSymbol.IsNullOrEmpty() || DepositSwapHelper.NoDepositSwap(request.Symbol, request.ToSymbol) ||
                 _tokenAppService.IsValidSwapAsync(request.Symbol, request.ToSymbol),
                 "Must be a valid Swap Deposit. Please refresh and try again.");
             
@@ -88,7 +88,7 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
                 ExtraNotes = depositInfo.ExtraNotes,
             };
 
-            if (InputHelper.IsDepositSwap(request.Symbol, request.ToSymbol))
+            if (DepositSwapHelper.IsDepositSwap(request.Symbol, request.ToSymbol))
             {
                 getDepositInfoDto.DepositInfo.ExtraNotes = depositInfo.SwapExtraNotes;
                 

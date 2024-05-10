@@ -107,7 +107,7 @@ public class UserDepositAddressGrain : Grain<TokenDepositAddressState>, IUserDep
 
     private IUserDepositAddressGrain GetUserDepositGrain(GetUserDepositAddressInput input, string[] split)
     {
-        if (InputHelper.NoDepositSwap(input.Symbol, input.ToSymbol))
+        if (DepositSwapHelper.NoDepositSwap(input.Symbol, input.ToSymbol))
         {
             return GrainFactory.GetGrain<IUserDepositAddressGrain>(GuidHelper.GenerateGrainId(input.UserId,
                 input.ChainId, split[0], split[1]));
@@ -125,7 +125,7 @@ public class UserDepositAddressGrain : Grain<TokenDepositAddressState>, IUserDep
         addressDto.ChainId = input.ChainId;
         addressDto.IsAssigned = true;
         addressDto.UpdateTime = DateTimeHelper.ToUnixTimeMilliseconds(DateTime.UtcNow);
-        if (InputHelper.IsDepositSwap(input.Symbol, input.ToSymbol))
+        if (DepositSwapHelper.IsDepositSwap(input.Symbol, input.ToSymbol))
         {
             addressDto.UserToken.Symbol = input.ToSymbol;
         }
