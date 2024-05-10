@@ -11,7 +11,7 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
         throw new NotImplementedException();
     }
 
-    public Task<decimal> ParseReturnValue(string returnValue)
+    public Task<decimal> ParseReturnValueAsync(string returnValue)
     {
         throw new NotImplementedException();
     }
