@@ -125,13 +125,9 @@ public class UserDepositAddressGrain : Grain<TokenDepositAddressState>, IUserDep
         addressDto.ChainId = input.ChainId;
         addressDto.IsAssigned = true;
         addressDto.UpdateTime = DateTimeHelper.ToUnixTimeMilliseconds(DateTime.UtcNow);
-        if (DepositSwapHelper.IsDepositSwap(input.Symbol, input.ToSymbol))
-        {
-            addressDto.UserToken.Symbol = input.ToSymbol;
-        }
-
-        // raymond.zhang
-        // addressDto.UserToken.Symbol = InputHelper.IsDepositSwap(input.Symbol, input.ToSymbol) ? input.ToSymbol : input.Symbol;
+        var isDepositSwap = DepositSwapHelper.IsDepositSwap(input.Symbol, input.ToSymbol);
+        addressDto.FromSymbol = isDepositSwap ? input.Symbol : addressDto.UserToken.Symbol;
+        addressDto.ToSymbol = isDepositSwap ? input.ToSymbol : addressDto.UserToken.Symbol;
 
         await grain.AddOrUpdate(addressDto);
         var addressGrain = GrainFactory.GetGrain<IUserTokenDepositAddressGrain>(addressDto.UserToken.Address);

@@ -95,10 +95,10 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
             if (DepositSwapHelper.IsDepositSwap(request.Symbol, request.ToSymbol))
             {
                 getDepositInfoDto.DepositInfo.ExtraNotes = depositInfo.SwapExtraNotes;
-                
-                getDepositInfoDto.DepositInfo.ExtraInfo = new ExtraInfo();
-                // raymond.zhang: set slippage
-                getDepositInfoDto.DepositInfo.ExtraInfo.Slippage = Convert.ToDecimal(0.05);
+                getDepositInfoDto.DepositInfo.ExtraInfo = new ExtraInfo
+                {
+                    Slippage = _swapAppService.GetSlippage(request.Symbol, request.ToSymbol)
+                };
             }
 
             try
@@ -170,12 +170,12 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
     {
         
         AssertHelper.IsTrue(request.ToChainId == ChainId.tDVV
-                                                            || request.ToChainId == ChainId.tDVW, "Param [ToChainId] is invalid. Please refresh and try again.");
+                            || request.ToChainId == ChainId.tDVW, "Param [ToChainId] is invalid. Please refresh and try again.");
         AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.FromSymbol), 
             "FromSymbol is not exist. Please refresh and try again.");
         AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.ToSymbol), 
             "ToSymbol is not exist. Please refresh and try again.");
-        AssertHelper.IsTrue(request.FromAmount.CompareTo(0m) > 0 && request.FromAmount.CompareTo(1000000000m) < 0, "Param [FromAmount] is invalid. Please refresh and try again.");
+        AssertHelper.IsTrue(DepositSwapAmountHelper.IsValidRange(request.FromAmount), "Param [FromAmount] is invalid. Please refresh and try again.");
         AssertHelper.IsTrue(_tokenAppService.IsValidSwapAsync(request.FromSymbol, request.ToSymbol), "Must be a valid Swap Deposit. Please refresh and try again.");
 
         var calculateAmountsOut = await _swapAppService.CalculateAmountsOut(request.ToChainId, request.FromSymbol, request.ToSymbol, request.FromAmount);

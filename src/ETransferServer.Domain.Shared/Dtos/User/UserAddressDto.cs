@@ -9,6 +9,8 @@ public class UserAddressDto
     public string ChainId { get; set; }
     public TokenDto UserToken { get; set; }
     public bool IsAssigned { get; set; }
+    public string FromSymbol { get; set; }
+    public string ToSymbol { get; set; }
     public long UpdateTime { get; set; }
     public long CreateTime { get; set; }
 }
