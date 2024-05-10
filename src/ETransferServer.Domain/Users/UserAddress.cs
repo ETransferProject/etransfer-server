@@ -12,6 +12,8 @@ public class UserAddress : UserAddressBase<Guid>, IIndexBuild
     [Keyword] public string ChainId { get; set; }
     public Token UserToken { get; set; }
     public bool IsAssigned { get; set; }
+    public string FromSymbol { get; set; }
+    public string ToSymbol { get; set; }
     public long UpdateTime { get; set; }
     public long CreateTime { get; set; }
 }
