@@ -7,6 +7,7 @@ using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
 using ETransferServer.Common.AElfSdk.Dtos;
 using ETransferServer.Dtos.Order;
+using ETransferServer.Grains.Grain.Swap;
 using ETransferServer.Grains.Grain.Token;
 using Google.Protobuf;
 using NBitcoin;
@@ -132,7 +133,8 @@ public partial class UserDepositGrain
     private async Task<DepositOrderChangeDto> ToStartSwapTx(DepositOrderDto orderDto)
     {
         // raymond.zhang
-        var result = await _swapGrain.SwapAsync(orderDto);
+        var swapGrain = GrainFactory.GetGrain<ISwapGrain>(orderDto.Id);
+        var result = await swapGrain.SwapAsync(orderDto);
         if (result.Success)
         {
             _logger.LogWarning("ToStartSwapTx success, result: {result}", JsonConvert.SerializeObject(result));

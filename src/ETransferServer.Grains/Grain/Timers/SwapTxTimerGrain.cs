@@ -27,17 +27,14 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
     
     private readonly IOptionsSnapshot<ChainOptions> _chainOptions;
     private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
-    private readonly ISwapGrain _swapGrain;
 
     public SwapTxTimerGrain(ILogger<SwapTxTimerGrain> logger, IContractProvider contractProvider,
-        IOptionsSnapshot<ChainOptions> chainOptions, IOptionsSnapshot<TimerOptions> timerOptions
-        , ISwapGrain swapGrain)
+        IOptionsSnapshot<ChainOptions> chainOptions, IOptionsSnapshot<TimerOptions> timerOptions)
     {
         _logger = logger;
         _contractProvider = contractProvider;
         _chainOptions = chainOptions;
         _timerOptions = timerOptions;
-        _swapGrain = swapGrain;
     }
 
 
@@ -252,7 +249,8 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
                     // LIB confirmed, return order to stream
                     transferInfo.Status = OrderTransferStatusEnum.Confirmed.ToString();
                     order.Status = OrderStatusEnum.ToTransferConfirmed.ToString();
-                    transferInfo.Amount =  await _swapGrain.ParseReturnValueAsync(txStatus.ReturnValue);
+                    var swapGrain = GrainFactory.GetGrain<ISwapGrain>(order.Id);
+                    transferInfo.Amount =  await swapGrain.ParseReturnValueAsync(txStatus.ReturnValue);
                     
                     
                     await SaveOrder(order, ExtensionBuilder.New()
