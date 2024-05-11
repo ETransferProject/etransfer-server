@@ -1,15 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
-using Awaken.Contracts.Swap;
-using ETransferServer.Common;
-using ETransferServer.Common.AElfSdk;
-using ETransferServer.Dtos.Token;
-using ETransferServer.Grains.Grain.Token;
+using ETransferServer.Grains.Grain.Swap;
 using ETransferServer.Options;
 using ETransferServer.Swap.Dtos;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans;
 using Volo.Abp;
@@ -23,80 +17,77 @@ namespace ETransferServer.Swap;
 public class SwapAppService : ApplicationService, ISwapAppService
 {
     private readonly SwapInfosOptions _swapInfosOptions;
-    private readonly IContractProvider _contractProvider;
     private readonly IClusterClient _clusterClient;
 
-    public SwapAppService(IOptionsSnapshot<SwapInfosOptions> swapSlippageOptions, IContractProvider contractProvider,
+    public SwapAppService(IOptionsSnapshot<SwapInfosOptions> swapInfosOptions,
         IClusterClient clusterClient)
     {
-        _contractProvider = contractProvider;
         _clusterClient = clusterClient;
-        _swapInfosOptions = swapSlippageOptions.Value;
+        _swapInfosOptions = swapInfosOptions.Value;
     }
 
     public decimal GetSlippage(string symbolIn, string symbolOut)
     {
-        var swapSymbol = GenerateSwapSymbol(symbolIn, symbolOut);
-        return _swapInfosOptions.SwapInfos.TryGetValue(swapSymbol, out var swapInfo) ? swapInfo.Slippage : 0;
+        var swapSymbol = GeneratePairSymbol(symbolIn, symbolOut);
+        return _swapInfosOptions.PairInfos.TryGetValue(swapSymbol, out var swapInfo) ? swapInfo.Slippage : 0;
     }
 
-    public Task<decimal> GetConversionRate(string chainId, string symbolIn, string symbolOut)
+    public async Task<decimal> GetConversionRate(string chainId, string symbolIn, string symbolOut)
     {
-        throw new System.NotImplementedException();
+        var swapSymbol = GeneratePairSymbol(symbolIn, symbolOut);
+        if (!_swapInfosOptions.PairInfos.TryGetValue(swapSymbol, out var swapInfo))
+        {
+            return 0;
+        }
+
+        var swapAmountsGrain =
+            _clusterClient.GetGrain<ISwapAmountsOutGrain>(
+                ISwapAmountsOutGrain.GenGrainId(chainId, symbolIn, symbolOut, swapInfo.Router));
+        var (_, amountOut,_,_) = await swapAmountsGrain.GetAmountsOutAsync(1, swapInfo.Path, true);
+        return amountOut;
     }
 
     public async Task<GetAmountsOutDto> CalculateAmountsOut(string chainId, string symbolIn, string symbolOut,
         decimal amountIn)
     {
-        var swapSymbol = GenerateSwapSymbol(symbolIn, symbolOut);
-        var tokenInfo = await GetAmountActual(symbolIn, chainId);
-        var amountInActual = (long)(amountIn * (decimal)Math.Pow(10, tokenInfo.Decimals));
+        var pairSymbol = GeneratePairSymbol(symbolIn, symbolOut);
 
         var result = new GetAmountsOutDto
         {
             SymbolIn = symbolIn,
             SymbolOut = symbolOut,
             AmountIn = amountIn,
-            AmountOut = 0
+            AmountOut = 0,
+            MinAmountOut = 0
         };
-        if (!_swapInfosOptions.SwapInfos.TryGetValue(swapSymbol, out var swapInfo))
+        if (!_swapInfosOptions.PairInfos.TryGetValue(pairSymbol, out var swapInfo))
         {
             return result;
         }
 
-        try
-        {
-            var amountsOut = await _contractProvider.CallTransactionAsync<GetAmountsOutOutput>(chainId, null,
-                "GetAmountsOut", new GetAmountsOutInput
-                {
-                    AmountIn = amountInActual,
-                    Path = { swapInfo.Path }
-                }, swapInfo.Router);
-            var tokenOutInfo = await GetAmountActual(symbolIn, chainId);
-            var amountOutActual = (long)(amountsOut.Amount.ToList().Last() * (decimal)Math.Pow(10, tokenOutInfo.Decimals));
-            result.AmountOut = amountOutActual;
-        }
-        catch (Exception e)
-        {
-            Logger.LogError(e, "Get amounts out failed.SymbolIn:{symbolIn},SymbolOut:{symbolOut},AmountIn:{amountIn}",
-                symbolIn, symbolOut, amountIn);
-            return result;
-        }
-
+        var swapAmountsGrain =
+            _clusterClient.GetGrain<ISwapAmountsOutGrain>(
+                ISwapAmountsOutGrain.GenGrainId(chainId, symbolIn, symbolOut, swapInfo.Router));
+        var (_, amountOut,_,_) = await swapAmountsGrain.GetAmountsOutAsync(amountIn, swapInfo.Path);
+        result.AmountOut = amountOut;
+        result.MinAmountOut = GetMinOutAmount(amountOut, symbolIn, symbolOut);
         return result;
     }
 
-    private async Task<TokenDto> GetAmountActual(string symbol,string chainId)
+    // public async Task TestSwap()
+    // {
+    //     var orderId = Guid.NewGuid();
+    //     var swapGrain =
+    //         _clusterClient.GetGrain<ISwapGrain>(orderId);
+    // }
+
+    private decimal GetMinOutAmount(decimal amountOut, string symbolIn, string symbolOut)
     {
-        var tokenGrain =
-            _clusterClient.GetGrain<ITokenGrain>(ITokenGrain.GenGrainId(symbol, chainId));
-        var tokenInfo = await tokenGrain.GetToken();
-        AssertHelper.NotNull(tokenInfo, "Token info {symbol}-{chainId} not found", symbol,
-            chainId);
-        return tokenInfo;
+        var slippage = GetSlippage(symbolIn, symbolOut);
+        return slippage == 0 ? amountOut : amountOut * (1 - slippage);
     }
 
-    private static string GenerateSwapSymbol(params string[] symbols)
+    private static string GeneratePairSymbol(params string[] symbols)
     {
         return symbols.JoinAsString("-");
     }

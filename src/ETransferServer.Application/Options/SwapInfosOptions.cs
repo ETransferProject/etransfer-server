@@ -4,7 +4,7 @@ namespace ETransferServer.Options;
 
 public class SwapInfosOptions
 {
-    public Dictionary<string, SwapInfo> SwapInfos { get; set; }
+    public Dictionary<string, SwapInfo> PairInfos { get; set; }
 }
 
 public class SwapInfo

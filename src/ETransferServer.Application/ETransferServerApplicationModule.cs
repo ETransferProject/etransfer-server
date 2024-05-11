@@ -1,6 +1,8 @@
 using ETransferServer.Common.AElfSdk;
+using ETransferServer.Common.GraphQL;
 using Microsoft.Extensions.DependencyInjection;
 using ETransferServer.Grains;
+using ETransferServer.GraphQL;
 using Volo.Abp.Account;
 using Volo.Abp.AutoMapper;
 using Volo.Abp.FeatureManagement;
@@ -32,5 +34,6 @@ public class ETransferServerApplicationModule : AbpModule
 
         context.Services.AddHttpClient();
         context.Services.AddSingleton<SignatureProvider>();
+        context.Services.AddSingleton<IGraphQLClientFactory, GraphQLClientFactory>();
     }
 }

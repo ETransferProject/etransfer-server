@@ -38,6 +38,9 @@ public interface IContractProvider
     Task<TransactionResultDto> QueryTransactionResultAsync(string chainId, string transactionId);
 
     Task<ChainStatusDto> GetChainStatusAsync(string chainId);
+    
+    Task<BlockDto> GetBlockAsync(string chainId,long blockHeight);
+
 
     Task<TransactionResultDto> WaitTransactionResultAsync(string chainId, string transactionId,
         int maxWaitMillis = 5000, int delayMillis = 1000);
@@ -132,6 +135,11 @@ public class ContractProvider : IContractProvider, ISingletonDependency
         return await Client(chainId).GetChainStatusAsync();
     }
 
+    public async Task<BlockDto> GetBlockAsync(string chainId, long blockHeight)
+    {
+        return await Client(chainId).GetBlockByHeightAsync(blockHeight);
+    }
+
     public async Task<(Hash transactionId, Transaction transaction)> CreateTransactionAsync(string chainId,
         string sender, string contractName, string methodName,
         IMessage param, string contractAddress = null)
@@ -195,7 +203,7 @@ public class ContractProvider : IContractProvider, ISingletonDependency
         IMessage param, string contractAddress = null) where T : class
     {
         var sender = Address.FromPublicKey(_internalKeyPair.PublicKey);
-        var transaction = await CreateRawTransaction(chainId, sender.ToBase58(), contractName, methodName, param);
+        var transaction = await CreateRawTransaction(chainId, sender.ToBase58(), contractName, methodName, param,contractAddress);
         var transactionId = HashHelper.ComputeFrom(transaction.ToByteArray());
         transaction.Signature = ByteStringHelper.FromHexString(CryptoHelper
             .SignWithPrivateKey(_internalKeyPair.PrivateKey, transactionId.ToByteArray()).ToHex());
