@@ -3,7 +3,7 @@ namespace ETransferServer.Grains.Options;
 public class SwapInfosOptions
 {
     public Dictionary<string, SwapInfo> PairInfos { get; set; }
-    public int SafeLibDiff { get; set; } = 10;
+    public int SafeLibDiff { get; set; } = 300;
     public int CallTxRetryTimes { get; set; } = 3;
 }
 

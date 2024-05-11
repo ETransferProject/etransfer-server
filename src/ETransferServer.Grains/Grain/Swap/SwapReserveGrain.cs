@@ -113,6 +113,7 @@ public class SwapReserveGrain : Grain<SwapReserveState>, ISwapReserveGrain
 
         try
         {
+            _logger.LogInformation("Get pair address from chain.{grainId}",this.GetPrimaryKeyString());
             var pairAddress = await _contractProvider.CallTransactionAsync<Address>(chainId, null, "GetPairAddress",
                 new GetPairAddressInput
                 {
@@ -125,7 +126,7 @@ public class SwapReserveGrain : Grain<SwapReserveState>, ISwapReserveGrain
         {
             _logger.LogError(e, "Failed to get pair address.{chainId}-{symbolIn}-{symbolOut}", chainId, symbolIn,
                 symbolOut);
-            retryTime++;
+            retryTime += 1;
             await GetPairAddressAsync(chainId, router, symbolIn, symbolOut, retryTime);
         }
 
@@ -148,13 +149,13 @@ public class SwapReserveGrain : Grain<SwapReserveState>, ISwapReserveGrain
             var libFromChain = chainStatus.LastIrreversibleBlockHeight;
             var blockTime = (await _contractProvider.GetBlockAsync(chainId, chainStatus.LongestChainHeight)).Header
                 .Time.ToUtcMilliSeconds();
-            return blockTime > timestamp && libFromGql >= libFromChain &&
-                   libFromGql >= libFromChain - _swapInfosOptions.SafeLibDiff;
+            return blockTime > timestamp && (libFromGql >= libFromChain ||
+                   libFromGql >= libFromChain - _swapInfosOptions.SafeLibDiff);
         }
         catch (Exception e)
         {
             _logger.LogError(e, "Get lib height or block time failed.{grainId}", this.GetPrimaryKeyString());
-            retryTime++;
+            retryTime += 1;
             await CheckLibHeightAndTimestampAsync(chainId, retryTime);
         }
 

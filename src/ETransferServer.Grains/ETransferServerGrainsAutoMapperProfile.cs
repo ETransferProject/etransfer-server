@@ -37,7 +37,18 @@ public class ETransferServerGrainsAutoMapperProfile : Profile
         CreateMap<CoBoCoinState, CoBoCoinDto>().ReverseMap();
         CreateMap<CoBoCoinState, CoBoCoinDetailDto>().ReverseMap();
         CreateMap<CoBoTransactionState, CoBoTransactionDto>().ReverseMap();
-        CreateMap<SwapReserveState, ReserveDto>().ReverseMap();
+        CreateMap<SwapReserveState, ReserveDto>().ReverseMap().ForMember(
+            destination => destination.SymbolIn,
+            opt => opt.MapFrom(source => source.SymbolA))
+            .ForMember(
+                destination => destination.SymbolOut,
+                opt => opt.MapFrom(source => source.SymbolB))
+            .ForMember(
+                destination => destination.ReserveIn,
+                opt => opt.MapFrom(source => source.ReserveA))
+            .ForMember(
+                destination => destination.ReserveOut,
+                opt => opt.MapFrom(source => source.ReserveB));
         CreateMap<SwapState, DepositOrderDto>().ReverseMap().ForMember(
             destination => destination.SymbolIn,
             opt => opt.MapFrom(source => source.FromTransfer.Symbol)).ForMember(destination => destination.SymbolOut,

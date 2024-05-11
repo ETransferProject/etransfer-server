@@ -180,23 +180,32 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
         TransferInfo toTransfer, long? createTime, SwapInfo swapInfo)
     {
         var result = new GrainResultDto();
+        decimal amountsExpected = 0;
         // 1. get create time reserve
-        var reserveResult = await GetOrderTimeReserveAsync(fromTransfer, toTransfer, swapInfo.Router,
-            createTime ?? fromTransfer.TxTime);
-        if (!reserveResult.Success)
+        var fromAmount = fromTransfer.Amount;
+        for (var i = 0; i < swapInfo.Path.Count - 1; i++)
         {
-            _logger.LogError("{Message}.{orderId}", reserveResult.Message, this.GetPrimaryKey().ToString());
-            result.Success = false;
-            result.Message = reserveResult.Message;
-            return (result, null);
-        }
+            var reserveResult = await GetOrderTimeReserveAsync(fromTransfer, swapInfo.Path[i], swapInfo.Path[i + 1],
+                toTransfer.ChainId, swapInfo.Router,
+                createTime ?? fromTransfer.TxTime);
+            if (!reserveResult.Success)
+            {
+                _logger.LogError("{Message}.{orderId}", reserveResult.Message, this.GetPrimaryKey().ToString());
+                result.Success = false;
+                result.Message = reserveResult.Message;
+                return (result, null);
+            }
 
-        var (fromReserve, toReserve) = await DealReserveAsync(fromTransfer.Symbol, reserveResult.Data);
-        _logger.LogInformation("Success to get reserve.{reserveIn},{reserveOut}", fromReserve, toReserve);
-        // 2. calculate create time amounts out
-        var (amountsOutPre, amountsOutPreWithDecimal) =
-            await CalculateAmountsOutPreAsync(swapInfo.FeeRate, fromTransfer, toTransfer, fromReserve, toReserve);
-        _logger.LogInformation("Amounts out expected.{amount}", amountsOutPre);
+            var (fromReserve, toReserve) = await DealReserveAsync(swapInfo.Path[i], reserveResult.Data);
+            _logger.LogInformation("Success to get reserve.{reserveIn},{reserveOut}", fromReserve, toReserve);
+            // 2. calculate create time amounts out
+            var (amountsOutPre, amountsOutPreWithDecimal) =
+                await CalculateAmountsOutPreAsync(swapInfo.FeeRate, swapInfo.Path[i], fromAmount, swapInfo.Path[i + 1],
+                    toTransfer.ChainId, fromReserve, toReserve);
+            fromAmount = amountsOutPre;
+            _logger.LogInformation("Amounts out expected.{amount}", amountsOutPre);
+            amountsExpected = amountsOutPre;
+        }
 
         // 3. get now amounts out
         var (amountIn, amountOut, amountInWithDecimal, amountOutWithDecimal) =
@@ -212,7 +221,7 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
         };
 
         // 4. get slippage and compare amount and get amount out min
-        var (success, amountsOutMin) = await CompareSlippageAndGetAmountsOutMinAsync(amountsOutPre, swapInfo.Slippage,
+        var (success, amountsOutMin) = await CompareSlippageAndGetAmountsOutMinAsync(amountsExpected, swapInfo.Slippage,
             amountOut, toTransfer.Symbol, toTransfer.ChainId);
         if (success)
         {
@@ -231,18 +240,18 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
 
     private async Task<(long, long)> DealReserveAsync(string fromSymbol, ReserveDto reserve)
     {
-        var isReversed = fromSymbol == reserve.SymbolIn;
+        var isReversed = fromSymbol == reserve.SymbolA;
         long fromReserve;
         long toReserve;
         if (isReversed)
         {
-            fromReserve = reserve.ReserveIn;
-            toReserve = reserve.ReserveOut;
+            fromReserve = reserve.ReserveA;
+            toReserve = reserve.ReserveB;
         }
         else
         {
-            fromReserve = reserve.ReserveOut;
-            toReserve = reserve.ReserveIn;
+            fromReserve = reserve.ReserveB;
+            toReserve = reserve.ReserveA;
         }
 
         State.ReserveIn = fromReserve;
@@ -251,21 +260,21 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
         return (fromReserve, toReserve);
     }
 
-    private async Task<(decimal, string)> CalculateAmountsOutPreAsync(decimal feeRate, TransferInfo fromTransfer,
-        TransferInfo toTransfer, long fromReserve, long toReserve)
+    private async Task<(decimal, long)> CalculateAmountsOutPreAsync(decimal feeRate, string fromSymbol,
+        decimal fromAmount,
+        string toSymbol, string chainId, long fromReserve, long toReserve)
     {
-        var fromToken = await GetTokenAsync(fromTransfer.Symbol, toTransfer.ChainId);
-        var toToken = await GetTokenAsync(toTransfer.Symbol, toTransfer.ChainId);
-        var fromTokenActualAmount = (new BigDecimal(fromTransfer.Amount) * BigInteger.Pow(10, fromToken.Decimals));
-        var amountInWithFee = (10000 - feeRate * 100) * fromTokenActualAmount;
+        var fromToken = await GetTokenAsync(fromSymbol, chainId);
+        var toToken = await GetTokenAsync(toSymbol, chainId);
+        var fromTokenActualAmount = (new BigDecimal(fromAmount) * BigInteger.Pow(10, fromToken.Decimals));
+        var amountInWithFee = (10000 - feeRate * 10000) * fromTokenActualAmount;
         var numerator = amountInWithFee * new BigInteger(toReserve);
         var denominator = new BigInteger(fromReserve) * 10000 + amountInWithFee;
-        var amountsOutPreWithDecimal = numerator / denominator;
-        AssertHelper.IsTrue(decimal.TryParse(
-            (amountsOutPreWithDecimal / BigInteger.Pow(10, toToken.Decimals)).ToString(), out var amountsOutPre));
+        var amountsOutPreWithDecimal = (long)Math.Floor((decimal)(numerator / denominator));
+        var amountsOutPre = amountsOutPreWithDecimal / (decimal)Math.Pow(10, toToken.Decimals);
         State.AmountOutPre = amountsOutPre;
         await WriteStateAsync();
-        return (amountsOutPre, amountsOutPreWithDecimal.ToString());
+        return (amountsOutPre, amountsOutPreWithDecimal);
     }
 
     private async Task<(decimal, decimal, long, long)> GetAmountsOutNowAsync(TransferInfo fromTransfer,
@@ -296,18 +305,20 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
         }
 
         var token = await GetTokenAsync(symbolOut, chainId);
-        var amountsOutMin = (long)(expectedMinAmountsOut * (decimal)Math.Pow(10, token.Decimals));
-        State.AmountOutMin = amountsOutMin;
+        var amountsOutMin = (new BigDecimal(expectedMinAmountsOut) * BigInteger.Pow(10, token.Decimals)).Floor();
+        AssertHelper.IsTrue(long.TryParse(amountsOutMin.ToString(), out var amountsOutMinActual));
+        State.AmountOutMin = amountsOutMinActual;
         await WriteStateAsync();
-        return (true, amountsOutMin);
+        return (true, amountsOutMinActual);
     }
 
     private async Task<GrainResultDto<ReserveDto>> GetOrderTimeReserveAsync(TransferInfo fromTransfer,
-        TransferInfo toTransfer, string router, long? createTime)
+        string fromSymbol,
+        string toSymbol, string chainId, string router, long? createTime)
     {
         var reserveGrain = GrainFactory.GetGrain<ISwapReserveGrain>(ISwapReserveGrain.GenGrainId(
-            toTransfer.ChainId,
-            fromTransfer.Symbol, toTransfer.Symbol, router));
+            chainId,
+            fromSymbol, toSymbol, router));
         var reserveResult = await reserveGrain.GetReserveAsync(createTime ?? fromTransfer.TxTime, 0, 10);
         return reserveResult;
     }
