@@ -178,7 +178,7 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
         AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.ToSymbol), 
             "ToSymbol is not exist. Please refresh and try again.");
         AssertHelper.IsTrue(DepositSwapAmountHelper.IsValidRange(request.FromAmount), "Param [FromAmount] is invalid. Please refresh and try again.");
-        AssertHelper.IsTrue(_tokenAppService.IsValidSwap(request.ToChainId, request.FromSymbol, request.ToSymbol), "Must be a valid Swap Deposit. Please refresh and try again.");
+        AssertHelper.IsTrue(_tokenAppService.IsValidSwap(request.ToChainId, request.FromSymbol, request.ToSymbol), "Must be valid Deposit Symbol. Please refresh and try again.");
 
         return new CalculateDepositRateDto()
         {
