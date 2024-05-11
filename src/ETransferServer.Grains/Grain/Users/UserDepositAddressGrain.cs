@@ -2,10 +2,14 @@ using ETransferServer.Common;
 using Orleans;
 using ETransferServer.Common.Dtos;
 using ETransferServer.Dtos.User;
+using ETransferServer.Grains.Grain.Worker.Transaction;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.State.Users;
 using ETransferServer.User;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
+using Serilog.Core;
 using Volo.Abp.ObjectMapping;
 
 namespace ETransferServer.Grains.Grain.Users;
@@ -23,14 +27,16 @@ public class UserDepositAddressGrain : Grain<TokenDepositAddressState>, IUserDep
     private readonly IUserAddressProvider _userAddressProvider;
     private readonly IOptionsSnapshot<DepositAddressOptions> _depositAddressOptions;
     private readonly IObjectMapper _objectMapper;
+    private readonly ILogger<TransactionNotificationGrain> _logger;
 
     public UserDepositAddressGrain(IUserAddressProvider userAddressProvider,
         IOptionsSnapshot<DepositAddressOptions> depositAddressOptions,
-        IObjectMapper objectMapper)
+        IObjectMapper objectMapper, ILogger<TransactionNotificationGrain> logger)
     {
         _userAddressProvider = userAddressProvider;
         _depositAddressOptions = depositAddressOptions;
         _objectMapper = objectMapper;
+        _logger = logger;
     }
 
     public override async Task OnActivateAsync()
@@ -47,6 +53,7 @@ public class UserDepositAddressGrain : Grain<TokenDepositAddressState>, IUserDep
 
     public async Task<string> GetUserAddress(GetUserDepositAddressInput input)
     {
+        _logger.LogInformation("for-test: input: {input}", JsonConvert.SerializeObject(input));
         var exist = await Exist();
         if (exist)
         {
@@ -54,10 +61,13 @@ public class UserDepositAddressGrain : Grain<TokenDepositAddressState>, IUserDep
         }
         
         var evmCoins = _depositAddressOptions.Value.EVMCoins;
+        _logger.LogInformation("for-test: evmCoins: {evmCoins}", evmCoins);
+        _logger.LogInformation("for-test: evmCoins: {evmCoins}", JsonConvert.SerializeObject(evmCoins));
         if (evmCoins.Contains(GuidHelper.GenerateId(input.NetWork, input.Symbol)) && evmCoins.Count > 0)
         {
             foreach (var coin in evmCoins)
             {
+                _logger.LogInformation("for-test: coin: {coin}", coin);
                 var userGrain = await GetUserDepositGrainAsync(coin, input);
                 if(userGrain == null) continue;
                 exist = await userGrain.Exist();
@@ -66,6 +76,7 @@ public class UserDepositAddressGrain : Grain<TokenDepositAddressState>, IUserDep
                     return await userGrain.GetAddress();
                 }
             }
+            _logger.LogInformation("for-test: coin: {coin}", evmCoins.First());
             var firstGrain = await GetUserDepositGrainAsync(evmCoins.First(), input);
             if (firstGrain != null)
             {
@@ -109,10 +120,12 @@ public class UserDepositAddressGrain : Grain<TokenDepositAddressState>, IUserDep
     {
         if (DepositSwapHelper.NoDepositSwap(input.Symbol, input.ToSymbol))
         {
+            _logger.LogInformation("for-test: NoDepositSwap");
             return GrainFactory.GetGrain<IUserDepositAddressGrain>(GuidHelper.GenerateGrainId(input.UserId,
                 input.ChainId, split[0], split[1]));
         }
 
+        _logger.LogInformation("for-test: IsDepositSwap");
         return GrainFactory.GetGrain<IUserDepositAddressGrain>(GuidHelper.GenerateGrainId(input.UserId,
             input.ChainId, split[0], split[1], input.ToSymbol));
     }
