@@ -6,4 +6,5 @@ public class GetAmountsOutDto
     public string SymbolOut { get; set; }
     public decimal AmountIn { get; set; }
     public decimal AmountOut { get; set; }
+    public decimal MinAmountOut { get; set; }
 }
