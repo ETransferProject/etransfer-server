@@ -27,6 +27,7 @@ public static class ExtensionKey
     public const string TransactionError = "TxErr";
     public const string RequestId = "requestId";
     public const string ToTransferTxId = "toTransferTxId";
+    public const string IsForward = "isForward";
     public const string SwapTxId = "swapTxId";
     public const string SwapSubsidyTxId = "SwapSubsidyTxId";
     public const string NeedSwap = "needSwap";

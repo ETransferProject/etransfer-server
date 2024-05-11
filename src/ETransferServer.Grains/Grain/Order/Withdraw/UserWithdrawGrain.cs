@@ -56,6 +56,7 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
     private IUserWithdrawRecordGrain _recordGrain;
     private IOrderStatusFlowGrain _orderStatusFlowGrain;
     private IUserWithdrawTxTimerGrain _withdrawTimerGrain;
+    private IUserWithdrawTxFastTimerGrain _withdrawFastTimerGrain;
     private IWithdrawOrderRetryTimerGrain _withdrawOrderRetryTimerGrain;
     private IWithdrawTimerGrain _withdrawQueryTimerGrain;
     private IOrderStatusReminderGrain _orderStatusReminderGrain;
@@ -105,6 +106,9 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         _withdrawTimerGrain =
             GrainFactory.GetGrain<IUserWithdrawTxTimerGrain>(
                 GuidHelper.UniqGuid(nameof(IUserWithdrawTxTimerGrain)));
+        _withdrawFastTimerGrain =
+            GrainFactory.GetGrain<IUserWithdrawTxFastTimerGrain>(
+                GuidHelper.UniqGuid(nameof(IUserWithdrawTxFastTimerGrain)));
         _withdrawOrderRetryTimerGrain =
             GrainFactory.GetGrain<IWithdrawOrderRetryTimerGrain>(
                 GuidHelper.UniqGuid(nameof(IWithdrawOrderRetryTimerGrain)));
@@ -160,6 +164,7 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         // save order flow to ES
         await _orderStatusFlowProvider.AddOrUpdate(orderDto.Id, orderFlowRes);
 
+        if (IsForward(orderDto, externalInfo)) return res.Value;
         // push order to stream
         _logger.LogInformation("push to stream, type:withdraw, orderId:{OrderId}, status:{Status}",
             orderDto.Id, orderDto.Status);
@@ -167,7 +172,22 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
 
         return res.Value;
     }
-    
+
+    private bool IsForward(WithdrawOrderDto orderDto, Dictionary<string, string> externalInfo)
+    {
+        var status = Enum.Parse<OrderStatusEnum>(orderDto.Status);
+        if (status == OrderStatusEnum.FromTransferConfirmed && !externalInfo.IsNullOrEmpty() &&
+            externalInfo.ContainsKey(ExtensionKey.IsForward))
+        {
+            var result = bool.TryParse(externalInfo[ExtensionKey.IsForward], out var isForward);
+            _logger.LogInformation("IsForward, type:withdraw, orderId:{OrderId}, isForward:{isForward}",
+                orderDto.Id, isForward);
+            return result && !isForward;
+        }
+
+        return false;
+    }
+
     public async Task AddCheckOrder(WithdrawOrderDto orderDto)
     {
         await _orderStatusReminderGrain.AddReminder(GuidHelper.GenerateId(orderDto.Id.ToString(), OrderTypeEnum.Withdraw.ToString()));

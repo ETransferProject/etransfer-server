@@ -63,7 +63,7 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
         AssertHelper.NotNull(transaction.TxTime, "Transaction time null");
 
         State.OrderTransactionDict[id] = transaction;
-
+        
         await WriteStateAsync();
     }
 
@@ -82,44 +82,52 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
             .Select(tx => tx.ChainId)
             .Distinct().ToList();
 
+        var removed = 0;
         var indexerLatestHeight = new Dictionary<string, long>();
         var chainStatus = new Dictionary<string, ChainStatusDto>();
         foreach (var chainId in chainIds)
         {
             chainStatus[chainId] = await _contractProvider.GetChainStatusAsync(chainId);
             if (chainStatus[chainId] != null)
-                _logger.LogDebug("TxTimer node chainId={ChainId}, Height= {Height}", chainId,
-                    chainStatus[chainId].LongestChainHeight);
+                _logger.LogDebug("TxTimer node chainId={ChainId}, Height= {Height}, LibHeight= {Height},", 
+                    chainId, chainStatus[chainId].LongestChainHeight, chainStatus[chainId].LastIrreversibleBlockHeight);
 
-            var indexerLatestBlock = await _transferProvider.GetLatestBlock(chainId);
+            var indexerLatestBlock = await _transferProvider.GetLatestBlockAsync(chainId);
             if (indexerLatestBlock != null && indexerLatestBlock.BlockHeight > 0)
             {
                 indexerLatestHeight[chainId] = indexerLatestBlock.BlockHeight;
                 _logger.LogDebug("TxTimer indexer chainId={ChainId}, Height= {Height}", chainId,
                     indexerLatestBlock.BlockHeight);
             }
-        }
 
-
-        var removed = 0;
-        const int subPageSize = 10;
-        var pendingList = State.OrderTransactionDict.ToList();
-        var pendingSubLists = SplitList(pendingList, subPageSize);
-        foreach (var subList in pendingSubLists)
-        {
-            var txIds = subList.Select(t => t.Value.TxId).Distinct().ToList();
-            var pager = await _transferProvider.GetTokenTransferInfoByTxIds(txIds);
-            var indexerTxDict = pager.Items.ToDictionary(t => t.TransactionId, t => t);
-            var handleResult = await HandlePage(subList, chainStatus, indexerLatestHeight, indexerTxDict);
-            foreach (var (orderId, remove) in handleResult)
+            var libHeight = chainStatus[chainId]?.LastIrreversibleBlockHeight ?? 0;
+            if (libHeight == 0)
             {
-                if (!remove) continue;
-                removed++;
-                _logger.LogDebug("OrderTxTimerGrain remove {RemovedOrderId}", orderId);
-                State.OrderTransactionDict.Remove(orderId);
+                libHeight = await _transferProvider.GetIndexBlockHeightAsync(chainId);
+                _logger.LogDebug("TxTimer confirmed indexer chainId={ChainId}, LibHeight= {libHeight}",
+                    chainId, libHeight);
+                if (libHeight == 0) continue;
             }
 
-            await WriteStateAsync();
+            const int subPageSize = 10;
+            var pendingList = State.OrderTransactionDict.Where(t => t.Value.ChainId.Equals(chainId)).ToList();
+            var pendingSubLists = SplitList(pendingList, subPageSize);
+            foreach (var subList in pendingSubLists)
+            {
+                var txIds = subList.Select(t => t.Value.TxId).Distinct().ToList();
+                var pager = await _transferProvider.GetTokenTransferInfoByTxIdsAsync(txIds, libHeight);
+                var indexerTxDict = pager.Items.ToDictionary(t => t.TransactionId, t => t);
+                var handleResult = await HandlePage(subList, chainStatus, indexerLatestHeight, indexerTxDict);
+                foreach (var (orderId, remove) in handleResult)
+                {
+                    if (!remove) continue;
+                    removed++;
+                    _logger.LogDebug("OrderTxTimerGrain remove {RemovedOrderId}", orderId);
+                    State.OrderTransactionDict.Remove(orderId);
+                }
+
+                await WriteStateAsync();
+            }
         }
 
         _logger.LogInformation("OrderTxTimerGrain finish, count: {Removed}/{Total}", removed, total);
@@ -172,7 +180,9 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
                 pendingTx.ChainId, pendingTx.TxId);
             // When the transaction is just sent to the node,
             // the query may appear NotExisted status immediately, so this is to skip this period of time
-            if (order.ToTransfer.TxTime > DateTime.UtcNow.AddSeconds(5).ToUtcMilliSeconds())
+            var isToTransfer = pendingTx.TransferType == TransferTypeEnum.ToTransfer.ToString();
+            var transferInfo = isToTransfer ? order.ToTransfer : order.FromTransfer;
+            if (transferInfo.TxTime > DateTime.UtcNow.AddSeconds(5).ToUtcMilliSeconds())
             {
                 result[orderId] = false;
                 continue;
@@ -199,6 +209,7 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
                 order.Status = OrderStatusEnum.FromTransferConfirmed.ToString();
             }
             await SaveOrder(order, ExtensionBuilder.New()
+                .Add(ExtensionKey.IsForward, pendingTx.IsForward)
                 .Add(ExtensionKey.TransactionStatus, transfer.Status)
                 .Build());
             result[orderId] = true;
@@ -276,6 +287,7 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
                         : OrderStatusEnum.FromTransferConfirmed.ToString();
 
                     await SaveOrder(order, ExtensionBuilder.New()
+                        .Add(ExtensionKey.IsForward, timerTx.IsForward)
                         .Add(ExtensionKey.TransactionStatus, txStatus.Status)
                         .Add(ExtensionKey.TransactionError, txStatus.Error)
                         .Build());
@@ -283,6 +295,7 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
                 }
 
                 // transaction status not mined before, save new status of tx
+                _logger.LogInformation("TxOrderTimer transaction status not mined");
                 transferInfo.Status = OrderTransferStatusEnum.Transferred.ToString();
                 order.Status = isToTransfer
                     ? OrderStatusEnum.ToTransferred.ToString()
@@ -304,6 +317,7 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
                     ? OrderStatusEnum.ToTransferFailed.ToString()
                     : OrderStatusEnum.FromTransferFailed.ToString();
                 await SaveOrder(order, ExtensionBuilder.New()
+                    .Add(ExtensionKey.IsForward, timerTx.IsForward)
                     .Add(ExtensionKey.TransactionStatus, txStatus.Status)
                     .Add(ExtensionKey.TransactionError, txStatus.Error)
                     .Build());
