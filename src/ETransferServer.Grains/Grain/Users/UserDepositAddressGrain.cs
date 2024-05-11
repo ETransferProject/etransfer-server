@@ -100,10 +100,21 @@ public class UserDepositAddressGrain : Grain<TokenDepositAddressState>, IUserDep
     private async Task<IUserDepositAddressGrain> GetUserDepositGrainAsync(string coin, GetUserDepositAddressInput input)
     {
         var split = coin.Split(DepositAddressOptions.DefaultDelimiter);
-        return split.Length >= 2 && !(split[0] == input.NetWork && split[1] == input.Symbol) ?
-            GrainFactory.GetGrain<IUserDepositAddressGrain>(GuidHelper.GenerateGrainId(input.UserId,
-                    input.ChainId, split[0], split[1]))
+        return split.Length >= 2 && !(split[0] == input.NetWork && split[1] == input.Symbol)
+            ? GetUserDepositGrain(input, split)
             : null;
+    }
+
+    private IUserDepositAddressGrain GetUserDepositGrain(GetUserDepositAddressInput input, string[] split)
+    {
+        if (DepositSwapHelper.NoDepositSwap(input.Symbol, input.ToSymbol))
+        {
+            return GrainFactory.GetGrain<IUserDepositAddressGrain>(GuidHelper.GenerateGrainId(input.UserId,
+                input.ChainId, split[0], split[1]));
+        }
+
+        return GrainFactory.GetGrain<IUserDepositAddressGrain>(GuidHelper.GenerateGrainId(input.UserId,
+            input.ChainId, split[0], split[1], input.ToSymbol));
     }
 
     private async Task<string> HandleUpdateAsync(GetUserDepositAddressInput input, IUserDepositAddressGrain grain)
@@ -114,7 +125,10 @@ public class UserDepositAddressGrain : Grain<TokenDepositAddressState>, IUserDep
         addressDto.ChainId = input.ChainId;
         addressDto.IsAssigned = true;
         addressDto.UpdateTime = DateTimeHelper.ToUnixTimeMilliseconds(DateTime.UtcNow);
-        
+        var isDepositSwap = DepositSwapHelper.IsDepositSwap(input.Symbol, input.ToSymbol);
+        addressDto.FromSymbol = isDepositSwap ? input.Symbol : addressDto.UserToken.Symbol;
+        addressDto.ToSymbol = isDepositSwap ? input.ToSymbol : addressDto.UserToken.Symbol;
+
         await grain.AddOrUpdate(addressDto);
         var addressGrain = GrainFactory.GetGrain<IUserTokenDepositAddressGrain>(addressDto.UserToken.Address);
         await addressGrain.AddOrUpdate(addressDto);

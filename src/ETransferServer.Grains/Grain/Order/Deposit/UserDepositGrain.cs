@@ -6,6 +6,7 @@ using Orleans.Streams;
 using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
 using ETransferServer.Dtos.Order;
+using ETransferServer.Grains.Grain.Swap;
 using ETransferServer.Grains.Grain.Timers;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.Provider;
@@ -38,9 +39,11 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
     private IUserDepositRecordGrain _recordGrain;
     private IOrderStatusFlowGrain _orderStatusFlowGrain;
     private IUserDepositTxTimerGrain _depositTxTimerGrain;
+    private ISwapTxTimerGrain _swapTxTimerGrain;
     private IDepositOrderRetryTimerGrain _depositOrderRetryTimerGrain;
     private IOrderStatusReminderGrain _orderStatusReminderGrain;
     private ICoBoDepositQueryTimerGrain _depositQueryTimerGrain;
+    private ISwapGrain _swapGrain;
     
     internal JsonSerializerSettings JsonSettings = JsonSettingsBuilder.New()
         .WithAElfTypesConverters()
@@ -50,7 +53,7 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
     public UserDepositGrain(IUserDepositProvider userDepositProvider,
         ILogger<UserDepositGrain> logger, IContractProvider contractProvider,
         IOptionsSnapshot<ChainOptions> chainOptions, IOptionsSnapshot<DepositOptions> depositOptions,
-        IOrderStatusFlowProvider orderStatusFlowProvider)
+        IOrderStatusFlowProvider orderStatusFlowProvider, ISwapGrain swapGrain)
     {
         _userDepositProvider = userDepositProvider;
         _logger = logger;
@@ -58,6 +61,7 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
         _depositOptions = depositOptions;
         _orderStatusFlowProvider = orderStatusFlowProvider;
         _contractProvider = contractProvider;
+        _swapGrain = swapGrain;
     }
 
     public override async Task OnActivateAsync()
@@ -76,6 +80,8 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
         _orderStatusFlowGrain = GrainFactory.GetGrain<IOrderStatusFlowGrain>(this.GetPrimaryKey());
         _depositTxTimerGrain =
             GrainFactory.GetGrain<IUserDepositTxTimerGrain>(GuidHelper.UniqGuid(nameof(IUserDepositTxTimerGrain)));
+        _swapTxTimerGrain =
+            GrainFactory.GetGrain<ISwapTxTimerGrain>(GuidHelper.UniqGuid(nameof(ISwapTxTimerGrain)));
         _depositOrderRetryTimerGrain =
             GrainFactory.GetGrain<IDepositOrderRetryTimerGrain>(
                 GuidHelper.UniqGuid(nameof(IDepositOrderRetryTimerGrain)));

@@ -53,13 +53,7 @@ public partial class UserDepositGrain
             case OrderStatusEnum.ToTransferring:
             case OrderStatusEnum.ToTransferred:
             {
-                await _depositTxTimerGrain.AddToPendingList(orderDto.Id, new TimerTransaction
-                {
-                    TxId = orderDto.ToTransfer.TxId,
-                    TxTime = orderDto.ToTransfer.TxTime,
-                    ChainId = orderDto.ToTransfer.ChainId,
-                    TransferType = TransferTypeEnum.ToTransfer.ToString()
-                });
+                await OnToTransferred(orderDto);
                 break;
             }
 

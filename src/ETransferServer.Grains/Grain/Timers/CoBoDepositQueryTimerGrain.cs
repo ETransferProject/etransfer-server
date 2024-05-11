@@ -13,6 +13,7 @@ using ETransferServer.Grains.State.Order;
 using ETransferServer.ThirdPart.CoBo;
 using ETransferServer.ThirdPart.CoBo.Dtos;
 using ETransferServer.User;
+using NBitcoin;
 
 namespace ETransferServer.Grains.Grain.Timers;
 
@@ -191,7 +192,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         var paymentAddress = _depositOption.Value.PaymentAddresses.GetValueOrDefault(addressInfo.ChainId);
         AssertHelper.NotEmpty(paymentAddress, "Payment address empty, ChainId={ChainId}", addressInfo.ChainId);
 
-        return new DepositOrderDto
+        var depositOrderDto = new DepositOrderDto
         {
             Id = OrderIdHelper.DepositOrderId(coinInfo.Network, coinInfo.Symbol, coBoTransaction.TxId),
             OrderType = OrderTypeEnum.Deposit.ToString(),
@@ -216,11 +217,36 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
                 ToAddress = addressInfo.Address,
                 Network = CommonConstant.Network.AElf,
                 ChainId = addressInfo.ChainId,
-                Symbol = coinInfo.Symbol,
+                Symbol = userAddress.UserToken.Symbol,
                 Amount = coBoTransaction.AbsAmount.SafeToDecimal(),
                 Status = OrderTransferStatusEnum.Created.ToString(),
             }
         };
+
+        return SpecialHandle(depositOrderDto);
+    }
+
+    private DepositOrderDto SpecialHandle(DepositOrderDto dto)
+    {
+
+        if (dto.ToTransfer.ToAddress.IsNullOrEmpty() 
+            || _depositOption.Value.NoSwapSymbols.Contains(dto.FromTransfer.Symbol))
+        {
+            dto.ToTransfer.Symbol = dto.FromTransfer.Symbol;
+            return dto;
+        }
+
+        // raymond.zhang
+        if (DepositSwapHelper.IsDepositSwap(dto.FromTransfer.Symbol, dto.ToTransfer.Symbol))
+        {
+            dto.ExtensionInfo ??= new Dictionary<string, string>();
+            dto.ExtensionInfo.Add(ExtensionKey.NeedSwap, Boolean.TrueString);
+            dto.ExtensionInfo.Add(ExtensionKey.SwapStage, SwapStage.SwapTx);
+            return dto;
+        }
+        
+        dto.ToTransfer.Symbol = dto.FromTransfer.Symbol;
+        return dto;
     }
 
     private async Task AddAfter(CoBoTransactionDto depositOrder)

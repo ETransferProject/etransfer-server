@@ -42,7 +42,7 @@ public static class CommonConstant
         public const string Elf = "ELF";
         public const string USD = "USD";
         public const string USDT = "USDT";
-        
+        public const string SGR = "SGR-1";
     }
 
     public static class StreamConstant

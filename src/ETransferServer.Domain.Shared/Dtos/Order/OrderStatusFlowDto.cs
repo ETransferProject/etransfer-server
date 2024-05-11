@@ -27,6 +27,18 @@ public static class ExtensionKey
     public const string TransactionError = "TxErr";
     public const string RequestId = "requestId";
     public const string ToTransferTxId = "toTransferTxId";
+    public const string IsForward = "isForward";
+    public const string SwapTxId = "swapTxId";
+    public const string SwapSubsidyTxId = "SwapSubsidyTxId";
+    public const string NeedSwap = "needSwap";
+    public const string SwapStage = "SwapStage";
+    public const string SwapSubsidyTxTime = "SwapSubsidyTxTime";
+}
+
+public static class SwapStage
+{
+    public const string SwapTx = "SwapTx";
+    public const string SwapSubsidy = "SwapSubsidy";
 }
 
 public class ExtensionBuilder

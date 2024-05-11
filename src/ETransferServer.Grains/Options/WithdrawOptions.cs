@@ -11,4 +11,12 @@ public class WithdrawOptions
     public int ThirdPartFeeExpireSeconds { get; set; } = 180;
     public int ToTransferMaxRetry { get; set; } = 5;
     public Dictionary<string, string> PaymentAddresses { get; set; } = new();
+    public Dictionary<string, TransactionThreshold> Homogeneous { get; set; } = new();
+}
+
+public class TransactionThreshold
+{
+    public long AmountThreshold { get; set; } = 300;
+    public long BlockHeightUpperThreshold { get; set; } = 300;
+    public long BlockHeightLowerThreshold { get; set; } = 30;
 }

@@ -12,6 +12,8 @@ using ETransferServer.Models;
 using ETransferServer.Network;
 using ETransferServer.Options;
 using ETransferServer.Orders;
+using ETransferServer.Swap;
+using ETransferServer.token;
 using ETransferServer.User;
 using Nest;
 using Volo.Abp;
@@ -32,13 +34,15 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
     private readonly IOptionsSnapshot<NetworkOptions> _networkInfoOptions;
     private readonly IUserAddressService _userAddressService;
     private readonly INetworkAppService _networkAppService;
+    private readonly ITokenAppService _tokenAppService;
+    private readonly ISwapAppService _swapAppService;
 
     public OrderDepositAppService(INESTRepository<OrderIndex, Guid> depositOrderIndexRepository,
         IObjectMapper objectMapper,
         ILogger<OrderDepositAppService> logger,
         IOptionsSnapshot<NetworkOptions> networkInfoOptions,
         IUserAddressService userAddressService,
-        INetworkAppService networkAppService)
+        INetworkAppService networkAppService, ITokenAppService tokenAppService, ISwapAppService swapAppService)
     {
         _depositOrderIndexRepository = depositOrderIndexRepository;
         _networkInfoOptions = networkInfoOptions;
@@ -46,6 +50,8 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
         _logger = logger;
         _userAddressService = userAddressService;
         _networkAppService = networkAppService;
+        _tokenAppService = tokenAppService;
+        _swapAppService = swapAppService;
     }
 
     public async Task<GetDepositInfoDto> GetDepositInfoAsync(GetDepositRequestDto request)
@@ -56,6 +62,12 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
                 || request.ChainId == ChainId.tDVW, "Param is invalid. Please refresh and try again.");
             AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.Symbol), 
                 "Symbol is not exist. Please refresh and try again.");
+            AssertHelper.IsTrue(request.ToSymbol.IsNullOrEmpty() || _networkInfoOptions.Value.NetworkMap.ContainsKey(request.ToSymbol), 
+                "ToSymbol is not null but does not exist. Please refresh and try again.");
+            AssertHelper.IsTrue(
+                request.ToSymbol.IsNullOrEmpty() || 
+                _tokenAppService.IsValidDeposit(request.ChainId, request.Symbol, request.ToSymbol),
+                "Must be a valid Deposit. Please refresh and try again.");
             
             var networkConfigs = _networkInfoOptions.Value.NetworkMap[request.Symbol];
             var depositInfo = networkConfigs.Where(n => n.NetworkInfo.Network == request.Network)
@@ -67,7 +79,8 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
                 UserId = CurrentUser.GetId().ToString(),
                 ChainId = request.ChainId,
                 NetWork = request.Network,
-                Symbol = request.Symbol
+                Symbol = request.Symbol,
+                ToSymbol = request.ToSymbol
             };
 
             var getDepositInfoDto = new GetDepositInfoDto();
@@ -76,8 +89,20 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
             {
                 DepositAddress = userAddressAsync,
                 MinAmount = depositInfo.MinDeposit,
-                ExtraNotes = depositInfo.ExtraNotes
+                ExtraNotes = depositInfo.ExtraNotes,
             };
+
+            if (DepositSwapHelper.IsDepositSwap(request.Symbol, request.ToSymbol))
+            {
+                getDepositInfoDto.DepositInfo.ExtraNotes = depositInfo.SwapExtraNotes;
+                getDepositInfoDto.DepositInfo.ExtraInfo = new ExtraInfo
+                {
+                    // Slippage = 0.05m
+                    // raymond.zhang
+                    Slippage = _swapAppService.GetSlippage(request.Symbol, request.ToSymbol)
+                };
+            }
+
             try
             {
                 var avgExchange =
@@ -141,5 +166,45 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
         QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery));
         var countResponse = await _depositOrderIndexRepository.CountAsync(Filter);
         return countResponse.Count > 0;
+    }
+
+    public async Task<CalculateDepositRateDto> CalculateDepositRateAsync(GetCalculateDepositRateRequestDto request)
+    {
+        
+        AssertHelper.IsTrue(request.ToChainId == ChainId.tDVV
+                            || request.ToChainId == ChainId.tDVW, "Param [ToChainId] is invalid. Please refresh and try again.");
+        AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.FromSymbol), 
+            "FromSymbol is not exist. Please refresh and try again.");
+        AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.ToSymbol), 
+            "ToSymbol is not exist. Please refresh and try again.");
+        AssertHelper.IsTrue(DepositSwapAmountHelper.IsValidRange(request.FromAmount), "Param [FromAmount] is invalid. Please refresh and try again.");
+        AssertHelper.IsTrue(_tokenAppService.IsValidSwap(request.ToChainId, request.FromSymbol, request.ToSymbol), "Must be valid swap Deposit symbols. Please refresh and try again.");
+
+        // return new CalculateDepositRateDto()
+        // {
+        //     ConversionRate = new ConversionRate()
+        //     {
+        //         FromSymbol = "USDT",
+        //         ToSymbol = "SGR-1",
+        //         FromAmount = 1.00m,
+        //         ToAmount = 0.38m,
+        //         // raymond.zhang
+        //         MinimumReceiveAmount = 0.35m
+        //     }
+        // };
+        
+        // raymond.zhang
+        var calculateAmountsOut = await _swapAppService.CalculateAmountsOut(request.ToChainId, request.FromSymbol, request.ToSymbol, request.FromAmount);
+        return new CalculateDepositRateDto()
+        {
+            ConversionRate = new ConversionRate()
+            {
+                FromSymbol = request.FromSymbol,
+                ToSymbol = request.ToSymbol,
+                FromAmount = request.FromAmount,
+                ToAmount = calculateAmountsOut.AmountOut,
+                MinimumReceiveAmount = calculateAmountsOut.MinAmountOut
+            }
+        };
     }
 }

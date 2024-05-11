@@ -9,7 +9,8 @@ using ETransferServer.Common.AElfSdk.Dtos;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Grains.Grain.Token;
 using Google.Protobuf;
-using Microsoft.IdentityModel.Tokens;
+using NBitcoin;
+using Transaction = AElf.Types.Transaction;
 
 namespace ETransferServer.Grains.Grain.Order.Deposit;
 
@@ -17,7 +18,23 @@ public partial class UserDepositGrain
 {
     private readonly IContractProvider _contractProvider;
 
-    public async Task<DepositOrderChangeDto> OnToStartTransfer(DepositOrderDto orderDto, bool withNewTx = false)
+    private async Task<DepositOrderChangeDto> OnToStartTransfer(DepositOrderDto orderDto)
+    {
+        if (IsSwapTx(orderDto))
+        {
+            // raymond.zhang
+            return await ToStartSwapTx(orderDto);
+        }
+        
+        if (IsSwapSubsidy(orderDto)) {
+            // raymond.zhang
+            await ToStartSwapSubsidy(orderDto);
+        }  
+        
+        return await ToStartTransfer(orderDto);
+    }
+
+    private async Task<DepositOrderChangeDto> ToStartTransfer(DepositOrderDto orderDto, bool withNewTx = false)
     {
         try
         {
@@ -110,5 +127,53 @@ public partial class UserDepositGrain
                     .Build()
             };
         }
+    }
+
+    private async Task<DepositOrderChangeDto> ToStartSwapTx(DepositOrderDto orderDto)
+    {
+        // raymond.zhang
+        var result = await _swapGrain.SwapAsync(orderDto);
+        if (result.Success)
+        {
+            _logger.LogWarning("ToStartSwapTx success, result: {result}", JsonConvert.SerializeObject(result));
+            return result.Data;
+        }
+        
+        _logger.LogWarning("ToStartSwapTx invalid or fail, will goto ToStartTransfer, result: {result}", JsonConvert.SerializeObject(result));
+        orderDto.ToTransfer.Symbol = orderDto.FromTransfer.Symbol;
+        return await ToStartTransfer(orderDto);
+    }
+    
+    private async Task<DepositOrderChangeDto> ToStartSwapSubsidy(DepositOrderDto orderDto)
+    {
+        // raymond.zhang
+        // Task<GrainResultDto<DepositOrderChangeDto>> SubsidyTransferAsync(DepositOrderDto dto，string returnValue);
+        return null;
+    }
+
+    private bool NeedSwap(DepositOrderDto orderDto)
+    {
+        return orderDto.ExtensionInfo.ContainsKey(ExtensionKey.NeedSwap) &&
+               orderDto.ExtensionInfo[ExtensionKey.NeedSwap].Equals(Boolean.TrueString);
+    }
+    
+    private bool IsSwapTx(DepositOrderDto orderDto)
+    {
+        if (NeedSwap(orderDto))
+        {
+            return orderDto.ExtensionInfo.ContainsKey(ExtensionKey.SwapStage) &&
+                   orderDto.ExtensionInfo[ExtensionKey.SwapStage].Equals(SwapStage.SwapTx);
+        }
+        return false;
+    }
+    
+    private bool IsSwapSubsidy(DepositOrderDto orderDto)
+    {
+        if (NeedSwap(orderDto))
+        {
+            return orderDto.ExtensionInfo.ContainsKey(ExtensionKey.SwapStage) &&
+                   orderDto.ExtensionInfo[ExtensionKey.SwapStage].Equals(SwapStage.SwapSubsidy);
+        }
+        return false;
     }
 }
