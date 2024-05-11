@@ -23,12 +23,12 @@ public interface ISwapAmountsOutGrain : IGrainWithStringKey
 
 public class SwapAmountsOutGrain : Grain<SwapAmountsState>, ISwapAmountsOutGrain
 {
-    private readonly ILogger<TokenGrain> _logger;
+    private readonly ILogger<SwapAmountsOutGrain> _logger;
     private readonly IObjectMapper _objectMapper;
     private readonly IContractProvider _contractProvider;
 
     public SwapAmountsOutGrain(IObjectMapper objectMapper, IContractProvider contractProvider,
-        ILogger<TokenGrain> logger)
+        ILogger<SwapAmountsOutGrain> logger)
     {
         _objectMapper = objectMapper;
         _contractProvider = contractProvider;
