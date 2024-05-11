@@ -228,10 +228,12 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
 
     private DepositOrderDto SpecialHandle(DepositOrderDto dto)
     {
-        
-        if (_depositOption.Value.NoSwapSymbols.Contains(dto.FromTransfer.Symbol))
+
+        if (dto.ToTransfer.ToAddress.IsNullOrEmpty() 
+            || _depositOption.Value.NoSwapSymbols.Contains(dto.FromTransfer.Symbol))
         {
             dto.ToTransfer.Symbol = dto.FromTransfer.Symbol;
+            return dto;
         }
 
         // raymond.zhang
