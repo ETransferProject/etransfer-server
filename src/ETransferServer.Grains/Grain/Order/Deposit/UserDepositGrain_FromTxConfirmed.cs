@@ -9,6 +9,8 @@ using ETransferServer.Common.AElfSdk.Dtos;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Grains.Grain.Token;
 using Google.Protobuf;
+using NBitcoin;
+using Transaction = AElf.Types.Transaction;
 
 namespace ETransferServer.Grains.Grain.Order.Deposit;
 
@@ -21,16 +23,12 @@ public partial class UserDepositGrain
         if (IsSwapTx(orderDto))
         {
             // raymond.zhang
-            // return await ToStartSwapTx(orderDto);
-            // if (fail)
-            // {
-            //     return await ToStartTransfer(orderDto);
-            // }
-
-        } else if (IsSwapSubsidy(orderDto))
-        {
+            return await ToStartSwapTx(orderDto);
+        }
+        
+        if (IsSwapSubsidy(orderDto)) {
             // raymond.zhang
-            // return await ToStartSwapSubsidy(orderDto);
+            await ToStartSwapSubsidy(orderDto);
         }  
         
         return await ToStartTransfer(orderDto);
@@ -134,8 +132,16 @@ public partial class UserDepositGrain
     private async Task<DepositOrderChangeDto> ToStartSwapTx(DepositOrderDto orderDto)
     {
         // raymond.zhang
-        // Task<GrainResultDto<DepositOrderChangeDto>> SwapAsync(DepositOrderDto dto);
-        return null;
+        var result = await _swapGrain.SwapAsync(orderDto);
+        if (result.Success)
+        {
+            _logger.LogWarning("ToStartSwapTx success, result: {result}", JsonConvert.SerializeObject(result));
+            return result.Data;
+        }
+        
+        _logger.LogWarning("ToStartSwapTx invalid or fail, will goto ToStartTransfer, result: {result}", JsonConvert.SerializeObject(result));
+        orderDto.ToTransfer.Symbol = orderDto.FromTransfer.Symbol;
+        return await ToStartTransfer(orderDto);
     }
     
     private async Task<DepositOrderChangeDto> ToStartSwapSubsidy(DepositOrderDto orderDto)

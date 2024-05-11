@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Orleans;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Grains.Grain.Order.Deposit;
+using ETransferServer.Grains.Grain.Swap;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.State.Order;
 using ETransferServer.Options;
@@ -26,13 +27,17 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
     
     private readonly IOptionsSnapshot<ChainOptions> _chainOptions;
     private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
-    
-    public SwapTxTimerGrain(ILogger<SwapTxTimerGrain> logger, IContractProvider contractProvider, IOptionsSnapshot<ChainOptions> chainOptions, IOptionsSnapshot<TimerOptions> timerOptions)
+    private readonly ISwapGrain _swapGrain;
+
+    public SwapTxTimerGrain(ILogger<SwapTxTimerGrain> logger, IContractProvider contractProvider,
+        IOptionsSnapshot<ChainOptions> chainOptions, IOptionsSnapshot<TimerOptions> timerOptions
+        , ISwapGrain swapGrain)
     {
         _logger = logger;
         _contractProvider = contractProvider;
         _chainOptions = chainOptions;
         _timerOptions = timerOptions;
+        _swapGrain = swapGrain;
     }
 
 
@@ -247,7 +252,9 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
                     // LIB confirmed, return order to stream
                     transferInfo.Status = OrderTransferStatusEnum.Confirmed.ToString();
                     order.Status = OrderStatusEnum.ToTransferConfirmed.ToString();
-
+                    transferInfo.Amount =  await _swapGrain.ParseReturnValueAsync(txStatus.ReturnValue);
+                    
+                    
                     await SaveOrder(order, ExtensionBuilder.New()
                         .Add(ExtensionKey.TransactionStatus, txStatus.Status)
                         .Add(ExtensionKey.TransactionError, txStatus.Error)

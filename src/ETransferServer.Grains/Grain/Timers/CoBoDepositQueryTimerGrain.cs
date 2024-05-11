@@ -237,14 +237,15 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         }
 
         // raymond.zhang
-        // if (InputHelper.IsDepositSwap(dto.FromTransfer.Symbol, dto.ToTransfer.Symbol))
-        // {
-        //     dto.ExtensionInfo ??= new Dictionary<string, string>();
-        //     dto.ExtensionInfo.Add(ExtensionKey.NeedSwap, Boolean.TrueString);
-        //     dto.ExtensionInfo.Add(ExtensionKey.SwapStage, SwapStage.SwapTx);
-        // }
+        if (DepositSwapHelper.IsDepositSwap(dto.FromTransfer.Symbol, dto.ToTransfer.Symbol))
+        {
+            dto.ExtensionInfo ??= new Dictionary<string, string>();
+            dto.ExtensionInfo.Add(ExtensionKey.NeedSwap, Boolean.TrueString);
+            dto.ExtensionInfo.Add(ExtensionKey.SwapStage, SwapStage.SwapTx);
+            return dto;
+        }
+        
         dto.ToTransfer.Symbol = dto.FromTransfer.Symbol;
-
         return dto;
     }
 

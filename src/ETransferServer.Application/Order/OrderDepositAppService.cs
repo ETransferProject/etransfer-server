@@ -97,9 +97,9 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
                 getDepositInfoDto.DepositInfo.ExtraNotes = depositInfo.SwapExtraNotes;
                 getDepositInfoDto.DepositInfo.ExtraInfo = new ExtraInfo
                 {
-                    Slippage = 0.05m
+                    // Slippage = 0.05m
                     // raymond.zhang
-                    // Slippage = _swapAppService.GetSlippage(request.Symbol, request.ToSymbol)
+                    Slippage = _swapAppService.GetSlippage(request.Symbol, request.ToSymbol)
                 };
             }
 
@@ -180,21 +180,21 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
         AssertHelper.IsTrue(DepositSwapAmountHelper.IsValidRange(request.FromAmount), "Param [FromAmount] is invalid. Please refresh and try again.");
         AssertHelper.IsTrue(_tokenAppService.IsValidSwap(request.ToChainId, request.FromSymbol, request.ToSymbol), "Must be valid swap Deposit symbols. Please refresh and try again.");
 
-        return new CalculateDepositRateDto()
-        {
-            ConversionRate = new ConversionRate()
-            {
-                FromSymbol = "USDT",
-                ToSymbol = "SGR-1",
-                FromAmount = 1.00m,
-                ToAmount = 0.38m,
-                // raymond.zhang
-                MinimumReceiveAmount = 0.35m
-            }
-        };
+        // return new CalculateDepositRateDto()
+        // {
+        //     ConversionRate = new ConversionRate()
+        //     {
+        //         FromSymbol = "USDT",
+        //         ToSymbol = "SGR-1",
+        //         FromAmount = 1.00m,
+        //         ToAmount = 0.38m,
+        //         // raymond.zhang
+        //         MinimumReceiveAmount = 0.35m
+        //     }
+        // };
         
         // raymond.zhang
-        /*var calculateAmountsOut = await _swapAppService.CalculateAmountsOut(request.ToChainId, request.FromSymbol, request.ToSymbol, request.FromAmount);
+        var calculateAmountsOut = await _swapAppService.CalculateAmountsOut(request.ToChainId, request.FromSymbol, request.ToSymbol, request.FromAmount);
         return new CalculateDepositRateDto()
         {
             ConversionRate = new ConversionRate()
@@ -203,9 +203,8 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
                 ToSymbol = request.ToSymbol,
                 FromAmount = request.FromAmount,
                 ToAmount = calculateAmountsOut.AmountOut,
-                // raymond.zhang
-                MinimumReceiveAmount = 0m
+                MinimumReceiveAmount = calculateAmountsOut.MinAmountOut
             }
-        };*/
+        };
     }
 }
