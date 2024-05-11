@@ -82,6 +82,7 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
             GrainFactory.GetGrain<IUserDepositTxTimerGrain>(GuidHelper.UniqGuid(nameof(IUserDepositTxTimerGrain)));
         _swapTxTimerGrain =
             GrainFactory.GetGrain<ISwapTxTimerGrain>(GuidHelper.UniqGuid(nameof(ISwapTxTimerGrain)));
+        _swapGrain = GrainFactory.GetGrain<ISwapGrain>(GuidHelper.UniqGuid(nameof(ISwapGrain)));
         _depositOrderRetryTimerGrain =
             GrainFactory.GetGrain<IDepositOrderRetryTimerGrain>(
                 GuidHelper.UniqGuid(nameof(IDepositOrderRetryTimerGrain)));
