@@ -228,12 +228,14 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
 
     private DepositOrderDto SpecialHandle(DepositOrderDto dto)
     {
+        _logger.LogInformation("SpecialHandle, input dto: {dto}", JsonConvert.SerializeObject(dto));
         // Add ExtensionInfo
         dto.ExtensionInfo ??= new Dictionary<string, string>();
         
         if (dto.ToTransfer.Symbol.IsNullOrEmpty() 
             || _depositOption.Value.NoSwapSymbols.Contains(dto.FromTransfer.Symbol))
         {
+            _logger.LogInformation("SpecialHandle, not need swap, set ToTransfer.Symbol = FromTransfer.Symbol");
             dto.ToTransfer.Symbol = dto.FromTransfer.Symbol;
             return dto;
         }
@@ -241,11 +243,13 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         // raymond.zhang
         if (DepositSwapHelper.IsDepositSwap(dto.FromTransfer.Symbol, dto.ToTransfer.Symbol))
         {
+            _logger.LogInformation("SpecialHandle, need swap, set ExtensionInfo");
             dto.ExtensionInfo.Add(ExtensionKey.NeedSwap, Boolean.TrueString);
             dto.ExtensionInfo.Add(ExtensionKey.SwapStage, SwapStage.SwapTx);
             return dto;
         }
         
+        _logger.LogInformation("SpecialHandle, default set ToTransfer.Symbol = FromTransfer.Symbol");
         dto.ToTransfer.Symbol = dto.FromTransfer.Symbol;
         return dto;
     }
