@@ -217,7 +217,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
                 ToAddress = addressInfo.Address,
                 Network = CommonConstant.Network.AElf,
                 ChainId = addressInfo.ChainId,
-                Symbol = userAddress.UserToken.Symbol,
+                Symbol = userAddress.ToSymbol,
                 Amount = coBoTransaction.AbsAmount.SafeToDecimal(),
                 Status = OrderTransferStatusEnum.Created.ToString(),
             }
