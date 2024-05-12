@@ -201,7 +201,7 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
         TransferInfo transferInfo = order.ToTransfer;;
         
         var swapId = order.ExtensionInfo[ExtensionKey.SwapStage].Equals(SwapStage.SwapTx)
-            ? order.ExtensionInfo[ExtensionKey.SwapTxId]
+            ? order.ToTransfer.TxId
             : order.ExtensionInfo[ExtensionKey.SwapSubsidyTxId];
         var swapTxTime = order.ExtensionInfo[ExtensionKey.SwapStage].Equals(SwapStage.SwapTx)
             ? transferInfo.TxTime

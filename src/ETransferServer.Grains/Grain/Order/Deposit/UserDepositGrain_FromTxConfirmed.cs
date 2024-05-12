@@ -137,11 +137,13 @@ public partial class UserDepositGrain
         var result = await swapGrain.SwapAsync(orderDto);
         if (result.Success)
         {
+            // orderDto.ExtensionInfo.AddOrReplace(ExtensionKey.SwapStage, SwapStage.SwapSubsidy);
             _logger.LogWarning("ToStartSwapTx success, result: {result}", JsonConvert.SerializeObject(result));
             return result.Data;
         }
         
         _logger.LogWarning("ToStartSwapTx invalid or fail, will goto ToStartTransfer, result: {result}", JsonConvert.SerializeObject(result));
+        orderDto.ExtensionInfo.AddOrReplace(ExtensionKey.SwapStage, SwapStage.SwapTxFailAndToTransfer);
         orderDto.ToTransfer.Symbol = orderDto.FromTransfer.Symbol;
         return await ToStartTransfer(orderDto);
     }
