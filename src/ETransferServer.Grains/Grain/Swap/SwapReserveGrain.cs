@@ -72,6 +72,8 @@ public class SwapReserveGrain : Grain<SwapReserveState>, ISwapReserveGrain
                 result.Message = "Empty reserve list.";
             }
 
+            State.PairAddress = pairAddress;
+            await WriteStateAsync();
             return result;
         }
 
@@ -90,14 +92,7 @@ public class SwapReserveGrain : Grain<SwapReserveState>, ISwapReserveGrain
 
         var pairAddress =
             await GetPairAddressAsync(grainId.ChainId, grainId.Router, grainId.SymbolIn, grainId.SymbolOut);
-        if (pairAddress.IsNullOrEmpty())
-        {
-            return State.PairAddress;
-        }
-
-        State.PairAddress = pairAddress;
-        await WriteStateAsync();
-        return State.PairAddress;
+        return pairAddress;
     }
 
     private async Task<string> GetPairAddressAsync(string chainId, string router, string symbolIn, string symbolOut,

@@ -73,14 +73,7 @@ public class SwapAppService : ApplicationService, ISwapAppService
         result.MinAmountOut = GetMinOutAmount(amountOut, symbolIn, symbolOut);
         return result;
     }
-
-    // public async Task TestSwap()
-    // {
-    //     var orderId = Guid.NewGuid();
-    //     var swapGrain =
-    //         _clusterClient.GetGrain<ISwapGrain>(orderId);
-    // }
-
+    
     private decimal GetMinOutAmount(decimal amountOut, string symbolIn, string symbolOut)
     {
         var slippage = GetSlippage(symbolIn, symbolOut);
