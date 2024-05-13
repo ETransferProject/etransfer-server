@@ -244,8 +244,8 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
             var txStatus =
                 await _contractProvider.QueryTransactionResultAsync(transferInfo.ChainId, swapId);
             _logger.LogInformation(
-                "TxOrderTimer order={OrderId}, txId={TxId}, status={Status}, txHeight={Height}, LIB={Lib}", order.Id,
-                timerTx.TxId, txStatus.Status, txStatus.BlockNumber, chainStatus.LastIrreversibleBlockHeight);
+                "TxOrderTimer order={OrderId}, txId={TxId}, status={Status}, txHeight={Height}, LIB={Lib}, returnValue={ReturnValue}", order.Id,
+                timerTx.TxId, txStatus.Status, txStatus.BlockNumber, chainStatus.LastIrreversibleBlockHeight, txStatus.ReturnValue);
 
             // pending status, continue waiting
             if (txStatus.Status == CommonConstant.TransactionState.Pending) return false;
@@ -263,7 +263,7 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
                     order.Status = OrderStatusEnum.ToTransferConfirmed.ToString();
                     var swapGrain = GrainFactory.GetGrain<ISwapGrain>(order.Id);
                     transferInfo.Amount =  await swapGrain.ParseReturnValueAsync(txStatus.ReturnValue);
-                    
+                    _logger.LogInformation("After ParseReturnValueAsync: {Amount}", transferInfo.Amount);
                     
                     await SaveOrder(order, ExtensionBuilder.New()
                         .Add(ExtensionKey.TransactionStatus, txStatus.Status)

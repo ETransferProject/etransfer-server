@@ -97,9 +97,7 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
                 getDepositInfoDto.DepositInfo.ExtraNotes = depositInfo.SwapExtraNotes;
                 getDepositInfoDto.DepositInfo.ExtraInfo = new ExtraInfo
                 {
-                    // Slippage = 0.05m
-                    // raymond.zhang
-                    Slippage = Math.Round(_swapAppService.GetSlippage(request.Symbol, request.ToSymbol), await GetToSymbolDecimalsAsync(getUserDepositAddressInput))
+                    Slippage = _swapAppService.GetSlippage(request.Symbol, request.ToSymbol)
                 };
             }
 
@@ -126,14 +124,14 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
         }
     }
 
-    private async Task<int> GetToSymbolDecimalsAsync(GetUserDepositAddressInput input)
+    private async Task<int> GetToSymbolDecimalsAsync(String chainId, string fromSymbol, string toSymbol)
     {
         var tokenOptionList = await _tokenAppService.GetTokenOptionListAsync(new GetTokenOptionListRequestDto(){Type = OrderTypeEnum.Deposit.ToString()});
 
-        var tokenOption = tokenOptionList.TokenList.FirstOrDefault(option => option.Symbol == input.Symbol);
+        var tokenOption = tokenOptionList.TokenList.FirstOrDefault(option => option.Symbol == fromSymbol);
         if (tokenOption != null)
         {
-            var toTokenOption = tokenOption.ToTokenList.FirstOrDefault(option => option.ChainIdList.Contains(input.ChainId) && option.Symbol == input.ToSymbol);
+            var toTokenOption = tokenOption.ToTokenList.FirstOrDefault(option => option.ChainIdList.Contains(chainId) && option.Symbol == toSymbol);
             if (toTokenOption != null)
             {
                 return toTokenOption.Decimals;
@@ -220,8 +218,8 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
                 FromSymbol = request.FromSymbol,
                 ToSymbol = request.ToSymbol,
                 FromAmount = request.FromAmount,
-                ToAmount = calculateAmountsOut.AmountOut,
-                MinimumReceiveAmount = calculateAmountsOut.MinAmountOut
+                ToAmount = Math.Round(calculateAmountsOut.AmountOut, await GetToSymbolDecimalsAsync(request.ToChainId, request.FromSymbol, request.ToSymbol)),
+                MinimumReceiveAmount = Math.Round(calculateAmountsOut.MinAmountOut, await GetToSymbolDecimalsAsync(request.ToChainId, request.FromSymbol, request.ToSymbol))
             }
         };
     }
