@@ -79,7 +79,12 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
                 return result;
             }
 
-            _objectMapper.Map<DepositOrderDto, SwapState>(dto);
+            // _objectMapper.Map<DepositOrderDto, SwapState>(dto);
+            State.ToChainId = dto.ToTransfer.ChainId;
+            State.SymbolIn = dto.FromTransfer.Symbol;
+            State.SymbolOut = dto.ToTransfer.Symbol;
+            State.AmountIn = dto.FromTransfer.Amount;
+            State.TimeStamp = dto.CreateTime;
             await WriteStateAsync();
             Transaction rawTransaction;
             if (dto.FromRawTransaction.IsNullOrEmpty())

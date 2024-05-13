@@ -49,11 +49,11 @@ public class ETransferServerGrainsAutoMapperProfile : Profile
             .ForMember(
                 destination => destination.ReserveOut,
                 opt => opt.MapFrom(source => source.ReserveB));
-        CreateMap<SwapState, DepositOrderDto>().ReverseMap().ForMember(
-            destination => destination.SymbolIn,
-            opt => opt.MapFrom(source => source.FromTransfer.Symbol)).ForMember(destination => destination.SymbolOut,
-            opt => opt.MapFrom(source => source.ToTransfer.Symbol)).ForMember(destination => destination.AmountIn,
-            opt => opt.MapFrom(source => source.FromTransfer.Amount)).ForMember(destination => destination.TimeStamp,
-            opt => opt.MapFrom(source => source.CreateTime ?? source.FromTransfer.TxTime));
+        // CreateMap<SwapState, DepositOrderDto>().ReverseMap().ForMember(
+        //     destination => destination.SymbolIn,
+        //     opt => opt.MapFrom(source => source.FromTransfer.Symbol)).ForMember(destination => destination.SymbolOut,
+        //     opt => opt.MapFrom(source => source.ToTransfer.Symbol)).ForMember(destination => destination.AmountIn,
+        //     opt => opt.MapFrom(source => source.FromTransfer.Amount)).ForMember(destination => destination.TimeStamp,
+        //     opt => opt.MapFrom(source => source.CreateTime ?? source.FromTransfer.TxTime));
     }
 }
