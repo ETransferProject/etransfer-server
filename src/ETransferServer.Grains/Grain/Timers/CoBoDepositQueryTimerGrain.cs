@@ -245,6 +245,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         if (DepositSwapHelper.IsDepositSwap(dto.FromTransfer.Symbol, dto.ToTransfer.Symbol))
         {
             _logger.LogInformation("SpecialHandle, need swap, set ExtensionInfo");
+            dto.ExtensionInfo.Add(ExtensionKey.IsSwap, Boolean.TrueString);
             dto.ExtensionInfo.Add(ExtensionKey.NeedSwap, Boolean.TrueString);
             dto.ExtensionInfo.Add(ExtensionKey.SwapStage, SwapStage.SwapTx);
             return dto;

@@ -43,9 +43,9 @@ public class UserDepositRecordGrain : Grain<DepositOrderState>, IUserDepositReco
             
             _objectMapper.Map(orderDto, State);
             State.Id = this.GetPrimaryKey();
-            State.CreateTime = orderDto.CreateTime = createTime;
-            State.LastModifyTime = orderDto.LastModifyTime = now;
-            State.ArrivalTime = orderDto.ArrivalTime = arrivalTime;
+            State.CreateTime = createTime;
+            State.LastModifyTime = now;
+            State.ArrivalTime = arrivalTime;
             if (orderDto.Status == OrderStatusEnum.Finish.ToString())
             {
                 State.ArrivalTime = State.LastModifyTime;

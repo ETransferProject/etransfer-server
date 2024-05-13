@@ -29,8 +29,9 @@ public static class ExtensionKey
     public const string ToTransferTxId = "toTransferTxId";
     public const string IsForward = "isForward";
 
+    public const string IsSwap = "IsSwap";
     public const string SwapSubsidyTxId = "SwapSubsidyTxId";
-    public const string NeedSwap = "needSwap";
+    public const string NeedSwap = "NeedSwap";
     public const string SwapStage = "SwapStage";
     public const string SwapSubsidyTxTime = "SwapSubsidyTxTime";
 }

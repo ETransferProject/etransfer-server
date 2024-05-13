@@ -21,18 +21,22 @@ public partial class UserDepositGrain
 
     private async Task<DepositOrderChangeDto> OnToStartTransfer(DepositOrderDto orderDto)
     {
-        
+
         if (IsSwapTx(orderDto))
         {
-            // raymond.zhang
             return await ToStartSwapTx(orderDto);
         }
-        
-        if (IsSwapSubsidy(orderDto)) {
-            // raymond.zhang
+
+        if (IsSwapSubsidy(orderDto))
+        {
             await ToStartSwapSubsidy(orderDto);
-        }  
-        
+        }
+
+        if (IsSwapTxFailAndToTransfer(orderDto))
+        {
+            await ToStartTransfer(orderDto, true);
+        }
+
         return await ToStartTransfer(orderDto);
     }
 
@@ -59,7 +63,8 @@ public partial class UserDepositGrain
                     Symbol = toTransfer.Symbol,
                     Memo = ITokenGrain.GetNewId(orderDto.Id)
                 };
-                var (txId, newTransaction) = await _contractProvider.CreateTransactionAsync(toTransfer.ChainId, toTransfer.FromAddress,
+                var (txId, newTransaction) = await _contractProvider.CreateTransactionAsync(toTransfer.ChainId,
+                    toTransfer.FromAddress,
                     SystemContractName.TokenContract, "Transfer", transferInput);
 
                 toTransfer.TxId = txId.ToHex();
@@ -68,7 +73,8 @@ public partial class UserDepositGrain
             }
             else
             {
-                rawTransaction = Transaction.Parser.ParseFrom(ByteStringHelper.FromHexString(orderDto.FromRawTransaction));
+                rawTransaction =
+                    Transaction.Parser.ParseFrom(ByteStringHelper.FromHexString(orderDto.FromRawTransaction));
             }
 
             toTransfer.TxTime = DateTime.UtcNow.ToUtcMilliSeconds();
@@ -135,13 +141,14 @@ public partial class UserDepositGrain
     {
         _logger.LogInformation("ToStartSwapTx, orderDto: {orderDto}", JsonConvert.SerializeObject(orderDto));
         var userDepositRecordGrain = GrainFactory.GetGrain<IUserDepositRecordGrain>(orderDto.Id);
-        
-        var order = await  userDepositRecordGrain.GetAsync();
+
+        var order = await userDepositRecordGrain.GetAsync();
         orderDto.CreateTime = order.Value.CreateTime;
         orderDto.ArrivalTime = order.Value.ArrivalTime;
         orderDto.LastModifyTime = order.Value.LastModifyTime;
-        _logger.LogInformation("ToStartSwapTx, orderDto after set time: {orderDto}", JsonConvert.SerializeObject(orderDto));
-        
+        _logger.LogInformation("ToStartSwapTx, orderDto after set time: {orderDto}",
+            JsonConvert.SerializeObject(orderDto));
+
         var swapGrain = GrainFactory.GetGrain<ISwapGrain>(orderDto.Id);
         var result = await swapGrain.SwapAsync(orderDto);
         if (result.Success)
@@ -150,13 +157,14 @@ public partial class UserDepositGrain
             _logger.LogInformation("ToStartSwapTx success, result: {result}", JsonConvert.SerializeObject(result));
             return result.Data;
         }
-        
-        _logger.LogInformation("ToStartSwapTx invalid or fail, will goto ToStartTransfer, result: {result}", JsonConvert.SerializeObject(result));
+
+        _logger.LogInformation("ToStartSwapTx invalid or fail, will goto ToStartTransfer, result: {result}",
+            JsonConvert.SerializeObject(result));
         orderDto.ExtensionInfo.AddOrReplace(ExtensionKey.SwapStage, SwapStage.SwapTxFailAndToTransfer);
         orderDto.ToTransfer.Symbol = orderDto.FromTransfer.Symbol;
         return await ToStartTransfer(orderDto);
     }
-    
+
     private async Task<DepositOrderChangeDto> ToStartSwapSubsidy(DepositOrderDto orderDto)
     {
         // raymond.zhang
@@ -169,7 +177,7 @@ public partial class UserDepositGrain
         return orderDto.ExtensionInfo.ContainsKey(ExtensionKey.NeedSwap) &&
                orderDto.ExtensionInfo[ExtensionKey.NeedSwap].Equals(Boolean.TrueString);
     }
-    
+
     private bool IsSwapTx(DepositOrderDto orderDto)
     {
         if (NeedSwap(orderDto))
@@ -177,9 +185,10 @@ public partial class UserDepositGrain
             return orderDto.ExtensionInfo.ContainsKey(ExtensionKey.SwapStage) &&
                    orderDto.ExtensionInfo[ExtensionKey.SwapStage].Equals(SwapStage.SwapTx);
         }
+
         return false;
     }
-    
+
     private bool IsSwapSubsidy(DepositOrderDto orderDto)
     {
         if (NeedSwap(orderDto))
@@ -187,6 +196,15 @@ public partial class UserDepositGrain
             return orderDto.ExtensionInfo.ContainsKey(ExtensionKey.SwapStage) &&
                    orderDto.ExtensionInfo[ExtensionKey.SwapStage].Equals(SwapStage.SwapSubsidy);
         }
+
         return false;
+    }
+
+    private bool IsSwapTxFailAndToTransfer(DepositOrderDto orderDto)
+    {
+        return (orderDto.ExtensionInfo.ContainsKey(ExtensionKey.NeedSwap) &&
+                orderDto.ExtensionInfo[ExtensionKey.NeedSwap].Equals(Boolean.FalseString)) ||
+               (orderDto.ExtensionInfo.ContainsKey(ExtensionKey.SwapStage) &&
+                orderDto.ExtensionInfo[ExtensionKey.SwapStage].Equals(SwapStage.SwapTxFailAndToTransfer));
     }
 }

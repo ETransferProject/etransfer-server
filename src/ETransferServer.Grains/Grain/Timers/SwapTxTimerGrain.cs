@@ -1,3 +1,4 @@
+using System.Text;
 using AElf.Client.Dto;
 using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
@@ -287,8 +288,15 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
                 || txStatus.Status == CommonConstant.TransactionState.NodeValidationFailed
                 || txStatus.Status == CommonConstant.TransactionState.NotExisted)
             {
-                transferInfo.Status = OrderTransferStatusEnum.Failed.ToString();
-                order.Status = OrderStatusEnum.ToTransferFailed.ToString();
+                // transferInfo.Status = OrderTransferStatusEnum.Failed.ToString();
+                // order.Status = OrderStatusEnum.ToTransferFailed.ToString();
+
+                transferInfo.Status = OrderTransferStatusEnum.StartTransfer.ToString();
+                order.Status = OrderStatusEnum.ToStartTransfer.ToString();
+                transferInfo.Symbol = order.FromTransfer.Symbol;
+                order.ExtensionInfo[ExtensionKey.NeedSwap] = Boolean.FalseString;
+                order.ExtensionInfo[ExtensionKey.SwapStage] = SwapStage.SwapTxFailAndToTransfer;
+
                 await SaveOrder(order, ExtensionBuilder.New()
                     .Add(ExtensionKey.TransactionStatus, txStatus.Status)
                     .Add(ExtensionKey.TransactionError, txStatus.Error)
@@ -296,6 +304,7 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
                 _logger.LogWarning(
                     "SwapTxOrderTimer tx status {TxStatus}, orderId={OrderId}. txId={TxId}, error={Error}", 
                     txStatus.Status, order.Id, transferInfo.TxId, txStatus.Error);
+
                 return true;
             }
 
