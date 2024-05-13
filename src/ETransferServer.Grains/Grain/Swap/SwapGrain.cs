@@ -217,7 +217,8 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
             AmountIn = amountInWithDecimal,
             To = Address.FromBase58(toTransfer.ToAddress),
             Deadline = Timestamp.FromDateTime(DateTime.UtcNow.AddDays(1)),
-            Channel = this.GetPrimaryKey().ToString().Replace("-", "")
+            Channel = this.GetPrimaryKey().ToString().Replace("-", ""),
+            Path = { swapInfo.Path }
         };
 
         // 4. get slippage and compare amount and get amount out min
