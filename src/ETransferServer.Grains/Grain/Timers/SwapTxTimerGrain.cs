@@ -158,8 +158,8 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
 
             // The following two cases directly from the node query results
             // 1. The order has been in the list for a long time.
-            var queryNode = now > pendingTx.TxTime + _chainOptions.Value.TxResultFromNodeSecondsAfter * 1000;
-            _logger.LogInformation("queryNode {queryNode}", queryNode);
+            var queryNode = now > pendingTx.TxTime;
+            _logger.LogInformation("queryNode {queryNode}, now: {now}, pendingTx.TxTime: {txTime}", queryNode, now, pendingTx.TxTime);
             if (queryNode)
             {
                 _logger.LogDebug("TxTimer use node result orderId={OrderId}, chainId={ChainId}, txId={TxId}", orderId,
