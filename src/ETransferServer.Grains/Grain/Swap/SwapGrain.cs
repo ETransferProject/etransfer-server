@@ -339,11 +339,24 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
 
     public async Task<decimal> ParseReturnValueAsync(string returnValue)
     {
-        var output = SwapOutput.Parser.ParseFrom(ByteString.FromBase64(returnValue));
-        var tokenInfo = await GetTokenAsync(State.SymbolOut, State.ToChainId);
-        var actualSwappedAmountOut = (output.Amount.ToList().Last() / (decimal)Math.Pow(10, tokenInfo.Decimals));
-        State.ActualSwappedAmountOut = actualSwappedAmountOut;
-        await WriteStateAsync();
+        if (returnValue.IsNullOrEmpty())
+        {
+            return 0;
+        }
+        decimal actualSwappedAmountOut = 0;
+        try
+        {
+            var output = SwapOutput.Parser.ParseFrom(ByteArrayHelper.HexStringToByteArray(returnValue));
+            var tokenInfo = await GetTokenAsync(State.SymbolOut, State.ToChainId);
+            actualSwappedAmountOut = (output.Amount.ToList().Last() / (decimal)Math.Pow(10, tokenInfo.Decimals));
+            State.ActualSwappedAmountOut = actualSwappedAmountOut;
+            await WriteStateAsync();
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e,"Failed to parse.");
+            return 0;
+        }
         return actualSwappedAmountOut;
     }
 }
