@@ -197,20 +197,21 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
         AssertHelper.IsTrue(DepositSwapAmountHelper.IsValidRange(request.FromAmount), "Param [FromAmount] is invalid. Please refresh and try again.");
         AssertHelper.IsTrue(_tokenAppService.IsValidSwap(request.ToChainId, request.FromSymbol, request.ToSymbol), "Must be valid swap Deposit symbols. Please refresh and try again.");
 
-        // return new CalculateDepositRateDto()
-        // {
-        //     ConversionRate = new ConversionRate()
-        //     {
-        //         FromSymbol = "USDT",
-        //         ToSymbol = "SGR-1",
-        //         FromAmount = 1.00m,
-        //         ToAmount = 0.38m,
-        //         // raymond.zhang
-        //         MinimumReceiveAmount = 0.35m
-        //     }
-        // };
+        if (request.FromAmount == DepositSwapAmountHelper.AmountZero)
+        {
+            return new CalculateDepositRateDto()
+            {
+                ConversionRate = new ConversionRate()
+                {
+                    FromSymbol = request.FromSymbol,
+                    ToSymbol = request.ToSymbol,
+                    FromAmount = request.FromAmount,
+                    ToAmount = DepositSwapAmountHelper.AmountZero,
+                    MinimumReceiveAmount = DepositSwapAmountHelper.AmountZero
+                }
+            };
+        }
         
-        // raymond.zhang
         var calculateAmountsOut = await _swapAppService.CalculateAmountsOut(request.ToChainId, request.FromSymbol, request.ToSymbol, request.FromAmount);
         return new CalculateDepositRateDto()
         {
