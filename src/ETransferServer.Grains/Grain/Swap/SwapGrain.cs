@@ -136,6 +136,7 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
                 case CommonConstant.TransactionState.NodeValidationFailed:
                     toTransfer.Status = OrderTransferStatusEnum.Failed.ToString();
                     dto.Status = OrderStatusEnum.ToTransferFailed.ToString();
+                    result.Success = false;
                     break;
                 default:
                     toTransfer.Status = OrderTransferStatusEnum.Transferring.ToString();
@@ -235,6 +236,8 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
             _logger.LogError("{message},{orderId}", result.Message, this.GetPrimaryKey().ToString());
             return (result, null);
         }
+        _logger.LogInformation("Swap input.{input},{grainId}", JsonConvert.SerializeObject(swapInput),
+            this.GetPrimaryKey().ToString());
 
         return (result, swapInput);
     }
