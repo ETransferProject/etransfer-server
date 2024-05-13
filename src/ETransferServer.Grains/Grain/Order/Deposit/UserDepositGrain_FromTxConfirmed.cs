@@ -132,14 +132,15 @@ public partial class UserDepositGrain
 
     private async Task<DepositOrderChangeDto> ToStartSwapTx(DepositOrderDto orderDto)
     {
-        // raymond.zhang
         _logger.LogInformation("ToStartSwapTx, orderDto: {orderDto}", JsonConvert.SerializeObject(orderDto));
         var userDepositRecordGrain = GrainFactory.GetGrain<IUserDepositRecordGrain>(orderDto.Id);
+        
         var order = await  userDepositRecordGrain.GetAsync();
         orderDto.CreateTime = order.Value.CreateTime;
         orderDto.ArrivalTime = order.Value.ArrivalTime;
         orderDto.LastModifyTime = order.Value.LastModifyTime;
-        _logger.LogInformation("ToStartSwapTx2, orderDto: {orderDto}", JsonConvert.SerializeObject(orderDto));
+        _logger.LogInformation("ToStartSwapTx, orderDto after set time: {orderDto}", JsonConvert.SerializeObject(orderDto));
+        
         var swapGrain = GrainFactory.GetGrain<ISwapGrain>(orderDto.Id);
         var result = await swapGrain.SwapAsync(orderDto);
         if (result.Success)
