@@ -4,6 +4,7 @@ using Orleans.Streams;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Grains.State.Order;
+using Newtonsoft.Json;
 
 namespace ETransferServer.Grains.Grain.Order.Deposit;
 
@@ -17,6 +18,7 @@ public partial class UserDepositGrain
     /// <param name="token"></param>
     public async Task OnNextAsync(DepositOrderDto orderDto, StreamSequenceToken token = null)
     {
+        
         // Bottom logic to prevent Stream dead loops
         if (++ _currentSteps >= MaxStreamSteps)
         {
@@ -33,6 +35,7 @@ public partial class UserDepositGrain
             // which is the first state of the charge order.
             case OrderStatusEnum.FromTransferConfirmed:
             {
+                _logger.LogInformation("FromTransferConfirmed, orderDto: {orderDto}", JsonConvert.SerializeObject(orderDto));
                 await AddCheckOrder(orderDto);
                 orderDto.Status = OrderStatusEnum.ToStartTransfer.ToString();
                 await AddOrUpdateOrder(orderDto);
@@ -42,6 +45,7 @@ public partial class UserDepositGrain
             // Send transaction to node 
             case OrderStatusEnum.ToStartTransfer:
             {
+                _logger.LogInformation("ToStartTransfer, orderDto: {orderDto}", JsonConvert.SerializeObject(orderDto));
                 var order = await OnToStartTransfer(orderDto);
                 await AddOrUpdateOrder(order.DepositOrder, order.ExtensionData);
                 break;
@@ -53,12 +57,14 @@ public partial class UserDepositGrain
             case OrderStatusEnum.ToTransferring:
             case OrderStatusEnum.ToTransferred:
             {
+                _logger.LogInformation("ToTransferred, orderDto: {orderDto}", JsonConvert.SerializeObject(orderDto));
                 await OnToTransferred(orderDto);
                 break;
             }
 
             // Finish
             case OrderStatusEnum.ToTransferConfirmed:
+                _logger.LogInformation("ToTransferred, orderDto: {orderDto}", JsonConvert.SerializeObject(orderDto));
                 orderDto.Status = OrderStatusEnum.Finish.ToString();
                 await AddOrUpdateOrder(orderDto);
                 break;
@@ -66,6 +72,7 @@ public partial class UserDepositGrain
             // Retry with max count
             case OrderStatusEnum.ToTransferFailed:
             {
+                _logger.LogInformation("ToTransferFailed, orderDto: {orderDto}", JsonConvert.SerializeObject(orderDto));
                 var statusFlow = await _orderStatusFlowGrain.GetAsync();
                 var querySuccess = statusFlow?.Data != null;
                 var retryFrom = OrderStatusEnum.ToStartTransfer.ToString();
