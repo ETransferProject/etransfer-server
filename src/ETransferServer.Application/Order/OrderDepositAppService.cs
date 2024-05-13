@@ -99,7 +99,7 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
                 {
                     // Slippage = 0.05m
                     // raymond.zhang
-                    Slippage = _swapAppService.GetSlippage(request.Symbol, request.ToSymbol)
+                    Slippage = Math.Round(_swapAppService.GetSlippage(request.Symbol, request.ToSymbol), await GetToSymbolDecimalsAsync(getUserDepositAddressInput))
                 };
             }
 
@@ -124,6 +124,23 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
             _logger.LogError(e, "GetDepositInfo error");
             throw;
         }
+    }
+
+    private async Task<int> GetToSymbolDecimalsAsync(GetUserDepositAddressInput input)
+    {
+        var tokenOptionList = await _tokenAppService.GetTokenOptionListAsync(new GetTokenOptionListRequestDto(){Type = OrderTypeEnum.Deposit.ToString()});
+
+        var tokenOption = tokenOptionList.TokenList.FirstOrDefault(option => option.Symbol == input.Symbol);
+        if (tokenOption != null)
+        {
+            var toTokenOption = tokenOption.ToTokenList.FirstOrDefault(option => option.ChainIdList.Contains(input.ChainId) && option.Symbol == input.ToSymbol);
+            if (toTokenOption != null)
+            {
+                return toTokenOption.Decimals;
+            }
+        }
+
+        return 8;
     }
 
 

@@ -27,11 +27,11 @@ public class UserDepositAddressGrain : Grain<TokenDepositAddressState>, IUserDep
     private readonly IUserAddressProvider _userAddressProvider;
     private readonly IOptionsSnapshot<DepositAddressOptions> _depositAddressOptions;
     private readonly IObjectMapper _objectMapper;
-    private readonly ILogger<TransactionNotificationGrain> _logger;
+    private readonly ILogger<UserDepositAddressGrain> _logger;
 
     public UserDepositAddressGrain(IUserAddressProvider userAddressProvider,
         IOptionsSnapshot<DepositAddressOptions> depositAddressOptions,
-        IObjectMapper objectMapper, ILogger<TransactionNotificationGrain> logger)
+        IObjectMapper objectMapper, ILogger<UserDepositAddressGrain> logger)
     {
         _userAddressProvider = userAddressProvider;
         _depositAddressOptions = depositAddressOptions;
