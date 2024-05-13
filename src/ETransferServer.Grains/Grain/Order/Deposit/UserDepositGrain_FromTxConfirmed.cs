@@ -202,9 +202,7 @@ public partial class UserDepositGrain
 
     private bool IsSwapTxFailAndToTransfer(DepositOrderDto orderDto)
     {
-        return (orderDto.ExtensionInfo.ContainsKey(ExtensionKey.NeedSwap) &&
-                orderDto.ExtensionInfo[ExtensionKey.NeedSwap].Equals(Boolean.FalseString)) ||
-               (orderDto.ExtensionInfo.ContainsKey(ExtensionKey.SwapStage) &&
-                orderDto.ExtensionInfo[ExtensionKey.SwapStage].Equals(SwapStage.SwapTxFailAndToTransfer));
+        return orderDto.ExtensionInfo.ContainsKey(ExtensionKey.SwapStage) &&
+                orderDto.ExtensionInfo[ExtensionKey.SwapStage].Equals(SwapStage.SwapTxFailAndToTransfer);
     }
 }
