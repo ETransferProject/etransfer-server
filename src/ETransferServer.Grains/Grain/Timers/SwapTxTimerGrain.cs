@@ -10,6 +10,7 @@ using ETransferServer.Grains.Options;
 using ETransferServer.Grains.State.Order;
 using ETransferServer.Options;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 using Volo.Abp;
 
 namespace ETransferServer.Grains.Grain.Timers;
@@ -51,11 +52,13 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
             return;
         }
 
+        _logger.LogInformation("Order id {Id} AddToPendingList before paramCheck", id);
         AssertHelper.NotNull(transaction, "Transaction empty");
         AssertHelper.NotEmpty(transaction.ChainId, "Transaction chainId empty");
         AssertHelper.NotEmpty(transaction.TxId, "Transaction id empty");
         AssertHelper.NotNull(transaction.TxTime, "Transaction time null");
 
+        _logger.LogInformation("Order id {Id} AddToPendingList after paramCheck", id);
         State.OrderTransactionDict[id] = transaction;
 
         await WriteStateAsync();
@@ -102,14 +105,17 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
         var removed = 0;
         const int subPageSize = 10;
         var pendingList = State.OrderTransactionDict.ToList();
+        _logger.LogInformation("pendingList {distinctPendingList}", JsonConvert.SerializeObject(pendingList));
         var distinctPendingList = pendingList
             .GroupBy(p => p.Value.TxId)
             .Select(g => g.First())
             .ToList();
+        _logger.LogInformation("distinctPendingList {distinctPendingList}", JsonConvert.SerializeObject(distinctPendingList));
         var pendingSubLists = SplitList(distinctPendingList, subPageSize);
         foreach (var subList in pendingSubLists)
         {
             var handleResult = await HandlePage(subList, chainStatus, indexerLatestHeight);
+            _logger.LogInformation("handleResult {handleResult}", JsonConvert.SerializeObject(handleResult));
             foreach (var (orderId, remove) in handleResult)
             {
                 if (!remove) continue;
@@ -143,6 +149,7 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
         {
             // query order and verify pendingTx data
             var order = await QueryOrderAndVerify(orderId, pendingTx);
+            _logger.LogInformation("QueryOrderAndVerify {order}", JsonConvert.SerializeObject(order));
             if (order == null)
             {
                 result[orderId] = true;
@@ -152,6 +159,7 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
             // The following two cases directly from the node query results
             // 1. The order has been in the list for a long time.
             var queryNode = now > pendingTx.TxTime + _chainOptions.Value.TxResultFromNodeSecondsAfter * 1000;
+            _logger.LogInformation("queryNode {queryNode}", queryNode);
             if (queryNode)
             {
                 _logger.LogDebug("TxTimer use node result orderId={OrderId}, chainId={ChainId}, txId={TxId}", orderId,
@@ -200,12 +208,16 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
 
         TransferInfo transferInfo = order.ToTransfer;;
         
+        _logger.LogInformation("HandleOrderTransaction: {order}", JsonConvert.SerializeObject(order));
+        
         var swapId = order.ExtensionInfo[ExtensionKey.SwapStage].Equals(SwapStage.SwapTx)
             ? order.ToTransfer.TxId
             : order.ExtensionInfo[ExtensionKey.SwapSubsidyTxId];
         var swapTxTime = order.ExtensionInfo[ExtensionKey.SwapStage].Equals(SwapStage.SwapTx)
             ? transferInfo.TxTime
             : getSwapSubsidyTxTime(order);
+        
+        _logger.LogInformation("HandleOrderTransaction after set param: {order}", JsonConvert.SerializeObject(order));
         
         try
         {
