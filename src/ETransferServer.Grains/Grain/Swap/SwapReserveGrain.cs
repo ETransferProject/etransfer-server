@@ -15,7 +15,7 @@ namespace ETransferServer.Grains.Grain.Swap;
 
 public interface ISwapReserveGrain : IGrainWithStringKey
 {
-    Task<GrainResultDto<ReserveDto>> GetReserveAsync(long? timeStamp, int skipCount, int maxResultCount);
+    Task<GrainResultDto<ReserveDto>> GetReserveAsync(long timeStamp, int skipCount, int maxResultCount);
 
     public static string GenGrainId(string chainId, string symbolIn, string symbolOut, string router)
     {
@@ -42,7 +42,7 @@ public class SwapReserveGrain : Grain<SwapReserveState>, ISwapReserveGrain
         _swapInfosOptions = swapInfosOptions.Value;
     }
 
-    public async Task<GrainResultDto<ReserveDto>> GetReserveAsync(long? timeStamp, int skipCount, int maxResultCount)
+    public async Task<GrainResultDto<ReserveDto>> GetReserveAsync(long timeStamp, int skipCount, int maxResultCount)
     {
         var result = new GrainResultDto<ReserveDto>();
         var grainId = SwapAmountsGrainId.FromGrainId(this.GetPrimaryKeyString());
@@ -149,7 +149,7 @@ public class SwapReserveGrain : Grain<SwapReserveState>, ISwapReserveGrain
                 .Time.ToUtcMilliSeconds();
             _logger.LogInformation("Get block time from chain:{time},create time:{timestamp},{grainId}", blockTime,
                 timestamp, this.GetPrimaryKeyString());
-            return blockTime > timestamp && (libFromGql >= libFromChain ||
+            return blockTime >= timestamp && (libFromGql >= libFromChain ||
                                              libFromGql >= libFromChain - _swapInfosOptions.SafeLibDiff);
         }
         catch (Exception e)

@@ -35,6 +35,8 @@
     <PackageReference Include="AElf.Whitelist.Application" Version="0.0.3" />
     <PackageReference Include="GraphQL.Client.Serializer.Newtonsoft" Version="5.1.0" />
     <PackageReference Include="GraphQL.Client" Version="5.1.0" />
+    <PackageReference Include="Nethereum.Web3" Version="4.20.0" />
+    <PackageReference Include="Nethereum.Util" Version="4.20.0" />
   </ItemGroup>
 
   <ItemGroup>
