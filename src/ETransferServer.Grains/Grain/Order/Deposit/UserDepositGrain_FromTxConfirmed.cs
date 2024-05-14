@@ -139,8 +139,10 @@ public partial class UserDepositGrain
 
     private async Task<DepositOrderChangeDto> ToStartSwapTx(DepositOrderDto orderDto)
     {
+       
+        orderDto = await TrySetTimes(orderDto);
         _logger.LogInformation("ToStartSwapTx, orderDto: {orderDto}", JsonConvert.SerializeObject(orderDto));
-
+        
         var swapGrain = GrainFactory.GetGrain<ISwapGrain>(orderDto.Id);
         var result = await swapGrain.SwapAsync(orderDto);
         if (result.Success)
@@ -161,6 +163,16 @@ public partial class UserDepositGrain
     {
         // Task<GrainResultDto<DepositOrderChangeDto>> SubsidyTransferAsync(DepositOrderDto dto，string returnValue);
         return null;
+    }
+    
+    private async Task<DepositOrderDto> TrySetTimes(DepositOrderDto orderDto)
+    {
+        var userDepositRecordGrain = GrainFactory.GetGrain<IUserDepositRecordGrain>(orderDto.Id);
+        var order = await userDepositRecordGrain.GetAsync();
+        orderDto.CreateTime ??= order.Value.CreateTime;
+        orderDto.ArrivalTime ??= order.Value.ArrivalTime;
+        orderDto.LastModifyTime ??= order.Value.LastModifyTime;
+        return orderDto;
     }
 
     private bool NeedSwap(DepositOrderDto orderDto)
