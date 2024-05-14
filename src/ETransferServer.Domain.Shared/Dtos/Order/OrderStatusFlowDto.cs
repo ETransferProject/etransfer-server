@@ -40,7 +40,8 @@ public static class SwapStage
 {
     public const string SwapTx = "SwapTx";
     public const string SwapSubsidy = "SwapSubsidy";
-    public const string SwapTxFailAndToTransfer = "SwapTxFailAndToTransfer";
+    public const string SwapTxCheckFailAndToTransfer = "SwapTxCheckFailAndToTransfer";
+    public const string SwapTxHandleFailAndToTransfer = "SwapTxHandleFailAndToTransfer";
 }
 
 public class ExtensionBuilder

@@ -295,7 +295,7 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
                 order.Status = OrderStatusEnum.ToStartTransfer.ToString();
                 transferInfo.Symbol = order.FromTransfer.Symbol;
                 order.ExtensionInfo[ExtensionKey.NeedSwap] = Boolean.FalseString;
-                order.ExtensionInfo[ExtensionKey.SwapStage] = SwapStage.SwapTxFailAndToTransfer;
+                order.ExtensionInfo[ExtensionKey.SwapStage] = SwapStage.SwapTxHandleFailAndToTransfer;
 
                 await SaveOrder(order, ExtensionBuilder.New()
                     .Add(ExtensionKey.TransactionStatus, txStatus.Status)

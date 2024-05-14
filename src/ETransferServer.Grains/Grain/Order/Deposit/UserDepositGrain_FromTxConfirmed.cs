@@ -29,12 +29,12 @@ public partial class UserDepositGrain
 
         if (IsSwapSubsidy(orderDto))
         {
-            await ToStartSwapSubsidy(orderDto);
+            return await ToStartSwapSubsidy(orderDto);
         }
 
-        if (IsSwapTxFailAndToTransfer(orderDto))
+        if (IsSwapTxHandleFailAndToTransfer(orderDto))
         {
-            await ToStartTransfer(orderDto, true);
+            return await ToStartTransfer(orderDto, true);
         }
 
         return await ToStartTransfer(orderDto);
@@ -140,13 +140,8 @@ public partial class UserDepositGrain
     private async Task<DepositOrderChangeDto> ToStartSwapTx(DepositOrderDto orderDto)
     {
         _logger.LogInformation("ToStartSwapTx, orderDto: {orderDto}", JsonConvert.SerializeObject(orderDto));
-        var userDepositRecordGrain = GrainFactory.GetGrain<IUserDepositRecordGrain>(orderDto.Id);
-
-        var order = await userDepositRecordGrain.GetAsync();
-        orderDto.CreateTime = order.Value.CreateTime;
-        orderDto.ArrivalTime = order.Value.ArrivalTime;
-        orderDto.LastModifyTime = order.Value.LastModifyTime;
-        _logger.LogInformation("ToStartSwapTx, orderDto after set time: {orderDto}",
+        orderDto = await TrySetTimes(orderDto);
+        _logger.LogInformation("ToStartSwapTx, orderDto after try set time: {orderDto}",
             JsonConvert.SerializeObject(orderDto));
 
         var swapGrain = GrainFactory.GetGrain<ISwapGrain>(orderDto.Id);
@@ -160,9 +155,19 @@ public partial class UserDepositGrain
 
         _logger.LogInformation("ToStartSwapTx invalid or fail, will goto ToStartTransfer, result: {result}",
             JsonConvert.SerializeObject(result));
-        orderDto.ExtensionInfo.AddOrReplace(ExtensionKey.SwapStage, SwapStage.SwapTxFailAndToTransfer);
+        orderDto.ExtensionInfo.AddOrReplace(ExtensionKey.SwapStage, SwapStage.SwapTxCheckFailAndToTransfer);
         orderDto.ToTransfer.Symbol = orderDto.FromTransfer.Symbol;
         return await ToStartTransfer(orderDto);
+    }
+
+    private async Task<DepositOrderDto> TrySetTimes(DepositOrderDto orderDto)
+    {
+        var userDepositRecordGrain = GrainFactory.GetGrain<IUserDepositRecordGrain>(orderDto.Id);
+        var order = await userDepositRecordGrain.GetAsync();
+        orderDto.CreateTime ??= order.Value.CreateTime;
+        orderDto.ArrivalTime ??= order.Value.ArrivalTime;
+        orderDto.LastModifyTime ??= order.Value.LastModifyTime;
+        return orderDto;
     }
 
     private async Task<DepositOrderChangeDto> ToStartSwapSubsidy(DepositOrderDto orderDto)
@@ -200,9 +205,9 @@ public partial class UserDepositGrain
         return false;
     }
 
-    private bool IsSwapTxFailAndToTransfer(DepositOrderDto orderDto)
+    private bool IsSwapTxHandleFailAndToTransfer(DepositOrderDto orderDto)
     {
         return orderDto.ExtensionInfo.ContainsKey(ExtensionKey.SwapStage) &&
-                orderDto.ExtensionInfo[ExtensionKey.SwapStage].Equals(SwapStage.SwapTxFailAndToTransfer);
+                orderDto.ExtensionInfo[ExtensionKey.SwapStage].Equals(SwapStage.SwapTxHandleFailAndToTransfer);
     }
 }
