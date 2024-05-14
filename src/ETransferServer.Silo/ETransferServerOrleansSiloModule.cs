@@ -46,7 +46,7 @@ public class ETransferServerOrleansSiloModule : AbpModule
         Configure<CoinGeckoOptions>(configuration.GetSection("CoinGecko"));
         Configure<SwapInfosOptions>(configuration.GetSection("SwapInfos"));
         Configure<GraphQLOptions>(configuration.GetSection("GraphQL"));
-
+        Configure<BlockChainInfoOptions>(configuration.GetSection("BlockChainInfo"));
 
         context.Services.AddHostedService<ETransferServerHostedService>();
         context.Services.AddHttpClient();

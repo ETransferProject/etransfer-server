@@ -9,7 +9,7 @@ namespace ETransferServer.Grains.GraphQL;
 
 public interface ISwapReserveProvider
 {
-    Task<PagedResultDto<ReserveDto>> GetReserveAsync(string chainId, string pairAddress, long? timestamp, int skipCount,
+    Task<PagedResultDto<ReserveDto>> GetReserveAsync(string chainId, string pairAddress, long timestamp, int skipCount,
         int maxResultCount);
 
     Task<long> GetConfirmedHeightAsync(string chainId);
@@ -26,7 +26,7 @@ public class SwapReserveProvider : ISwapReserveProvider, ISingletonDependency
         _graphQlClientFactory = graphQlClientFactory;
     }
 
-    public async Task<PagedResultDto<ReserveDto>> GetReserveAsync(string chainId, string pairAddress, long? timestamp,
+    public async Task<PagedResultDto<ReserveDto>> GetReserveAsync(string chainId, string pairAddress, long timestamp,
         int skipCount,
         int maxResultCount)
     {

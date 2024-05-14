@@ -1,4 +1,6 @@
+using ETransferServer.ChainsClient;
 using ETransferServer.Common.AElfSdk;
+using ETransferServer.Common.ChainsClient;
 using ETransferServer.Common.GraphQL;
 using Microsoft.Extensions.DependencyInjection;
 using ETransferServer.Grains;
@@ -35,5 +37,7 @@ public class ETransferServerApplicationModule : AbpModule
         context.Services.AddHttpClient();
         context.Services.AddSingleton<SignatureProvider>();
         context.Services.AddSingleton<IGraphQLClientFactory, GraphQLClientFactory>();
+        context.Services.AddSingleton<IBlockchainClientFactory<Nethereum.Web3.Web3>, EvmClientFactory>();
+        context.Services.AddTransient<IBlockchainClientProvider, EvmClientProvider>();
     }
 }
