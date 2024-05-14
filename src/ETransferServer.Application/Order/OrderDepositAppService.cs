@@ -63,11 +63,11 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
             AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.Symbol), 
                 "Symbol is not exist. Please refresh and try again.");
             AssertHelper.IsTrue(request.ToSymbol.IsNullOrEmpty() || _networkInfoOptions.Value.NetworkMap.ContainsKey(request.ToSymbol), 
-                "ToSymbol is not null but does not exist. Please refresh and try again.");
+                "ToSymbol is an invalid parameter. Please refresh and try again. ");
             AssertHelper.IsTrue(
                 request.ToSymbol.IsNullOrEmpty() || 
                 _tokenAppService.IsValidDeposit(request.ChainId, request.Symbol, request.ToSymbol),
-                "Must be a valid Deposit. Please refresh and try again.");
+                "The combination of ChainId, FromSymbol and ToSymbol is an invalid parameter. Please refresh and try again.");
             
             var networkConfigs = _networkInfoOptions.Value.NetworkMap[request.Symbol];
             var depositInfo = networkConfigs.Where(n => n.NetworkInfo.Network == request.Network)
@@ -192,8 +192,8 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
             "FromSymbol is not exist. Please refresh and try again.");
         AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.ToSymbol), 
             "ToSymbol is not exist. Please refresh and try again.");
-        AssertHelper.IsTrue(DepositSwapAmountHelper.IsValidRange(request.FromAmount), "FromAmount is invalid. Please refresh and try again.");
-        AssertHelper.IsTrue(_tokenAppService.IsValidSwap(request.ToChainId, request.FromSymbol, request.ToSymbol), "Must be valid swap Deposit symbols. Please refresh and try again.");
+        AssertHelper.IsTrue(DepositSwapAmountHelper.IsValidRange(request.FromAmount), "FromAmount is an invalid parameter. Please refresh and try again. ");
+        AssertHelper.IsTrue(_tokenAppService.IsValidSwap(request.ToChainId, request.FromSymbol, request.ToSymbol), "The combination of ChainId, FromSymbol and ToSymbol is an invalid parameter. Please refresh and try again.");
 
         if (request.FromAmount == DepositSwapAmountHelper.AmountZero)
         {
