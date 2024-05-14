@@ -84,14 +84,14 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
             State.SymbolIn = dto.FromTransfer.Symbol;
             State.SymbolOut = dto.ToTransfer.Symbol;
             State.AmountIn = dto.FromTransfer.Amount;
-            State.TimeStamp = dto.CreateTime;
+            State.TimeStamp = dto.FromTransfer.TxTime;
             await WriteStateAsync();
             Transaction rawTransaction;
             if (dto.FromRawTransaction.IsNullOrEmpty())
             {
                 _logger.LogInformation("New swap transaction will struct.{grainId}", this.GetPrimaryKey().ToString());
                 var (swapCheckResult, swapInput) =
-                    await StructSwapTransactionAsync(fromTransfer, toTransfer, dto.CreateTime, swapInfo);
+                    await StructSwapTransactionAsync(fromTransfer, toTransfer, dto.FromTransfer.TxTime, swapInfo);
                 if (!swapCheckResult.Success)
                 {
                     result.Message = swapCheckResult.Message;
