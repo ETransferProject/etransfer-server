@@ -139,9 +139,9 @@ public partial class UserDepositGrain
 
     private async Task<DepositOrderChangeDto> ToStartSwapTx(DepositOrderDto orderDto)
     {
-       
-        orderDto = await TrySetTimes(orderDto);
         _logger.LogInformation("ToStartSwapTx, orderDto: {orderDto}", JsonConvert.SerializeObject(orderDto));
+        orderDto = await TrySetTimes(orderDto);
+        _logger.LogInformation("ToStartSwapTx, TrySetTimes, orderDto: {orderDto}", JsonConvert.SerializeObject(orderDto));
         
         var swapGrain = GrainFactory.GetGrain<ISwapGrain>(orderDto.Id);
         var result = await swapGrain.SwapAsync(orderDto);
@@ -172,12 +172,20 @@ public partial class UserDepositGrain
         orderDto.CreateTime ??= order.Value.CreateTime;
         orderDto.ArrivalTime ??= order.Value.ArrivalTime;
         orderDto.LastModifyTime ??= order.Value.LastModifyTime;
+
+        if (orderDto.CreateTime == null)
+        {
+            _logger.LogInformation("order create is null, default set now");
+            orderDto.CreateTime = DateTime.UtcNow.ToUtcMilliSeconds();
+        }
+
         // for test
         if (orderDto.CreateTime.HasValue)
         {
             orderDto.CreateTime -= (long)TimeSpan.FromMinutes(5).TotalMilliseconds;
+            _logger.LogInformation("order create reduce, default set now");
         }
-
+        
         return orderDto;
     }
 
