@@ -92,7 +92,7 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
                 result.Message = timeRes.Message;
                 return result;
             }
-            _logger.LogInformation("Get transaction time from {network},{time}",dto.FromTransfer.Network,timestamp);
+            _logger.LogInformation("Get transaction time from {network},{time},{grainId}",dto.FromTransfer.Network,timestamp,this.GetPrimaryKeyString());
 
             // _objectMapper.Map<DepositOrderDto, SwapState>(dto);
             State.ToChainId = dto.ToTransfer.ChainId;
