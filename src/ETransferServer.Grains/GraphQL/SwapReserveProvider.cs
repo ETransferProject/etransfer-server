@@ -30,6 +30,7 @@ public class SwapReserveProvider : ISwapReserveProvider, ISingletonDependency
         int skipCount,
         int maxResultCount)
     {
+        _logger.LogInformation("Query from gql:{chainId},{pairAddress},{timestamp}",chainId,pairAddress,timestamp);
         try
         {
             var res = await _graphQlClientFactory.GetClient(GraphQLClientEnum.SwapClient)
