@@ -187,12 +187,12 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
     {
         
         AssertHelper.IsTrue(request.ToChainId == ChainId.tDVV
-                            || request.ToChainId == ChainId.tDVW, "Param [ToChainId] is invalid. Please refresh and try again.");
+                            || request.ToChainId == ChainId.tDVW, "Param is invalid. Please refresh and try again.");
         AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.FromSymbol), 
             "FromSymbol is not exist. Please refresh and try again.");
         AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.ToSymbol), 
             "ToSymbol is not exist. Please refresh and try again.");
-        AssertHelper.IsTrue(DepositSwapAmountHelper.IsValidRange(request.FromAmount), "Param [FromAmount] is invalid. Please refresh and try again.");
+        AssertHelper.IsTrue(DepositSwapAmountHelper.IsValidRange(request.FromAmount), "FromAmount is invalid. Please refresh and try again.");
         AssertHelper.IsTrue(_tokenAppService.IsValidSwap(request.ToChainId, request.FromSymbol, request.ToSymbol), "Must be valid swap Deposit symbols. Please refresh and try again.");
 
         if (request.FromAmount == DepositSwapAmountHelper.AmountZero)

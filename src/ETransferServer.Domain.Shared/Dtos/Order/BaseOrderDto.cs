@@ -34,5 +34,6 @@ public class TransferInfo
     public string Status { get; set; }
     public string FromAddress { get; set; }
     public string ToAddress { get; set; }
+    public string BlockHash { get; set; }
     public List<FeeInfo> FeeInfo { get; set; }
 }

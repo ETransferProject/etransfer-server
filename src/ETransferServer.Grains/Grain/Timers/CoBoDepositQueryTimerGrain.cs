@@ -211,6 +211,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
                 Amount = Convert.ToDecimal(coBoTransaction.AbsAmount),
                 FromAddress = coBoTransaction.SourceAddress,
                 ToAddress = coBoTransaction.Address,
+                BlockHash = coBoTransaction.TxDetail.BlockHash
             },
             ToTransfer = new TransferInfo
             {
@@ -241,7 +242,6 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
             return dto;
         }
 
-        // raymond.zhang
         if (DepositSwapHelper.IsDepositSwap(dto.FromTransfer.Symbol, dto.ToTransfer.Symbol))
         {
             _logger.LogInformation("SpecialHandle, need swap, set ExtensionInfo");
