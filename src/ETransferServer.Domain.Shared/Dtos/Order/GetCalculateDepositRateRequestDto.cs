@@ -17,8 +17,8 @@ public class GetCalculateDepositRateRequestDto : IValidatableObject
         if (decimalPlaces > 8 || FromAmount < 0)
         {
             yield return new ValidationResult(
-                "Amount invalid.",
-                new[] { "Amount" }
+                "FromAmount invalid.",
+                new[] { "FromAmount" }
             );
         }
     }
