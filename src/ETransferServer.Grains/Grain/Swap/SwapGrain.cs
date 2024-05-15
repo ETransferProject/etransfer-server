@@ -223,7 +223,7 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
             }
 
             AssertHelper.IsTrue(long.TryParse(block.BlockTimeStamp.ToString(), out var time));
-            return (new GrainResultDto { Success = true, }, time);
+            return (new GrainResultDto { Success = true, }, time * 1000);
         }
         catch (Exception e)
         {
