@@ -5,5 +5,5 @@ namespace ETransferServer.Common.ChainsClient;
 public interface IBlockchainClientProvider
 {
     BlockchainType ChainType { get; }
-    Task<BlockDtos> GetBlocksAsync(string chainId, string blockHash);
+    Task<BlockDtos> GetBlockTimeAsync(string chainId, string blockHash, string txId = null);
 }

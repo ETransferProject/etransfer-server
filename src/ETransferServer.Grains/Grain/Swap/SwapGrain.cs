@@ -83,30 +83,41 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
                 return result;
             }
 
-            var (timeRes, timestamp) = await GetTransactionTimeAsync(dto.FromTransfer.Network,
-                dto.FromTransfer.BlockHash,
-                fromTransfer.TxId);
-            if (!timeRes.Success)
-            {
-                result.Success = false;
-                result.Message = timeRes.Message;
-                return result;
-            }
-            _logger.LogInformation("Get transaction time from {network},{time},{grainId}",dto.FromTransfer.Network,timestamp,this.GetPrimaryKeyString());
-
-            // _objectMapper.Map<DepositOrderDto, SwapState>(dto);
-            State.ToChainId = dto.ToTransfer.ChainId;
-            State.SymbolIn = dto.FromTransfer.Symbol;
-            State.SymbolOut = dto.ToTransfer.Symbol;
-            State.AmountIn = dto.FromTransfer.Amount;
-            State.TimeStamp = timestamp;
-            await WriteStateAsync();
             Transaction rawTransaction;
             if (dto.FromRawTransaction.IsNullOrEmpty())
             {
+                State.ToChainId = dto.ToTransfer.ChainId;
+                State.SymbolIn = dto.FromTransfer.Symbol;
+                State.SymbolOut = dto.ToTransfer.Symbol;
+                State.AmountIn = dto.FromTransfer.Amount;
+                await WriteStateAsync();
+                long timestamp = 0;
                 _logger.LogInformation("New swap transaction will struct.{grainId}", this.GetPrimaryKey().ToString());
+                if (dto.FromTransfer.TxTime == null && State.TimeStamp == null)
+                {
+                    var timeRes = await GetTransactionTimeAsync(dto.FromTransfer.Network,
+                        dto.FromTransfer.BlockHash,
+                        fromTransfer.TxId);
+                    if (!timeRes.Success)
+                    {
+                        result.Success = false;
+                        result.Message = timeRes.Message;
+                        return result;
+                    }
+
+                    timestamp = timeRes.Data;
+                    State.TimeStamp = timestamp;
+                }
+                else
+                {
+                    timestamp = (long)(dto.FromTransfer.TxTime ?? State.TimeStamp);
+                }
+
+                _logger.LogInformation("Get transaction time from {network},{time},{grainId}", dto.FromTransfer.Network,
+                    timestamp, this.GetPrimaryKey().ToString());
+                dto.FromTransfer.TxTime = timestamp;
                 var (swapCheckResult, swapInput) =
-                    await StructSwapTransactionAsync(fromTransfer, toTransfer, timestamp, swapInfo);
+                    await StructSwapTransactionAsync(dto.Id, fromTransfer, toTransfer, timestamp, swapInfo);
                 if (!swapCheckResult.Success)
                 {
                     result.Message = swapCheckResult.Message;
@@ -192,52 +203,24 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
         }
     }
 
-    private async Task<(GrainResultDto, long)> GetTransactionTimeAsync(string chainId, string blockHash, string txId,
-        int retryTime = 0)
+    private async Task<GrainResultDto<long>> GetTransactionTimeAsync(string chainId, string blockHash, string txId)
     {
-        if (retryTime > _swapInfosOptions.CallTxRetryTimes)
-        {
-            _logger.LogError("Get {chainId} transaction time failed after retry {times}.{grainId}",
-                chainId, _swapInfosOptions.CallTxRetryTimes,
-                this.GetPrimaryKeyString());
-            return (new GrainResultDto
-            {
-                Success = false,
-                Message = "Get transaction time failed after retry"
-            }, 0);
-        }
-
         try
         {
-            var provider = await _blockchainClientProvider.GetBlockChainClientProviderAsync(chainId);
-            var block = await provider.GetBlocksAsync(chainId, blockHash);
-            if (!block.TransactionIdList.Contains(txId))
-            {
-                _logger.LogError("Block {blockHash} not contains transaction {txId}.{grainId}", blockHash, chainId,
-                    this.GetPrimaryKeyString());
-                return (new GrainResultDto
-                {
-                    Success = false,
-                    Message = "Block not contains transaction"
-                }, 0);
-            }
-
-            AssertHelper.IsTrue(long.TryParse(block.BlockTimeStamp.ToString(), out var time));
-            return (new GrainResultDto { Success = true, }, time * 1000);
+            var grain = GrainFactory.GetGrain<IEvmTransactionGrain>(blockHash);
+            var resultDto = await grain.GetTransactionTimeAsync(chainId, blockHash, txId);
+            return resultDto;
         }
         catch (Exception e)
         {
             _logger.LogError(e, "Failed to get {chainId} transaction time.{grainId}", chainId,
                 this.GetPrimaryKeyString());
-            retryTime += 1;
-            await GetTransactionTimeAsync(chainId, blockHash, txId, retryTime);
+            return new GrainResultDto<long>
+            {
+                Success = false,
+                Message = "Failed to get transaction time."
+            };
         }
-
-        return (new GrainResultDto
-        {
-            Success = false,
-            Message = "Get transaction time failed."
-        }, 0);
     }
 
     private static string GeneratePairSymbol(params string[] symbols)
@@ -245,7 +228,8 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
         return symbols.JoinAsString("-");
     }
 
-    private async Task<(GrainResultDto, IMessage input)> StructSwapTransactionAsync(TransferInfo fromTransfer,
+    private async Task<(GrainResultDto, IMessage input)> StructSwapTransactionAsync(Guid orderId,
+        TransferInfo fromTransfer,
         TransferInfo toTransfer, long createTime, SwapInfo swapInfo)
     {
         var result = new GrainResultDto();
@@ -254,7 +238,8 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
         var fromAmount = fromTransfer.Amount;
         for (var i = 0; i < swapInfo.Path.Count - 1; i++)
         {
-            var reserveResult = await GetOrderTimeReserveAsync(fromTransfer, swapInfo.Path[i], swapInfo.Path[i + 1],
+            var reserveResult = await GetOrderTimeReserveAsync(orderId, fromTransfer, swapInfo.Path[i],
+                swapInfo.Path[i + 1],
                 toTransfer.ChainId, swapInfo.Router,
                 createTime);
             if (!reserveResult.Success)
@@ -266,20 +251,20 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
             }
 
             var (fromReserve, toReserve) = await DealReserveAsync(swapInfo.Path[i], reserveResult.Data);
-            _logger.LogInformation("Success to get reserve.{reserveIn},{reserveOut}", fromReserve, toReserve);
+            _logger.LogInformation("Success to get reserve.{reserveIn},{reserveOut},{grainId}", fromReserve, toReserve,this.GetPrimaryKey());
             // 2. calculate create time amounts out
             var (amountsOutPre, amountsOutPreWithDecimal) =
                 await CalculateAmountsOutPreAsync(swapInfo.FeeRate, swapInfo.Path[i], fromAmount, swapInfo.Path[i + 1],
                     toTransfer.ChainId, fromReserve, toReserve);
             fromAmount = amountsOutPre;
-            _logger.LogInformation("Amounts out expected.{amount}", amountsOutPre);
+            _logger.LogInformation("Amounts out expected {fromSymbol},{toSymbol},{amount},{grainId}", swapInfo.Path[i],swapInfo.Path[i + 1], amountsOutPre,this.GetPrimaryKey());
             amountsExpected = amountsOutPre;
         }
 
         // 3. get now amounts out
         var (amountIn, amountOut, amountInWithDecimal, amountOutWithDecimal) =
             await GetAmountsOutNowAsync(fromTransfer, toTransfer, swapInfo);
-        _logger.LogInformation("Amounts out now.{amount}", amountOut);
+        _logger.LogInformation("Amounts out now.{amount},{grainId}", amountOut,this.GetPrimaryKey());
 
         var swapInput = new SwapExactTokensForTokensInput()
         {
@@ -373,7 +358,7 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
         {
             _logger.LogInformation(
                 "The amount currently available is less than the expected amount.{available},{expected},orderId:{orderId}",
-                availableAmountsOut, expectedAmountsOut, this.GetPrimaryKey().ToString());
+                availableAmountsOut, expectedMinAmountsOut, this.GetPrimaryKey().ToString());
             return (false, 0);
         }
 
@@ -385,14 +370,14 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
         return (true, amountsOutMinActual);
     }
 
-    private async Task<GrainResultDto<ReserveDto>> GetOrderTimeReserveAsync(TransferInfo fromTransfer,
+    private async Task<GrainResultDto<ReserveDto>> GetOrderTimeReserveAsync(Guid orderId, TransferInfo fromTransfer,
         string fromSymbol,
         string toSymbol, string chainId, string router, long createTime)
     {
         var reserveGrain = GrainFactory.GetGrain<ISwapReserveGrain>(ISwapReserveGrain.GenGrainId(
             chainId,
             fromSymbol, toSymbol, router));
-        var reserveResult = await reserveGrain.GetReserveAsync(createTime, 0, 10);
+        var reserveResult = await reserveGrain.GetReserveAsync(orderId, createTime, 0, 10);
         return reserveResult;
     }
 

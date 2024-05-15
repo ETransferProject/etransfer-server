@@ -37,6 +37,7 @@
     <PackageReference Include="GraphQL.Client" Version="5.1.0" />
     <PackageReference Include="Nethereum.Web3" Version="4.20.0" />
     <PackageReference Include="Nethereum.Util" Version="4.20.0" />
+    <PackageReference Include="Solnet.Rpc" Version="6.1.0" />
   </ItemGroup>
 
   <ItemGroup>

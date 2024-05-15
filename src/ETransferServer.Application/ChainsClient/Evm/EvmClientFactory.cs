@@ -2,7 +2,7 @@ using ETransferServer.Common.ChainsClient;
 using ETransferServer.Options;
 using Microsoft.Extensions.Options;
 
-namespace ETransferServer.ChainsClient;
+namespace ETransferServer.ChainsClient.Evm;
 
 public class EvmClientFactory : IBlockchainClientFactory<Nethereum.Web3.Web3>
 {

@@ -15,7 +15,7 @@ namespace ETransferServer.Grains.Grain.Swap;
 
 public interface ISwapReserveGrain : IGrainWithStringKey
 {
-    Task<GrainResultDto<ReserveDto>> GetReserveAsync(long timeStamp, int skipCount, int maxResultCount);
+    Task<GrainResultDto<ReserveDto>> GetReserveAsync(Guid orderId, long timeStamp, int skipCount, int maxResultCount);
 
     public static string GenGrainId(string chainId, string symbolIn, string symbolOut, string router)
     {
@@ -42,19 +42,20 @@ public class SwapReserveGrain : Grain<SwapReserveState>, ISwapReserveGrain
         _swapInfosOptions = swapInfosOptions.Value;
     }
 
-    public async Task<GrainResultDto<ReserveDto>> GetReserveAsync(long timeStamp, int skipCount, int maxResultCount)
+    public async Task<GrainResultDto<ReserveDto>> GetReserveAsync(Guid orderId, long timeStamp, int skipCount,
+        int maxResultCount)
     {
         var result = new GrainResultDto<ReserveDto>();
         var grainId = SwapAmountsGrainId.FromGrainId(this.GetPrimaryKeyString());
-        var pairAddress = await GetPairAddressAsync();
+        var pairAddress = await GetPairAddressAsync(orderId);
         if (pairAddress == null)
         {
             result.Success = false;
-            result.Message = "Failed to get pair address";
+            result.Message = $"Failed to get pair address {orderId}";
             return result;
         }
 
-        if (await CheckLibHeightAndTimestampAsync(grainId.ChainId, timeStamp))
+        if (await CheckLibHeightAndTimestampAsync(orderId, grainId.ChainId, timeStamp))
         {
             var reserve =
                 await _swapReserveProvider.GetReserveAsync(grainId.ChainId, pairAddress, timeStamp, skipCount,
@@ -82,7 +83,7 @@ public class SwapReserveGrain : Grain<SwapReserveState>, ISwapReserveGrain
         return result;
     }
 
-    private async Task<string> GetPairAddressAsync()
+    private async Task<string> GetPairAddressAsync(Guid orderId)
     {
         var grainId = SwapAmountsGrainId.FromGrainId(this.GetPrimaryKeyString());
         if (!State.PairAddress.IsNullOrEmpty())
@@ -91,24 +92,26 @@ public class SwapReserveGrain : Grain<SwapReserveState>, ISwapReserveGrain
         }
 
         var pairAddress =
-            await GetPairAddressAsync(grainId.ChainId, grainId.Router, grainId.SymbolIn, grainId.SymbolOut);
+            await GetPairAddressAsync(orderId, grainId.ChainId, grainId.Router, grainId.SymbolIn, grainId.SymbolOut);
         return pairAddress;
     }
 
-    private async Task<string> GetPairAddressAsync(string chainId, string router, string symbolIn, string symbolOut,
+    private async Task<string> GetPairAddressAsync(Guid orderId, string chainId, string router, string symbolIn,
+        string symbolOut,
         int retryTime = 0)
     {
         if (retryTime > _swapInfosOptions.CallTxRetryTimes)
         {
-            _logger.LogError("Get pair address failed after retry {times}.{grainId}",
+            _logger.LogError("Get pair address failed after retry {times}.{grainId},{orderId}",
                 _swapInfosOptions.CallTxRetryTimes,
-                this.GetPrimaryKeyString());
+                this.GetPrimaryKeyString(), orderId);
             return null;
         }
 
         try
         {
-            _logger.LogInformation("Get pair address from chain.{grainId}", this.GetPrimaryKeyString());
+            _logger.LogInformation("Get pair address from chain.{grainId},{orderId}", this.GetPrimaryKeyString(),
+                orderId);
             var pairAddress = await _contractProvider.CallTransactionAsync<Address>(chainId, null, "GetPairAddress",
                 new GetPairAddressInput
                 {
@@ -119,44 +122,49 @@ public class SwapReserveGrain : Grain<SwapReserveState>, ISwapReserveGrain
         }
         catch (Exception e)
         {
-            _logger.LogError(e, "Failed to get pair address.{chainId}-{symbolIn}-{symbolOut}", chainId, symbolIn,
-                symbolOut);
+            _logger.LogError(e, "Failed to get pair address.{chainId}-{symbolIn}-{symbolOut},{orderId}", chainId,
+                symbolIn,
+                symbolOut, orderId);
             retryTime += 1;
-            await GetPairAddressAsync(chainId, router, symbolIn, symbolOut, retryTime);
+            await GetPairAddressAsync(orderId, chainId, router, symbolIn, symbolOut, retryTime);
         }
 
         return null;
     }
 
-    private async Task<bool> CheckLibHeightAndTimestampAsync(string chainId, long? timestamp, int retryTime = 0)
+    private async Task<bool> CheckLibHeightAndTimestampAsync(Guid orderId, string chainId, long? timestamp,
+        int retryTime = 0)
     {
         if (retryTime > _swapInfosOptions.CallTxRetryTimes)
         {
-            _logger.LogWarning("Get lib height failed after retry {times}.{grainId}",
+            _logger.LogWarning("Get lib height failed after retry {times}.{grainId},orderId:{orderId}",
                 _swapInfosOptions.CallTxRetryTimes,
-                this.GetPrimaryKeyString());
+                this.GetPrimaryKeyString(), orderId);
             return false;
         }
 
         try
         {
             var libFromGql = await _swapReserveProvider.GetConfirmedHeightAsync(chainId);
-            _logger.LogInformation("Get lib from swap gql:{lib},{grainId}", libFromGql, this.GetPrimaryKeyString());
+            _logger.LogInformation("Get lib from swap gql:{lib},{grainId},{orderId}", libFromGql,
+                this.GetPrimaryKeyString(), orderId);
             var chainStatus = await _contractProvider.GetChainStatusAsync(chainId);
             var libFromChain = chainStatus.LastIrreversibleBlockHeight;
-            _logger.LogInformation("Get lib from chain:{lib},{grainId}", libFromChain, this.GetPrimaryKeyString());
+            _logger.LogInformation("Get lib from chain:{lib},{grainId},{orderId}", libFromChain,
+                this.GetPrimaryKeyString(), orderId);
             var blockTime = (await _contractProvider.GetBlockAsync(chainId, chainStatus.LongestChainHeight)).Header
                 .Time.ToUtcMilliSeconds();
-            _logger.LogInformation("Get block time from chain:{time},create time:{timestamp},{grainId}", blockTime,
-                timestamp, this.GetPrimaryKeyString());
+            _logger.LogInformation("Get block time from chain:{time},create time:{timestamp},{grainId},{orderId}",
+                blockTime, timestamp, this.GetPrimaryKeyString(), orderId);
             return blockTime >= timestamp && (libFromGql >= libFromChain ||
-                                             libFromGql >= libFromChain - _swapInfosOptions.SafeLibDiff);
+                                              libFromGql >= libFromChain - _swapInfosOptions.SafeLibDiff);
         }
         catch (Exception e)
         {
-            _logger.LogError(e, "Get lib height or block time failed.{grainId}", this.GetPrimaryKeyString());
+            _logger.LogError(e, "Get lib height or block time failed.{grainId},{orderId}", this.GetPrimaryKeyString(),
+                orderId);
             retryTime += 1;
-            await CheckLibHeightAndTimestampAsync(chainId, retryTime);
+            await CheckLibHeightAndTimestampAsync(orderId, chainId, retryTime);
         }
 
         return false;

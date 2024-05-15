@@ -2,5 +2,7 @@ namespace ETransferServer.Common;
 
 public enum BlockchainType
 {
-    Evm
+    Evm,
+    Tron,
+    Solana
 }
