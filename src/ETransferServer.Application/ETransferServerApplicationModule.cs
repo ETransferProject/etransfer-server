@@ -41,7 +41,6 @@ public class ETransferServerApplicationModule : AbpModule
         context.Services.AddSingleton<SignatureProvider>();
         context.Services.AddSingleton<IGraphQLClientFactory, GraphQLClientFactory>();
         context.Services.AddSingleton<IBlockchainClientFactory<Nethereum.Web3.Web3>, EvmClientFactory>();
-        context.Services.AddSingleton<IBlockchainClientFactory<IRpcClient>, SolanaClientFactory>();
         context.Services.AddTransient<IBlockchainClientProvider, EvmClientProvider>();
         context.Services.AddTransient<IBlockchainClientProvider, TronClientProvider>();
         context.Services.AddTransient<IBlockchainClientProvider, SolanaClientProvider>();

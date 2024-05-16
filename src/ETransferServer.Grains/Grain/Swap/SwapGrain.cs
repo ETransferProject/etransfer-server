@@ -207,7 +207,8 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
     {
         try
         {
-            var grain = GrainFactory.GetGrain<IEvmTransactionGrain>(blockHash);
+            var grain = GrainFactory.GetGrain<IEvmTransactionGrain>(string.Join(CommonConstant.Underline, chainId,
+                blockHash));
             var resultDto = await grain.GetTransactionTimeAsync(chainId, blockHash, txId);
             return resultDto;
         }
@@ -251,20 +252,22 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
             }
 
             var (fromReserve, toReserve) = await DealReserveAsync(swapInfo.Path[i], reserveResult.Data);
-            _logger.LogInformation("Success to get reserve.{reserveIn},{reserveOut},{grainId}", fromReserve, toReserve,this.GetPrimaryKey());
+            _logger.LogInformation("Success to get reserve.{reserveIn},{reserveOut},{grainId}", fromReserve, toReserve,
+                this.GetPrimaryKey());
             // 2. calculate create time amounts out
             var (amountsOutPre, amountsOutPreWithDecimal) =
                 await CalculateAmountsOutPreAsync(swapInfo.FeeRate, swapInfo.Path[i], fromAmount, swapInfo.Path[i + 1],
                     toTransfer.ChainId, fromReserve, toReserve);
             fromAmount = amountsOutPre;
-            _logger.LogInformation("Amounts out expected {fromSymbol},{toSymbol},{amount},{grainId}", swapInfo.Path[i],swapInfo.Path[i + 1], amountsOutPre,this.GetPrimaryKey());
+            _logger.LogInformation("Amounts out expected {fromSymbol},{toSymbol},{amount},{grainId}", swapInfo.Path[i],
+                swapInfo.Path[i + 1], amountsOutPre, this.GetPrimaryKey());
             amountsExpected = amountsOutPre;
         }
 
         // 3. get now amounts out
         var (amountIn, amountOut, amountInWithDecimal, amountOutWithDecimal) =
             await GetAmountsOutNowAsync(fromTransfer, toTransfer, swapInfo);
-        _logger.LogInformation("Amounts out now.{amount},{grainId}", amountOut,this.GetPrimaryKey());
+        _logger.LogInformation("Amounts out now.{amount},{grainId}", amountOut, this.GetPrimaryKey());
 
         var swapInput = new SwapExactTokensForTokensInput()
         {
