@@ -27,6 +27,10 @@ public class TransferInfoDto
 
 public class OrderStatusDto
 {
-    public string CreateTime { get; set; } = default(int).ToString();
     public bool Status { get; set; }
+}
+
+public class OrderReadDto
+{
+    
 }
