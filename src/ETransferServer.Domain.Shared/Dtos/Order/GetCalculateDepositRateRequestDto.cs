@@ -14,7 +14,7 @@ public class GetCalculateDepositRateRequestDto : IValidatableObject
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         int decimalPlaces = FromAmount.ToString().Length - FromAmount.ToString().IndexOf('.') - 1;
-        if (decimalPlaces > 8 || FromAmount < 0)
+        if (decimalPlaces > 6 || FromAmount < 0)
         {
             yield return new ValidationResult(
                 "FromAmount invalid.",
