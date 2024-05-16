@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace ETransferServer.ChainsClient.Solana
+namespace ETransferServer.ChainsClient.Solana.Helper
 {
     /// <summary>
     /// Helper class that holds a key-value config pair that filters out null values.

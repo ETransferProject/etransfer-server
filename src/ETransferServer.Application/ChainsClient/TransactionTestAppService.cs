@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using ETransferServer.Common;
 using ETransferServer.Grains.Grain.Swap;
 using ETransferServer.Swap;
 using Orleans;
@@ -21,7 +22,8 @@ public class TransactionTestAppService : ApplicationService, ITransactionTestApp
 
     public async Task<long> GetTransactionTimeAsync(string network, string blockHash, string transactionId)
     {
-        var grain = _clusterClient.GetGrain<IEvmTransactionGrain>(blockHash);
+        var grain = _clusterClient.GetGrain<IEvmTransactionGrain>(string.Join(CommonConstant.Underline, network,
+            blockHash));
         var result = await grain.GetTransactionTimeAsync(network,blockHash,transactionId);
         if (result.Success)
         {

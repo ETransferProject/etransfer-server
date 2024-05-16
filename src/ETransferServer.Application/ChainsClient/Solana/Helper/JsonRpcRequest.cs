@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
-namespace ETransferServer.ChainsClient.Solana;
+namespace ETransferServer.ChainsClient.Solana.Helper;
 
 public abstract class JsonRpcBase
 {

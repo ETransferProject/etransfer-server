@@ -16,7 +16,7 @@ public class TronClientProvider : IBlockchainClientProvider
     private readonly IHttpProvider _httpProvider;
     private readonly ILogger<TronClientProvider> _logger;
     private readonly BlockChainInfoOptions _blockChainInfoOptions;
-    private const string TransactionById = "/wallet/gettransactionbyid";
+    private const string BlockById = "/wallet/getblockbyid";
 
 
     public TronClientProvider(
@@ -32,18 +32,16 @@ public class TronClientProvider : IBlockchainClientProvider
 
     public async Task<BlockDtos> GetBlockTimeAsync(string chainId, string blockHash, string txId = null)
     {
-        AssertHelper.NotNull(txId,"TxId can not be null.");
-        var url = $"{_blockChainInfoOptions.ChainInfos[chainId].Api}" + TransactionById;
+        var url = $"{_blockChainInfoOptions.ChainInfos[chainId].Api}" + BlockById;
         var result = new BlockDtos();
         try
         {
             var res = await _httpProvider.InvokeAsync<TronResponse>(HttpMethod.Post, url,
                 body: JsonConvert.SerializeObject(new TronQueryParam
                 {
-                    Value = txId,
-                    Visible = true
+                    Value = blockHash
                 }, HttpProvider.DefaultJsonSettings));
-            result.BlockTimeStamp = res.RawData.TimeStamp;
+            result.BlockTimeStamp = res.BlockHeader.RawData.TimeStamp;
             return result;
         }
         catch (Exception e)

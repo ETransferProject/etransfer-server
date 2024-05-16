@@ -58,7 +58,7 @@ public class EvmTransactionGrain : Grain<EvmTransactionState>, IEvmTransactionGr
             switch (provider.ChainType)
             {
                 case BlockchainType.Tron:
-                    block = await provider.GetBlockTimeAsync(chainId, blockHash, txId);
+                    block = await provider.GetBlockTimeAsync(chainId, blockHash);
                     AssertHelper.IsTrue(long.TryParse(block.BlockTimeStamp.ToString(), out time));
                     break;
                 case BlockchainType.Solana:
