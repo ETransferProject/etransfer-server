@@ -7,7 +7,6 @@ using ETransferServer.Common.GraphQL;
 using Microsoft.Extensions.DependencyInjection;
 using ETransferServer.Grains;
 using ETransferServer.GraphQL;
-using Solnet.Rpc;
 using Volo.Abp.Account;
 using Volo.Abp.AutoMapper;
 using Volo.Abp.FeatureManagement;
