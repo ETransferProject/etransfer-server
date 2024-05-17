@@ -27,11 +27,6 @@ public partial class UserDepositGrain
             return await ToStartSwapTx(orderDto);
         }
 
-        if (IsSwapTxHandleFailAndToTransfer(orderDto))
-        {
-            return await ToStartTransfer(orderDto, true);
-        }
-
         return await ToStartTransfer(orderDto);
     }
 
@@ -157,11 +152,5 @@ public partial class UserDepositGrain
     {
         return orderDto.ExtensionInfo.ContainsKey(ExtensionKey.NeedSwap) &&
                orderDto.ExtensionInfo[ExtensionKey.NeedSwap].Equals(Boolean.TrueString);
-    }
-
-    private bool IsSwapTxHandleFailAndToTransfer(DepositOrderDto orderDto)
-    {
-        return orderDto.ExtensionInfo.ContainsKey(ExtensionKey.SwapStage) &&
-                orderDto.ExtensionInfo[ExtensionKey.SwapStage].Equals(SwapStage.SwapTxHandleFailAndToTransfer);
     }
 }

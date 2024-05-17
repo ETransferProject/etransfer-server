@@ -290,6 +290,9 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
                 transferInfo.Status = OrderTransferStatusEnum.StartTransfer.ToString();
                 order.Status = OrderStatusEnum.ToStartTransfer.ToString();
                 transferInfo.Symbol = order.FromTransfer.Symbol;
+                order.FromRawTransaction = null;
+                transferInfo.TxId = null;
+                transferInfo.TxTime = null;
                 order.ExtensionInfo[ExtensionKey.NeedSwap] = Boolean.FalseString;
                 order.ExtensionInfo[ExtensionKey.SwapStage] = SwapStage.SwapTxHandleFailAndToTransfer;
 
