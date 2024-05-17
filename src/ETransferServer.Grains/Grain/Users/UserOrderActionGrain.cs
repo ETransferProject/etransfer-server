@@ -26,8 +26,9 @@ public class UserOrderActionGrain : Grain<UserOrderActionState>, IUserOrderActio
 
     public async Task AddOrUpdateAsync()
     {
-        if (State.Id == Guid.Empty) {
-            State.Id = this.GetPrimaryKey();
+        if (State.Id.IsNullOrEmpty())
+        {
+            State.Id = this.GetPrimaryKeyString();
         }
         State.LastModifyTime = DateTime.UtcNow.ToUtcMilliSeconds();
         await WriteStateAsync();
@@ -35,6 +36,6 @@ public class UserOrderActionGrain : Grain<UserOrderActionState>, IUserOrderActio
 
     public async Task<long> GetAsync()
     {
-        return State.Id == Guid.Empty ? -1 : State.LastModifyTime;
+        return State.Id.IsNullOrEmpty() ? -1 : State.LastModifyTime;
     }
 }
