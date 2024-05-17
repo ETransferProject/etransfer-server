@@ -164,7 +164,7 @@ public class SwapReserveGrain : Grain<SwapReserveState>, ISwapReserveGrain
             _logger.LogError(e, "Get lib height or block time failed.{grainId},{orderId}", this.GetPrimaryKeyString(),
                 orderId);
             retryTime += 1;
-            await CheckLibHeightAndTimestampAsync(orderId, chainId, retryTime);
+            await CheckLibHeightAndTimestampAsync(orderId, chainId, timestamp, retryTime);
         }
 
         return false;
