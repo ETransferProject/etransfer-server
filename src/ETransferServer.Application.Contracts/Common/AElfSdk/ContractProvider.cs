@@ -137,7 +137,13 @@ public class ContractProvider : IContractProvider, ISingletonDependency
     public async Task<BlockDto> GetBlockAsync(string chainId, string blockHash)
     {
         return await Client(chainId).GetBlockByHashAsync(blockHash);
+        _logger.LogInformation("chainId: {chainId}, blockHeight: {blockHeight}", chainId, blockHeight);
+        var requestUrl = GetRequestUrl(Client(chainId).BaseUrl, string.Format("api/blockChain/blockByHeight?blockHeight={0}&includeTransactions={1}", (object) blockHeight, false));
+        _logger.LogInformation("requestUrl: {requestUrl}", requestUrl);
+        return await Client(chainId).GetBlockByHeightAsync(blockHeight);
     }
+    
+    private string GetRequestUrl(string baseUrl, string relativeUrl) => new Uri(new Uri(baseUrl + (baseUrl.EndsWith("/") ? "" : "/")), relativeUrl).ToString();
 
     public async Task<(Hash transactionId, Transaction transaction)> CreateTransactionAsync(string chainId,
         string sender, string contractName, string methodName,
