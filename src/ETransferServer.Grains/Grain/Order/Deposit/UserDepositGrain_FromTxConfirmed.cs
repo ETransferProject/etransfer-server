@@ -22,14 +22,9 @@ public partial class UserDepositGrain
     private async Task<DepositOrderChangeDto> OnToStartTransfer(DepositOrderDto orderDto)
     {
 
-        if (IsSwapTx(orderDto))
+        if (NeedSwap(orderDto))
         {
             return await ToStartSwapTx(orderDto);
-        }
-
-        if (IsSwapSubsidy(orderDto))
-        {
-            return await ToStartSwapSubsidy(orderDto);
         }
 
         if (IsSwapTxHandleFailAndToTransfer(orderDto))
@@ -152,67 +147,16 @@ public partial class UserDepositGrain
 
         _logger.LogInformation("ToStartSwapTx invalid or fail, will goto ToStartTransfer, result: {result}",
             JsonConvert.SerializeObject(result));
+        orderDto.ExtensionInfo.AddOrReplace(ExtensionKey.NeedSwap, Boolean.FalseString);
         orderDto.ExtensionInfo.AddOrReplace(ExtensionKey.SwapStage, SwapStage.SwapTxCheckFailAndToTransfer);
         orderDto.ToTransfer.Symbol = orderDto.FromTransfer.Symbol;
         return await ToStartTransfer(orderDto);
-    }
-
-    private async Task<DepositOrderChangeDto> ToStartSwapSubsidy(DepositOrderDto orderDto)
-    {
-        // Task<GrainResultDto<DepositOrderChangeDto>> SubsidyTransferAsync(DepositOrderDto dto，string returnValue);
-        return null;
-    }
-    
-    private async Task<DepositOrderDto> TrySetTimes(DepositOrderDto orderDto)
-    {
-        var userDepositRecordGrain = GrainFactory.GetGrain<IUserDepositRecordGrain>(orderDto.Id);
-        var order = await userDepositRecordGrain.GetAsync();
-        orderDto.CreateTime ??= order.Value.CreateTime;
-        orderDto.ArrivalTime ??= order.Value.ArrivalTime;
-        orderDto.LastModifyTime ??= order.Value.LastModifyTime;
-
-        if (orderDto.CreateTime == null)
-        {
-            _logger.LogInformation("order create is null, default set now");
-            orderDto.CreateTime = DateTime.UtcNow.ToUtcMilliSeconds();
-        }
-
-        // for test
-        if (orderDto.CreateTime.HasValue)
-        {
-            orderDto.CreateTime -= (long)TimeSpan.FromMinutes(5).TotalMilliseconds;
-            _logger.LogInformation("order create reduce, default set now");
-        }
-        
-        return orderDto;
     }
 
     private bool NeedSwap(DepositOrderDto orderDto)
     {
         return orderDto.ExtensionInfo.ContainsKey(ExtensionKey.NeedSwap) &&
                orderDto.ExtensionInfo[ExtensionKey.NeedSwap].Equals(Boolean.TrueString);
-    }
-
-    private bool IsSwapTx(DepositOrderDto orderDto)
-    {
-        if (NeedSwap(orderDto))
-        {
-            return orderDto.ExtensionInfo.ContainsKey(ExtensionKey.SwapStage) &&
-                   orderDto.ExtensionInfo[ExtensionKey.SwapStage].Equals(SwapStage.SwapTx);
-        }
-
-        return false;
-    }
-
-    private bool IsSwapSubsidy(DepositOrderDto orderDto)
-    {
-        if (NeedSwap(orderDto))
-        {
-            return orderDto.ExtensionInfo.ContainsKey(ExtensionKey.SwapStage) &&
-                   orderDto.ExtensionInfo[ExtensionKey.SwapStage].Equals(SwapStage.SwapSubsidy);
-        }
-
-        return false;
     }
 
     private bool IsSwapTxHandleFailAndToTransfer(DepositOrderDto orderDto)
