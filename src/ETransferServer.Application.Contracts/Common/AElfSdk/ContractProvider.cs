@@ -39,8 +39,7 @@ public interface IContractProvider
 
     Task<ChainStatusDto> GetChainStatusAsync(string chainId);
     
-    Task<BlockDto> GetBlockAsync(string chainId,long blockHeight);
-
+    Task<BlockDto> GetBlockAsync(string chainId, string blockHash);
 
     Task<TransactionResultDto> WaitTransactionResultAsync(string chainId, string transactionId,
         int maxWaitMillis = 5000, int delayMillis = 1000);
@@ -135,9 +134,9 @@ public class ContractProvider : IContractProvider, ISingletonDependency
         return await Client(chainId).GetChainStatusAsync();
     }
 
-    public async Task<BlockDto> GetBlockAsync(string chainId, long blockHeight)
+    public async Task<BlockDto> GetBlockAsync(string chainId, string blockHash)
     {
-        return await Client(chainId).GetBlockByHeightAsync(blockHeight);
+        return await Client(chainId).GetBlockByHashAsync(blockHash);
     }
 
     public async Task<(Hash transactionId, Transaction transaction)> CreateTransactionAsync(string chainId,

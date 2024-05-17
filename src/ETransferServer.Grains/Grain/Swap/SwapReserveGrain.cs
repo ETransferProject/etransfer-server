@@ -152,8 +152,8 @@ public class SwapReserveGrain : Grain<SwapReserveState>, ISwapReserveGrain
             var libFromChain = chainStatus.LastIrreversibleBlockHeight;
             _logger.LogInformation("Get lib from chain:{lib},{grainId},{orderId}", libFromChain,
                 this.GetPrimaryKeyString(), orderId);
-            var blockTime = (await _contractProvider.GetBlockAsync(chainId, chainStatus.LongestChainHeight)).Header
-                .Time.ToUtcMilliSeconds();
+            var blockTime = (await _contractProvider.GetBlockAsync(chainId, chainStatus.BestChainHash)).Header.Time
+                .ToUtcMilliSeconds();
             _logger.LogInformation("Get block time from chain:{time},create time:{timestamp},{grainId},{orderId}",
                 blockTime, timestamp, this.GetPrimaryKeyString(), orderId);
             return blockTime >= timestamp && (libFromGql >= libFromChain ||
