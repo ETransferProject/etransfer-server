@@ -24,17 +24,17 @@ namespace ETransferServer.Order;
 public class OrderAppService : ApplicationService, IOrderAppService
 {
     private readonly INESTRepository<OrderIndex, Guid> _orderIndexRepository;
-    private readonly IGrainFactory _grainFactory; 
+    private readonly IClusterClient _clusterClient;
     private readonly IObjectMapper _objectMapper;
     private readonly ILogger<OrderAppService> _logger;
 
     public OrderAppService(INESTRepository<OrderIndex, Guid> orderIndexRepository,
-        IGrainFactory grainFactory, 
+        IClusterClient clusterClient,
         IObjectMapper objectMapper,
         ILogger<OrderAppService> logger)
     {
         _orderIndexRepository = orderIndexRepository;
-        _grainFactory = grainFactory;
+        _clusterClient = clusterClient;
         _objectMapper = objectMapper;
         _logger = logger;
     }
@@ -150,7 +150,7 @@ public class OrderAppService : ApplicationService, IOrderAppService
                 return new OrderStatusDto();
             }
 
-            var userOrderActionGrain = _grainFactory.GetGrain<IUserOrderActionGrain>(userId.ToString());
+            var userOrderActionGrain = _clusterClient.GetGrain<IUserOrderActionGrain>(userId.ToString());
             var lastModifyTime = await userOrderActionGrain.GetAsync();
 
             var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>
@@ -194,7 +194,7 @@ public class OrderAppService : ApplicationService, IOrderAppService
         var userId = CurrentUser?.GetId();
         if (!userId.HasValue || userId == Guid.Empty) return new();
 
-        var userOrderActionGrain = _grainFactory.GetGrain<IUserOrderActionGrain>(userId.ToString());
+        var userOrderActionGrain = _clusterClient.GetGrain<IUserOrderActionGrain>(userId.ToString());
         await userOrderActionGrain.AddOrUpdateAsync();
 
         return new();
