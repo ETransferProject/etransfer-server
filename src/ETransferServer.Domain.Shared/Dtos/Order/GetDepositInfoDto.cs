@@ -13,4 +13,10 @@ public class DepositInfoDto
     public string MinAmount { get; set; }
     public string MinAmountUsd { get; set; }
     public List<string> ExtraNotes { get; set; }
+    public ExtraInfo ExtraInfo { get; set; }
+}
+
+public class ExtraInfo
+{
+    public decimal Slippage { get; set; }
 }

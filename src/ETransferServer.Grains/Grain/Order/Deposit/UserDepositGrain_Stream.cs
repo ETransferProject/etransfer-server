@@ -4,6 +4,7 @@ using Orleans.Streams;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Grains.State.Order;
+using Newtonsoft.Json;
 
 namespace ETransferServer.Grains.Grain.Order.Deposit;
 
@@ -17,6 +18,7 @@ public partial class UserDepositGrain
     /// <param name="token"></param>
     public async Task OnNextAsync(DepositOrderDto orderDto, StreamSequenceToken token = null)
     {
+        
         // Bottom logic to prevent Stream dead loops
         if (++ _currentSteps >= MaxStreamSteps)
         {
@@ -53,13 +55,7 @@ public partial class UserDepositGrain
             case OrderStatusEnum.ToTransferring:
             case OrderStatusEnum.ToTransferred:
             {
-                await _depositTxTimerGrain.AddToPendingList(orderDto.Id, new TimerTransaction
-                {
-                    TxId = orderDto.ToTransfer.TxId,
-                    TxTime = orderDto.ToTransfer.TxTime,
-                    ChainId = orderDto.ToTransfer.ChainId,
-                    TransferType = TransferTypeEnum.ToTransfer.ToString()
-                });
+                await OnToTransferred(orderDto);
                 break;
             }
 

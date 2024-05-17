@@ -32,7 +32,7 @@
         <PackageReference Include="GraphQL" Version="7.4.1" />
         <PackageReference Include="GraphQL.Client.Abstractions" Version="6.0.0" />
         <PackageReference Include="GraphQL.SystemTextJson" Version="7.4.1" />
-
+        <PackageReference Include="Nethereum.Util" Version="4.14.0" />
 
     </ItemGroup>
     

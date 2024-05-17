@@ -17,7 +17,7 @@ using ETransferServer.User;
 using Volo.Abp.AspNetCore.Serilog;
 using Volo.Abp.Autofac;
 using Volo.Abp.Modularity;
-using Volo.Abp.OpenIddict.Tokens;
+using SwapInfosOptions = ETransferServer.Grains.Options.SwapInfosOptions;
 
 namespace ETransferServer.Silo;
 [DependsOn(typeof(AbpAutofacModule),
@@ -44,7 +44,10 @@ public class ETransferServerOrleansSiloModule : AbpModule
         Configure<NotifyTemplateOptions>(configuration.GetSection("NotifyTemplates"));
         Configure<ExchangeOptions>(configuration.GetSection("Exchange"));
         Configure<CoinGeckoOptions>(configuration.GetSection("CoinGecko"));
-        
+        Configure<SwapInfosOptions>(configuration.GetSection("SwapInfos"));
+        Configure<GraphQLOptions>(configuration.GetSection("GraphQL"));
+        Configure<BlockChainInfoOptions>(configuration.GetSection("BlockChainInfo"));
+
         context.Services.AddHostedService<ETransferServerHostedService>();
         context.Services.AddHttpClient();
         context.Services.AddSingleton<HttpProvider>();
