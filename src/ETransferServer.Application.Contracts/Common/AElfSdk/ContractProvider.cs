@@ -39,8 +39,7 @@ public interface IContractProvider
 
     Task<ChainStatusDto> GetChainStatusAsync(string chainId);
     
-    Task<BlockDto> GetBlockAsync(string chainId,long blockHeight);
-
+    Task<BlockDto> GetBlockAsync(string chainId, long blockHeight);
 
     Task<TransactionResultDto> WaitTransactionResultAsync(string chainId, string transactionId,
         int maxWaitMillis = 5000, int delayMillis = 1000);
