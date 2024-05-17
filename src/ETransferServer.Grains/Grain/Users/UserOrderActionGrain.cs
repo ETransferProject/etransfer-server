@@ -26,7 +26,7 @@ public class UserOrderActionGrain : Grain<UserOrderActionState>, IUserOrderActio
 
     public async Task AddOrUpdateAsync()
     {
-        if (State.Id == Guid.Empty)
+        if (State.Id == null || State.Id == Guid.Empty)
         {
             State.Id = Guid.NewGuid();
             State.UserId = this.GetPrimaryKeyString();
