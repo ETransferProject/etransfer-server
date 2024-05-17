@@ -6,6 +6,7 @@ using Orleans.Streams;
 using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
 using ETransferServer.Dtos.Order;
+using ETransferServer.Grains.Grain.Swap;
 using ETransferServer.Grains.Grain.Timers;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.Provider;
@@ -38,10 +39,11 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
     private IUserDepositRecordGrain _recordGrain;
     private IOrderStatusFlowGrain _orderStatusFlowGrain;
     private IUserDepositTxTimerGrain _depositTxTimerGrain;
+    private ISwapTxTimerGrain _swapTxTimerGrain;
     private IDepositOrderRetryTimerGrain _depositOrderRetryTimerGrain;
     private IOrderStatusReminderGrain _orderStatusReminderGrain;
     private ICoBoDepositQueryTimerGrain _depositQueryTimerGrain;
-    
+
     internal JsonSerializerSettings JsonSettings = JsonSettingsBuilder.New()
         .WithAElfTypesConverters()
         .WithCamelCasePropertyNamesResolver()
@@ -76,6 +78,8 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
         _orderStatusFlowGrain = GrainFactory.GetGrain<IOrderStatusFlowGrain>(this.GetPrimaryKey());
         _depositTxTimerGrain =
             GrainFactory.GetGrain<IUserDepositTxTimerGrain>(GuidHelper.UniqGuid(nameof(IUserDepositTxTimerGrain)));
+        _swapTxTimerGrain =
+            GrainFactory.GetGrain<ISwapTxTimerGrain>(GuidHelper.UniqGuid(nameof(ISwapTxTimerGrain)));
         _depositOrderRetryTimerGrain =
             GrainFactory.GetGrain<IDepositOrderRetryTimerGrain>(
                 GuidHelper.UniqGuid(nameof(IDepositOrderRetryTimerGrain)));
@@ -91,6 +95,7 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
     {
         // save deposit order to Grain
         var res = await _recordGrain.CreateOrUpdateAsync(orderDto);
+        _logger.LogInformation("AddOrUpdateOrder, orderDto: {orderDto}", JsonConvert.SerializeObject(orderDto));
         AssertHelper.IsTrue(res.Success, "save order data error, orderId = {Id}", orderDto.Id);
 
         // save order flow
@@ -105,6 +110,7 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
         // push order to stream
         _logger.LogInformation("push to stream, type:deposit, orderId:{orderId}, status:{status}", orderDto.Id,
             orderDto.Status);
+        _logger.LogInformation("AddOrUpdateOrder before OnNextAsync, orderDto: {orderDto}", JsonConvert.SerializeObject(orderDto));
         await _orderChangeStream.OnNextAsync(orderDto);
     }
     

@@ -16,6 +16,16 @@ public static class TimeHelper
         return start.AddMilliseconds(timeStamp).ToUniversalTime();
     }
     
+    public static long TryGetTimeStamp(string timeStamp, DateTime defaultDateTime)
+    {
+        if (long.TryParse(timeStamp, out var timestamp))
+        {
+            return timestamp;
+        }
+
+        return defaultDateTime.ToUtcMilliSeconds();
+    }
+    
     public static long GetTimeStampInMilliseconds()
     {
         return new DateTimeOffset(DateTime.UtcNow).ToUnixTimeMilliseconds();

@@ -42,6 +42,7 @@ public class DepositInfo
     public decimal MultiConfirmSeconds { get; set; }
     public string ContractAddress { get; set; }
     public List<string> ExtraNotes { get; set; }
+    public List<string> SwapExtraNotes { get; set; }
 }
 
 public class WithdrawInfo

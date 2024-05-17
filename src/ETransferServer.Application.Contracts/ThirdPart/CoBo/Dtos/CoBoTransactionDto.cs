@@ -29,4 +29,13 @@ public class CoBoTransactionDto
     [JsonProperty("fee_coin")] public string FeeCoin { get; set; }
     [JsonProperty("fee_amount")] public string FeeAmount { get; set; }
     [JsonProperty("fee_decimal")] public string FeeDecimal { get; set; }
+    [JsonProperty("tx_detail")] public TransactionDetailDto TxDetail { get; set; }
+}
+
+public class TransactionDetailDto
+{
+    public string TxId { get; set; }
+    public int BlockNum { get; set; }
+    public string BlockHash { get; set; }
+    public string HexStr { get; set; }
 }

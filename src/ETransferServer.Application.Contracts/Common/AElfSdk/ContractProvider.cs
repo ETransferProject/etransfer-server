@@ -26,18 +26,21 @@ public interface IContractProvider
 {
     Task<(Hash transactionId, Transaction transaction)> CreateTransactionAsync(string chainId, string senderAddress,
         string contractName, string methodName,
-        IMessage param);
+        IMessage param, string contractAddress = null);
 
     Task<Tuple<bool, string>> SendTransactionAsync(string chainId, Transaction transaction);
 
     Task<T> CallTransactionAsync<T>(string chainId, string contractName, string methodName,
-        IMessage param) where T : class;
+        IMessage param, string contractAddress = null) where T : class;
 
     Task<T> CallTransactionAsync<T>(string chainId, Transaction transaction) where T : class;
 
     Task<TransactionResultDto> QueryTransactionResultAsync(string chainId, string transactionId);
 
     Task<ChainStatusDto> GetChainStatusAsync(string chainId);
+    
+    Task<BlockDto> GetBlockAsync(string chainId,long blockHeight);
+
 
     Task<TransactionResultDto> WaitTransactionResultAsync(string chainId, string transactionId,
         int maxWaitMillis = 5000, int delayMillis = 1000);
@@ -97,7 +100,8 @@ public class ContractProvider : IContractProvider, ISingletonDependency
     public async Task<string> GetContractAddressAsync(string chainId, string contractName)
     {
         var contractAddress = _contractAddress.GetOrAdd(chainId, _ => new ConcurrentDictionary<string, string>());
-        var addressResult = contractAddress.GetOrAdd<string, string>(contractName, name => new Lazy<string>(() => {
+        var addressResult = contractAddress.GetOrAdd<string, string>(contractName, name => new Lazy<string>(() =>
+        {
             var chainInfoExists = _chainOption.Value.ChainInfos.TryGetValue(chainId, out var chainInfo);
             AssertHelper.IsTrue(chainInfoExists, "ChainId {ChainId} not exists in option");
             var address = chainInfo?.ContractAddress.GetValueOrDefault(contractName, CommonConstant.EmptyString);
@@ -131,12 +135,17 @@ public class ContractProvider : IContractProvider, ISingletonDependency
         return await Client(chainId).GetChainStatusAsync();
     }
 
+    public async Task<BlockDto> GetBlockAsync(string chainId, long blockHeight)
+    {
+        return await Client(chainId).GetBlockByHeightAsync(blockHeight);
+    }
+
     public async Task<(Hash transactionId, Transaction transaction)> CreateTransactionAsync(string chainId,
         string sender, string contractName, string methodName,
-        IMessage param)
+        IMessage param, string contractAddress = null)
     {
         // create raw transaction
-        var transaction = await CreateRawTransaction(chainId, sender, contractName, methodName, param);
+        var transaction = await CreateRawTransaction(chainId, sender, contractName, methodName, param, contractAddress);
 
         var transactionId = HashHelper.ComputeFrom(transaction.ToByteArray());
         var signature = await _signatureProvider.GetTransactionSignature(sender, transactionId);
@@ -147,9 +156,9 @@ public class ContractProvider : IContractProvider, ISingletonDependency
 
     private async Task<Transaction> CreateRawTransaction(string chainId,
         string sender, string contractName, string methodName,
-        IMessage param)
+        IMessage param, string contractAddress = null)
     {
-        var address = await GetContractAddressAsync(chainId, contractName);
+        var address = contractAddress ?? await GetContractAddressAsync(chainId, contractName);
         var client = Client(chainId);
         var status = await client.GetChainStatusAsync();
 
@@ -191,10 +200,10 @@ public class ContractProvider : IContractProvider, ISingletonDependency
     }
 
     public async Task<T> CallTransactionAsync<T>(string chainId, string contractName, string methodName,
-        IMessage param) where T : class
+        IMessage param, string contractAddress = null) where T : class
     {
         var sender = Address.FromPublicKey(_internalKeyPair.PublicKey);
-        var transaction = await CreateRawTransaction(chainId, sender.ToBase58(), contractName, methodName, param);
+        var transaction = await CreateRawTransaction(chainId, sender.ToBase58(), contractName, methodName, param,contractAddress);
         var transactionId = HashHelper.ComputeFrom(transaction.ToByteArray());
         transaction.Signature = ByteStringHelper.FromHexString(CryptoHelper
             .SignWithPrivateKey(_internalKeyPair.PrivateKey, transactionId.ToByteArray()).ToHex());

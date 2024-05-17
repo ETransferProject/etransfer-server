@@ -13,4 +13,5 @@ public interface IOrderDepositAppService: IApplicationService
     Task<bool> AddOrUpdateAsync(DepositOrderDto dto);
     Task<bool> ExistSync(DepositOrderDto dto);
     Task<GetDepositInfoDto> GetDepositInfoAsync(GetDepositRequestDto request);
+    Task<CalculateDepositRateDto> CalculateDepositRateAsync(GetCalculateDepositRateRequestDto request);
 }
