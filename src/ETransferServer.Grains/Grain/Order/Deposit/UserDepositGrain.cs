@@ -16,7 +16,7 @@ namespace ETransferServer.Grains.Grain.Order.Deposit;
 
 public interface IUserDepositGrain : IGrainWithGuidKey
 {
-    Task AddOrUpdateOrder(DepositOrderDto orderDto, Dictionary<string, string> externalInfo = null);
+    Task AddOrUpdateOrder(DepositOrderDto orderDto, Dictionary<string, string> externalInfo = null, bool needOnNext = true);
 }
 
 /// <summary>
@@ -91,11 +91,13 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
             GuidHelper.UniqGuid(nameof(ICoBoDepositQueryTimerGrain)));
     }
 
-    public async Task AddOrUpdateOrder(DepositOrderDto orderDto, Dictionary<string, string> externalInfo = null)
+    public async Task AddOrUpdateOrder(DepositOrderDto orderDto, Dictionary<string, string> externalInfo = null, bool needOnNext = true)
     {
+        
+        _logger.LogInformation("AddOrUpdateOrder, orderDto: {orderDto}, externalInfo: {externalInfo}, needOnNext: {needOnNext}", JsonConvert.SerializeObject(orderDto), JsonConvert.SerializeObject(externalInfo), needOnNext);
+        
         // save deposit order to Grain
         var res = await _recordGrain.CreateOrUpdateAsync(orderDto);
-        _logger.LogInformation("AddOrUpdateOrder, orderDto: {orderDto}", JsonConvert.SerializeObject(orderDto));
         AssertHelper.IsTrue(res.Success, "save order data error, orderId = {Id}", orderDto.Id);
 
         // save order flow
@@ -108,10 +110,12 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
         await _orderStatusFlowProvider.AddOrUpdate(orderDto.Id, orderFlowRes);
 
         // push order to stream
-        _logger.LogInformation("push to stream, type:deposit, orderId:{orderId}, status:{status}", orderDto.Id,
-            orderDto.Status);
-        _logger.LogInformation("AddOrUpdateOrder before OnNextAsync, orderDto: {orderDto}", JsonConvert.SerializeObject(orderDto));
-        await _orderChangeStream.OnNextAsync(orderDto);
+        if (needOnNext)
+        {
+            _logger.LogInformation("push to stream, type:deposit, orderId:{orderId}, status:{status}", orderDto.Id,
+                orderDto.Status);
+            await _orderChangeStream.OnNextAsync(orderDto);
+        }
     }
     
     public async Task AddCheckOrder(DepositOrderDto orderDto)
