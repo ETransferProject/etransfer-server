@@ -5,6 +5,8 @@ public class SwapInfosOptions
     public Dictionary<string, SwapInfo> PairInfos { get; set; }
     public int SafeLibDiff { get; set; } = 300;
     public int CallTxRetryTimes { get; set; } = 3;
+    public int SafeBestChainDiff { get; set; } = 10;
+
 }
 
 public class SwapInfo

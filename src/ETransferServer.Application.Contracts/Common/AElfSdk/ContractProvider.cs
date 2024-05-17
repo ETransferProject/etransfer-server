@@ -39,7 +39,7 @@ public interface IContractProvider
 
     Task<ChainStatusDto> GetChainStatusAsync(string chainId);
     
-    Task<BlockDto> GetBlockAsync(string chainId, string blockHash);
+    Task<BlockDto> GetBlockAsync(string chainId, long blockHeight);
 
     Task<TransactionResultDto> WaitTransactionResultAsync(string chainId, string transactionId,
         int maxWaitMillis = 5000, int delayMillis = 1000);
@@ -134,12 +134,12 @@ public class ContractProvider : IContractProvider, ISingletonDependency
         return await Client(chainId).GetChainStatusAsync();
     }
 
-    public async Task<BlockDto> GetBlockAsync(string chainId, string blockHash)
+    public async Task<BlockDto> GetBlockAsync(string chainId, long blockHeight)
     {
-        _logger.LogInformation("chainId: {chainId}, blockHash: {blockHash}", chainId, blockHash);
-        var requestUrl = GetRequestUrl(Client(chainId).BaseUrl, string.Format("api/blockChain/block?blockHash={0}&includeTransactions={1}", (object) blockHash, false));
+        _logger.LogInformation("chainId: {chainId}, blockHeight: {blockHeight}", chainId, blockHeight);
+        var requestUrl = GetRequestUrl(Client(chainId).BaseUrl, string.Format("api/blockChain/blockByHeight?blockHeight={0}&includeTransactions={1}", (object) blockHeight, false));
         _logger.LogInformation("requestUrl: {requestUrl}", requestUrl);
-        return await Client(chainId).GetBlockByHashAsync(blockHash);
+        return await Client(chainId).GetBlockByHeightAsync(blockHeight);
     }
     
     private string GetRequestUrl(string baseUrl, string relativeUrl) => new Uri(new Uri(baseUrl + (baseUrl.EndsWith("/") ? "" : "/")), relativeUrl).ToString();
