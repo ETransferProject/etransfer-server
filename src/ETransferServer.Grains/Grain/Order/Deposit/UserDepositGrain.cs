@@ -6,7 +6,6 @@ using Orleans.Streams;
 using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
 using ETransferServer.Dtos.Order;
-using ETransferServer.Grains.Grain.Swap;
 using ETransferServer.Grains.Grain.Timers;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.Provider;
@@ -16,7 +15,7 @@ namespace ETransferServer.Grains.Grain.Order.Deposit;
 
 public interface IUserDepositGrain : IGrainWithGuidKey
 {
-    Task AddOrUpdateOrder(DepositOrderDto orderDto, Dictionary<string, string> externalInfo = null, bool needOnNext = true);
+    Task AddOrUpdateOrder(DepositOrderDto orderDto, Dictionary<string, string> externalInfo = null);
 }
 
 /// <summary>
@@ -91,11 +90,12 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
             GuidHelper.UniqGuid(nameof(ICoBoDepositQueryTimerGrain)));
     }
 
-    public async Task AddOrUpdateOrder(DepositOrderDto orderDto, Dictionary<string, string> externalInfo = null, bool needOnNext = true)
+    public async Task AddOrUpdateOrder(DepositOrderDto orderDto, Dictionary<string, string> externalInfo = null)
     {
-        
-        _logger.LogInformation("AddOrUpdateOrder, orderDto: {orderDto}, externalInfo: {externalInfo}, needOnNext: {needOnNext}", JsonConvert.SerializeObject(orderDto), JsonConvert.SerializeObject(externalInfo), needOnNext);
-        
+        _logger.LogInformation(
+            "AddOrUpdateOrder, orderDto: {orderDto}, externalInfo: {externalInfo}",
+            JsonConvert.SerializeObject(orderDto), JsonConvert.SerializeObject(externalInfo));
+
         // save deposit order to Grain
         var res = await _recordGrain.CreateOrUpdateAsync(orderDto);
         AssertHelper.IsTrue(res.Success, "save order data error, orderId = {Id}", orderDto.Id);
@@ -109,13 +109,26 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
         // save order flow to ES
         await _orderStatusFlowProvider.AddOrUpdate(orderDto.Id, orderFlowRes);
 
+        if (IsForward(orderDto, externalInfo)) return;
         // push order to stream
-        if (needOnNext)
+        _logger.LogInformation("push to stream, type:deposit, orderId:{orderId}, status:{status}", orderDto.Id,
+            orderDto.Status);
+        await _orderChangeStream.OnNextAsync(orderDto);
+    }
+    
+    private bool IsForward(DepositOrderDto orderDto, Dictionary<string, string> externalInfo)
+    {
+        var status = Enum.Parse<OrderStatusEnum>(orderDto.Status);
+        if (status == OrderStatusEnum.ToTransferring && !externalInfo.IsNullOrEmpty() &&
+            externalInfo.ContainsKey(ExtensionKey.IsForward))
         {
-            _logger.LogInformation("push to stream, type:deposit, orderId:{orderId}, status:{status}", orderDto.Id,
-                orderDto.Status);
-            await _orderChangeStream.OnNextAsync(orderDto);
+            var result = bool.TryParse(externalInfo[ExtensionKey.IsForward], out var isForward);
+            _logger.LogInformation("IsForward, type:deposit, orderId:{OrderId}, isForward:{isForward}",
+                orderDto.Id, isForward);
+            return result && !isForward;
         }
+
+        return false;
     }
     
     public async Task AddCheckOrder(DepositOrderDto orderDto)

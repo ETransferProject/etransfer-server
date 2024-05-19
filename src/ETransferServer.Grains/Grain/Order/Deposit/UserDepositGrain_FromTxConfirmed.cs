@@ -73,9 +73,10 @@ public partial class UserDepositGrain
             orderDto.Status = OrderStatusEnum.ToTransferring.ToString();
 
             await AddOrUpdateOrder(orderDto, ExtensionBuilder.New()
+                .Add(ExtensionKey.IsForward, Boolean.FalseString)
                 .Add(ExtensionKey.TransactionId, toTransfer.TxId)
                 .Add(ExtensionKey.Transaction, JsonConvert.SerializeObject(rawTransaction, JsonSettings))
-                .Build(), false);
+                .Build());
 
             // send 
             var (isSuccess, error) = await _contractProvider.SendTransactionAsync(toTransfer.ChainId, rawTransaction);
