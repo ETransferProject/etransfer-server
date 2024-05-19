@@ -287,6 +287,9 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
                 // transferInfo.Status = OrderTransferStatusEnum.Failed.ToString();
                 // order.Status = OrderStatusEnum.ToTransferFailed.ToString();
 
+                _logger.LogInformation("SwapTx result Confirmed failed, will call ToStartTransfer, status: {result}, order: {order}",
+                    txStatus.Status, JsonConvert.SerializeObject(order));
+                
                 transferInfo.Status = OrderTransferStatusEnum.StartTransfer.ToString();
                 order.Status = OrderStatusEnum.ToStartTransfer.ToString();
                 transferInfo.Symbol = order.FromTransfer.Symbol;
@@ -296,6 +299,9 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
                 order.ExtensionInfo[ExtensionKey.NeedSwap] = Boolean.FalseString;
                 order.ExtensionInfo[ExtensionKey.SwapStage] = SwapStage.SwapTxHandleFailAndToTransfer;
 
+                _logger.LogInformation("Before calling the ToStartTransfer method, after resetting the properties of the order, order: {order}",
+                    JsonConvert.SerializeObject(order));
+                
                 await SaveOrder(order, ExtensionBuilder.New()
                     .Add(ExtensionKey.TransactionStatus, txStatus.Status)
                     .Add(ExtensionKey.TransactionError, txStatus.Error)

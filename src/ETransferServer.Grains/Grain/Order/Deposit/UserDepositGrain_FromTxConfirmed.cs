@@ -141,11 +141,21 @@ public partial class UserDepositGrain
             return result.Data;
         }
 
-        _logger.LogInformation("ToStartSwapTx invalid or fail, will goto ToStartTransfer, result: {result}",
-            JsonConvert.SerializeObject(result));
+        _logger.LogInformation("ToStartSwapTx method validation or invocation failed, will call ToStartTransfer, result: {result}, order: {order}",
+            JsonConvert.SerializeObject(result), JsonConvert.SerializeObject(orderDto));
+        
+        orderDto.Status = OrderStatusEnum.ToStartTransfer.ToString();
+        orderDto.ToTransfer.Status = OrderTransferStatusEnum.StartTransfer.ToString();
+        orderDto.ToTransfer.Symbol = orderDto.FromTransfer.Symbol;
+        orderDto.FromRawTransaction = null;
+        orderDto.ToTransfer.TxId = null;
+        orderDto.ToTransfer.TxTime = null;
         orderDto.ExtensionInfo.AddOrReplace(ExtensionKey.NeedSwap, Boolean.FalseString);
         orderDto.ExtensionInfo.AddOrReplace(ExtensionKey.SwapStage, SwapStage.SwapTxCheckFailAndToTransfer);
-        orderDto.ToTransfer.Symbol = orderDto.FromTransfer.Symbol;
+        
+        _logger.LogInformation("Before calling the ToStartTransfer method, after resetting the properties of the order, order: {order}",
+            JsonConvert.SerializeObject(orderDto));
+        
         return await ToStartTransfer(orderDto);
     }
 

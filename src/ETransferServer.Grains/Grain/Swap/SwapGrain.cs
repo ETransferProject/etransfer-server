@@ -200,6 +200,8 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
                     .Add(ExtensionKey.TransactionError, e.Message)
                     .Build()
             };
+            result.Success = false;
+            result.Message = e.Message;
             return result;
         }
     }
