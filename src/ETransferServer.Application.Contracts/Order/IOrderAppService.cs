@@ -8,5 +8,4 @@ public interface IOrderAppService
 {
     Task<PagedResultDto<OrderIndexDto>> GetOrderRecordListAsync(GetOrderRecordRequestDto request);
     Task<OrderStatusDto> GetOrderRecordStatusAsync();
-    Task<OrderReadDto> UpdateOrderRecordReadAsync();
 }

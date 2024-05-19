@@ -6,7 +6,7 @@ namespace ETransferServer.Grains.Grain.Users;
 
 public interface IUserOrderActionGrain : IGrainWithStringKey
 {
-    Task AddOrUpdateAsync();
+    Task AddOrUpdateAsync(long? createTime);
     Task<long> GetAsync();
 }
 
@@ -24,7 +24,7 @@ public class UserOrderActionGrain : Grain<UserOrderActionState>, IUserOrderActio
         await base.OnDeactivateAsync();
     }
 
-    public async Task AddOrUpdateAsync()
+    public async Task AddOrUpdateAsync(long? createTime)
     {
         if (State.Id == null || State.Id == Guid.Empty)
         {
@@ -32,12 +32,15 @@ public class UserOrderActionGrain : Grain<UserOrderActionState>, IUserOrderActio
             State.UserId = this.GetPrimaryKeyString();
         }
 
-        State.LastModifyTime = DateTime.UtcNow.ToUtcMilliSeconds();
+        if (createTime != null && createTime > State.LastModifyTime)
+        {
+            State.LastModifyTime = DateTime.UtcNow.ToUtcMilliSeconds();
+        }
         await WriteStateAsync();
     }
 
     public async Task<long> GetAsync()
     {
-        return State.Id == Guid.Empty ? -1 : State.LastModifyTime;
+        return State.Id == null || State.Id == Guid.Empty ? -1 : State.LastModifyTime;
     }
 }
