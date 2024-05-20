@@ -10,6 +10,7 @@ public class OrderIndexDto
     public string Status { get; set; }
     public long LastModifyTime { get; set; }
     public long ArrivalTime { get; set; }
+    public long? CreateTime { get; set; }
     public TransferInfoDto FromTransfer { get; set; }
     public TransferInfoDto ToTransfer { get; set; }
 }

@@ -86,11 +86,4 @@ public class OrderController : ETransferController
     {
         return await _orderAppService.GetOrderRecordStatusAsync();
     }
-
-    [Authorize]
-    [HttpPost("record/read")]
-    public async Task<OrderReadDto> UpdateRecordReadAsync()
-    {
-        return await _orderAppService.UpdateOrderRecordReadAsync();
-    }
 }

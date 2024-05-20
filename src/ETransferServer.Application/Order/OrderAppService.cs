@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using AElf.Indexing.Elasticsearch;
 using ETransferServer.Common;
@@ -125,12 +126,21 @@ public class OrderAppService : ApplicationService, IOrderAppService
                 request.MaxResultCount,
                 skip: request.SkipCount);
 
-            return new PagedResultDto<OrderIndexDto>
+            var orderIndexDtoPageResult = new PagedResultDto<OrderIndexDto>
             {
                 Items = await LoopCollectionItemsAsync(
                     _objectMapper.Map<List<OrderIndex>, List<OrderIndexDto>>(list)),
                 TotalCount = count
             };
+            
+            if (orderIndexDtoPageResult.Items.Any())
+            {
+                var maxCreateTime = orderIndexDtoPageResult.Items.Max(item => item.CreateTime);
+                var userOrderActionGrain = _clusterClient.GetGrain<IUserOrderActionGrain>(userId.ToString());
+                await userOrderActionGrain.AddOrUpdateAsync(maxCreateTime);
+            }
+            
+            return orderIndexDtoPageResult;
         }
         catch (Exception e)
         {
@@ -187,17 +197,6 @@ public class OrderAppService : ApplicationService, IOrderAppService
             _logger.LogError(e, "Get order record status failed");
             return new OrderStatusDto();
         }
-    }
-
-    public async Task<OrderReadDto> UpdateOrderRecordReadAsync()
-    {
-        var userId = CurrentUser?.GetId();
-        if (!userId.HasValue || userId == Guid.Empty) return new();
-
-        var userOrderActionGrain = _clusterClient.GetGrain<IUserOrderActionGrain>(userId.ToString());
-        await userOrderActionGrain.AddOrUpdateAsync();
-
-        return new();
     }
 
     private static Func<SortDescriptor<OrderIndex>, IPromise<IList<ISort>>> GetSorting(string sorting)
