@@ -22,19 +22,9 @@ public partial class UserDepositGrain
     private async Task<DepositOrderChangeDto> OnToStartTransfer(DepositOrderDto orderDto)
     {
 
-        if (IsSwapTx(orderDto))
+        if (NeedSwap(orderDto))
         {
             return await ToStartSwapTx(orderDto);
-        }
-
-        if (IsSwapSubsidy(orderDto))
-        {
-            return await ToStartSwapSubsidy(orderDto);
-        }
-
-        if (IsSwapTxHandleFailAndToTransfer(orderDto))
-        {
-            return await ToStartTransfer(orderDto, true);
         }
 
         return await ToStartTransfer(orderDto);
@@ -83,6 +73,7 @@ public partial class UserDepositGrain
             orderDto.Status = OrderStatusEnum.ToTransferring.ToString();
 
             await AddOrUpdateOrder(orderDto, ExtensionBuilder.New()
+                .Add(ExtensionKey.IsForward, Boolean.FalseString)
                 .Add(ExtensionKey.TransactionId, toTransfer.TxId)
                 .Add(ExtensionKey.Transaction, JsonConvert.SerializeObject(rawTransaction, JsonSettings))
                 .Build());
@@ -150,74 +141,27 @@ public partial class UserDepositGrain
             return result.Data;
         }
 
-        _logger.LogInformation("ToStartSwapTx invalid or fail, will goto ToStartTransfer, result: {result}",
-            JsonConvert.SerializeObject(result));
-        orderDto.ExtensionInfo.AddOrReplace(ExtensionKey.SwapStage, SwapStage.SwapTxCheckFailAndToTransfer);
-        orderDto.ToTransfer.Symbol = orderDto.FromTransfer.Symbol;
-        return await ToStartTransfer(orderDto);
-    }
-
-    private async Task<DepositOrderChangeDto> ToStartSwapSubsidy(DepositOrderDto orderDto)
-    {
-        // Task<GrainResultDto<DepositOrderChangeDto>> SubsidyTransferAsync(DepositOrderDto dto，string returnValue);
-        return null;
-    }
-    
-    private async Task<DepositOrderDto> TrySetTimes(DepositOrderDto orderDto)
-    {
-        var userDepositRecordGrain = GrainFactory.GetGrain<IUserDepositRecordGrain>(orderDto.Id);
-        var order = await userDepositRecordGrain.GetAsync();
-        orderDto.CreateTime ??= order.Value.CreateTime;
-        orderDto.ArrivalTime ??= order.Value.ArrivalTime;
-        orderDto.LastModifyTime ??= order.Value.LastModifyTime;
-
-        if (orderDto.CreateTime == null)
-        {
-            _logger.LogInformation("order create is null, default set now");
-            orderDto.CreateTime = DateTime.UtcNow.ToUtcMilliSeconds();
-        }
-
-        // for test
-        if (orderDto.CreateTime.HasValue)
-        {
-            orderDto.CreateTime -= (long)TimeSpan.FromMinutes(5).TotalMilliseconds;
-            _logger.LogInformation("order create reduce, default set now");
-        }
+        _logger.LogInformation("ToStartSwapTx method validation or invocation failed, will call ToStartTransfer, result: {result}, order: {order}",
+            JsonConvert.SerializeObject(result), JsonConvert.SerializeObject(orderDto));
         
-        return orderDto;
+        orderDto.Status = OrderStatusEnum.ToStartTransfer.ToString();
+        orderDto.ToTransfer.Status = OrderTransferStatusEnum.StartTransfer.ToString();
+        orderDto.ToTransfer.Symbol = orderDto.FromTransfer.Symbol;
+        orderDto.FromRawTransaction = null;
+        orderDto.ToTransfer.TxId = null;
+        orderDto.ToTransfer.TxTime = null;
+        orderDto.ExtensionInfo.AddOrReplace(ExtensionKey.NeedSwap, Boolean.FalseString);
+        orderDto.ExtensionInfo.AddOrReplace(ExtensionKey.SwapStage, SwapStage.SwapTxCheckFailAndToTransfer);
+        
+        _logger.LogInformation("Before calling the ToStartTransfer method, after resetting the properties of the order, order: {order}",
+            JsonConvert.SerializeObject(orderDto));
+        
+        return await ToStartTransfer(orderDto);
     }
 
     private bool NeedSwap(DepositOrderDto orderDto)
     {
         return orderDto.ExtensionInfo.ContainsKey(ExtensionKey.NeedSwap) &&
                orderDto.ExtensionInfo[ExtensionKey.NeedSwap].Equals(Boolean.TrueString);
-    }
-
-    private bool IsSwapTx(DepositOrderDto orderDto)
-    {
-        if (NeedSwap(orderDto))
-        {
-            return orderDto.ExtensionInfo.ContainsKey(ExtensionKey.SwapStage) &&
-                   orderDto.ExtensionInfo[ExtensionKey.SwapStage].Equals(SwapStage.SwapTx);
-        }
-
-        return false;
-    }
-
-    private bool IsSwapSubsidy(DepositOrderDto orderDto)
-    {
-        if (NeedSwap(orderDto))
-        {
-            return orderDto.ExtensionInfo.ContainsKey(ExtensionKey.SwapStage) &&
-                   orderDto.ExtensionInfo[ExtensionKey.SwapStage].Equals(SwapStage.SwapSubsidy);
-        }
-
-        return false;
-    }
-
-    private bool IsSwapTxHandleFailAndToTransfer(DepositOrderDto orderDto)
-    {
-        return orderDto.ExtensionInfo.ContainsKey(ExtensionKey.SwapStage) &&
-                orderDto.ExtensionInfo[ExtensionKey.SwapStage].Equals(SwapStage.SwapTxHandleFailAndToTransfer);
     }
 }

@@ -152,8 +152,8 @@ public class SwapReserveGrain : Grain<SwapReserveState>, ISwapReserveGrain
             var libFromChain = chainStatus.LastIrreversibleBlockHeight;
             _logger.LogInformation("Get lib from chain:{lib},{grainId},{orderId}", libFromChain,
                 this.GetPrimaryKeyString(), orderId);
-            var blockTime = (await _contractProvider.GetBlockAsync(chainId, chainStatus.LongestChainHeight)).Header
-                .Time.ToUtcMilliSeconds();
+            var blockTime = (await _contractProvider.GetBlockAsync(chainId, chainStatus.BestChainHeight - _swapInfosOptions.SafeBestChainDiff)).Header.Time
+                .ToUtcMilliSeconds();
             _logger.LogInformation("Get block time from chain:{time},create time:{timestamp},{grainId},{orderId}",
                 blockTime, timestamp, this.GetPrimaryKeyString(), orderId);
             return blockTime >= timestamp && (libFromGql >= libFromChain ||
@@ -164,7 +164,7 @@ public class SwapReserveGrain : Grain<SwapReserveState>, ISwapReserveGrain
             _logger.LogError(e, "Get lib height or block time failed.{grainId},{orderId}", this.GetPrimaryKeyString(),
                 orderId);
             retryTime += 1;
-            await CheckLibHeightAndTimestampAsync(orderId, chainId, retryTime);
+            await CheckLibHeightAndTimestampAsync(orderId, chainId, timestamp, retryTime);
         }
 
         return false;

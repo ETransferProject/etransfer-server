@@ -30,16 +30,13 @@ public static class ExtensionKey
     public const string IsForward = "isForward";
 
     public const string IsSwap = "IsSwap";
-    public const string SwapSubsidyTxId = "SwapSubsidyTxId";
     public const string NeedSwap = "NeedSwap";
     public const string SwapStage = "SwapStage";
-    public const string SwapSubsidyTxTime = "SwapSubsidyTxTime";
 }
 
 public static class SwapStage
 {
     public const string SwapTx = "SwapTx";
-    public const string SwapSubsidy = "SwapSubsidy";
     public const string SwapTxCheckFailAndToTransfer = "SwapTxCheckFailAndToTransfer";
     public const string SwapTxHandleFailAndToTransfer = "SwapTxHandleFailAndToTransfer";
 }
