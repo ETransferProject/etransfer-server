@@ -6,7 +6,6 @@ using Orleans.Streams;
 using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
 using ETransferServer.Dtos.Order;
-using ETransferServer.Grains.Grain.Swap;
 using ETransferServer.Grains.Grain.Timers;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.Provider;
@@ -93,9 +92,12 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
 
     public async Task AddOrUpdateOrder(DepositOrderDto orderDto, Dictionary<string, string> externalInfo = null)
     {
+        _logger.LogInformation(
+            "AddOrUpdateOrder, orderDto: {orderDto}, externalInfo: {externalInfo}",
+            JsonConvert.SerializeObject(orderDto), JsonConvert.SerializeObject(externalInfo));
+
         // save deposit order to Grain
         var res = await _recordGrain.CreateOrUpdateAsync(orderDto);
-        _logger.LogInformation("AddOrUpdateOrder, orderDto: {orderDto}", JsonConvert.SerializeObject(orderDto));
         AssertHelper.IsTrue(res.Success, "save order data error, orderId = {Id}", orderDto.Id);
 
         // save order flow
@@ -107,11 +109,26 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
         // save order flow to ES
         await _orderStatusFlowProvider.AddOrUpdate(orderDto.Id, orderFlowRes);
 
+        if (IsForward(orderDto, externalInfo)) return;
         // push order to stream
         _logger.LogInformation("push to stream, type:deposit, orderId:{orderId}, status:{status}", orderDto.Id,
             orderDto.Status);
-        _logger.LogInformation("AddOrUpdateOrder before OnNextAsync, orderDto: {orderDto}", JsonConvert.SerializeObject(orderDto));
         await _orderChangeStream.OnNextAsync(orderDto);
+    }
+    
+    private bool IsForward(DepositOrderDto orderDto, Dictionary<string, string> externalInfo)
+    {
+        var status = Enum.Parse<OrderStatusEnum>(orderDto.Status);
+        if (status == OrderStatusEnum.ToTransferring && !externalInfo.IsNullOrEmpty() &&
+            externalInfo.ContainsKey(ExtensionKey.IsForward))
+        {
+            var result = bool.TryParse(externalInfo[ExtensionKey.IsForward], out var isForward);
+            _logger.LogInformation("IsForward, type:deposit, orderId:{OrderId}, isForward:{isForward}",
+                orderDto.Id, isForward);
+            return result && !isForward;
+        }
+
+        return false;
     }
     
     public async Task AddCheckOrder(DepositOrderDto orderDto)

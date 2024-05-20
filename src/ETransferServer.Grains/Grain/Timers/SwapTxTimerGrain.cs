@@ -210,13 +210,9 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
         TransferInfo transferInfo = order.ToTransfer;;
         
         _logger.LogInformation("HandleOrderTransaction: {order}", JsonConvert.SerializeObject(order));
-        
-        var swapId = order.ExtensionInfo[ExtensionKey.SwapStage].Equals(SwapStage.SwapTx)
-            ? order.ToTransfer.TxId
-            : order.ExtensionInfo[ExtensionKey.SwapSubsidyTxId];
-        var swapTxTime = order.ExtensionInfo[ExtensionKey.SwapStage].Equals(SwapStage.SwapTx)
-            ? transferInfo.TxTime
-            : getSwapSubsidyTxTime(order);
+
+        var swapId = order.ToTransfer.TxId;
+        var swapTxTime = transferInfo.TxTime;
         
         _logger.LogInformation("HandleOrderTransaction after set param: {order}", JsonConvert.SerializeObject(order));
         
@@ -291,12 +287,21 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
                 // transferInfo.Status = OrderTransferStatusEnum.Failed.ToString();
                 // order.Status = OrderStatusEnum.ToTransferFailed.ToString();
 
+                _logger.LogInformation("SwapTx result Confirmed failed, will call ToStartTransfer, status: {result}, order: {order}",
+                    txStatus.Status, JsonConvert.SerializeObject(order));
+                
                 transferInfo.Status = OrderTransferStatusEnum.StartTransfer.ToString();
                 order.Status = OrderStatusEnum.ToStartTransfer.ToString();
                 transferInfo.Symbol = order.FromTransfer.Symbol;
+                order.FromRawTransaction = null;
+                transferInfo.TxId = null;
+                transferInfo.TxTime = null;
                 order.ExtensionInfo[ExtensionKey.NeedSwap] = Boolean.FalseString;
                 order.ExtensionInfo[ExtensionKey.SwapStage] = SwapStage.SwapTxHandleFailAndToTransfer;
 
+                _logger.LogInformation("Before calling the ToStartTransfer method, after resetting the properties of the order, order: {order}",
+                    JsonConvert.SerializeObject(order));
+                
                 await SaveOrder(order, ExtensionBuilder.New()
                     .Add(ExtensionKey.TransactionStatus, txStatus.Status)
                     .Add(ExtensionKey.TransactionError, txStatus.Error)
@@ -353,12 +358,5 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
             return null;
         }
         return resp.Data as DepositOrderDto;
-    }
-    
-    private long getSwapSubsidyTxTime(DepositOrderDto order) {
-        long timestamp = Convert.ToInt64(order.ExtensionInfo[ExtensionKey.SwapSubsidyTxTime]);
-        DateTime dateTime = DateTimeOffset.FromUnixTimeMilliseconds(timestamp).UtcDateTime;
-        long utcMilliseconds = (long)(dateTime - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds;
-        return utcMilliseconds;
     }
 }
