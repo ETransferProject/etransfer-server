@@ -143,6 +143,8 @@ public partial class UserDepositGrain
 
         _logger.LogInformation("ToStartSwapTx method validation or invocation failed, will call ToStartTransfer, result: {result}, order: {order}",
             JsonConvert.SerializeObject(result), JsonConvert.SerializeObject(orderDto));
+
+        await DepositSwapFailureAlarmAsync(orderDto, SwapStage.SwapTxCheckFailAndToTransfer);
         
         orderDto.Status = OrderStatusEnum.ToStartTransfer.ToString();
         orderDto.ToTransfer.Status = OrderTransferStatusEnum.StartTransfer.ToString();
@@ -163,5 +165,11 @@ public partial class UserDepositGrain
     {
         return orderDto.ExtensionInfo.ContainsKey(ExtensionKey.NeedSwap) &&
                orderDto.ExtensionInfo[ExtensionKey.NeedSwap].Equals(Boolean.TrueString);
+    }
+
+    private async Task DepositSwapFailureAlarmAsync(DepositOrderDto orderDto, string reason)
+    {
+        var depositSwapMonitorGrain = GrainFactory.GetGrain<IDepositSwapMonitorGrain>(orderDto.Id.ToString());
+        await depositSwapMonitorGrain.DoMonitorAsync(DepositSwapMonitorDto.Create(orderDto, reason));
     }
 }
