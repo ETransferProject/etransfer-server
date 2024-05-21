@@ -34,7 +34,7 @@ public class UserOrderActionGrain : Grain<UserOrderActionState>, IUserOrderActio
 
         if (createTime != null && createTime > State.LastModifyTime)
         {
-            State.LastModifyTime = DateTime.UtcNow.ToUtcMilliSeconds();
+            State.LastModifyTime = createTime.Value;
         }
         await WriteStateAsync();
     }
