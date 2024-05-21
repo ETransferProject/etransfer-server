@@ -71,7 +71,7 @@ public class DepositSwapMonitorGrain : Grain<DepositSwapMonitorState>, IDepositS
                 [Keys.AmountFrom] = dto.FromAmount.ToString(),
                 [Keys.ChainIdTo] = dto.ToChainId,
                 [Keys.Reason] = dto.Reason,
-                [Keys.CreateTime] = dto.CreateTime == null ? DateTimeHelper.FromUnixTimeMilliseconds(dto.CreateTime.Value).ToUtcString(TimeHelper.UtcPattern): null
+                [Keys.CreateTime] = dto.CreateTime != null ? DateTimeHelper.FromUnixTimeMilliseconds(dto.CreateTime.Value).ToUtcString(TimeHelper.UtcPattern) : DateTime.UtcNow.ToUtcString(TimeHelper.UtcPattern)
             }
         });
     }
