@@ -166,8 +166,8 @@ public class OrderAppService : ApplicationService, IOrderAppService
             var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>
             {
                 q => q.Term(i => i.Field(f => f.UserId).Value(userId.ToString())),
-                q => q.Range(i => i.Field(f => f.CreateTime).GreaterThanOrEquals(lastModifyTime)),
-                q => q.Range(i => i.Field(f => f.CreateTime).GreaterThanOrEquals(DateTime.UtcNow.AddDays(OrderOptions.ValidOrderThreshold).ToUtcMilliSeconds())),
+                q => q.Range(i => i.Field(f => f.CreateTime).GreaterThan(lastModifyTime)),
+                q => q.Range(i => i.Field(f => f.CreateTime).GreaterThan(DateTime.UtcNow.AddDays(OrderOptions.ValidOrderThreshold).ToUtcMilliSeconds())),
                 q => q.Terms(i => i.Field(f => f.Status).Terms((IEnumerable<string>)new List<string>
                 {
                     OrderStatusEnum.Initialized.ToString(),
