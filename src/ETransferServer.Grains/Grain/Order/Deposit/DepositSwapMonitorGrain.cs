@@ -41,12 +41,12 @@ public class DepositSwapMonitorGrain : Grain<DepositSwapMonitorState>, IDepositS
         catch (UserFriendlyException e)
         {
             _logger.LogWarning(
-                "Withdraw fee monitor handle failed , Message={Msg}, GrainId={GrainId} feeInfo={FeeInfo}", e.Message,
+                "Deposit swap monitor handle failed , Message={Msg}, GrainId={GrainId} dto={dto}", e.Message,
                 this.GetPrimaryKeyString(), JsonConvert.SerializeObject(dto));
         }
         catch (Exception e)
         {
-            _logger.LogError(e, "Withdraw fee monitor handle failed GrainId={GrainId}, feeInfo={FeeInfo}",
+            _logger.LogError(e, "Deposit swap monitor handle failed GrainId={GrainId}, feeInfo={dto}",
                 this.GetPrimaryKeyString(), JsonConvert.SerializeObject(dto));
         }
     }
