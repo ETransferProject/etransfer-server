@@ -146,6 +146,7 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
 
             var depositRecordGrain = GrainFactory.GetGrain<IUserDepositGrain>(this.GetPrimaryKey());
             await depositRecordGrain.AddOrUpdateOrder(dto, ExtensionBuilder.New()
+                .Add(ExtensionKey.IsForward, Boolean.FalseString)
                 .Add(ExtensionKey.TransactionId, toTransfer.TxId)
                 .Add(ExtensionKey.Transaction, JsonConvert.SerializeObject(rawTransaction, JsonSettings))
                 .Build());
@@ -199,6 +200,8 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
                     .Add(ExtensionKey.TransactionError, e.Message)
                     .Build()
             };
+            result.Success = false;
+            result.Message = e.Message;
             return result;
         }
     }
