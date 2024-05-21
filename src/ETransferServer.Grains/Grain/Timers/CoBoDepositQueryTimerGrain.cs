@@ -13,6 +13,8 @@ using ETransferServer.Grains.State.Order;
 using ETransferServer.ThirdPart.CoBo;
 using ETransferServer.ThirdPart.CoBo.Dtos;
 using ETransferServer.User;
+using Microsoft.AspNetCore.Razor.Language.Intermediate;
+using NBitcoin;
 
 namespace ETransferServer.Grains.Grain.Timers;
 
@@ -191,7 +193,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         var paymentAddress = _depositOption.Value.PaymentAddresses.GetValueOrDefault(addressInfo.ChainId);
         AssertHelper.NotEmpty(paymentAddress, "Payment address empty, ChainId={ChainId}", addressInfo.ChainId);
 
-        return new DepositOrderDto
+        var depositOrderDto = new DepositOrderDto
         {
             Id = OrderIdHelper.DepositOrderId(coinInfo.Network, coinInfo.Symbol, coBoTransaction.TxId),
             OrderType = OrderTypeEnum.Deposit.ToString(),
@@ -209,6 +211,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
                 Amount = Convert.ToDecimal(coBoTransaction.AbsAmount),
                 FromAddress = coBoTransaction.SourceAddress,
                 ToAddress = coBoTransaction.Address,
+                BlockHash = coBoTransaction.TxDetail.BlockHash
             },
             ToTransfer = new TransferInfo
             {
@@ -216,11 +219,41 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
                 ToAddress = addressInfo.Address,
                 Network = CommonConstant.Network.AElf,
                 ChainId = addressInfo.ChainId,
-                Symbol = coinInfo.Symbol,
+                Symbol = userAddress.ToSymbol,
                 Amount = coBoTransaction.AbsAmount.SafeToDecimal(),
                 Status = OrderTransferStatusEnum.Created.ToString(),
             }
         };
+
+        return SpecialHandle(depositOrderDto);
+    }
+
+    private DepositOrderDto SpecialHandle(DepositOrderDto dto)
+    {
+        _logger.LogInformation("SpecialHandle, input dto: {dto}", JsonConvert.SerializeObject(dto));
+        // Add ExtensionInfo
+        dto.ExtensionInfo ??= new Dictionary<string, string>();
+        
+        if (dto.ToTransfer.Symbol.IsNullOrEmpty() 
+            || _depositOption.Value.NoSwapSymbols.Contains(dto.FromTransfer.Symbol))
+        {
+            _logger.LogInformation("SpecialHandle, not need swap, set ToTransfer.Symbol = FromTransfer.Symbol");
+            dto.ToTransfer.Symbol = dto.FromTransfer.Symbol;
+            return dto;
+        }
+
+        if (DepositSwapHelper.IsDepositSwap(dto.FromTransfer.Symbol, dto.ToTransfer.Symbol))
+        {
+            _logger.LogInformation("SpecialHandle, need swap, set ExtensionInfo");
+            dto.ExtensionInfo.Add(ExtensionKey.IsSwap, Boolean.TrueString);
+            dto.ExtensionInfo.Add(ExtensionKey.NeedSwap, Boolean.TrueString);
+            dto.ExtensionInfo.Add(ExtensionKey.SwapStage, SwapStage.SwapTx);
+            return dto;
+        }
+        
+        _logger.LogInformation("SpecialHandle, default set ToTransfer.Symbol = FromTransfer.Symbol");
+        dto.ToTransfer.Symbol = dto.FromTransfer.Symbol;
+        return dto;
     }
 
     private async Task AddAfter(CoBoTransactionDto depositOrder)

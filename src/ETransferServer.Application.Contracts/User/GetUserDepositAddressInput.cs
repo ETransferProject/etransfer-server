@@ -8,4 +8,5 @@ public class GetUserDepositAddressInput
     [Required] public string ChainId { get; set; }
     [Required] public string NetWork { get; set; }
     public string Symbol { get; set; }
+    public string ToSymbol { get; set; }
 }

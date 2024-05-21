@@ -2,10 +2,14 @@ using ETransferServer.Common;
 using Orleans;
 using ETransferServer.Common.Dtos;
 using ETransferServer.Dtos.User;
+using ETransferServer.Grains.Grain.Worker.Transaction;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.State.Users;
 using ETransferServer.User;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
+using Serilog.Core;
 using Volo.Abp.ObjectMapping;
 
 namespace ETransferServer.Grains.Grain.Users;
@@ -23,14 +27,16 @@ public class UserDepositAddressGrain : Grain<TokenDepositAddressState>, IUserDep
     private readonly IUserAddressProvider _userAddressProvider;
     private readonly IOptionsSnapshot<DepositAddressOptions> _depositAddressOptions;
     private readonly IObjectMapper _objectMapper;
+    private readonly ILogger<UserDepositAddressGrain> _logger;
 
     public UserDepositAddressGrain(IUserAddressProvider userAddressProvider,
         IOptionsSnapshot<DepositAddressOptions> depositAddressOptions,
-        IObjectMapper objectMapper)
+        IObjectMapper objectMapper, ILogger<UserDepositAddressGrain> logger)
     {
         _userAddressProvider = userAddressProvider;
         _depositAddressOptions = depositAddressOptions;
         _objectMapper = objectMapper;
+        _logger = logger;
     }
 
     public override async Task OnActivateAsync()
@@ -100,10 +106,21 @@ public class UserDepositAddressGrain : Grain<TokenDepositAddressState>, IUserDep
     private async Task<IUserDepositAddressGrain> GetUserDepositGrainAsync(string coin, GetUserDepositAddressInput input)
     {
         var split = coin.Split(DepositAddressOptions.DefaultDelimiter);
-        return split.Length >= 2 && !(split[0] == input.NetWork && split[1] == input.Symbol) ?
-            GrainFactory.GetGrain<IUserDepositAddressGrain>(GuidHelper.GenerateGrainId(input.UserId,
-                    input.ChainId, split[0], split[1]))
+        return split.Length >= 2 && !(split[0] == input.NetWork && split[1] == input.Symbol)
+            ? GetUserDepositGrain(input, split)
             : null;
+    }
+
+    private IUserDepositAddressGrain GetUserDepositGrain(GetUserDepositAddressInput input, string[] split)
+    {
+        if (DepositSwapHelper.NoDepositSwap(input.Symbol, input.ToSymbol))
+        {
+            return GrainFactory.GetGrain<IUserDepositAddressGrain>(GuidHelper.GenerateGrainId(input.UserId,
+                input.ChainId, split[0], split[1]));
+        }
+
+        return GrainFactory.GetGrain<IUserDepositAddressGrain>(GuidHelper.GenerateGrainId(input.UserId,
+            input.ChainId, split[0], split[1], input.ToSymbol));
     }
 
     private async Task<string> HandleUpdateAsync(GetUserDepositAddressInput input, IUserDepositAddressGrain grain)
@@ -114,7 +131,10 @@ public class UserDepositAddressGrain : Grain<TokenDepositAddressState>, IUserDep
         addressDto.ChainId = input.ChainId;
         addressDto.IsAssigned = true;
         addressDto.UpdateTime = DateTimeHelper.ToUnixTimeMilliseconds(DateTime.UtcNow);
-        
+        var isDepositSwap = DepositSwapHelper.IsDepositSwap(input.Symbol, input.ToSymbol);
+        addressDto.FromSymbol = isDepositSwap ? input.Symbol : addressDto.UserToken.Symbol;
+        addressDto.ToSymbol = isDepositSwap ? input.ToSymbol : addressDto.UserToken.Symbol;
+
         await grain.AddOrUpdate(addressDto);
         var addressGrain = GrainFactory.GetGrain<IUserTokenDepositAddressGrain>(addressDto.UserToken.Address);
         await addressGrain.AddOrUpdate(addressDto);

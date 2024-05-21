@@ -50,6 +50,13 @@ public class OrderController : ETransferController
     {
         return await _depositOrderAppService.GetDepositInfoAsync(request);
     }
+    
+    [Authorize]
+    [HttpGet("deposit/calculator")]
+    public async Task<CalculateDepositRateDto> CalculateDepositRateAsync(GetCalculateDepositRateRequestDto request)
+    {
+        return await _depositOrderAppService.CalculateDepositRateAsync(request);
+    }
 
     [Authorize]
     [HttpGet("withdraw/info")]

@@ -7,9 +7,11 @@ using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
 using ETransferServer.Common.AElfSdk.Dtos;
 using ETransferServer.Dtos.Order;
+using ETransferServer.Grains.Grain.Swap;
 using ETransferServer.Grains.Grain.Token;
 using Google.Protobuf;
-using Microsoft.IdentityModel.Tokens;
+using NBitcoin;
+using Transaction = AElf.Types.Transaction;
 
 namespace ETransferServer.Grains.Grain.Order.Deposit;
 
@@ -17,7 +19,18 @@ public partial class UserDepositGrain
 {
     private readonly IContractProvider _contractProvider;
 
-    public async Task<DepositOrderChangeDto> OnToStartTransfer(DepositOrderDto orderDto, bool withNewTx = false)
+    private async Task<DepositOrderChangeDto> OnToStartTransfer(DepositOrderDto orderDto)
+    {
+
+        if (NeedSwap(orderDto))
+        {
+            return await ToStartSwapTx(orderDto);
+        }
+
+        return await ToStartTransfer(orderDto);
+    }
+
+    private async Task<DepositOrderChangeDto> ToStartTransfer(DepositOrderDto orderDto, bool withNewTx = false)
     {
         try
         {
@@ -40,7 +53,8 @@ public partial class UserDepositGrain
                     Symbol = toTransfer.Symbol,
                     Memo = ITokenGrain.GetNewId(orderDto.Id)
                 };
-                var (txId, newTransaction) = await _contractProvider.CreateTransactionAsync(toTransfer.ChainId, toTransfer.FromAddress,
+                var (txId, newTransaction) = await _contractProvider.CreateTransactionAsync(toTransfer.ChainId,
+                    toTransfer.FromAddress,
                     SystemContractName.TokenContract, "Transfer", transferInput);
 
                 toTransfer.TxId = txId.ToHex();
@@ -49,7 +63,8 @@ public partial class UserDepositGrain
             }
             else
             {
-                rawTransaction = Transaction.Parser.ParseFrom(ByteStringHelper.FromHexString(orderDto.FromRawTransaction));
+                rawTransaction =
+                    Transaction.Parser.ParseFrom(ByteStringHelper.FromHexString(orderDto.FromRawTransaction));
             }
 
             toTransfer.TxTime = DateTime.UtcNow.ToUtcMilliSeconds();
@@ -58,6 +73,7 @@ public partial class UserDepositGrain
             orderDto.Status = OrderStatusEnum.ToTransferring.ToString();
 
             await AddOrUpdateOrder(orderDto, ExtensionBuilder.New()
+                .Add(ExtensionKey.IsForward, Boolean.FalseString)
                 .Add(ExtensionKey.TransactionId, toTransfer.TxId)
                 .Add(ExtensionKey.Transaction, JsonConvert.SerializeObject(rawTransaction, JsonSettings))
                 .Build());
@@ -110,5 +126,42 @@ public partial class UserDepositGrain
                     .Build()
             };
         }
+    }
+
+    private async Task<DepositOrderChangeDto> ToStartSwapTx(DepositOrderDto orderDto)
+    {
+        _logger.LogInformation("ToStartSwapTx, orderDto: {orderDto}", JsonConvert.SerializeObject(orderDto));
+        
+        var swapGrain = GrainFactory.GetGrain<ISwapGrain>(orderDto.Id);
+        var result = await swapGrain.SwapAsync(orderDto);
+        if (result.Success)
+        {
+            // orderDto.ExtensionInfo.AddOrReplace(ExtensionKey.SwapStage, SwapStage.SwapSubsidy);
+            _logger.LogInformation("ToStartSwapTx success, result: {result}", JsonConvert.SerializeObject(result));
+            return result.Data;
+        }
+
+        _logger.LogInformation("ToStartSwapTx method validation or invocation failed, will call ToStartTransfer, result: {result}, order: {order}",
+            JsonConvert.SerializeObject(result), JsonConvert.SerializeObject(orderDto));
+        
+        orderDto.Status = OrderStatusEnum.ToStartTransfer.ToString();
+        orderDto.ToTransfer.Status = OrderTransferStatusEnum.StartTransfer.ToString();
+        orderDto.ToTransfer.Symbol = orderDto.FromTransfer.Symbol;
+        orderDto.FromRawTransaction = null;
+        orderDto.ToTransfer.TxId = null;
+        orderDto.ToTransfer.TxTime = null;
+        orderDto.ExtensionInfo.AddOrReplace(ExtensionKey.NeedSwap, Boolean.FalseString);
+        orderDto.ExtensionInfo.AddOrReplace(ExtensionKey.SwapStage, SwapStage.SwapTxCheckFailAndToTransfer);
+        
+        _logger.LogInformation("Before calling the ToStartTransfer method, after resetting the properties of the order, order: {order}",
+            JsonConvert.SerializeObject(orderDto));
+        
+        return await ToStartTransfer(orderDto);
+    }
+
+    private bool NeedSwap(DepositOrderDto orderDto)
+    {
+        return orderDto.ExtensionInfo.ContainsKey(ExtensionKey.NeedSwap) &&
+               orderDto.ExtensionInfo[ExtensionKey.NeedSwap].Equals(Boolean.TrueString);
     }
 }

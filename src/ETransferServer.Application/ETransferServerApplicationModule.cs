@@ -1,6 +1,12 @@
+using ETransferServer.ChainsClient.Evm;
+using ETransferServer.ChainsClient.Solana;
+using ETransferServer.ChainsClient.Tron;
 using ETransferServer.Common.AElfSdk;
+using ETransferServer.Common.ChainsClient;
+using ETransferServer.Common.GraphQL;
 using Microsoft.Extensions.DependencyInjection;
 using ETransferServer.Grains;
+using ETransferServer.GraphQL;
 using Volo.Abp.Account;
 using Volo.Abp.AutoMapper;
 using Volo.Abp.FeatureManagement;
@@ -32,5 +38,10 @@ public class ETransferServerApplicationModule : AbpModule
 
         context.Services.AddHttpClient();
         context.Services.AddSingleton<SignatureProvider>();
+        context.Services.AddSingleton<IGraphQLClientFactory, GraphQLClientFactory>();
+        context.Services.AddSingleton<IBlockchainClientFactory<Nethereum.Web3.Web3>, EvmClientFactory>();
+        context.Services.AddTransient<IBlockchainClientProvider, EvmClientProvider>();
+        context.Services.AddTransient<IBlockchainClientProvider, TronClientProvider>();
+        context.Services.AddTransient<IBlockchainClientProvider, SolanaClientProvider>();
     }
 }

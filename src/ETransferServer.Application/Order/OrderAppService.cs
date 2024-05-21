@@ -240,6 +240,7 @@ public class OrderAppService : ApplicationService, IOrderAppService
             var status = Enum.Parse<OrderStatusEnum>(item.Status);
             switch (status)
             {
+                case OrderStatusEnum.ToTransferConfirmed:
                 case OrderStatusEnum.Finish:
                     item.Status = OrderStatusResponseEnum.Succeed.ToString();
                     item.ArrivalTime = item.LastModifyTime;

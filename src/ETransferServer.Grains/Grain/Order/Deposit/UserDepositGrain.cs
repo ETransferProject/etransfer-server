@@ -38,10 +38,11 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
     private IUserDepositRecordGrain _recordGrain;
     private IOrderStatusFlowGrain _orderStatusFlowGrain;
     private IUserDepositTxTimerGrain _depositTxTimerGrain;
+    private ISwapTxTimerGrain _swapTxTimerGrain;
     private IDepositOrderRetryTimerGrain _depositOrderRetryTimerGrain;
     private IOrderStatusReminderGrain _orderStatusReminderGrain;
     private ICoBoDepositQueryTimerGrain _depositQueryTimerGrain;
-    
+
     internal JsonSerializerSettings JsonSettings = JsonSettingsBuilder.New()
         .WithAElfTypesConverters()
         .WithCamelCasePropertyNamesResolver()
@@ -76,6 +77,8 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
         _orderStatusFlowGrain = GrainFactory.GetGrain<IOrderStatusFlowGrain>(this.GetPrimaryKey());
         _depositTxTimerGrain =
             GrainFactory.GetGrain<IUserDepositTxTimerGrain>(GuidHelper.UniqGuid(nameof(IUserDepositTxTimerGrain)));
+        _swapTxTimerGrain =
+            GrainFactory.GetGrain<ISwapTxTimerGrain>(GuidHelper.UniqGuid(nameof(ISwapTxTimerGrain)));
         _depositOrderRetryTimerGrain =
             GrainFactory.GetGrain<IDepositOrderRetryTimerGrain>(
                 GuidHelper.UniqGuid(nameof(IDepositOrderRetryTimerGrain)));
@@ -89,6 +92,10 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
 
     public async Task AddOrUpdateOrder(DepositOrderDto orderDto, Dictionary<string, string> externalInfo = null)
     {
+        _logger.LogInformation(
+            "AddOrUpdateOrder, orderDto: {orderDto}, externalInfo: {externalInfo}",
+            JsonConvert.SerializeObject(orderDto), JsonConvert.SerializeObject(externalInfo));
+
         // save deposit order to Grain
         var res = await _recordGrain.CreateOrUpdateAsync(orderDto);
         AssertHelper.IsTrue(res.Success, "save order data error, orderId = {Id}", orderDto.Id);
@@ -102,10 +109,26 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
         // save order flow to ES
         await _orderStatusFlowProvider.AddOrUpdate(orderDto.Id, orderFlowRes);
 
+        if (IsForward(orderDto, externalInfo)) return;
         // push order to stream
         _logger.LogInformation("push to stream, type:deposit, orderId:{orderId}, status:{status}", orderDto.Id,
             orderDto.Status);
         await _orderChangeStream.OnNextAsync(orderDto);
+    }
+    
+    private bool IsForward(DepositOrderDto orderDto, Dictionary<string, string> externalInfo)
+    {
+        var status = Enum.Parse<OrderStatusEnum>(orderDto.Status);
+        if (status == OrderStatusEnum.ToTransferring && !externalInfo.IsNullOrEmpty() &&
+            externalInfo.ContainsKey(ExtensionKey.IsForward))
+        {
+            var result = bool.TryParse(externalInfo[ExtensionKey.IsForward], out var isForward);
+            _logger.LogInformation("IsForward, type:deposit, orderId:{OrderId}, isForward:{isForward}",
+                orderDto.Id, isForward);
+            return result && !isForward;
+        }
+
+        return false;
     }
     
     public async Task AddCheckOrder(DepositOrderDto orderDto)

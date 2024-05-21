@@ -35,6 +35,8 @@
     <PackageReference Include="AElf.Whitelist.Application" Version="0.0.3" />
     <PackageReference Include="GraphQL.Client.Serializer.Newtonsoft" Version="5.1.0" />
     <PackageReference Include="GraphQL.Client" Version="5.1.0" />
+    <PackageReference Include="Nethereum.Web3" Version="4.20.0" />
+    <PackageReference Include="Nethereum.Util" Version="4.20.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -56,6 +58,9 @@
     </ContractReference>
     <ContractReference Include="..\..\protobuf\ca_contract.proto">
       <Link>Protobuf\Proto\ca_contract.proto</Link>
+    </ContractReference>
+    <ContractReference Include="..\..\protobuf\awaken_swap_contract.proto">
+      <Link>Protobuf\Proto\awaken_swap_contract.proto</Link>
     </ContractReference>
   </ItemGroup>
 
