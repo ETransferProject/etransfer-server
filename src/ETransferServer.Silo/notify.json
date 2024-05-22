@@ -56,6 +56,21 @@
             "Message: {message}"
           ]
         }
+      },
+      "DepositOrderSwapFailureAlarm": {
+        "FeiShuGroup": {
+          "WebhookUrl": "",
+          "Secret": "",
+          "TitleTemplate": "orange",
+          "Title": "❗️ [test3] Deposit swap failure alert",
+          "Contents": [
+            "OrderType: {orderType}",
+            "OrderId: {orderId}\nUserId: {userId}\nTxId: {txId}\nCreateTime: {createTime}",
+            "NetworkFrom: {networkFrom} NetworkTo: {networkTo}\nSymbolFrom: {symbolFrom} SymbolTo: {symbolTo}",
+            "AmountFrom: {amountFrom} ChainIdTo: {chainIdTo}",
+            "Failure Reason: {reason}"
+          ]
+        }
       }
     }
   }
