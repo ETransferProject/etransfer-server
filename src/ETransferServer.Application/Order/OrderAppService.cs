@@ -1,13 +1,16 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using AElf.Indexing.Elasticsearch;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Order;
+using ETransferServer.Grains.Grain.Users;
 using ETransferServer.Options;
 using ETransferServer.Orders;
 using Microsoft.Extensions.Logging;
 using Nest;
+using Orleans;
 using Volo.Abp;
 using Volo.Abp.Application.Dtos;
 using Volo.Abp.Application.Services;
@@ -22,14 +25,17 @@ namespace ETransferServer.Order;
 public class OrderAppService : ApplicationService, IOrderAppService
 {
     private readonly INESTRepository<OrderIndex, Guid> _orderIndexRepository;
+    private readonly IClusterClient _clusterClient;
     private readonly IObjectMapper _objectMapper;
     private readonly ILogger<OrderAppService> _logger;
 
     public OrderAppService(INESTRepository<OrderIndex, Guid> orderIndexRepository,
+        IClusterClient clusterClient,
         IObjectMapper objectMapper,
         ILogger<OrderAppService> logger)
     {
         _orderIndexRepository = orderIndexRepository;
+        _clusterClient = clusterClient;
         _objectMapper = objectMapper;
         _logger = logger;
     }
@@ -120,12 +126,21 @@ public class OrderAppService : ApplicationService, IOrderAppService
                 request.MaxResultCount,
                 skip: request.SkipCount);
 
-            return new PagedResultDto<OrderIndexDto>
+            var orderIndexDtoPageResult = new PagedResultDto<OrderIndexDto>
             {
                 Items = await LoopCollectionItemsAsync(
                     _objectMapper.Map<List<OrderIndex>, List<OrderIndexDto>>(list)),
                 TotalCount = count
             };
+            
+            if (orderIndexDtoPageResult.Items.Any())
+            {
+                var maxCreateTime = orderIndexDtoPageResult.Items.Max(item => item.CreateTime);
+                var userOrderActionGrain = _clusterClient.GetGrain<IUserOrderActionGrain>(userId.ToString());
+                await userOrderActionGrain.AddOrUpdateAsync(maxCreateTime);
+            }
+            
+            return orderIndexDtoPageResult;
         }
         catch (Exception e)
         {
@@ -140,17 +155,20 @@ public class OrderAppService : ApplicationService, IOrderAppService
         try
         {
             var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
-            if (!userId.HasValue || userId == Guid.Empty) return new OrderStatusDto();
+            if (!userId.HasValue || userId == Guid.Empty)
+            {
+                return new OrderStatusDto();
+            }
 
-            var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
-            mustQuery.Add(q => q.Term(i =>
-                i.Field(f => f.UserId).Value(userId.ToString())));
-            mustQuery.Add(q => q.Range(i =>
-                i.Field(f => f.CreateTime)
-                    .GreaterThanOrEquals(DateTime.UtcNow.AddDays(OrderOptions.ValidOrderThreshold).ToUtcMilliSeconds())));
+            var userOrderActionGrain = _clusterClient.GetGrain<IUserOrderActionGrain>(userId.ToString());
+            var lastModifyTime = await userOrderActionGrain.GetAsync();
 
-            mustQuery.Add(q => q.Terms(i => 
-                i.Field(f => f.Status).Terms(new List<string>
+            var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>
+            {
+                q => q.Term(i => i.Field(f => f.UserId).Value(userId.ToString())),
+                q => q.Range(i => i.Field(f => f.CreateTime).GreaterThan(lastModifyTime)),
+                q => q.Range(i => i.Field(f => f.CreateTime).GreaterThan(DateTime.UtcNow.AddDays(OrderOptions.ValidOrderThreshold).ToUtcMilliSeconds())),
+                q => q.Terms(i => i.Field(f => f.Status).Terms((IEnumerable<string>)new List<string>
                 {
                     OrderStatusEnum.Initialized.ToString(),
                     OrderStatusEnum.Created.ToString(),
@@ -162,16 +180,16 @@ public class OrderAppService : ApplicationService, IOrderAppService
                     OrderStatusEnum.ToStartTransfer.ToString(),
                     OrderStatusEnum.ToTransferring.ToString(),
                     OrderStatusEnum.ToTransferred.ToString()
-                })));
+                }))
+            };
 
             QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery));
-
-            var (count, list) = await _orderIndexRepository.GetSortListAsync(Filter, null,
-                s => s.Descending(a => a.CreateTime) , 1);
+            
+            var count = await _orderIndexRepository.CountAsync(Filter);
+            
             return new OrderStatusDto
             {
-                CreateTime = count > 0 ? list[0].CreateTime.ToString() : count.ToString(),
-                Status = count > 0
+                Status = count.Count > 0
             };
         }
         catch (Exception e)

@@ -10,6 +10,7 @@ public class OrderIndexDto
     public string Status { get; set; }
     public long LastModifyTime { get; set; }
     public long ArrivalTime { get; set; }
+    public long? CreateTime { get; set; }
     public TransferInfoDto FromTransfer { get; set; }
     public TransferInfoDto ToTransfer { get; set; }
 }
@@ -27,6 +28,10 @@ public class TransferInfoDto
 
 public class OrderStatusDto
 {
-    public string CreateTime { get; set; } = default(int).ToString();
     public bool Status { get; set; }
+}
+
+public class OrderReadDto
+{
+    
 }
