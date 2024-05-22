@@ -158,7 +158,7 @@ public class OrderAppServiceTest : ETransferServerApplicationTestBase
 
         status = await _orderAppService.GetOrderRecordStatusAsync();
         // status.Status.ShouldBeTrue();
-        // status.Status.ShouldBeFalse();
+        status.Status.ShouldBeFalse();
         
         input.Sorting = " ";
         result = await _orderAppService.GetOrderRecordListAsync(input);
