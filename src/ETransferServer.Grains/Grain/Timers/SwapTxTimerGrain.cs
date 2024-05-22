@@ -289,6 +289,8 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
 
                 _logger.LogInformation("SwapTx result Confirmed failed, will call ToStartTransfer, status: {result}, order: {order}",
                     txStatus.Status, JsonConvert.SerializeObject(order));
+
+                await DepositSwapFailureAlarmAsync(order, SwapStage.SwapTxHandleFailAndToTransfer);
                 
                 transferInfo.Status = OrderTransferStatusEnum.StartTransfer.ToString();
                 order.Status = OrderStatusEnum.ToStartTransfer.ToString();
@@ -358,5 +360,11 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
             return null;
         }
         return resp.Data as DepositOrderDto;
+    }
+    
+    private async Task DepositSwapFailureAlarmAsync(DepositOrderDto orderDto, string reason)
+    {
+        var depositSwapMonitorGrain = GrainFactory.GetGrain<IDepositSwapMonitorGrain>(orderDto.Id.ToString());
+        await depositSwapMonitorGrain.DoMonitorAsync(DepositSwapMonitorDto.Create(orderDto, reason));
     }
 }

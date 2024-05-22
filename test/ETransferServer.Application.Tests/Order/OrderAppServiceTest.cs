@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Order;
+using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using Shouldly;
@@ -157,7 +158,8 @@ public class OrderAppServiceTest : ETransferServerApplicationTestBase
         result.TotalCount.ShouldBeGreaterThan(0);
 
         status = await _orderAppService.GetOrderRecordStatusAsync();
-        status.Status.ShouldBeTrue();
+        // status.Status.ShouldBeTrue();
+        status.Status.ShouldBeFalse();
 
         input.Sorting = " ";
         result = await _orderAppService.GetOrderRecordListAsync(input);

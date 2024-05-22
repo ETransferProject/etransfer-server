@@ -13,13 +13,21 @@ public class GetCalculateDepositRateRequestDto : IValidatableObject
     
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
-        int decimalPlaces = FromAmount.ToString().Length - FromAmount.ToString().IndexOf('.') - 1;
-        if (decimalPlaces > 6 || FromAmount < 0)
+        if (FromAmount != null)
         {
-            yield return new ValidationResult(
-                "FromAmount invalid.",
-                new[] { "FromAmount" }
-            );
+            string fromAmountStr = FromAmount.ToString();
+            int decimalIndex = fromAmountStr.IndexOf('.');
+            if (decimalIndex != -1)
+            {
+                int decimalPlaces = fromAmountStr.Length - decimalIndex - 1;
+                if (decimalPlaces > 6 || FromAmount < 0)
+                {
+                    yield return new ValidationResult(
+                        "FromAmount invalid.",
+                        new[] { "FromAmount" }
+                    );
+                }
+            }
         }
     }
 }
