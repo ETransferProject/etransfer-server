@@ -109,7 +109,7 @@ public class DepositOrderStatusReminderGrain : Orleans.Grain, IDepositOrderStatu
 
     private async Task CancelReminder(string reminderName)
     {
-        _logger.LogInformation("DepositOrderStatusReminderGrain UnregisterReminder, reminderName={reminderName}");
+        _logger.LogInformation("DepositOrderStatusReminderGrain UnregisterReminder, reminderName={reminderName}", reminderName);
         var grainReminder = await _reminderRegistry.GetReminder(reminderName);
         await _reminderRegistry.UnregisterReminder(grainReminder);
         _reminderCountMap.Remove(reminderName);
