@@ -48,10 +48,15 @@ public class DepositOrderStatusReminderGrain : Orleans.Grain, IDepositOrderStatu
         _logger.LogDebug("DepositOrderStatusReminderGrain Startup dueTimeSec={Due}, periodSec={Per}",
             _timerOptions.Value.DepositOrderStatusReminder.DelaySeconds,
             _timerOptions.Value.DepositOrderStatusReminder.PeriodSeconds);
-        await _reminderRegistry.RegisterOrUpdateReminder(
-            reminderName: id,
-            dueTime: TimeSpan.FromSeconds(_timerOptions.Value.DepositOrderStatusReminder.DelaySeconds),
-            period: TimeSpan.FromSeconds(_timerOptions.Value.DepositOrderStatusReminder.PeriodSeconds));
+        
+        var existingReminder = await _reminderRegistry.GetReminder(id);
+        if (existingReminder == null)
+        {
+            await _reminderRegistry.RegisterOrUpdateReminder(
+                reminderName: id,
+                dueTime: TimeSpan.FromSeconds(_timerOptions.Value.DepositOrderStatusReminder.DelaySeconds),
+                period: TimeSpan.FromSeconds(_timerOptions.Value.DepositOrderStatusReminder.PeriodSeconds));
+        }
     }
 
     public async Task ReceiveReminder(string reminderName, TickStatus status)
@@ -104,6 +109,7 @@ public class DepositOrderStatusReminderGrain : Orleans.Grain, IDepositOrderStatu
 
     private async Task CancelReminder(string reminderName)
     {
+        _logger.LogInformation("DepositOrderStatusReminderGrain UnregisterReminder, reminderName={reminderName}", reminderName);
         var grainReminder = await _reminderRegistry.GetReminder(reminderName);
         await _reminderRegistry.UnregisterReminder(grainReminder);
         _reminderCountMap.Remove(reminderName);

@@ -18,14 +18,18 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
 {
     private readonly ILogger<TransactionNotificationGrain> _logger;
     private readonly IOptionsSnapshot<NetworkOptions> _networkOption;
+    private readonly IOptionsSnapshot<DepositAddressOptions> _depositAddressOption;
     private readonly ICoBoProvider _coBoProvider;
     private IDepositOrderStatusReminderGrain _depositOrderStatusReminderGrain;
 
     public TransactionNotificationGrain(ILogger<TransactionNotificationGrain> logger,
-        IOptionsSnapshot<NetworkOptions> networkOption, ICoBoProvider coBoProvider)
+        IOptionsSnapshot<NetworkOptions> networkOption,
+        IOptionsSnapshot<DepositAddressOptions> depositAddressOption, 
+        ICoBoProvider coBoProvider)
     {
         _logger = logger;
         _networkOption = networkOption;
+        _depositAddressOption = depositAddressOption;
         _coBoProvider = coBoProvider;
     }
 
@@ -77,7 +81,7 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
 
     private async Task<bool> HandleDeposit(CoBoTransactionDto coBoTransaction)
     {
-        var coinInfo = await GetCoinNetwork(coBoTransaction.Coin, coBoTransaction.Id);
+        var coinInfo = await GetCoinNetwork(coBoTransaction);
         var recordGrainId = OrderIdHelper.DepositOrderId(coinInfo.Network, coinInfo.Symbol, coBoTransaction.TxId);
         var userDepositRecordGrain = GrainFactory.GetGrain<IUserDepositRecordGrain>(recordGrainId);
 
@@ -104,16 +108,23 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
         return Task.FromResult(true);
     }
 
-    private async Task<CoBoHelper.CoinNetwork> GetCoinNetwork(string coin, string transactionId)
+    private async Task<CoBoHelper.CoinNetwork> GetCoinNetwork(CoBoTransactionDto coBoTransaction)
     {
         try
         {
-            return CoBoHelper.MatchNetwork(coin, _networkOption.Value.CoBo);
+            return CoBoHelper.MatchNetwork(coBoTransaction.Coin, _networkOption.Value.CoBo);
         }
         catch (Exception e)
         {
-            _logger.LogError(e, "match network error, id:{id}, coin:{coin}", transactionId, coin);
-            await _depositOrderStatusReminderGrain.AddReminder(transactionId);
+            _logger.LogError(e, "match network error, id:{id}, coin:{coin}", coBoTransaction.Id, coBoTransaction.Coin);
+            if (_depositAddressOption.Value.AddressWhiteLists.Contains(coBoTransaction.Address))
+            {
+                _logger.LogInformation("deposit callback hit address whiteList: {address}", coBoTransaction.Address);
+                throw;
+            }
+            var coBoDepositGrain = GrainFactory.GetGrain<ICoBoDepositGrain>(coBoTransaction.Id);
+            await coBoDepositGrain.AddOrUpdate(coBoTransaction);
+            await _depositOrderStatusReminderGrain.AddReminder(coBoTransaction.Id);
             throw;
         }
     }
