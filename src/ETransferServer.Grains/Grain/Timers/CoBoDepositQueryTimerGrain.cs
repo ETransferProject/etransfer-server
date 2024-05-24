@@ -13,8 +13,6 @@ using ETransferServer.Grains.State.Order;
 using ETransferServer.ThirdPart.CoBo;
 using ETransferServer.ThirdPart.CoBo.Dtos;
 using ETransferServer.User;
-using Microsoft.AspNetCore.Razor.Language.Intermediate;
-using NBitcoin;
 
 namespace ETransferServer.Grains.Grain.Timers;
 
@@ -34,6 +32,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
     private readonly ILogger<CoBoDepositQueryTimerGrain> _logger;
     private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
     private readonly IOptionsSnapshot<DepositOptions> _depositOption;
+    private readonly IOptionsSnapshot<DepositAddressOptions> _depositAddressOption;
     private readonly IOptionsSnapshot<NetworkOptions> _networkOption;
     private readonly IUserAppService _userAppService;
     private readonly IUserAddressService _userAddressService;
@@ -42,14 +41,19 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
     private IDepositOrderStatusReminderGrain _depositOrderStatusReminderGrain;
 
     public CoBoDepositQueryTimerGrain(ILogger<CoBoDepositQueryTimerGrain> logger,
-        IOptionsSnapshot<TimerOptions> timerOptions, ICoBoProvider coBoProvider,
-        IOptionsSnapshot<DepositOptions> depositOption, IOptionsSnapshot<NetworkOptions> networkOption,
-        IUserAppService userAppService, IUserAddressService userAddressService)
+        IOptionsSnapshot<TimerOptions> timerOptions, 
+        ICoBoProvider coBoProvider,
+        IOptionsSnapshot<DepositOptions> depositOption, 
+        IOptionsSnapshot<DepositAddressOptions> depositAddressOption, 
+        IOptionsSnapshot<NetworkOptions> networkOption,
+        IUserAppService userAppService, 
+        IUserAddressService userAddressService)
     {
         _logger = logger;
         _timerOptions = timerOptions;
         _coBoProvider = coBoProvider;
         _depositOption = depositOption;
+        _depositAddressOption = depositAddressOption;
         _networkOption = networkOption;
         _userAppService = userAppService;
         _userAddressService = userAddressService;
@@ -140,6 +144,13 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
     {
         try
         {
+            if (_depositAddressOption.Value.AddressWhiteLists.Contains(coBoTransaction.Address))
+            {
+                _logger.LogInformation("Deposit hit address whiteList: {address}", coBoTransaction.Address);
+                await Remove(coBoTransaction.Id);
+                return;
+            }
+
             var orderDto = await ConvertToDepositOrderDto(coBoTransaction);
 
             // Query existing orders first to prevent repeated additions.
