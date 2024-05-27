@@ -151,7 +151,10 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             withdrawInfoDto.AelfTransactionUnit = CommonConstant.Symbol.Elf;
 
             var receiveAmount = Math.Max(0, request.Amount) - feeAmount;
-            withdrawInfoDto.MinAmount = Math.Max(feeAmount, _withdrawOptions.Value.MinThirdPartFee)
+            var minAmount = withdrawInfoDto.TransactionUnit == withdrawInfoDto.AelfTransactionUnit
+                ? feeAmount + networkFee
+                : feeAmount;
+            withdrawInfoDto.MinAmount = Math.Max(minAmount, _withdrawOptions.Value.MinThirdPartFee)
                 .ToString(2, DecimalHelper.RoundingOption.Ceiling);
             withdrawInfoDto.ReceiveAmount = receiveAmount > 0
                 ? receiveAmount.ToString(decimals, DecimalHelper.RoundingOption.Ceiling)
