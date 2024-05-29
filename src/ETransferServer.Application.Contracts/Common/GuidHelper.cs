@@ -33,4 +33,9 @@ public static class GuidHelper
     {
         return ids.JoinAsString("-");
     }
+    
+    public static string GenerateCombinedId(params string[] parts)
+    {
+        return string.Join(CommonConstant.Colon, parts);
+    }
 }

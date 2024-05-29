@@ -9,6 +9,7 @@ using Orleans.Runtime;
 using Orleans.Timers;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.Provider.Notify;
+using JetBrains.Annotations;
 using Newtonsoft.Json;
 
 namespace ETransferServer.Grains.Grain.Timers;
@@ -21,7 +22,8 @@ public interface IDepositOrderStatusReminderGrain : IGrainWithGuidKey
 public class DepositOrderStatusReminderGrain : Orleans.Grain, IDepositOrderStatusReminderGrain, IRemindable
 {
     private const string DepositOrderPendingAlarmTemplate = "DepositOrderPendingAlarm";
-    private const string DepositOrderLostAlarmTemplate = "DepositOrderLostAlarm";
+    private const string DepositOrderLostAlarmTemplate = CommonConstant.DepositOrderLostAlarm;
+    // private const string DepositOrderCoinNotSupportAlarmTemplate = CommonConstant.DepositOrderCoinNotSupportAlarm;
     private readonly ILogger<DepositOrderStatusReminderGrain> _logger;
     private readonly IReminderRegistry _reminderRegistry;
     private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
@@ -73,7 +75,7 @@ public class DepositOrderStatusReminderGrain : Orleans.Grain, IDepositOrderStatu
             _logger.LogInformation("DepositOrderStatusReminderGrain CheckOrder reminderName={reminderName}",
                 reminderName);
             var nameSplit = reminderName.Split(CommonConstant.Underline);
-            var transactionId = nameSplit[0];
+            var transactionId = ParseNameSplit(nameSplit[0]).transactionId;
             var orderId = nameSplit.Length > 1 ? Guid.Parse(nameSplit[1]) : Guid.Empty;
             if (orderId == Guid.Empty)
             {
@@ -101,6 +103,28 @@ public class DepositOrderStatusReminderGrain : Orleans.Grain, IDepositOrderStatu
             }
         }
     }
+    
+    private (string transactionId, string templateName) ParseNameSplit(string nameSplit)
+    {
+        string transactionId;
+        string templateName;
+
+        if (nameSplit.Contains(CommonConstant.Hyphen))
+        {
+            var parts = nameSplit.Split(CommonConstant.Hyphen);
+            transactionId = parts[0];
+            templateName = parts[1];
+        }
+        else
+        {
+            transactionId = nameSplit;
+            templateName = DepositOrderLostAlarmTemplate;
+        }
+
+        return (transactionId, templateName);
+    }
+    
+    
 
     public async Task AddReminder(String id)
     {
@@ -115,7 +139,7 @@ public class DepositOrderStatusReminderGrain : Orleans.Grain, IDepositOrderStatu
         _reminderCountMap.Remove(reminderName);
     }
 
-    private async Task<bool> SendNotifyAsync(string transactionId)
+    private async Task<bool> SendNotifyAsync(string transactionId, string template = DepositOrderLostAlarmTemplate)
     {
         _logger.LogInformation("DepositOrderStatusReminderGrain SendNotifyAsync txId={txId}", transactionId);
         var providerExists = _notifyProvider.TryGetValue(NotifyTypeEnum.FeiShuGroup.ToString(), out var provider);
@@ -126,7 +150,7 @@ public class DepositOrderStatusReminderGrain : Orleans.Grain, IDepositOrderStatu
 
         var notifyRequest = new NotifyRequest
         {
-            Template = DepositOrderLostAlarmTemplate,
+            Template = template,
             Params = new Dictionary<string, string>
             {
                 [Keys.OrderType] = OrderTypeEnum.Deposit.ToString(),

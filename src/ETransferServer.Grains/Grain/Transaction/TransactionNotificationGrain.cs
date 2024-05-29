@@ -123,8 +123,13 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
                 throw;
             }
             var coBoDepositGrain = GrainFactory.GetGrain<ICoBoDepositGrain>(coBoTransaction.Id);
-            await coBoDepositGrain.AddOrUpdate(coBoTransaction);
-            await _depositOrderStatusReminderGrain.AddReminder(coBoTransaction.Id);
+            if (await coBoDepositGrain.NotExistAsync())
+            {
+                await coBoDepositGrain.AddOrUpdate(coBoTransaction);
+                await _depositOrderStatusReminderGrain.AddReminder(GuidHelper.GenerateCombinedId(coBoTransaction.Id,
+                    CommonConstant.DepositOrderCoinNotSupportAlarm));
+            }
+
             throw;
         }
     }
