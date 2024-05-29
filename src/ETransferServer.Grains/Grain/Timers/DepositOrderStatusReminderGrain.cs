@@ -109,9 +109,9 @@ public class DepositOrderStatusReminderGrain : Orleans.Grain, IDepositOrderStatu
         string transactionId;
         string templateName;
 
-        if (nameSplit.Contains(CommonConstant.Hyphen))
+        if (nameSplit.Contains(CommonConstant.Colon))
         {
-            var parts = nameSplit.Split(CommonConstant.Hyphen);
+            var parts = nameSplit.Split(CommonConstant.Colon);
             transactionId = parts[0];
             templateName = parts[1];
         }
