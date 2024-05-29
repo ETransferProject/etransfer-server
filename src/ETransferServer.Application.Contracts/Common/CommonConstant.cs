@@ -19,6 +19,9 @@ public static class CommonConstant
     public const string Withdraw = "withdraw";
     public const string Deposit = "deposit";
     
+    public const string DepositOrderLostAlarm = "DepositOrderLostAlarm";
+    public const string DepositOrderCoinNotSupportAlarm = "DepositOrderCoinNotSupportAlarm";
+    
     public static class ChainId
     {
         public const string AElfMainChain = "AELF";

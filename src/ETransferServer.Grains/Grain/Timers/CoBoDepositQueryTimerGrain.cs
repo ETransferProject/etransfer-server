@@ -13,6 +13,7 @@ using ETransferServer.Grains.State.Order;
 using ETransferServer.ThirdPart.CoBo;
 using ETransferServer.ThirdPart.CoBo.Dtos;
 using ETransferServer.User;
+using Volo.Abp;
 
 namespace ETransferServer.Grains.Grain.Timers;
 
@@ -166,12 +167,32 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         }
         catch (Exception e)
         {
-            await AddCheckDepositOrder(coBoTransaction.Id);
+            var coBoDepositGrain = GrainFactory.GetGrain<ICoBoDepositGrain>(coBoTransaction.Id);
+            if (await coBoDepositGrain.NotUpdatedAsync())
+            {
+                await AddCheckDepositOrder(GuidHelper.GenerateCombinedId(coBoTransaction.Id, GetAlarmTemplate(e)));
+            }
+
             _logger.LogError(e,
                 "Create deposit order error, coBoTransactionId={CoBoTxId}, requestId={CoBoRequestId}, coBoSymbol={Symbol}, amount={Amount}",
                 coBoTransaction.TxId, coBoTransaction.RequestId, coBoTransaction.Coin, coBoTransaction.AbsAmount);
         }
     }
+    
+    private string GetAlarmTemplate(Exception e)
+    {
+        if (e is UserFriendlyException userFriendlyException)
+        {
+            if (userFriendlyException.Code == ErrorResult.CoBoCoinInvalid.ToString() ||
+                userFriendlyException.Code == ErrorResult.CoBoCoinNotSupport.ToString())
+            {
+                return CommonConstant.DepositOrderCoinNotSupportAlarm;
+            }
+        }
+
+        return CommonConstant.DepositOrderLostAlarm;
+    }
+    
 
     public async Task Remove(string transactionId)
     {

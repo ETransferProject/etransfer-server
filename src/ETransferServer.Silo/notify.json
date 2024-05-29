@@ -57,6 +57,18 @@
           ]
         }
       },
+      "DepositOrderCoinNotSupportAlarm" : {
+        "FeiShuGroup": {
+          "WebhookUrl": "",
+          "Secret": "",
+          "TitleTemplate": "blue",
+          "Title": "💡️ [test3] Order Coin Support Alarm",
+          "Contents": [
+            "OrderType: {orderType}",
+            "Message: {message}"
+          ]
+        }
+      },
       "DepositOrderSwapFailureAlarm": {
         "FeiShuGroup": {
           "WebhookUrl": "",

@@ -19,6 +19,8 @@ public static class ErrorResult
     public const int OrderSaveFailCode = 40015;
     public const int AddressFormatWrongCode = 40100;
     public const int NetworkNotSupportCode = 40101;
+    public const int CoBoCoinInvalid = 40201;
+    public const int CoBoCoinNotSupport = 40202;
 
     public static string GetMessage(int code)
     {
@@ -41,6 +43,8 @@ public static class ErrorResult
         { 40014, "Transaction failed. The ETransfer team is actively looking into this issue. Please be assured that your accounts and assets will remain unaffected." },
         { 40015, "Failed to synchronise data. The ETransfer team is actively looking into this issue. Please be assured that your accounts and assets will remain unaffected." },
         { 40100, "Please enter a correct address." },
-        { 40101, "If you're withdrawing to {Networks}, please wait a while for the service to be restored and try again later." }
+        { 40101, "If you're withdrawing to {Networks}, please wait a while for the service to be restored and try again later." },
+        { 40201, "CoBo coin {coBoCoin} invalid" },
+        { 40202, "CoBo coin {Coin} not support" }
     };
 }
