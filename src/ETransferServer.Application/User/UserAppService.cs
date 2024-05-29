@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using AElf.Indexing.Elasticsearch;
+using ETransferServer.Dtos.User;
 using Microsoft.Extensions.Logging;
 using Nest;
 using ETransferServer.Entities;
@@ -10,6 +11,7 @@ using ETransferServer.User.Dtos;
 using Volo.Abp;
 using Volo.Abp.Application.Services;
 using Volo.Abp.Auditing;
+using Volo.Abp.Identity;
 
 namespace ETransferServer.User;
 
@@ -18,10 +20,12 @@ namespace ETransferServer.User;
 public class UserAppService : ApplicationService, IUserAppService
 {
     private readonly INESTRepository<UserIndex, Guid> _userIndexRepository;
-
-    public UserAppService(INESTRepository<UserIndex, Guid> userIndexRepository)
+    private readonly IdentityUserManager _userManager;
+    
+    public UserAppService(INESTRepository<UserIndex, Guid> userIndexRepository, IdentityUserManager userManager)
     {
         _userIndexRepository = userIndexRepository;
+        _userManager = userManager;
     }
 
     public async Task AddOrUpdateUserAsync(UserDto user)
@@ -51,5 +55,14 @@ public class UserAppService : ApplicationService, IUserAppService
         }
 
         return ObjectMapper.Map<UserIndex, UserDto>(users.First());
+    }
+    
+    public async Task<EoaRegistrationResult> CheckEoaRegistrationAsync(GetEoaRegistrationResultRequestDto requestDto)
+    {
+        var user = await _userManager.FindByNameAsync(requestDto.Address);
+        return new EoaRegistrationResult
+        {
+            Result = user != null
+        };
     }
 }
