@@ -88,9 +88,9 @@ public static class CoBoHelper
     public static CoinNetwork MatchNetwork(string coBoCoin, Dictionary<string, string> mapping)
     {
         var vals = coBoCoin.Split(CommonConstant.Underline);
-        AssertHelper.NotEmpty(vals, "CoBo coin {coBoCoin} invalid", coBoCoin);
+        AssertHelper.NotEmpty(vals, ErrorResult.CoBoCoinInvalid, coBoCoin);
         var coinNetwork = mapping.GetValueOrDefault(coBoCoin);
-        AssertHelper.NotEmpty(coinNetwork, "CoBo coin {Coin} not support", coBoCoin);
+        AssertHelper.NotEmpty(coinNetwork, ErrorResult.CoBoCoinNotSupport, coBoCoin);
         var network = CoinNetwork.Of(coinNetwork);
         network.CoBoNetwork = vals[0];
         return network;
