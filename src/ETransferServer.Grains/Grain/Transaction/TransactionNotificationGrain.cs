@@ -125,6 +125,8 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
             var coBoDepositGrain = GrainFactory.GetGrain<ICoBoDepositGrain>(coBoTransaction.Id);
             if (await coBoDepositGrain.NotExistAsync())
             {
+                _logger.LogInformation("coBoDepositGrain not exist, Id: {id}, CombinedId: {combineId}", coBoTransaction.Id, GuidHelper.GenerateCombinedId(coBoTransaction.Id,
+                    CommonConstant.DepositOrderCoinNotSupportAlarm));
                 await coBoDepositGrain.AddOrUpdate(coBoTransaction);
                 await _depositOrderStatusReminderGrain.AddReminder(GuidHelper.GenerateCombinedId(coBoTransaction.Id,
                     CommonConstant.DepositOrderCoinNotSupportAlarm));

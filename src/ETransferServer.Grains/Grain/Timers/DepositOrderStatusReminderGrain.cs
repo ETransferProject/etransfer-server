@@ -75,13 +75,14 @@ public class DepositOrderStatusReminderGrain : Orleans.Grain, IDepositOrderStatu
             _logger.LogInformation("DepositOrderStatusReminderGrain CheckOrder reminderName={reminderName}",
                 reminderName);
             var nameSplit = reminderName.Split(CommonConstant.Underline);
-            var transactionId = ParseNameSplit(nameSplit[0]).transactionId;
+            var transactionNameSplit = ParseNameSplit(nameSplit[0]);
+            var transactionId = transactionNameSplit.transactionId;
             var orderId = nameSplit.Length > 1 ? Guid.Parse(nameSplit[1]) : Guid.Empty;
             if (orderId == Guid.Empty)
             {
                 _logger.LogInformation("DepositOrderStatusReminderGrain CheckOrder txId={txId}", transactionId);
                 cancel = await _userDepositProvider.ExistSync(new DepositOrderDto { ThirdPartOrderId = transactionId })
-                         || await SendNotifyAsync(transactionId);
+                         || await SendNotifyAsync(transactionNameSplit.transactionId, transactionNameSplit.templateName);
             }
             else
             {
