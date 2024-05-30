@@ -25,7 +25,6 @@ using Volo.Abp.DistributedLocking;
 using Volo.Abp.Identity;
 using Volo.Abp.OpenIddict;
 using Volo.Abp.OpenIddict.ExtensionGrantTypes;
-using Volo.Abp.Users;
 using IdentityUser = Volo.Abp.Identity.IdentityUser;
 using SignInResult = Microsoft.AspNetCore.Mvc.SignInResult;
 
