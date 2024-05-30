@@ -20,6 +20,7 @@ using ETransferServer.Auth.Dtos;
 using ETransferServer.Auth.Options;
 using ETransferServer.Grains.Grain.Users;
 using ETransferServer.User.Dtos;
+using Newtonsoft.Json.Linq;
 using Volo.Abp.DistributedLocking;
 using Volo.Abp.Identity;
 using Volo.Abp.OpenIddict;
@@ -37,6 +38,8 @@ public class SignatureGrantHandler : ITokenExtensionGrant
     private IClusterClient _clusterClient;
     private IOptionsSnapshot<GraphQlOption> _graphQlOptions;
     private IOptionsSnapshot<ChainOptions> _chainOptions;
+    private IOptionsSnapshot<RecaptchaOptions> _recaptchaOptions;
+    private HttpClient _httpClient;
     private readonly string _lockKeyPrefix = "ETransferServer:Auth:SignatureGrantHandler:";
 
     public async Task<IActionResult> HandleAsync(ExtensionGrantContext context)
@@ -49,6 +52,7 @@ public class SignatureGrantHandler : ITokenExtensionGrant
         var scope = context.Request.GetParameter("scope").ToString();
         var version = context.Request.GetParameter("version")?.ToString();
         var source = context.Request.GetParameter("source").ToString();
+        var recaptchaToken = context.Request.GetParameter("recaptchaToken").ToString();
 
         _logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<SignatureGrantHandler>>();
         _logger.LogInformation(
@@ -68,14 +72,20 @@ public class SignatureGrantHandler : ITokenExtensionGrant
             publicKeyVal, signatureVal, plainText, caHash, chainId, version, source);
 
         var rawText = Encoding.UTF8.GetString(ByteArrayHelper.HexStringToByteArray(plainText));
+        _logger.LogInformation("rawText:{rawText}", rawText);
         var nonce = rawText.TrimEnd().Substring(plainText.IndexOf("Nonce:") + 7);
-
+        _logger.LogInformation("nonce:{nonce}", nonce);
         var publicKey = ByteArrayHelper.HexStringToByteArray(publicKeyVal);
+        _logger.LogInformation("publicKey:{publicKey}", publicKey);
         var signature = ByteArrayHelper.HexStringToByteArray(signatureVal);
+        _logger.LogInformation("signature:{signature}", signature);
         var timestamp = long.Parse(nonce);
+        _logger.LogInformation("timestamp:{timestamp}", timestamp);
         var address = Address.FromPublicKey(publicKey).ToBase58();
+        _logger.LogInformation("address:{address}", address);
 
         var time = DateTime.UnixEpoch.AddMilliseconds(timestamp);
+        _logger.LogInformation("time:{time}", time);
         var timeRangeConfig = context.HttpContext.RequestServices
             .GetRequiredService<IOptionsSnapshot<TimeRangeOption>>().Value;
         _contractOptions = context.HttpContext.RequestServices.GetRequiredService<IOptionsSnapshot<ContractOptions>>();
@@ -90,7 +100,9 @@ public class SignatureGrantHandler : ITokenExtensionGrant
                 $"The time should be {timeRangeConfig.TimeRange} minutes before and after the current time.");
         }
 
+        _logger.LogInformation("before Encoding.UTF8.GetBytes(plainText).ComputeHash()");
         var hash = Encoding.UTF8.GetBytes(plainText).ComputeHash();
+        _logger.LogInformation("hash:{hash}", hash);
         if (!AElf.Cryptography.CryptoHelper.VerifySignature(signature, hash, publicKey))
         {
             return GetForbidResult(OpenIddictConstants.Errors.InvalidRequest, "Signature validation failed.");
@@ -99,9 +111,12 @@ public class SignatureGrantHandler : ITokenExtensionGrant
         //Find manager by caHash
         _graphQlOptions = context.HttpContext.RequestServices.GetRequiredService<IOptionsSnapshot<GraphQlOption>>();
         _chainOptions = context.HttpContext.RequestServices.GetRequiredService<IOptionsSnapshot<ChainOptions>>();
+        _recaptchaOptions =
+            context.HttpContext.RequestServices.GetRequiredService<IOptionsSnapshot<RecaptchaOptions>>();
         
         IdentityUser user = null;
         
+        _logger.LogInformation("before create User, source: {source}", source);
         if (source == AuthConstant.PortKeySource)
         {
             var managerCheck = await CheckAddressAsync(chainId,
@@ -115,10 +130,12 @@ public class SignatureGrantHandler : ITokenExtensionGrant
                 return GetForbidResult(OpenIddictConstants.Errors.InvalidRequest, "Manager validation failed.");
             }
 
+            _logger.LogInformation("before  var userManager = context.HttpContext.RequestServices.GetRequiredService<IdentityUserManager>();");
             var userManager = context.HttpContext.RequestServices.GetRequiredService<IdentityUserManager>();
             user = await userManager.FindByNameAsync(caHash);
             if (user == null)
             {
+                _logger.LogInformation("before  CreatePortKeyUserAsync(userManager, userId, caHash, version)");
                 var userId = Guid.NewGuid();
                 var createUserResult = await CreatePortKeyUserAsync(userManager, userId, caHash, version);
                 if (!createUserResult)
@@ -158,8 +175,15 @@ public class SignatureGrantHandler : ITokenExtensionGrant
             user = await userManager.FindByNameAsync(address);
             if (user == null)
             {
+                
+                var httpClient = context.HttpContext.RequestServices.GetRequiredService<IHttpClientFactory>().CreateClient();
+                var valid = !recaptchaToken.IsNullOrEmpty() && await IsCaptchaValid(recaptchaToken);
+                if (!valid)
+                {
+                    return GetForbidResult(OpenIddictConstants.Errors.InvalidRequest, "RecaptchaToken validation failed.");
+                }
+                
                 var userId = Guid.NewGuid();
-
                 var createUserResult = await CreateEoaUserAsync(userManager, userId, address);
                 if (!createUserResult)
                 {
@@ -185,7 +209,13 @@ public class SignatureGrantHandler : ITokenExtensionGrant
         return new SignInResult(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme, claimsPrincipal);
     }
     
-    
+    private async Task<bool> IsCaptchaValid(string token)
+    {
+        var response = await _httpClient.PostAsync($"{_recaptchaOptions.Value.BaseUrl}?secret={_recaptchaOptions.Value.SecretKey}&response={token}", null);
+        var jsonString = await response.Content.ReadAsStringAsync();
+        dynamic jsonData = JObject.Parse(jsonString);
+        return (bool)jsonData.success;
+    }
 
     private ForbidResult CheckParams(string publicKeyVal, string signatureVal, string plainText, string caHash,
         string chainId, string scope, string version, string source)

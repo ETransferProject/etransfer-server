@@ -94,6 +94,7 @@ public class ETransferAuthServerModule : AbpModule
 
         context.Services.Configure<GraphQlOption>(configuration.GetSection("GraphQL"));
         context.Services.Configure<ChainOptions>(configuration.GetSection("Chains"));
+        context.Services.Configure<RecaptchaOptions>(configuration.GetSection("Recaptcha"));
         Configure<ContractOptions>(configuration.GetSection("Contract"));
         context.Services.Configure<TimeRangeOption>(option =>
         {
