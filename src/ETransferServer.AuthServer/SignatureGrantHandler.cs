@@ -25,6 +25,7 @@ using Volo.Abp.DistributedLocking;
 using Volo.Abp.Identity;
 using Volo.Abp.OpenIddict;
 using Volo.Abp.OpenIddict.ExtensionGrantTypes;
+using Volo.Abp.Users;
 using IdentityUser = Volo.Abp.Identity.IdentityUser;
 using SignInResult = Microsoft.AspNetCore.Mvc.SignInResult;
 
@@ -202,12 +203,12 @@ public class SignatureGrantHandler : ITokenExtensionGrant
                     return GetForbidResult(OpenIddictConstants.Errors.ServerError, userInfo.Message);
                 }
                 
-                if (userInfo.Data.AddressInfos.IsNullOrEmpty() || userInfo.Data.AddressInfos.Count < 2)
+                var chainIds = _recaptchaOptions.Value.ChainIds;
+                _logger.LogInformation("_recaptchaOptions chainIds: {chainIds}", chainIds);
+                if (userInfo.Data.AddressInfos.IsNullOrEmpty() || NoAllChainIdsIncluded(userInfo.Data.AddressInfos, chainIds))
                 {
                     _logger.LogInformation("save user info into grain again, userId:{userId}", user.Id.ToString());
                     
-                    var chainIds = _recaptchaOptions.Value.ChainIds;
-                    _logger.LogInformation("_recaptchaOptions chainIds: {chainIds}", chainIds);
                     var addressInfos = chainIds.Select(chainId => new AddressInfo { ChainId = chainId, Address = address }).ToList();
 
                     await userGrain.AddOrUpdateUser(new UserGrainDto()
@@ -245,6 +246,12 @@ public class SignatureGrantHandler : ITokenExtensionGrant
         _logger.LogInformation("IsCaptchaValid response, jsonString: {json}", jsonString);
         dynamic jsonData = JObject.Parse(jsonString);
         return (bool)jsonData.success;
+    }
+    
+    private bool NoAllChainIdsIncluded(List<AddressInfo> addressInfos, List<string> recaptchaChainIds)
+    {
+        var userChainIds = addressInfos.Select(info => info.ChainId).ToList();
+        return recaptchaChainIds.Except(userChainIds).Any();
     }
 
     private ForbidResult CheckParams(string publicKeyVal, string signatureVal, string plainText, string caHash,
