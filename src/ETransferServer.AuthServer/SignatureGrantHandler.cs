@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Security.Claims;
 using System.Text;
 using AElf;
 using AElf.Client.Dto;
@@ -21,7 +20,6 @@ using ETransferServer.Auth.Dtos;
 using ETransferServer.Auth.Options;
 using ETransferServer.Grains.Grain.Users;
 using ETransferServer.User.Dtos;
-using NUglify.JavaScript.Syntax;
 using Volo.Abp.DistributedLocking;
 using Volo.Abp.Identity;
 using Volo.Abp.OpenIddict;
@@ -43,26 +41,41 @@ public class SignatureGrantHandler : ITokenExtensionGrant
 
     public async Task<IActionResult> HandleAsync(ExtensionGrantContext context)
     {
-        // Parse parameters from the context
-        var parameters = ParseParametersFromContext(context);
+        var publicKeyVal = context.Request.GetParameter("pubkey").ToString();
+        var signatureVal = context.Request.GetParameter("signature").ToString();
+        var plainText = context.Request.GetParameter("plain_text").ToString();
+        var caHash = context.Request.GetParameter("ca_hash").ToString();
+        var chainId = context.Request.GetParameter("chain_id").ToString();
+        var scope = context.Request.GetParameter("scope").ToString();
+        var version = context.Request.GetParameter("version")?.ToString();
+        var source = context.Request.GetParameter("source").ToString();
 
-        // Validate the parameters
-        var invalidParamResult = CheckParams(parameters);
+        _logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<SignatureGrantHandler>>();
+        _logger.LogInformation(
+            "before publicKeyVal:{publicKeyVal}, signatureVal:{signatureVal}, plainText:{plainText}, caHash:{caHash}, chainId:{chainId}, version:{version}, source:{source}",
+            publicKeyVal, signatureVal, plainText, caHash, chainId, version, source);
+        
+        
+        var invalidParamResult = CheckParams(publicKeyVal, signatureVal, plainText, caHash, chainId, scope, version, source);
         if (invalidParamResult != null)
         {
             return invalidParamResult;
         }
 
-        // Log the parameters
         _logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<SignatureGrantHandler>>();
         _logger.LogInformation(
             "publicKeyVal:{publicKeyVal}, signatureVal:{signatureVal}, plainText:{plainText}, caHash:{caHash}, chainId:{chainId}, version:{version}, source:{source}",
-            parameters.PublicKeyVal, parameters.SignatureVal, parameters.PlainText, parameters.CaHash, parameters.ChainId, parameters.Version, parameters.Source);
+            publicKeyVal, signatureVal, plainText, caHash, chainId, version, source);
 
-        // Parse signature parameters
-        parameters = ParseSignatureParameters(parameters);
-        
-        // Get the time range configuration
+        var rawText = Encoding.UTF8.GetString(ByteArrayHelper.HexStringToByteArray(plainText));
+        var nonce = rawText.TrimEnd().Substring(plainText.IndexOf("Nonce:") + 7);
+
+        var publicKey = ByteArrayHelper.HexStringToByteArray(publicKeyVal);
+        var signature = ByteArrayHelper.HexStringToByteArray(signatureVal);
+        var timestamp = long.Parse(nonce);
+        var address = Address.FromPublicKey(publicKey).ToBase58();
+
+        var time = DateTime.UnixEpoch.AddMilliseconds(timestamp);
         var timeRangeConfig = context.HttpContext.RequestServices
             .GetRequiredService<IOptionsSnapshot<TimeRangeOption>>().Value;
         _contractOptions = context.HttpContext.RequestServices.GetRequiredService<IOptionsSnapshot<ContractOptions>>();
@@ -70,17 +83,15 @@ public class SignatureGrantHandler : ITokenExtensionGrant
 
         _distributedLock = context.HttpContext.RequestServices.GetRequiredService<IAbpDistributedLock>();
 
-        // Validate the timestamp
-        if (parameters.Time < DateTime.UtcNow.AddMinutes(-timeRangeConfig.TimeRange) ||
-            parameters.Time > DateTime.UtcNow.AddMinutes(timeRangeConfig.TimeRange))
+        if (time < DateTime.UtcNow.AddMinutes(-timeRangeConfig.TimeRange) ||
+            time > DateTime.UtcNow.AddMinutes(timeRangeConfig.TimeRange))
         {
             return GetForbidResult(OpenIddictConstants.Errors.InvalidRequest,
                 $"The time should be {timeRangeConfig.TimeRange} minutes before and after the current time.");
         }
 
-        // Verify the signature
-        var hash = Encoding.UTF8.GetBytes(parameters.PlainText).ComputeHash();
-        if (!AElf.Cryptography.CryptoHelper.VerifySignature(parameters.Signature, hash, parameters.PublicKey))
+        var hash = Encoding.UTF8.GetBytes(plainText).ComputeHash();
+        if (!AElf.Cryptography.CryptoHelper.VerifySignature(signature, hash, publicKey))
         {
             return GetForbidResult(OpenIddictConstants.Errors.InvalidRequest, "Signature validation failed.");
         }
@@ -90,155 +101,75 @@ public class SignatureGrantHandler : ITokenExtensionGrant
         _chainOptions = context.HttpContext.RequestServices.GetRequiredService<IOptionsSnapshot<ChainOptions>>();
         
         IdentityUser user = null;
-        var userManager = GetUserManager(context);
         
-        // Get or create user based on source
-        try
+        if (source == AuthConstant.PortKeySource)
         {
-            user = await GetUserBasedOnSourceAsync(userManager, parameters, _chainOptions.Value);
-        }
-        catch (Exception ex)
-        {
-            return GetForbidResult(OpenIddictConstants.Errors.ServerError, ex.Message);
-        }
-        
-        // Create and return the principal
-        return new SignInResult(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme, await CreatePrincipalAsync(context, user));
-    }
-    
-    private SignatureGrantParameters ParseParametersFromContext(ExtensionGrantContext context)
-    {
-        return new SignatureGrantParameters
-        {
-            PublicKeyVal = context.Request.GetParameter("pubkey").ToString(),
-            SignatureVal = context.Request.GetParameter("signature").ToString(),
-            PlainText = context.Request.GetParameter("plain_text").ToString(),
-            CaHash = context.Request.GetParameter("ca_hash").ToString(),
-            ChainId = context.Request.GetParameter("chain_id").ToString(),
-            Scope = context.Request.GetParameter("scope").ToString(),
-            Version = context.Request.GetParameter("version")?.ToString(),
-            Source = context.Request.GetParameter("source").ToString()
-        };
-    }
-    
-    private SignatureGrantParameters ParseSignatureParameters(SignatureGrantParameters parameters)
-    {
-        var rawText = Encoding.UTF8.GetString(ByteArrayHelper.HexStringToByteArray(parameters.PlainText));
-        parameters.Nonce = rawText.TrimEnd().Substring(parameters.PlainText.IndexOf("Nonce:") + 7);
-
-        parameters.PublicKey = ByteArrayHelper.HexStringToByteArray(parameters.PublicKeyVal);
-        parameters.Signature = ByteArrayHelper.HexStringToByteArray(parameters.SignatureVal);
-        parameters.Timestamp = long.Parse(parameters.Nonce);
-        parameters.Address = Address.FromPublicKey(parameters.PublicKey).ToBase58();
-
-        parameters.Time = DateTime.UnixEpoch.AddMilliseconds(parameters.Timestamp);
-
-        return parameters;
-    }
-    
-    private async Task<IdentityUser> GetUserBasedOnSourceAsync(IdentityUserManager userManager, SignatureGrantParameters parameters, ChainOptions chainOptions)
-    {
-        IdentityUser user = null;
-        try
-        {
-            if (parameters.Source == AuthConstant.PortKeySource)
+            var managerCheck = await CheckAddressAsync(chainId,
+                AuthConstant.PortKeyVersion2.Equals(version) ? _graphQlOptions.Value.Url2 : _graphQlOptions.Value.Url,
+                caHash, address, version, _chainOptions.Value);
+            if (!managerCheck.HasValue || !managerCheck.Value)
             {
-                user = await GetPortKeyUserOrCreateIfNotExistsAsync(userManager, parameters.ChainId, parameters.Version, parameters.CaHash, parameters.Address, chainOptions);
+                _logger.LogError(
+                    "Manager validation failed. caHash:{caHash}, address:{address}, chainId:{chainId}", caHash, address,
+                    chainId);
+                return GetForbidResult(OpenIddictConstants.Errors.InvalidRequest, "Manager validation failed.");
+            }
+
+            var userManager = context.HttpContext.RequestServices.GetRequiredService<IdentityUserManager>();
+            user = await userManager.FindByNameAsync(caHash);
+            if (user == null)
+            {
+                var userId = Guid.NewGuid();
+                var createUserResult = await CreatePortKeyUserAsync(userManager, userId, caHash, version);
+                if (!createUserResult)
+                {
+                    return GetForbidResult(OpenIddictConstants.Errors.ServerError, "Create user failed.");
+                }
+                user = await userManager.GetByIdAsync(userId);
             }
             else
             {
-                user = await GetEoaUserOrCreateIfNotExistsAsync(userManager, parameters.Address);
+                _logger.LogInformation("check user data consistency, userId:{userId}", user.Id.ToString());
+                var userGrain = _clusterClient.GetGrain<IUserGrain>(user.Id);
+                var userInfo = await userGrain.GetUser();
+                if (!userInfo.Success)
+                {
+                    return GetForbidResult(OpenIddictConstants.Errors.ServerError, userInfo.Message);
+                }
+
+                if (userInfo.Data.AddressInfos.IsNullOrEmpty() || userInfo.Data.AddressInfos.Count == 1)
+                {
+                    _logger.LogInformation("save user info into grain again, userId:{userId}", user.Id.ToString());
+                    var addressInfos = await GetAddressInfosAsync(caHash, version);
+                    await userGrain.AddOrUpdateUser(new UserGrainDto()
+                    {
+                        UserId = user.Id,
+                        CaHash = caHash,
+                        AppId = AuthConstant.PortKeyAppId,
+                        AddressInfos = addressInfos
+                    });
+                    _logger.LogInformation("save user success, userId:{userId}", user.Id.ToString());
+                }
             }
-        }
-        catch (Exception ex)
-        {
-            throw new Exception(ex.Message);
-        }
-        return user;
-    }
-
-    private async Task<IdentityUser> GetPortKeyUserOrCreateIfNotExistsAsync(IdentityUserManager userManager,
-        string chainId, string version, string caHash, string address, ChainOptions chainOptions)
-    {
-        var managerCheck = await CheckAddressAsync(chainId,
-            AuthConstant.PortKeyVersion2.Equals(version) ? _graphQlOptions.Value.Url2 : _graphQlOptions.Value.Url,
-            caHash, address, version, chainOptions);
-        if (!managerCheck.HasValue || !managerCheck.Value)
-        {
-            _logger.LogError(
-                "Manager validation failed. caHash:{caHash}, address:{address}, chainId:{chainId}", caHash, address,
-                chainId);
-            throw new Exception("Manager validation failed.");
-        }
-
-        var user = await userManager.FindByNameAsync(address);
-        if (user == null)
-        {
-            var userId = Guid.NewGuid();
-            var createUserResult = await CreatePortKeyUserAsync(userManager, userId, caHash, version);
-            if (!createUserResult)
-            {
-                throw new Exception("Create user failed.");
-            }
-
-            user = await userManager.GetByIdAsync(userId);
         }
         else
         {
-            _logger.LogInformation("check user data consistency, userId:{userId}", user.Id.ToString());
-            var userGrain = _clusterClient.GetGrain<IUserGrain>(user.Id);
-            var userInfo = await userGrain.GetUser();
-            if (!userInfo.Success)
+            var userManager = context.HttpContext.RequestServices.GetRequiredService<IdentityUserManager>();
+            user = await userManager.FindByNameAsync(address);
+            if (user == null)
             {
-                throw new Exception(userInfo.Message);
-            }
+                var userId = Guid.NewGuid();
 
-            if (userInfo.Data.AddressInfos.IsNullOrEmpty() || userInfo.Data.AddressInfos.Count == 1)
-            {
-                _logger.LogInformation("save user info into grain again, userId:{userId}", user.Id.ToString());
-                var addressInfos = await GetAddressInfosAsync(caHash, version);
-                await userGrain.AddOrUpdateUser(new UserGrainDto()
+                var createUserResult = await CreateEoaUserAsync(userManager, userId, address);
+                if (!createUserResult)
                 {
-                    UserId = user.Id,
-                    CaHash = caHash,
-                    AppId = AuthConstant.PortKeyAppId,
-                    AddressInfos = addressInfos
-                });
-                _logger.LogInformation("save user success, userId:{userId}", user.Id.ToString());
+                    return GetForbidResult(OpenIddictConstants.Errors.ServerError, "Create user failed.");
+                }
+
+                user = await userManager.GetByIdAsync(userId);
             }
         }
 
-        return user;
-    }
-    
-    private async Task<IdentityUser> GetEoaUserOrCreateIfNotExistsAsync(IdentityUserManager userManager, string address)
-    {
-        var user = await userManager.FindByNameAsync(address);
-        if (user == null)
-        {
-            var userId = Guid.NewGuid();
-            var createUserResult = await CreateEoaUserAsync(userManager, userId, address);
-            if (!createUserResult)
-            {
-                throw new Exception("Create user failed.");
-            }
-            user = await userManager.GetByIdAsync(userId);
-        }
-        return user;
-    }
-    
-    private IdentityUserManager GetUserManager(ExtensionGrantContext context)
-    {
-        return context.HttpContext.RequestServices.GetRequiredService<IdentityUserManager>();
-    }
-
-    private async Task<IdentityUser> FindUserByNameAsync(IdentityUserManager userManager, string name)
-    {
-        return await userManager.FindByNameAsync(name);
-    }
-    
-    private async Task<ClaimsPrincipal> CreatePrincipalAsync(ExtensionGrantContext context, IdentityUser user)
-    {
         var userClaimsPrincipalFactory = context.HttpContext.RequestServices
             .GetRequiredService<IUserClaimsPrincipalFactory<IdentityUser>>();
         var signInManager = context.HttpContext.RequestServices.GetRequiredService<SignInManager<IdentityUser>>();
@@ -251,48 +182,51 @@ public class SignatureGrantHandler : ITokenExtensionGrant
         await context.HttpContext.RequestServices.GetRequiredService<AbpOpenIddictClaimDestinationsManager>()
             .SetAsync(principal);
 
-        return claimsPrincipal;
+        return new SignInResult(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme, claimsPrincipal);
     }
+    
+    
 
-    private ForbidResult CheckParams(SignatureGrantParameters parameters)
+    private ForbidResult CheckParams(string publicKeyVal, string signatureVal, string plainText, string caHash,
+        string chainId, string scope, string version, string source)
     {
         var errors = new List<string>();
-        if (string.IsNullOrWhiteSpace(parameters.Source) || !(parameters.Source == AuthConstant.PortKeySource || parameters.Source == AuthConstant.NightElfSource))
+        if (string.IsNullOrWhiteSpace(source) || !(source == AuthConstant.PortKeySource || source == AuthConstant.NightElfSource))
         {
             errors.Add("invalid parameter source.");
         }
-        if (string.IsNullOrWhiteSpace(parameters.PublicKeyVal))
+        if (string.IsNullOrWhiteSpace(publicKeyVal))
         {
             errors.Add("invalid parameter publish_key.");
         }
 
-        if (string.IsNullOrWhiteSpace(parameters.SignatureVal))
+        if (string.IsNullOrWhiteSpace(signatureVal))
         {
             errors.Add("invalid parameter signature.");
         }
 
-        if (string.IsNullOrWhiteSpace(parameters.PlainText))
+        if (string.IsNullOrWhiteSpace(plainText))
         {
             errors.Add("invalid parameter plainText.");
         }
 
-        if (parameters.Source == AuthConstant.PortKeySource && string.IsNullOrWhiteSpace(parameters.CaHash))
+        if (source == AuthConstant.PortKeySource && string.IsNullOrWhiteSpace(caHash))
         {
             errors.Add("invalid parameter ca_hash.");
         }
 
-        if (parameters.Source == AuthConstant.PortKeySource && string.IsNullOrWhiteSpace(parameters.ChainId))
+        if (source == AuthConstant.PortKeySource && string.IsNullOrWhiteSpace(chainId))
         {
             errors.Add("invalid parameter chain_id.");
         }
 
-        if (string.IsNullOrWhiteSpace(parameters.Scope))
+        if (string.IsNullOrWhiteSpace(scope))
         {
             errors.Add("invalid parameter scope.");
         }
         
-        if (!(string.IsNullOrWhiteSpace(parameters.Version) || AuthConstant.PortKeyVersion.Equals(parameters.Version) || 
-              AuthConstant.PortKeyVersion2.Equals(parameters.Version)))
+        if (!(string.IsNullOrWhiteSpace(version) || AuthConstant.PortKeyVersion.Equals(version) || 
+              AuthConstant.PortKeyVersion2.Equals(version)))
         {
             errors.Add("invalid parameter version.");
         }
@@ -590,22 +524,4 @@ public class SignatureGrantHandler : ITokenExtensionGrant
     }
 
     public string Name { get; } = "signature";
-    
-    private class SignatureGrantParameters
-    {
-        public string PublicKeyVal { get; set; }
-        public string SignatureVal { get; set; }
-        public string PlainText { get; set; }
-        public string CaHash { get; set; }
-        public string ChainId { get; set; }
-        public string Scope { get; set; }
-        public string Version { get; set; }
-        public string Source { get; set; }
-        public string Nonce { get; set; }
-        public byte[] PublicKey { get; set; }
-        public byte[] Signature { get; set; }
-        public long Timestamp { get; set; }
-        public string Address { get; set; }
-        public DateTime Time { get; set; }
-    }
 }
