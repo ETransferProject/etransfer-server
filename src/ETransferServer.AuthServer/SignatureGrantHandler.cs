@@ -176,7 +176,7 @@ public class SignatureGrantHandler : ITokenExtensionGrant
             if (user == null)
             {
                 
-                var httpClient = context.HttpContext.RequestServices.GetRequiredService<IHttpClientFactory>().CreateClient();
+                _httpClient = context.HttpContext.RequestServices.GetRequiredService<IHttpClientFactory>().CreateClient();
                 var valid = !recaptchaToken.IsNullOrEmpty() && await IsCaptchaValid(recaptchaToken);
                 if (!valid)
                 {
