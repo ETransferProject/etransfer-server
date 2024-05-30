@@ -56,8 +56,8 @@ public class SignatureGrantHandler : ITokenExtensionGrant
 
         _logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<SignatureGrantHandler>>();
         _logger.LogInformation(
-            "before publicKeyVal:{publicKeyVal}, signatureVal:{signatureVal}, plainText:{plainText}, caHash:{caHash}, chainId:{chainId}, version:{version}, source:{source}",
-            publicKeyVal, signatureVal, plainText, caHash, chainId, version, source);
+            "before publicKeyVal:{publicKeyVal}, signatureVal:{signatureVal}, plainText:{plainText}, caHash:{caHash}, chainId:{chainId}, version:{version}, source:{source}, recaptchaToken: {recaptchaToken}",
+            publicKeyVal, signatureVal, plainText, caHash, chainId, version, source, recaptchaToken);
         
         
         var invalidParamResult = CheckParams(publicKeyVal, signatureVal, plainText, caHash, chainId, scope, version, source);
