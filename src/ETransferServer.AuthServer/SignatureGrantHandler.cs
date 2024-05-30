@@ -192,6 +192,34 @@ public class SignatureGrantHandler : ITokenExtensionGrant
 
                 user = await userManager.GetByIdAsync(userId);
             }
+            else
+            {
+                _logger.LogInformation("check user data consistency, userId:{userId}", user.Id.ToString());
+                var userGrain = _clusterClient.GetGrain<IUserGrain>(user.Id);
+                var userInfo = await userGrain.GetUser();
+                if (!userInfo.Success)
+                {
+                    return GetForbidResult(OpenIddictConstants.Errors.ServerError, userInfo.Message);
+                }
+                
+                if (userInfo.Data.AddressInfos.IsNullOrEmpty() || userInfo.Data.AddressInfos.Count < 2)
+                {
+                    _logger.LogInformation("save user info into grain again, userId:{userId}", user.Id.ToString());
+                    
+                    var chainIds = _recaptchaOptions.Value.ChainIds;
+                    _logger.LogInformation("_recaptchaOptions chainIds: {chainIds}", chainIds);
+                    var addressInfos = chainIds.Select(chainId => new AddressInfo { ChainId = chainId, Address = address }).ToList();
+
+                    await userGrain.AddOrUpdateUser(new UserGrainDto()
+                    {
+                        UserId = user.Id,
+                        AppId = AuthConstant.PortKeyAppId,
+                        AddressInfos = addressInfos
+                    });
+                    _logger.LogInformation("save user success, userId:{userId}", user.Id.ToString());
+                }
+                
+            }
         }
 
         var userClaimsPrincipalFactory = context.HttpContext.RequestServices
@@ -336,11 +364,16 @@ public class SignatureGrantHandler : ITokenExtensionGrant
             {
                 _logger.LogInformation("save eoa user info into grain, userId:{userId}", userId.ToString());
                 var grain = _clusterClient.GetGrain<IUserGrain>(userId);
+
+                var chainIds = _recaptchaOptions.Value.ChainIds;
+                _logger.LogInformation("_recaptchaOptions chainIds: {chainIds}", chainIds);
+                var addressInfos = chainIds.Select(chainId => new AddressInfo { ChainId = chainId, Address = address }).ToList();
                 
                 await grain.AddOrUpdateUser(new UserGrainDto()
                 {
                     UserId = userId,
                     AppId = AuthConstant.NightElfAppId,
+                    AddressInfos = addressInfos
                 });
                 _logger.LogInformation("create eoa user success, userId:{userId}", userId.ToString());
             }
