@@ -239,8 +239,10 @@ public class SignatureGrantHandler : ITokenExtensionGrant
     
     private async Task<bool> IsCaptchaValid(string token)
     {
+        _logger.LogInformation("method IsCaptchaValid, token: {token}", token);
         var response = await _httpClient.PostAsync($"{_recaptchaOptions.Value.BaseUrl}?secret={_recaptchaOptions.Value.SecretKey}&response={token}", null);
         var jsonString = await response.Content.ReadAsStringAsync();
+        _logger.LogInformation("IsCaptchaValid response, jsonString: {json}", jsonString);
         dynamic jsonData = JObject.Parse(jsonString);
         return (bool)jsonData.success;
     }
