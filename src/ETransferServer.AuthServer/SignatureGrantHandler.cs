@@ -213,7 +213,7 @@ public class SignatureGrantHandler : ITokenExtensionGrant
                     await userGrain.AddOrUpdateUser(new UserGrainDto()
                     {
                         UserId = user.Id,
-                        AppId = AuthConstant.PortKeyAppId,
+                        AppId = AuthConstant.NightElfAppId,
                         AddressInfos = addressInfos
                     });
                     _logger.LogInformation("save user success, userId:{userId}", user.Id.ToString());
