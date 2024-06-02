@@ -204,7 +204,7 @@ public class SignatureGrantHandler : ITokenExtensionGrant
                 
                 var chainIds = _recaptchaOptions.Value.ChainIds;
                 _logger.LogInformation("_recaptchaOptions chainIds: {chainIds}", chainIds);
-                if (userInfo.Data.AddressInfos.IsNullOrEmpty() || NoAllChainIdsIncluded(userInfo.Data.AddressInfos, chainIds))
+                if (userInfo.Data.AddressInfos.IsNullOrEmpty() || IsChainIdMismatch(userInfo.Data.AddressInfos, chainIds))
                 {
                     _logger.LogInformation("save user info into grain again, userId:{userId}", user.Id.ToString());
                     
@@ -247,10 +247,18 @@ public class SignatureGrantHandler : ITokenExtensionGrant
         return (bool)jsonData.success;
     }
     
-    private bool NoAllChainIdsIncluded(List<AddressInfo> addressInfos, List<string> recaptchaChainIds)
+    private bool IsChainIdMismatch(List<AddressInfo> addressInfos, List<string> recaptchaChainIds)
     {
         var userChainIds = addressInfos.Select(info => info.ChainId).ToList();
-        return recaptchaChainIds.Except(userChainIds).Any();
+
+        // Check if the lengths are equal
+        if (userChainIds.Count != recaptchaChainIds.Count)
+        {
+            return true;
+        }
+
+        // Check if the elements are the same
+        return recaptchaChainIds.Except(userChainIds).Any() || userChainIds.Except(recaptchaChainIds).Any();
     }
 
     private ForbidResult CheckParams(string publicKeyVal, string signatureVal, string plainText, string caHash,
