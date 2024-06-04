@@ -222,9 +222,11 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         var paymentAddressExists =
             _depositOption.Value.PaymentAddresses?.ContainsKey(addressInfo.ChainId) ?? false;
         AssertHelper.IsTrue(paymentAddressExists, "Payment address missing, ChainId={ChainId}", addressInfo.ChainId);
-        var paymentAddress = _depositOption.Value.PaymentAddresses.GetValueOrDefault(addressInfo.ChainId);
-        AssertHelper.NotEmpty(paymentAddress, "Payment address empty, ChainId={ChainId}", addressInfo.ChainId);
-
+        var paymentAddressDic = _depositOption.Value.PaymentAddresses.GetValueOrDefault(addressInfo.ChainId);
+        AssertHelper.NotEmpty(paymentAddressDic, "Payment address empty, ChainId={ChainId}", addressInfo.ChainId);
+        var paymentAddress = paymentAddressDic.GetValueOrDefault(userAddress.ToSymbol);
+        AssertHelper.NotEmpty(paymentAddress, "Payment address empty, Symbol={Symbol}", userAddress.ToSymbol);
+        
         var depositOrderDto = new DepositOrderDto
         {
             Id = OrderIdHelper.DepositOrderId(coinInfo.Network, coinInfo.Symbol, coBoTransaction.TxId),

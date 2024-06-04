@@ -18,6 +18,8 @@ public static class CommonConstant
     public const string SuccessStatus = "success";
     public const string Withdraw = "withdraw";
     public const string Deposit = "deposit";
+    public const string ETransferTokenPoolContractName = "ETransfer.Contracts.TokenPool";
+    public const string ETransferReleaseToken = "ReleaseToken";
     
     public const string DepositOrderLostAlarm = "DepositOrderLostAlarm";
     public const string DepositOrderCoinNotSupportAlarm = "DepositOrderCoinNotSupportAlarm";

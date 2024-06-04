@@ -16,8 +16,14 @@ service TokenPoolContract {
 
     rpc TransferToken(TransferTokenInput) returns (google.protobuf.Empty) {}
     
+    rpc ReleaseToken(ReleaseTokenInput) returns (google.protobuf.Empty) {}
+    
     // For Admin.
     rpc SetAdmin (aelf.Address) returns (google.protobuf.Empty) {}
+    
+    rpc AddReleaseController (ControllerInput) returns (google.protobuf.Empty) {}
+    
+    rpc RemoveReleaseController (ControllerInput) returns (google.protobuf.Empty) {}
     
     rpc Withdraw(WithdrawInput) returns (google.protobuf.Empty) {}
     
@@ -26,7 +32,11 @@ service TokenPoolContract {
     rpc AddTokenHolders(AddTokenHolderInput) returns (google.protobuf.Empty) {}
 
     // Views.
-    rpc GetAdmin (google.protobuf.Empty) returns (aelf.Address){
+    rpc GetAdmin (google.protobuf.Empty) returns (aelf.Address) {
+        option (aelf.is_view) = true;
+    }
+    
+    rpc GetReleaseControllers (google.protobuf.Empty) returns (ControllerOutput) {
         option (aelf.is_view) = true;
     }
     
@@ -47,6 +57,29 @@ message InitializeInput {
 message TransferTokenInput {
     string symbol = 1;
     int64 amount = 2;
+    string to_chain_id = 3;
+    string to_address = 4;
+    int64 max_estimate_fee = 5;
+}
+
+message ReleaseTokenInput {
+    string symbol = 1;
+    int64 amount = 2;
+    aelf.Address from = 3;
+    aelf.Address to = 4;
+    string memo = 5;
+}
+
+message ControllerInput {
+  aelf.Address address = 1;
+}
+
+message ControllerOutput {
+  repeated aelf.Address addresses = 1;
+}
+
+message ControllerList {
+  repeated aelf.Address controllers = 1;
 }
 
 message WithdrawInput {
@@ -77,7 +110,7 @@ message PoolInfo {
     repeated TokenHolder token_holders = 2;
 }
 
-message TokenHolderList{
+message TokenHolderList {
     repeated TokenHolder value = 1;
 }
 
@@ -87,12 +120,34 @@ message TokenHolder {
 }
 
 // event log
-message TokenPoolTransferred{
+message TokenPoolTransferred {
     option (aelf.is_event) = true;
     string symbol = 1;
     int64 amount = 2;
     aelf.Address from = 3;
     aelf.Address to = 4;
+    string to_chain_id = 5;
+    string to_address = 6;
+    int64 max_estimate_fee = 7;
+}
+
+message TokenPoolReleased {
+    option (aelf.is_event) = true;
+    string symbol = 1;
+    int64 amount = 2;
+    aelf.Address from = 3;
+    aelf.Address to = 4;
+    string memo = 5;
+}
+
+message ReleaseControllerAdded {
+    option (aelf.is_event) = true;
+    aelf.Address address = 1;
+}
+
+message ReleaseControllerRemoved {
+    option (aelf.is_event) = true;
+    aelf.Address address = 1;
 }
 
 message TokenPoolAdded {
@@ -100,7 +155,7 @@ message TokenPoolAdded {
     string symbol = 1;
 }
 
-message TokenHolderAdded{
+message TokenHolderAdded {
     option (aelf.is_event) = true;
     string symbol = 1;
     TokenHolderList token_holders = 2;
