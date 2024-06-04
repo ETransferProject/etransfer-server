@@ -22,11 +22,13 @@ using ETransferServer.Grains.Options;
 using ETransferServer.Models;
 using ETransferServer.Network;
 using ETransferServer.Options;
+using ETransferServer.User.Dtos;
 using ETransferServer.Withdraw.Dtos;
 using ETransferServer.WithdrawOrder.Dtos;
 using Google.Protobuf;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Orleans;
@@ -309,15 +311,25 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         var userDto = await userGrain.GetUser();
         AssertHelper.IsTrue(userDto.Success, "User not exists");
 
-        var addressInfo = userDto.Data.AddressInfos.FirstOrDefault(addr => addr.ChainId == chainId);
-        var address = addressInfo?.Address.IsNullOrEmpty() ?? true
-            ? ConvertVirtualAddressToContractAddress(Hash.LoadFromHex(userDto.Data.CaHash),
-                Address.FromBase58(await _contractProvider.GetContractAddressAsync(chainId,
-                    PortKeyVersion2.Equals(version) ? CaContractName2 : CaContractName)))
-            : Address.FromBase58(addressInfo.Address);
-        _logger.LogInformation(
-            "Get address when calculate fee: {address}, userId: {userId}, chainId: {chainId}, version: {version}",
-            address, userId.ToString(), chainId, version);
+        AddressInfo addressInfo;
+        Address address;
+        if (userDto.Data.AppId == CommonConstant.NightElfAppId)
+        {
+            addressInfo = userDto.Data.AddressInfos.FirstOrDefault(addr => addr.ChainId == chainId);
+            address = Address.FromBase58(addressInfo.Address);
+        }
+        else
+        {
+            addressInfo = userDto.Data.AddressInfos.FirstOrDefault(addr => addr.ChainId == chainId);
+            address = addressInfo?.Address.IsNullOrEmpty() ?? true
+                ? ConvertVirtualAddressToContractAddress(Hash.LoadFromHex(userDto.Data.CaHash),
+                    Address.FromBase58(await _contractProvider.GetContractAddressAsync(chainId,
+                        PortKeyVersion2.Equals(version) ? CaContractName2 : CaContractName)))
+                : Address.FromBase58(addressInfo.Address);
+            _logger.LogInformation(
+                "Get address when calculate fee: {address}, userId: {userId}, chainId: {chainId}, version: {version}",
+                address, userId.ToString(), chainId, version);
+        }
 
         var balance = await _contractProvider.CallTransactionAsync<GetBalanceOutput>(chainId,
             SystemContractName.TokenContract,

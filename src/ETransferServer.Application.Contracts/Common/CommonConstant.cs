@@ -22,6 +22,9 @@ public static class CommonConstant
     public const string DepositOrderLostAlarm = "DepositOrderLostAlarm";
     public const string DepositOrderCoinNotSupportAlarm = "DepositOrderCoinNotSupportAlarm";
     
+    public const string PortKeyAppId = "PortKey";
+    public const string NightElfAppId = "NightElf";
+    
     public static class ChainId
     {
         public const string AElfMainChain = "AELF";
