@@ -82,12 +82,14 @@ public partial class UserWithdrawGrain
             case OrderStatusEnum.Finish:
                 _logger.LogInformation("Order {Id} stream end, current status={Status}", this.GetPrimaryKey(),
                     status.ToString());
+                await HandleWithdrawQueryGrain(orderDto.FromTransfer.TxId);
                 break;
             case OrderStatusEnum.Expired:
             case OrderStatusEnum.Failed:
                 _logger.LogInformation("Order {Id} stream end, current status={Status}", this.GetPrimaryKey(),
                     status.ToString());
                 await ReverseTokenLimitAsync(orderDto.Id, orderDto.ToTransfer.Symbol, orderDto.AmountUsd);
+                await HandleWithdrawQueryGrain(orderDto.FromTransfer.TxId);
                 break;
 
             // Invalid status
@@ -120,7 +122,7 @@ public partial class UserWithdrawGrain
         }
         else
         {
-            await _withdrawQueryTimerGrain.AddToRequest(orderDto);
+            await _withdrawTimerGrain.AddToRequest(orderDto);
         }
     }
     
@@ -132,7 +134,7 @@ public partial class UserWithdrawGrain
         }
         else
         {
-            await _withdrawQueryTimerGrain.AddToQuery(orderDto);
+            await _withdrawTimerGrain.AddToQuery(orderDto);
         }
     }
 
@@ -152,7 +154,7 @@ public partial class UserWithdrawGrain
         }
         else
         {
-            await _withdrawTimerGrain.AddToPendingList(id, tx);
+            await _withdrawTxTimerGrain.AddToPendingList(id, tx);
         }
     }
 
@@ -201,5 +203,10 @@ public partial class UserWithdrawGrain
             return 0;
         }
         return (res.Data as WithdrawOrderDto)?.CreateTime ?? 0;
+    }
+    
+    private async Task HandleWithdrawQueryGrain(string transactionId)
+    {
+        await _withdrawQueryTimerGrain.Remove(transactionId);
     }
 }

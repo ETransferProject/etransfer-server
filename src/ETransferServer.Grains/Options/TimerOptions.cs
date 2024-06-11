@@ -21,6 +21,7 @@ public class TimerOptions
     public TimerOption WithdrawTimer { get; set; } = new();
     public TimerOption DepositRetryTimer { get; set; } = new();
     public TimerOption WithdrawRetryTimer { get; set; } = new();
+    public TimerOption WithdrawQueryTimer { get; set; } = new(60);
 }
 
 

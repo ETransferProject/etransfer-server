@@ -13,7 +13,8 @@ public interface ITokenTransferProvider
     Task<long> GetIndexBlockHeightAsync(string chainId);
     Task<LatestBlockDto> GetLatestBlockAsync(string chainId);
     Task<PagedResultDto<TransferDto>> GetTokenTransferInfoByTxIdsAsync(List<string> txIds, long endHeight);
-    Task<PagedResultDto<TransferDto>> GetTokenTransferInfoByBlockHeightAsync(int startHeight, int endHeight, int pageSize, int skipCount);
+    Task<PagedResultDto<TransferRecordDto>> GetTokenPoolRecordListAsync(long timestampMin, long timestampMax,
+        int maxResultCount, int skipCount);
 }
 
 public class TokenTransferProvider : ITokenTransferProvider, ISingletonDependency
@@ -41,7 +42,7 @@ public class TokenTransferProvider : ITokenTransferProvider, ISingletonDependenc
                 Variables = new
                 {
                     chainId,
-                    filterType = BlockFilterType.TRANSACTION
+                    filterType = BlockFilterType.LOG_EVENT
                 }
             });
             return res.Data.ConfirmedBlockHeight;
@@ -87,7 +88,6 @@ public class TokenTransferProvider : ITokenTransferProvider, ISingletonDependenc
         }
     }
 
-    
     public async Task<PagedResultDto<TransferDto>> GetTokenTransferInfoByTxIdsAsync(List<string> txIds, long endHeight)
     {
         if (txIds.IsNullOrEmpty())
@@ -96,9 +96,57 @@ public class TokenTransferProvider : ITokenTransferProvider, ISingletonDependenc
         return await GetTokenTransferInfoAsync(txIds, 0, endHeight, txIds.Count, 0);
     }
 
-    public async Task<PagedResultDto<TransferDto>> GetTokenTransferInfoByBlockHeightAsync(int startHeight, int endHeight, int resultCount, int skipCount)
+    public async Task<PagedResultDto<TransferRecordDto>> GetTokenPoolRecordListAsync(long timestampMin, long timestampMax, 
+        int maxResultCount, int skipCount = 0)
     {
-        return await GetTokenTransferInfoAsync(null, startHeight, endHeight, resultCount, skipCount);
+        try
+        {
+            var res = await _graphQlHelper.QueryAsync<GraphQLResponse<PagedResultDto<TransferRecordDto>>>(new GraphQLRequest
+            {
+                Query = @"
+			    query(
+                    $timestampMin:Long!,
+                    $timestampMax:Long!,
+                    $skipCount:Int!,
+                    $maxResultCount:Int!,
+                    $isFilterEmpty: Boolean!,
+                    $transferType: TokenTransferType!
+                ) {
+                    data:getTokenPoolRecords(
+                        input: {
+                            timestampMin:$timestampMin,
+                            timestampMax:$timestampMax,
+                            skipCount:$skipCount,
+                            maxResultCount:$maxResultCount,
+                            isFilterEmpty:$isFilterEmpty,
+                            transferType:$transferType
+                        }
+                    ){
+                        items:data{
+                            id,transactionId,methodName,from,to,
+                            toChainId,toAddress,symbol,amount,maxEstimateFee,
+                            timestamp,transferType,chainId,blockHash,blockHeight
+                        },
+                        totalCount
+                    }
+                }",
+                Variables = new
+                {
+                    timestampMin = timestampMin,
+                    timestampMax = timestampMax,
+                    skipCount = skipCount,
+                    maxResultCount = maxResultCount,
+                    isFilterEmpty = true,
+                    transferType = TokenTransferType.In
+                }
+            });
+            return res.Data;
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Query token pool records error");
+            return new PagedResultDto<TransferRecordDto>();
+        }
     }
 
 
@@ -153,4 +201,11 @@ public class TokenTransferProvider : ITokenTransferProvider, ISingletonDependenc
         }
 
     }
+}
+
+public enum TokenTransferType
+{
+    All,
+    In,
+    Out
 }

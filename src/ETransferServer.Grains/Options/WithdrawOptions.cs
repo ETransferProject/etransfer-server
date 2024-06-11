@@ -10,6 +10,7 @@ public class WithdrawOptions
     public decimal FeeFluctuationPercent { get; set; } = (decimal)0.1;
     public int ThirdPartFeeExpireSeconds { get; set; } = 180;
     public int ToTransferMaxRetry { get; set; } = 5;
+    public int MaxListLength { get; set; } = 1000;
     public Dictionary<string, Dictionary<string, string>> PaymentAddresses { get; set; } = new();
     public Dictionary<string, TransactionThreshold> Homogeneous { get; set; } = new();
 }

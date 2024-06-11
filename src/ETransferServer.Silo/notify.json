@@ -83,6 +83,22 @@
             "Failure Reason: {reason}"
           ]
         }
+      },
+      "WithdrawOrderFailureAlarm": {
+        "FeiShuGroup": {
+          "WebhookUrl": "",
+          "Secret": "",
+          "TitleTemplate": "orange",
+          "Title": "❗️ [test3] Withdraw order invalid alert",
+          "Contents": [
+            "OrderType: {orderType}",
+            "TransactionId: {transactionId}\nMethodName: {methodName}\nFrom: {from}\nTo: {to}",
+            "FromChainId: {chainId} ToChainId: {toChainId}\nSymbol: {symbol} Amount: {amount}\nToAddress: {toAddress}",
+            "MaxEstimateFee: {maxEstimateFee} Timestamp: {timestamp}",
+            "BlockHash: {blockHash}\nBlockHeight: {blockHeight}",
+            "Reason: {reason}"
+          ]
+        }
       }
     }
   }
