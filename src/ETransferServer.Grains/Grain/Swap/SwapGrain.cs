@@ -129,7 +129,7 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
 
                 // create swap transaction
                 var (txId, newTransaction) = await _contractProvider.CreateTransactionAsync(toTransfer.ChainId,
-                    toTransfer.FromAddress,
+                    _chainOptions.ChainInfos[toTransfer.ChainId].ReleaseAccount,
                     CommonConstant.ETransferTokenPoolContractName, CommonConstant.ETransferSwapToken, swapInput);
 
                 toTransfer.TxId = txId.ToHex();
@@ -281,7 +281,8 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
             Deadline = Timestamp.FromDateTime(DateTime.UtcNow.AddDays(1)),
             Channel = this.GetPrimaryKey().ToString().Replace("-", ""),
             Path = { swapInfo.Path },
-            FeeRate = (long)(swapInfo.FeeRate * 10000)
+            FeeRate = (long)(swapInfo.FeeRate * 10000),
+            From = Address.FromBase58(toTransfer.FromAddress)
         };
 
         // 4. get slippage and compare amount and get amount out min
