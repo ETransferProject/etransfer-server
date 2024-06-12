@@ -2,6 +2,7 @@ using System.Numerics;
 using AElf;
 using AElf.Types;
 using Awaken.Contracts.Swap;
+using ETransfer.Contracts.TokenPool;
 using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
 using ETransferServer.Common.ChainsClient;
@@ -30,6 +31,7 @@ public interface ISwapGrain : IGrainWithGuidKey
 
     // Task<GrainResultDto<DepositOrderChangeDto>> SubsidyTransferAsync(DepositOrderDto dto，string returnValue);
     Task<decimal> ParseReturnValueAsync(string returnValue);
+    Task<decimal> RecordAmountOutAsync(long amount);
 }
 
 public class SwapGrain : Grain<SwapState>, ISwapGrain
@@ -128,7 +130,7 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
                 // create swap transaction
                 var (txId, newTransaction) = await _contractProvider.CreateTransactionAsync(toTransfer.ChainId,
                     toTransfer.FromAddress,
-                    null, swapInfo.MethodName, swapInput, swapInfo.Router);
+                    CommonConstant.ETransferTokenPoolContractName, CommonConstant.ETransferSwapToken, swapInput);
 
                 toTransfer.TxId = txId.ToHex();
                 rawTransaction = newTransaction;
@@ -272,13 +274,14 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
             await GetAmountsOutNowAsync(fromTransfer, toTransfer, swapInfo);
         _logger.LogInformation("Amounts out now.{amount},{grainId}", amountOut, this.GetPrimaryKey());
 
-        var swapInput = new SwapExactTokensForTokensInput()
+        var swapInput = new SwapTokenInput
         {
             AmountIn = amountInWithDecimal,
             To = Address.FromBase58(toTransfer.ToAddress),
             Deadline = Timestamp.FromDateTime(DateTime.UtcNow.AddDays(1)),
             Channel = this.GetPrimaryKey().ToString().Replace("-", ""),
-            Path = { swapInfo.Path }
+            Path = { swapInfo.Path },
+            FeeRate = (long)(swapInfo.FeeRate * 10000)
         };
 
         // 4. get slippage and compare amount and get amount out min
@@ -410,6 +413,25 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
             var output = SwapOutput.Parser.ParseFrom(ByteArrayHelper.HexStringToByteArray(returnValue));
             var tokenInfo = await GetTokenAsync(State.SymbolOut, State.ToChainId);
             actualSwappedAmountOut = (output.Amount.ToList().Last() / (decimal)Math.Pow(10, tokenInfo.Decimals));
+            State.ActualSwappedAmountOut = actualSwappedAmountOut;
+            await WriteStateAsync();
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Failed to parse.");
+            return 0;
+        }
+
+        return actualSwappedAmountOut;
+    }
+
+    public async Task<decimal> RecordAmountOutAsync(long amount)
+    {
+        decimal actualSwappedAmountOut = 0;
+        try
+        {
+            var tokenInfo = await GetTokenAsync(State.SymbolOut, State.ToChainId);
+            actualSwappedAmountOut = (amount / (decimal)Math.Pow(10, tokenInfo.Decimals));
             State.ActualSwappedAmountOut = actualSwappedAmountOut;
             await WriteStateAsync();
         }

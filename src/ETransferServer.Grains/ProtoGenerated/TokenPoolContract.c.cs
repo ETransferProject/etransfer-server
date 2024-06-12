@@ -93,6 +93,31 @@ namespace ETransfer.Contracts.TokenPool {
     }
   }
 
+  public partial class TokenSwapped : aelf::IEvent<TokenSwapped>
+  {
+    public global::System.Collections.Generic.IEnumerable<TokenSwapped> GetIndexed()
+    {
+      return new List<TokenSwapped>
+      {
+      };
+    }
+
+    public TokenSwapped GetNonIndexed()
+    {
+      return new TokenSwapped
+      {
+        SymbolIn = SymbolIn,
+        SymbolOut = SymbolOut,
+        AmountIn = AmountIn,
+        AmountOut = AmountOut,
+        To = To,
+        Channel = Channel,
+        SwapPath = SwapPath,
+        From = From,
+      };
+    }
+  }
+
   public partial class TokenPoolAdded : aelf::IEvent<TokenPoolAdded>
   {
     public global::System.Collections.Generic.IEnumerable<TokenPoolAdded> GetIndexed()
@@ -145,10 +170,13 @@ namespace ETransfer.Contracts.TokenPool {
     static readonly aelf::Marshaller<global::ETransfer.Contracts.TokenPool.WithdrawInput> __Marshaller_WithdrawInput = aelf::Marshallers.Create((arg) => global::Google.Protobuf.MessageExtensions.ToByteArray(arg), global::ETransfer.Contracts.TokenPool.WithdrawInput.Parser.ParseFrom);
     static readonly aelf::Marshaller<global::ETransfer.Contracts.TokenPool.AddTokenPoolInput> __Marshaller_AddTokenPoolInput = aelf::Marshallers.Create((arg) => global::Google.Protobuf.MessageExtensions.ToByteArray(arg), global::ETransfer.Contracts.TokenPool.AddTokenPoolInput.Parser.ParseFrom);
     static readonly aelf::Marshaller<global::ETransfer.Contracts.TokenPool.AddTokenHolderInput> __Marshaller_AddTokenHolderInput = aelf::Marshallers.Create((arg) => global::Google.Protobuf.MessageExtensions.ToByteArray(arg), global::ETransfer.Contracts.TokenPool.AddTokenHolderInput.Parser.ParseFrom);
+    static readonly aelf::Marshaller<global::ETransfer.Contracts.TokenPool.SetSwapContractAddressInput> __Marshaller_SetSwapContractAddressInput = aelf::Marshallers.Create((arg) => global::Google.Protobuf.MessageExtensions.ToByteArray(arg), global::ETransfer.Contracts.TokenPool.SetSwapContractAddressInput.Parser.ParseFrom);
+    static readonly aelf::Marshaller<global::ETransfer.Contracts.TokenPool.SwapTokenInput> __Marshaller_SwapTokenInput = aelf::Marshallers.Create((arg) => global::Google.Protobuf.MessageExtensions.ToByteArray(arg), global::ETransfer.Contracts.TokenPool.SwapTokenInput.Parser.ParseFrom);
     static readonly aelf::Marshaller<global::ETransfer.Contracts.TokenPool.ControllerOutput> __Marshaller_ControllerOutput = aelf::Marshallers.Create((arg) => global::Google.Protobuf.MessageExtensions.ToByteArray(arg), global::ETransfer.Contracts.TokenPool.ControllerOutput.Parser.ParseFrom);
     static readonly aelf::Marshaller<global::ETransfer.Contracts.TokenPool.GetPoolInfoInput> __Marshaller_GetPoolInfoInput = aelf::Marshallers.Create((arg) => global::Google.Protobuf.MessageExtensions.ToByteArray(arg), global::ETransfer.Contracts.TokenPool.GetPoolInfoInput.Parser.ParseFrom);
     static readonly aelf::Marshaller<global::ETransfer.Contracts.TokenPool.PoolInfo> __Marshaller_PoolInfo = aelf::Marshallers.Create((arg) => global::Google.Protobuf.MessageExtensions.ToByteArray(arg), global::ETransfer.Contracts.TokenPool.PoolInfo.Parser.ParseFrom);
     static readonly aelf::Marshaller<global::ETransfer.Contracts.TokenPool.TokenSymbolList> __Marshaller_TokenSymbolList = aelf::Marshallers.Create((arg) => global::Google.Protobuf.MessageExtensions.ToByteArray(arg), global::ETransfer.Contracts.TokenPool.TokenSymbolList.Parser.ParseFrom);
+    static readonly aelf::Marshaller<global::Google.Protobuf.WellKnownTypes.Int64Value> __Marshaller_google_protobuf_Int64Value = aelf::Marshallers.Create((arg) => global::Google.Protobuf.MessageExtensions.ToByteArray(arg), global::Google.Protobuf.WellKnownTypes.Int64Value.Parser.ParseFrom);
     #endregion
 
     #region Methods
@@ -215,6 +243,20 @@ namespace ETransfer.Contracts.TokenPool {
         __Marshaller_AddTokenHolderInput,
         __Marshaller_google_protobuf_Empty);
 
+    static readonly aelf::Method<global::ETransfer.Contracts.TokenPool.SetSwapContractAddressInput, global::Google.Protobuf.WellKnownTypes.Empty> __Method_SetSwapContractAddress = new aelf::Method<global::ETransfer.Contracts.TokenPool.SetSwapContractAddressInput, global::Google.Protobuf.WellKnownTypes.Empty>(
+        aelf::MethodType.Action,
+        __ServiceName,
+        "SetSwapContractAddress",
+        __Marshaller_SetSwapContractAddressInput,
+        __Marshaller_google_protobuf_Empty);
+
+    static readonly aelf::Method<global::ETransfer.Contracts.TokenPool.SwapTokenInput, global::Google.Protobuf.WellKnownTypes.Empty> __Method_SwapToken = new aelf::Method<global::ETransfer.Contracts.TokenPool.SwapTokenInput, global::Google.Protobuf.WellKnownTypes.Empty>(
+        aelf::MethodType.Action,
+        __ServiceName,
+        "SwapToken",
+        __Marshaller_SwapTokenInput,
+        __Marshaller_google_protobuf_Empty);
+
     static readonly aelf::Method<global::Google.Protobuf.WellKnownTypes.Empty, global::AElf.Types.Address> __Method_GetAdmin = new aelf::Method<global::Google.Protobuf.WellKnownTypes.Empty, global::AElf.Types.Address>(
         aelf::MethodType.View,
         __ServiceName,
@@ -243,6 +285,13 @@ namespace ETransfer.Contracts.TokenPool {
         __Marshaller_google_protobuf_Empty,
         __Marshaller_TokenSymbolList);
 
+    static readonly aelf::Method<global::Google.Protobuf.WellKnownTypes.Int64Value, global::AElf.Types.Address> __Method_GetSwapContracts = new aelf::Method<global::Google.Protobuf.WellKnownTypes.Int64Value, global::AElf.Types.Address>(
+        aelf::MethodType.View,
+        __ServiceName,
+        "GetSwapContracts",
+        __Marshaller_google_protobuf_Int64Value,
+        __Marshaller_aelf_Address);
+
     #endregion
 
     #region Descriptors
@@ -263,7 +312,7 @@ namespace ETransfer.Contracts.TokenPool {
       }
     }
     #endregion
-
+    
   }
 }
 #endregion
