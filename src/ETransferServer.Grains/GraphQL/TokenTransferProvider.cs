@@ -241,7 +241,7 @@ public class TokenTransferProvider : ITokenTransferProvider, ISingletonDependenc
                             maxResultCount:$maxResultCount
                         }
                     ){
-                        items:data{
+                        items {
                             transactionId,symbolIn,symbolOut,amountIn,amountOut,
                             fromAddress,toAddress,channel,feeRate,blockHeight
                         },
