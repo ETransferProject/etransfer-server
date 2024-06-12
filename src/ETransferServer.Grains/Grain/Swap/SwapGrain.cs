@@ -1,5 +1,6 @@
 using System.Numerics;
 using AElf;
+using AElf.Client.Dto;
 using AElf.Types;
 using Awaken.Contracts.Swap;
 using ETransfer.Contracts.TokenPool;
@@ -30,7 +31,7 @@ public interface ISwapGrain : IGrainWithGuidKey
     Task<GrainResultDto<DepositOrderChangeDto>> SwapAsync(DepositOrderDto dto);
 
     // Task<GrainResultDto<DepositOrderChangeDto>> SubsidyTransferAsync(DepositOrderDto dto，string returnValue);
-    Task<decimal> ParseReturnValueAsync(string returnValue);
+    Task<decimal> ParseReturnValueAsync(LogEventDto[] logs);
     Task<decimal> RecordAmountOutAsync(long amount);
 }
 
@@ -401,28 +402,29 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
         return tokenInfo;
     }
 
-    public async Task<decimal> ParseReturnValueAsync(string returnValue)
+    public async Task<decimal> ParseReturnValueAsync(LogEventDto[] logs)
     {
-        if (returnValue.IsNullOrEmpty())
-        {
-            return 0;
-        }
-
         decimal actualSwappedAmountOut = 0;
         try
         {
-            var output = SwapOutput.Parser.ParseFrom(ByteArrayHelper.HexStringToByteArray(returnValue));
-            var tokenInfo = await GetTokenAsync(State.SymbolOut, State.ToChainId);
-            actualSwappedAmountOut = (output.Amount.ToList().Last() / (decimal)Math.Pow(10, tokenInfo.Decimals));
-            State.ActualSwappedAmountOut = actualSwappedAmountOut;
-            await WriteStateAsync();
+            if (logs.Length > 0)
+            {
+                var swapLog = logs.FirstOrDefault(l => l.Name == nameof(TokenSwapped))?.NonIndexed;
+                if (!swapLog.IsNullOrWhiteSpace())
+                {
+                    var amountsOut = TokenSwapped.Parser.ParseFrom(ByteArrayHelper.HexStringToByteArray(swapLog)).AmountOut;
+                    _logger.LogInformation("Amounts out parsed:{amount}",amountsOut.AmountOut.Last());
+                    var tokenInfo = await GetTokenAsync(State.SymbolOut, State.ToChainId);
+                    actualSwappedAmountOut = (amountsOut.AmountOut.Last() / (decimal)Math.Pow(10, tokenInfo.Decimals));
+                    State.ActualSwappedAmountOut = actualSwappedAmountOut;
+                }
+            }
         }
         catch (Exception e)
         {
             _logger.LogError(e, "Failed to parse.");
             return 0;
         }
-
         return actualSwappedAmountOut;
     }
 

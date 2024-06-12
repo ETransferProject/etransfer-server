@@ -324,7 +324,7 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
                     transferInfo.Status = OrderTransferStatusEnum.Confirmed.ToString();
                     order.Status = OrderStatusEnum.ToTransferConfirmed.ToString();
                     var swapGrain = GrainFactory.GetGrain<ISwapGrain>(order.Id);
-                    transferInfo.Amount =  await swapGrain.ParseReturnValueAsync(txStatus.ReturnValue);
+                    transferInfo.Amount =  await swapGrain.ParseReturnValueAsync(txStatus.Logs);
                     _logger.LogInformation("After ParseReturnValueAsync: {Amount}", transferInfo.Amount);
                     
                     await SaveOrder(order, ExtensionBuilder.New()
