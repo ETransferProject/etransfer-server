@@ -116,6 +116,8 @@ public class TokenTransferProvider : ITokenTransferProvider, ISingletonDependenc
 			    query(
                     $timestampMin:Long!,
                     $timestampMax:Long!,
+                    $startBlockHeight:Long!,
+                    $endBlockHeight:Long!,
                     $skipCount:Int!,
                     $maxResultCount:Int!,
                     $isFilterEmpty: Boolean!,
@@ -125,6 +127,8 @@ public class TokenTransferProvider : ITokenTransferProvider, ISingletonDependenc
                         input: {
                             timestampMin:$timestampMin,
                             timestampMax:$timestampMax,
+                            startBlockHeight:$startBlockHeight,
+                            endBlockHeight:$endBlockHeight,
                             skipCount:$skipCount,
                             maxResultCount:$maxResultCount,
                             isFilterEmpty:$isFilterEmpty,
@@ -143,6 +147,8 @@ public class TokenTransferProvider : ITokenTransferProvider, ISingletonDependenc
                 {
                     timestampMin = timestampMin,
                     timestampMax = timestampMax,
+                    startBlockHeight = 0,
+                    endBlockHeight = 0,
                     skipCount = skipCount,
                     maxResultCount = maxResultCount,
                     isFilterEmpty = true,
