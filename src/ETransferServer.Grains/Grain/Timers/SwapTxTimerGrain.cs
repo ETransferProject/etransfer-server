@@ -212,6 +212,9 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
             _logger.LogDebug("SwapTxTimer indexer transaction exists, orderId={OrderId}, txId={TxId}", 
                 orderId, pendingTx.TxId);
             var transfer = indexerTx[pendingTx.TxId];
+            var swapGrain = GrainFactory.GetGrain<ISwapGrain>(order.Id);
+            order.ToTransfer.Amount =  await swapGrain.RecordAmountOutAsync(transfer.AmountOut);
+            _logger.LogInformation("SwapTxTimer toTransfer amount: {Amount}", order.ToTransfer.Amount);
             order.ToTransfer.Status = OrderTransferStatusEnum.Confirmed.ToString();
             order.Status = OrderStatusEnum.ToTransferConfirmed.ToString();
            
@@ -269,7 +272,7 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
         var txDateTime = TimeHelper.GetDateTimeFromTimeStamp(timerTx.TxTime ?? 0);
         var txExpireTime = txDateTime.AddSeconds(_chainOptions.Value.Contract.TransactionTimerMaxSeconds);
 
-        TransferInfo transferInfo = order.ToTransfer;;
+        var transferInfo = order.ToTransfer;;
         
         _logger.LogInformation("HandleOrderTransaction: {order}", JsonConvert.SerializeObject(order));
 

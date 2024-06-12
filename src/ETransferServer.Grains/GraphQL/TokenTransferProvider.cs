@@ -43,7 +43,7 @@ public class TokenTransferProvider : ITokenTransferProvider, ISingletonDependenc
                 Variables = new
                 {
                     chainId,
-                    filterType = BlockFilterType.LOG_EVENT
+                    filterType = BlockFilterType.TRANSACTION
                 }
             });
             return res.Data.ConfirmedBlockHeight;

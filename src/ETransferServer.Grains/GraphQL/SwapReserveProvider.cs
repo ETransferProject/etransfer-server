@@ -90,7 +90,7 @@ public class SwapReserveProvider : ISwapReserveProvider, ISingletonDependency
             Variables = new
             {
                 chainId,
-                filterType = BlockFilterType.LOG_EVENT
+                filterType = BlockFilterType.TRANSACTION
             }
         });
 
