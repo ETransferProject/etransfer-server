@@ -13,6 +13,7 @@ public interface ITokenTransferProvider
     Task<long> GetIndexBlockHeightAsync(string chainId);
     Task<LatestBlockDto> GetLatestBlockAsync(string chainId);
     Task<PagedResultDto<TransferDto>> GetTokenTransferInfoByTxIdsAsync(List<string> txIds, long endHeight);
+    Task<PagedResultDto<SwapRecordDto>> GetSwapTokenInfoByTxIdsAsync(List<string> txIds, long endHeight);
     Task<PagedResultDto<TransferRecordDto>> GetTokenPoolRecordListAsync(long timestampMin, long timestampMax,
         int maxResultCount, int skipCount);
 }
@@ -94,6 +95,14 @@ public class TokenTransferProvider : ITokenTransferProvider, ISingletonDependenc
             return new PagedResultDto<TransferDto>();
         
         return await GetTokenTransferInfoAsync(txIds, 0, endHeight, txIds.Count, 0);
+    }
+
+    public async Task<PagedResultDto<SwapRecordDto>> GetSwapTokenInfoByTxIdsAsync(List<string> txIds, long endHeight)
+    {
+        if (txIds.IsNullOrEmpty())
+            return new PagedResultDto<SwapRecordDto>();
+        
+        return await GetSwapTokenInfoAsync(txIds, 0, endHeight, txIds.Count, 0);
     }
 
     public async Task<PagedResultDto<TransferRecordDto>> GetTokenPoolRecordListAsync(long timestampMin, long timestampMax, 
@@ -198,6 +207,56 @@ public class TokenTransferProvider : ITokenTransferProvider, ISingletonDependenc
         {
             _logger.LogError(e, "Query token transfer error");
             return new PagedResultDto<TransferDto>();
+        }
+
+    }
+    
+    private async Task<PagedResultDto<SwapRecordDto>> GetSwapTokenInfoAsync(List<string> txIds, long startBlockHeight,
+        long endBlockHeight, int inputMaxResultCount, int inputSkipCount = 0)
+    {
+        try
+        {
+            var res = await _graphQlHelper.QueryAsync<GraphQLResponse<PagedResultDto<SwapRecordDto>>>(new GraphQLRequest
+            {
+                Query = @"
+			    query(
+                    $txIds:[String],
+                    $startBlockHeight:Long!,
+                    $endBlockHeight:Long!,
+                    $skipCount:Int!,
+                    $maxResultCount:Int!
+                ) {
+                    data:getSwapTokenRecord(
+                        input: {
+                            startBlockHeight:$startBlockHeight,
+                            endBlockHeight:$endBlockHeight,
+                            transactionIds:$txIds,
+                            skipCount:$skipCount,
+                            maxResultCount:$maxResultCount
+                        }
+                    ){
+                        items:data{
+                            transactionId,symbolIn,symbolOut,amountIn,amountOut,
+                            fromAddress,toAddress,channel,feeRate,blockHeight
+                        },
+                        totalCount
+                    }
+                }",
+                Variables = new
+                {
+                    txIds = txIds,
+                    skipCount = inputSkipCount,
+                    maxResultCount = inputMaxResultCount,
+                    startBlockHeight = startBlockHeight,
+                    endBlockHeight = endBlockHeight
+                }
+            });
+            return res.Data;
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Query swap token error");
+            return new PagedResultDto<SwapRecordDto>();
         }
 
     }
