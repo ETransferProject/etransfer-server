@@ -1,6 +1,7 @@
 using ETransferServer.Common;
 using ETransferServer.Dtos.Notify;
 using ETransferServer.Dtos.Order;
+using ETransferServer.Grains.Common;
 using ETransferServer.Grains.Provider.Notify;
 using ETransferServer.Grains.State.Order;
 using Microsoft.Extensions.Logging;
@@ -33,9 +34,9 @@ public class WithdrawOrderMonitorGrain : Grain<WithdrawOrderMonitorState>, IWith
     {
         try
         {
-            if (State != null && State.Id == dto.Id)
+            if ((State != null && State.Id == dto.Id) || await ExistWithdrawOrderAsync(dto))
             {
-                _logger.LogWarning("WithdrawOrderMonitor already handle: {txId}", dto.TransactionId);
+                _logger.LogWarning("WithdrawOrderMonitor already handle: {id}", dto.Id);
                 return;
             }
             var sendSuccess =
@@ -58,6 +59,22 @@ public class WithdrawOrderMonitorGrain : Grain<WithdrawOrderMonitorState>, IWith
             State.Id = dto.Id;
             await WriteStateAsync();
         }
+    }
+    
+    private async Task<bool> ExistWithdrawOrderAsync(WithdrawOrderMonitorDto dto)
+    {
+        try
+        {
+            var orderId = OrderIdHelper.WithdrawOrderId(dto.Id, dto.ToChainId, dto.ToAddress);
+            var withdrawRecordGrain = GrainFactory.GetGrain<IUserWithdrawRecordGrain>(orderId);
+            return  (await withdrawRecordGrain.GetAsync())?.Value != null;
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "WithdrawOrderMonitor Exception, {id}", dto.Id);
+        }
+
+        return false;
     }
     
     private async Task<bool> SendNotifyAsync(WithdrawOrderMonitorDto dto)
