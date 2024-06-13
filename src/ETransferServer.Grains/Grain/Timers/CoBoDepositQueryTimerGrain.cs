@@ -224,8 +224,6 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         AssertHelper.IsTrue(paymentAddressExists, "Payment address missing, ChainId={ChainId}", addressInfo.ChainId);
         var paymentAddressDic = _depositOption.Value.PaymentAddresses.GetValueOrDefault(addressInfo.ChainId);
         AssertHelper.NotEmpty(paymentAddressDic, "Payment address empty, ChainId={ChainId}", addressInfo.ChainId);
-        var paymentAddress = paymentAddressDic.GetValueOrDefault(userAddress.ToSymbol);
-        AssertHelper.NotEmpty(paymentAddress, "Payment address empty, Symbol={Symbol}", userAddress.ToSymbol);
         
         var depositOrderDto = new DepositOrderDto
         {
@@ -249,45 +247,51 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
             },
             ToTransfer = new TransferInfo
             {
-                FromAddress = paymentAddress,
+                FromAddress = GetPaymentAddress(paymentAddressDic, coinInfo.Symbol),
                 ToAddress = addressInfo.Address,
                 Network = CommonConstant.Network.AElf,
                 ChainId = addressInfo.ChainId,
-                Symbol = userAddress.ToSymbol,
+                Symbol = coinInfo.Symbol,
                 Amount = coBoTransaction.AbsAmount.SafeToDecimal(),
                 Status = OrderTransferStatusEnum.Created.ToString(),
             }
         };
 
-        return SpecialHandle(depositOrderDto);
+        return SpecialHandle(depositOrderDto, paymentAddressDic, userAddress.ToSymbol);
     }
 
-    private DepositOrderDto SpecialHandle(DepositOrderDto dto)
+    private DepositOrderDto SpecialHandle(DepositOrderDto dto, Dictionary<string, string> paymentAddressDic, string symbol)
     {
         _logger.LogInformation("SpecialHandle, input dto: {dto}", JsonConvert.SerializeObject(dto));
         // Add ExtensionInfo
         dto.ExtensionInfo ??= new Dictionary<string, string>();
         
-        if (dto.ToTransfer.Symbol.IsNullOrEmpty() 
-            || _depositOption.Value.NoSwapSymbols.Contains(dto.FromTransfer.Symbol))
+        if (symbol.IsNullOrEmpty() || _depositOption.Value.NoSwapSymbols.Contains(dto.FromTransfer.Symbol))
         {
             _logger.LogInformation("SpecialHandle, not need swap, set ToTransfer.Symbol = FromTransfer.Symbol");
-            dto.ToTransfer.Symbol = dto.FromTransfer.Symbol;
             return dto;
         }
 
-        if (DepositSwapHelper.IsDepositSwap(dto.FromTransfer.Symbol, dto.ToTransfer.Symbol))
+        if (DepositSwapHelper.IsDepositSwap(dto.FromTransfer.Symbol, symbol))
         {
             _logger.LogInformation("SpecialHandle, need swap, set ExtensionInfo");
             dto.ExtensionInfo.Add(ExtensionKey.IsSwap, Boolean.TrueString);
             dto.ExtensionInfo.Add(ExtensionKey.NeedSwap, Boolean.TrueString);
             dto.ExtensionInfo.Add(ExtensionKey.SwapStage, SwapStage.SwapTx);
+            dto.ToTransfer.Symbol = symbol;
+            dto.ToTransfer.FromAddress = GetPaymentAddress(paymentAddressDic, symbol);
             return dto;
         }
         
         _logger.LogInformation("SpecialHandle, default set ToTransfer.Symbol = FromTransfer.Symbol");
-        dto.ToTransfer.Symbol = dto.FromTransfer.Symbol;
         return dto;
+    }
+
+    private string GetPaymentAddress(Dictionary<string, string> paymentAddressDic, string symbol)
+    {
+        var paymentAddress = paymentAddressDic.GetValueOrDefault(symbol);
+        AssertHelper.NotEmpty(paymentAddress, "Payment address empty, Symbol={Symbol}", symbol);
+        return paymentAddress;
     }
 
     private async Task AddAfter(CoBoTransactionDto depositOrder)

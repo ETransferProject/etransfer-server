@@ -150,6 +150,7 @@ public partial class UserDepositGrain
         orderDto.Status = OrderStatusEnum.ToStartTransfer.ToString();
         orderDto.ToTransfer.Status = OrderTransferStatusEnum.StartTransfer.ToString();
         orderDto.ToTransfer.Symbol = orderDto.FromTransfer.Symbol;
+        orderDto.ToTransfer.FromAddress = GetPaymentAddress(orderDto.ToTransfer.ChainId, orderDto.FromTransfer.Symbol);
         orderDto.FromRawTransaction = null;
         orderDto.ToTransfer.TxId = null;
         orderDto.ToTransfer.TxTime = null;
@@ -160,6 +161,18 @@ public partial class UserDepositGrain
             JsonConvert.SerializeObject(orderDto));
         
         return await ToStartTransfer(orderDto);
+    }
+    
+    private string GetPaymentAddress(string chainId, string symbol)
+    {
+        var paymentAddressExists =
+            _depositOptions.Value.PaymentAddresses?.ContainsKey(chainId) ?? false;
+        AssertHelper.IsTrue(paymentAddressExists, "Payment address missing, ChainId={ChainId}", chainId);
+        var paymentAddressDic = _depositOptions.Value.PaymentAddresses.GetValueOrDefault(chainId);
+        AssertHelper.NotEmpty(paymentAddressDic, "Payment address empty, ChainId={ChainId}", chainId);
+        var paymentAddress = paymentAddressDic.GetValueOrDefault(symbol);
+        AssertHelper.NotEmpty(paymentAddress, "Payment address empty, Symbol={Symbol}", symbol);
+        return paymentAddress;
     }
 
     private bool NeedSwap(DepositOrderDto orderDto)
