@@ -257,10 +257,10 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
             }
         };
 
-        return SpecialHandle(depositOrderDto, paymentAddressDic, userAddress.ToSymbol);
+        return SpecialHandle(depositOrderDto, userAddress.ToSymbol);
     }
 
-    private DepositOrderDto SpecialHandle(DepositOrderDto dto, Dictionary<string, string> paymentAddressDic, string symbol)
+    private DepositOrderDto SpecialHandle(DepositOrderDto dto, string symbol)
     {
         _logger.LogInformation("SpecialHandle, input dto: {dto}", JsonConvert.SerializeObject(dto));
         // Add ExtensionInfo
@@ -279,7 +279,6 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
             dto.ExtensionInfo.Add(ExtensionKey.NeedSwap, Boolean.TrueString);
             dto.ExtensionInfo.Add(ExtensionKey.SwapStage, SwapStage.SwapTx);
             dto.ToTransfer.Symbol = symbol;
-            dto.ToTransfer.FromAddress = GetPaymentAddress(paymentAddressDic, symbol);
             return dto;
         }
         
