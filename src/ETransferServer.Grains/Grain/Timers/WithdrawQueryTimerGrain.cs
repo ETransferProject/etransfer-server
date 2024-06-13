@@ -180,6 +180,8 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
                 {
                     Network = CommonConstant.Network.AElf,
                     ChainId = transferRecord.ChainId,
+                    FromAddress = transferRecord.From,
+                    ToAddress = transferRecord.To,
                     Amount = amountDecimal,
                     Symbol = transferRecord.Symbol,
                     TxId = transferRecord.TransactionId,
