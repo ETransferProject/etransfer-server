@@ -37,6 +37,7 @@ public class ChainOptions
         public int EstimatedArrivalTime { get; set; } = 160;
         public int EstimatedArrivalFastUpperTime { get; set; } = 60;
         public int EstimatedArrivalFastLowerTime { get; set; } = 10;
+        public string ReleaseAccount { get; set; }
         public Dictionary<string, string> ContractAddress { get; set; } = new();
     }
 }

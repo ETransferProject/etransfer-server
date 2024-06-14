@@ -55,11 +55,12 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
 
     private IUserWithdrawRecordGrain _recordGrain;
     private IOrderStatusFlowGrain _orderStatusFlowGrain;
-    private IUserWithdrawTxTimerGrain _withdrawTimerGrain;
+    private IUserWithdrawTxTimerGrain _withdrawTxTimerGrain;
     private IUserWithdrawTxFastTimerGrain _withdrawFastTimerGrain;
     private IWithdrawOrderRetryTimerGrain _withdrawOrderRetryTimerGrain;
-    private IWithdrawTimerGrain _withdrawQueryTimerGrain;
+    private IWithdrawTimerGrain _withdrawTimerGrain;
     private IOrderStatusReminderGrain _orderStatusReminderGrain;
+    private IWithdrawQueryTimerGrain _withdrawQueryTimerGrain;
 
     private readonly IContractProvider _contractProvider;
     private readonly IUserWithdrawProvider _userWithdrawProvider;
@@ -103,7 +104,7 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         _recordGrain = GrainFactory.GetGrain<IUserWithdrawRecordGrain>(this.GetPrimaryKey());
         _orderStatusFlowGrain = GrainFactory.GetGrain<IOrderStatusFlowGrain>(this.GetPrimaryKey());
 
-        _withdrawTimerGrain =
+        _withdrawTxTimerGrain =
             GrainFactory.GetGrain<IUserWithdrawTxTimerGrain>(
                 GuidHelper.UniqGuid(nameof(IUserWithdrawTxTimerGrain)));
         _withdrawFastTimerGrain =
@@ -112,12 +113,15 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         _withdrawOrderRetryTimerGrain =
             GrainFactory.GetGrain<IWithdrawOrderRetryTimerGrain>(
                 GuidHelper.UniqGuid(nameof(IWithdrawOrderRetryTimerGrain)));
-        _withdrawQueryTimerGrain =
+        _withdrawTimerGrain =
             GrainFactory.GetGrain<IWithdrawTimerGrain>(
                 GuidHelper.UniqGuid(nameof(IWithdrawTimerGrain)));
         _orderStatusReminderGrain = 
             GrainFactory.GetGrain<IOrderStatusReminderGrain>(
                 GuidHelper.UniqGuid(nameof(IOrderStatusReminderGrain)));
+        _withdrawQueryTimerGrain =
+            GrainFactory.GetGrain<IWithdrawQueryTimerGrain>(
+                GuidHelper.UniqGuid(nameof(IWithdrawQueryTimerGrain)));
     }
 
     public async Task<WithdrawOrderDto> CreateOrder(WithdrawOrderDto withdrawOrderDto)

@@ -94,12 +94,11 @@ public class UserWithdrawRecordGrain : Grain<WithdrawOrderState>, IUserWithdrawR
             return new CommonResponseDto<WithdrawOrderDto>().Error(e);
         }
     }
-
-
+    
     public Task<CommonResponseDto<WithdrawOrderDto>> GetAsync()
     {
         return State.Id == Guid.Empty
-            ? new Task<CommonResponseDto<WithdrawOrderDto>>(null!)
+            ? Task.FromResult(new CommonResponseDto<WithdrawOrderDto>(null!))
             : Task.FromResult(
                 new CommonResponseDto<WithdrawOrderDto>(_objectMapper.Map<WithdrawOrderState, WithdrawOrderDto>(State)));
     }

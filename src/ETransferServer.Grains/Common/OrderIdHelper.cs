@@ -10,4 +10,9 @@ public static class OrderIdHelper
         return GuidHelper.UniqGuid(network, symbol, depositTxId);
     }
     
+    public static Guid WithdrawOrderId(string id, string chainId, string address)
+    {
+        return GuidHelper.UniqGuid(id, chainId, address);
+    }
+    
 }
