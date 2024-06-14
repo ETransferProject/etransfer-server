@@ -57,6 +57,17 @@ public class UserAppService : ApplicationService, IUserAppService
         return ObjectMapper.Map<UserIndex, UserDto>(users.First());
     }
     
+    public async Task<UserDto> GetUserByAddressAsync(string address)
+    {
+        var mustQuery = new List<Func<QueryContainerDescriptor<UserIndex>, QueryContainer>>() { };
+        mustQuery.Add(q => q.Term(i => i.Field("addressInfos.address").Value(address)));
+
+        QueryContainer Filter(QueryContainerDescriptor<UserIndex> f) => f.Bool(b => b.Must(mustQuery));
+        var user = await _userIndexRepository.GetListAsync(Filter);
+
+        return ObjectMapper.Map<UserIndex, UserDto>(user.Item2.FirstOrDefault());
+    }
+    
     public async Task<EoaRegistrationResult> CheckEoaRegistrationAsync(GetEoaRegistrationResultRequestDto requestDto)
     {
         var user = await _userManager.FindByNameAsync(requestDto.Address);

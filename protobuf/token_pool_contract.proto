@@ -5,6 +5,8 @@ import "aelf/options.proto";
 import "acs12.proto";
 
 import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
 
 option csharp_namespace = "ETransfer.Contracts.TokenPool";
 
@@ -16,17 +18,31 @@ service TokenPoolContract {
 
     rpc TransferToken(TransferTokenInput) returns (google.protobuf.Empty) {}
     
+    rpc ReleaseToken(ReleaseTokenInput) returns (google.protobuf.Empty) {}
+    
     // For Admin.
     rpc SetAdmin (aelf.Address) returns (google.protobuf.Empty) {}
+    
+    rpc AddReleaseController (ControllerInput) returns (google.protobuf.Empty) {}
+    
+    rpc RemoveReleaseController (ControllerInput) returns (google.protobuf.Empty) {}
     
     rpc Withdraw(WithdrawInput) returns (google.protobuf.Empty) {}
     
     rpc AddTokenPool(AddTokenPoolInput) returns (google.protobuf.Empty) {}
     
     rpc AddTokenHolders(AddTokenHolderInput) returns (google.protobuf.Empty) {}
-
+    
+    rpc SetSwapContractAddress(SetSwapContractAddressInput) returns (google.protobuf.Empty) {}
+    
+    rpc SwapToken (SwapTokenInput) returns (google.protobuf.Empty) {}
+    
     // Views.
-    rpc GetAdmin (google.protobuf.Empty) returns (aelf.Address){
+    rpc GetAdmin (google.protobuf.Empty) returns (aelf.Address) {
+        option (aelf.is_view) = true;
+    }
+    
+    rpc GetReleaseControllers (google.protobuf.Empty) returns (ControllerOutput) {
         option (aelf.is_view) = true;
     }
     
@@ -37,6 +53,10 @@ service TokenPoolContract {
     rpc GetSymbolTokens(google.protobuf.Empty) returns (TokenSymbolList) {
         option (aelf.is_view) = true;
     }
+    
+    rpc GetSwapContracts(google.protobuf.Int64Value) returns (aelf.Address) {
+        option (aelf.is_view) = true;
+    } 
 }
 
 message InitializeInput {
@@ -47,6 +67,29 @@ message InitializeInput {
 message TransferTokenInput {
     string symbol = 1;
     int64 amount = 2;
+    string to_chain_id = 3;
+    string to_address = 4;
+    int64 max_estimate_fee = 5;
+}
+
+message ReleaseTokenInput {
+    string symbol = 1;
+    int64 amount = 2;
+    aelf.Address from = 3;
+    aelf.Address to = 4;
+    string memo = 5;
+}
+
+message ControllerInput {
+  aelf.Address address = 1;
+}
+
+message ControllerOutput {
+  repeated aelf.Address addresses = 1;
+}
+
+message ControllerList {
+  repeated aelf.Address controllers = 1;
 }
 
 message WithdrawInput {
@@ -68,6 +111,26 @@ message AddTokenHolderInput {
     int32 holder_count = 2;
 }
 
+message SetSwapContractAddressInput {
+    repeated SwapContract value = 1;
+}
+
+message SwapContract {
+    int64 fee_rate = 1;
+    aelf.Address swap_contract_address = 2;
+}
+
+message SwapTokenInput {
+    int64 fee_rate = 1;
+    int64 amount_in = 2;
+    int64 amount_out_min = 3;
+    repeated string path = 4;
+    aelf.Address to = 5;
+    google.protobuf.Timestamp deadline = 6;
+    string channel = 7;
+    aelf.Address from = 8;
+}
+
 message GetPoolInfoInput {
     string symbol = 1;
 }
@@ -77,7 +140,7 @@ message PoolInfo {
     repeated TokenHolder token_holders = 2;
 }
 
-message TokenHolderList{
+message TokenHolderList {
     repeated TokenHolder value = 1;
 }
 
@@ -87,12 +150,54 @@ message TokenHolder {
 }
 
 // event log
-message TokenPoolTransferred{
+message TokenPoolTransferred {
     option (aelf.is_event) = true;
     string symbol = 1;
     int64 amount = 2;
     aelf.Address from = 3;
     aelf.Address to = 4;
+    string to_chain_id = 5;
+    string to_address = 6;
+    int64 max_estimate_fee = 7;
+}
+
+message TokenPoolReleased {
+    option (aelf.is_event) = true;
+    string symbol = 1;
+    int64 amount = 2;
+    aelf.Address from = 3;
+    aelf.Address to = 4;
+    string memo = 5;
+}
+
+message ReleaseControllerAdded {
+    option (aelf.is_event) = true;
+    aelf.Address address = 1;
+}
+
+message ReleaseControllerRemoved {
+    option (aelf.is_event) = true;
+    aelf.Address address = 1;
+}
+
+message TokenSwapped{
+    option (aelf.is_event) = true;
+    string symbol_in = 1;
+    string symbol_out = 2;
+    int64 amount_in = 3;
+    AmountsOut amount_out = 4;
+    aelf.Address to = 5;
+    string channel = 6;
+    SwapPath swap_path = 7;
+    aelf.Address from = 8;
+    int64 fee_rate = 9;
+}
+
+message SwapPath {
+    repeated string path = 1;
+}
+message AmountsOut {
+    repeated int64 amount_out = 1;
 }
 
 message TokenPoolAdded {
@@ -100,7 +205,7 @@ message TokenPoolAdded {
     string symbol = 1;
 }
 
-message TokenHolderAdded{
+message TokenHolderAdded {
     option (aelf.is_event) = true;
     string symbol = 1;
     TokenHolderList token_holders = 2;

@@ -1,11 +1,10 @@
 using AElf;
-using AElf.Contracts.MultiToken;
 using AElf.Types;
+using ETransfer.Contracts.TokenPool;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
-using ETransferServer.Common.AElfSdk.Dtos;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Grains.Grain.Swap;
 using ETransferServer.Grains.Grain.Token;
@@ -46,16 +45,18 @@ public partial class UserDepositGrain
                     toTransfer.ChainId);
 
                 var amount = (long)(toTransfer.Amount * (decimal)Math.Pow(10, tokenInfo.Decimals));
-                var transferInput = new TransferInput
+                var releaseTokenInput = new ReleaseTokenInput
                 {
-                    To = Address.FromBase58(toTransfer.ToAddress),
-                    Amount = amount,
                     Symbol = toTransfer.Symbol,
+                    Amount = amount,
+                    From = Address.FromBase58(toTransfer.FromAddress),
+                    To = Address.FromBase58(toTransfer.ToAddress),
                     Memo = ITokenGrain.GetNewId(orderDto.Id)
                 };
                 var (txId, newTransaction) = await _contractProvider.CreateTransactionAsync(toTransfer.ChainId,
-                    toTransfer.FromAddress,
-                    SystemContractName.TokenContract, "Transfer", transferInput);
+                    _chainOptions.Value.ChainInfos[toTransfer.ChainId].ReleaseAccount,
+                    CommonConstant.ETransferTokenPoolContractName, CommonConstant.ETransferReleaseToken,
+                    releaseTokenInput);
 
                 toTransfer.TxId = txId.ToHex();
                 rawTransaction = newTransaction;

@@ -1,12 +1,13 @@
-using System.Text;
 using AElf.Client.Dto;
 using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
+using ETransferServer.Dtos.GraphQL;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Grains.Grain.Order.Deposit;
 using ETransferServer.Grains.Grain.Swap;
+using ETransferServer.Grains.GraphQL;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.State.Order;
 using ETransferServer.Options;
@@ -26,17 +27,20 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
 
     private readonly ILogger<SwapTxTimerGrain> _logger;
     private readonly IContractProvider _contractProvider;
+    private readonly ITokenTransferProvider _transferProvider;
     
     private readonly IOptionsSnapshot<ChainOptions> _chainOptions;
     private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
 
     public SwapTxTimerGrain(ILogger<SwapTxTimerGrain> logger, IContractProvider contractProvider,
-        IOptionsSnapshot<ChainOptions> chainOptions, IOptionsSnapshot<TimerOptions> timerOptions)
+        IOptionsSnapshot<ChainOptions> chainOptions, IOptionsSnapshot<TimerOptions> timerOptions,
+        ITokenTransferProvider transferProvider)
     {
         _logger = logger;
         _contractProvider = contractProvider;
         _chainOptions = chainOptions;
         _timerOptions = timerOptions;
+        _transferProvider = transferProvider;
     }
 
 
@@ -49,7 +53,7 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
     {
         if (State.OrderTransactionDict.ContainsKey(id))
         {
-            _logger.LogWarning("Order id {Id} exists in OrderTxTimerGrain state", id);
+            _logger.LogWarning("Order id {Id} exists in SwapTxTimerGrain state", id);
             return;
         }
 
@@ -92,43 +96,61 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
             .Select(tx => tx.ChainId)
             .Distinct().ToList();
 
+        var removed = 0;
         var indexerLatestHeight = new Dictionary<string, long>();
         var chainStatus = new Dictionary<string, ChainStatusDto>();
         foreach (var chainId in chainIds)
         {
             chainStatus[chainId] = await _contractProvider.GetChainStatusAsync(chainId);
             if (chainStatus[chainId] != null)
-                _logger.LogDebug("TxTimer node chainId={ChainId}, Height= {Height}", chainId,
-                    chainStatus[chainId].LongestChainHeight);
-        }
-
-
-        var removed = 0;
-        const int subPageSize = 10;
-        var pendingList = State.OrderTransactionDict.ToList();
-        _logger.LogInformation("pendingList {distinctPendingList}", JsonConvert.SerializeObject(pendingList));
-        var distinctPendingList = pendingList
-            .GroupBy(p => p.Value.TxId)
-            .Select(g => g.First())
-            .ToList();
-        _logger.LogInformation("distinctPendingList {distinctPendingList}", JsonConvert.SerializeObject(distinctPendingList));
-        var pendingSubLists = SplitList(distinctPendingList, subPageSize);
-        foreach (var subList in pendingSubLists)
-        {
-            var handleResult = await HandlePage(subList, chainStatus, indexerLatestHeight);
-            _logger.LogInformation("handleResult {handleResult}", JsonConvert.SerializeObject(handleResult));
-            foreach (var (orderId, remove) in handleResult)
             {
-                if (!remove) continue;
-                removed++;
-                _logger.LogDebug("OrderTxTimerGrain remove {RemovedOrderId}", orderId);
-                State.OrderTransactionDict.Remove(orderId);
-            }
+                _logger.LogDebug("SwapTxTimer node chainId={ChainId}, Height= {Height}", chainId,
+                    chainStatus[chainId].LongestChainHeight);
 
-            await WriteStateAsync();
+                indexerLatestHeight[chainId] = chainStatus[chainId].BestChainHeight;
+                _logger.LogDebug("SwapTxTimer indexer chainId={ChainId}, Height= {Height}", chainId,
+                    chainStatus[chainId].BestChainHeight);
+            }
+            
+            var libHeight = chainStatus[chainId]?.LastIrreversibleBlockHeight ?? 0;
+            if (libHeight == 0)
+            {
+                libHeight = await _transferProvider.GetIndexBlockHeightAsync(chainId);
+                _logger.LogDebug("SwapTxTimer confirmed indexer chainId={ChainId}, LibHeight= {libHeight}",
+                    chainId, libHeight);
+                if (libHeight == 0) continue;
+            }
+            
+            const int subPageSize = 10;
+            var pendingList = State.OrderTransactionDict.Where(t => t.Value.ChainId.Equals(chainId)).ToList();
+            _logger.LogInformation("pendingList {distinctPendingList}", JsonConvert.SerializeObject(pendingList));
+            var distinctPendingList = pendingList
+                .GroupBy(p => p.Value.TxId)
+                .Select(g => g.First())
+                .ToList();
+            _logger.LogInformation("distinctPendingList {distinctPendingList}",
+                JsonConvert.SerializeObject(distinctPendingList));
+            var pendingSubLists = SplitList(distinctPendingList, subPageSize);
+            foreach (var subList in pendingSubLists)
+            {
+                var txIds = subList.Select(t => t.Value.TxId).Distinct().ToList();
+                var pager = await _transferProvider.GetSwapTokenInfoByTxIdsAsync(txIds, libHeight);
+                var indexerTxDict = pager.Items.ToDictionary(t => t.TransactionId, t => t);
+                var handleResult = await HandlePage(subList, chainStatus, indexerLatestHeight, indexerTxDict);
+                _logger.LogInformation("handleResult {handleResult}", JsonConvert.SerializeObject(handleResult));
+                foreach (var (orderId, remove) in handleResult)
+                {
+                    if (!remove) continue;
+                    removed++;
+                    _logger.LogDebug("SwapTxTimerGrain remove {RemovedOrderId}", orderId);
+                    State.OrderTransactionDict.Remove(orderId);
+                }
+
+                await WriteStateAsync();
+            }
         }
 
-        _logger.LogInformation("OrderTxTimerGrain finish, count: {Removed}/{Total}", removed, total);
+        _logger.LogInformation("SwapTxTimerGrain finish, count: {Removed}/{Total}", removed, total);
     }
     
     private IEnumerable<List<T>> SplitList<T>(List<T> locations, int nSize = 10)
@@ -141,7 +163,7 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
 
     private async Task<Dictionary<Guid, bool>> HandlePage(
         List<KeyValuePair<Guid, TimerTransaction>> pendingList, Dictionary<string, ChainStatusDto> chainStatusDict,
-        Dictionary<string, long> indexerHeightDict)
+        Dictionary<string, long> indexerHeightDict, Dictionary<string, SwapRecordDto> indexerTx)
     {
         _logger.LogDebug("SwapTxTimer handle page, pendingCount={Count}", pendingList.Count);
         var now = DateTime.UtcNow.ToUtcMilliSeconds();
@@ -159,17 +181,60 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
 
             // The following two cases directly from the node query results
             // 1. The order has been in the list for a long time.
-            var queryNode = now > pendingTx.TxTime;
+            var queryNode = now > pendingTx.TxTime + _chainOptions.Value.TxResultFromNodeSecondsAfter * 1000;
             _logger.LogInformation("queryNode {queryNode}, now: {now}, pendingTx.TxTime: {txTime}", queryNode, now, pendingTx.TxTime);
-            if (queryNode)
+            if (queryNode || !IndexerAvailable(pendingTx.ChainId, chainStatusDict, indexerHeightDict))
             {
-                _logger.LogDebug("TxTimer use node result orderId={OrderId}, chainId={ChainId}, txId={TxId}", orderId,
-                    pendingTx.ChainId, pendingTx.TxId);
+                _logger.LogDebug("SwapTxTimer use node result orderId={OrderId}, chainId={ChainId}, txId={TxId}", 
+                    orderId, pendingTx.ChainId, pendingTx.TxId);
                 result[orderId] = await HandleOrderTransaction(order, pendingTx, chainStatusDict[pendingTx.ChainId]);
+                continue;
             }
+            
+            _logger.LogDebug("SwapTxTimer use indexer result orderId={OrderId}, chainId={ChainId}, txId={TxId}", 
+                orderId, pendingTx.ChainId, pendingTx.TxId);
+            // When the transaction is just sent to the node,
+            // the query may appear NotExisted status immediately, so this is to skip this period of time
+            var transferInfo = order.ToTransfer;
+            if (transferInfo.TxTime > DateTime.UtcNow.AddSeconds(5).ToUtcMilliSeconds())
+            {
+                result[orderId] = false;
+                continue;
+            }
+
+            if (!indexerTx.ContainsKey(pendingTx.TxId))
+            {
+                result[orderId] = false;
+                continue;
+            }
+
+            // Transfer data from indexer
+            _logger.LogDebug("SwapTxTimer indexer transaction exists, orderId={OrderId}, txId={TxId}", 
+                orderId, pendingTx.TxId);
+            var transfer = indexerTx[pendingTx.TxId];
+            var swapGrain = GrainFactory.GetGrain<ISwapGrain>(order.Id);
+            order.ToTransfer.Amount =  await swapGrain.RecordAmountOutAsync(transfer.AmountOut);
+            _logger.LogInformation("SwapTxTimer toTransfer amount: {Amount}", order.ToTransfer.Amount);
+            order.ToTransfer.Status = OrderTransferStatusEnum.Confirmed.ToString();
+            order.Status = OrderStatusEnum.ToTransferConfirmed.ToString();
+           
+            await SaveOrder(order, ExtensionBuilder.New()
+                .Add(ExtensionKey.TransactionStatus, CommonConstant.TransactionState.Mined)
+                .Build());
+            result[orderId] = true;
         }
 
         return result;
+    }
+    
+    private bool IndexerAvailable(string chainId, Dictionary<string, ChainStatusDto> chainStatus,
+        Dictionary<string, long> indexerBlockHeight)
+    {
+        var statusExists = chainStatus.TryGetValue(chainId, out var status);
+        var heightExists = indexerBlockHeight.TryGetValue(chainId, out var indexerHeight);
+        return statusExists && heightExists &&
+               status.LastIrreversibleBlockHeight - _chainOptions.Value.IndexerAvailableHeightBehind <
+               indexerHeight;
     }
     
     private async Task<DepositOrderDto> QueryOrderAndVerify(Guid orderId, TimerTransaction timerTx)
@@ -207,7 +272,7 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
         var txDateTime = TimeHelper.GetDateTimeFromTimeStamp(timerTx.TxTime ?? 0);
         var txExpireTime = txDateTime.AddSeconds(_chainOptions.Value.Contract.TransactionTimerMaxSeconds);
 
-        TransferInfo transferInfo = order.ToTransfer;;
+        var transferInfo = order.ToTransfer;;
         
         _logger.LogInformation("HandleOrderTransaction: {order}", JsonConvert.SerializeObject(order));
 
@@ -259,7 +324,7 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
                     transferInfo.Status = OrderTransferStatusEnum.Confirmed.ToString();
                     order.Status = OrderStatusEnum.ToTransferConfirmed.ToString();
                     var swapGrain = GrainFactory.GetGrain<ISwapGrain>(order.Id);
-                    transferInfo.Amount =  await swapGrain.ParseReturnValueAsync(txStatus.ReturnValue);
+                    transferInfo.Amount =  await swapGrain.ParseReturnValueAsync(txStatus.Logs);
                     _logger.LogInformation("After ParseReturnValueAsync: {Amount}", transferInfo.Amount);
                     
                     await SaveOrder(order, ExtensionBuilder.New()

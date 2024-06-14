@@ -6,9 +6,9 @@ using Xunit.Abstractions;
 namespace ETransferServer.Grain.Test.Timers;
 
 [Collection(ClusterCollection.Name)]
-public class WithdrawTImerGrainTest : ETransferServerTestBase
+public class WithdrawTimerGrainTest : ETransferServerTestBase
 {
-    public WithdrawTImerGrainTest(ITestOutputHelper output) : base(output)
+    public WithdrawTimerGrainTest(ITestOutputHelper output) : base(output)
     {
     }
 

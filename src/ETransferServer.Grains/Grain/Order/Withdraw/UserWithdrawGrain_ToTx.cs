@@ -1,10 +1,9 @@
 using AElf;
-using AElf.Contracts.MultiToken;
 using AElf.Types;
+using ETransfer.Contracts.TokenPool;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using ETransferServer.Common;
-using ETransferServer.Common.AElfSdk.Dtos;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Grains.Grain.Token;
 using Google.Protobuf;
@@ -32,19 +31,23 @@ public partial class UserWithdrawGrain
                 var paymentAddressExists =
                     _withdrawOptions.Value.PaymentAddresses?.ContainsKey(toTransfer.ChainId) ?? false;
                 AssertHelper.IsTrue(paymentAddressExists, "Payment address missing, ChainId={ChainId}", toTransfer.ChainId);
-                var paymentAddress = _withdrawOptions.Value.PaymentAddresses.GetValueOrDefault(toTransfer.ChainId);
-                AssertHelper.NotEmpty(paymentAddress, "Payment address empty, ChainId={ChainId}", toTransfer.ChainId);
-                toTransfer.FromAddress = paymentAddress;
-                var transferInput = new TransferInput
+                var paymentAddressDic = _withdrawOptions.Value.PaymentAddresses.GetValueOrDefault(toTransfer.ChainId);
+                AssertHelper.NotEmpty(paymentAddressDic, "Payment address empty, ChainId={ChainId}", toTransfer.ChainId);
+                toTransfer.FromAddress = paymentAddressDic.GetValueOrDefault(toTransfer.Symbol);
+                AssertHelper.NotEmpty(toTransfer.FromAddress, "Payment address empty, Symbol={Symbol}", toTransfer.Symbol);
+                var releaseTokenInput = new ReleaseTokenInput
                 {
-                    To = Address.FromBase58(toTransfer.ToAddress),
-                    Amount = amount,
                     Symbol = toTransfer.Symbol,
+                    Amount = amount,
+                    From = Address.FromBase58(toTransfer.FromAddress),
+                    To = Address.FromBase58(toTransfer.ToAddress),
                     Memo = ITokenGrain.GetNewId(orderDto.Id)
                 };
-                var (txId, newTransaction) = await _contractProvider.CreateTransactionAsync(toTransfer.ChainId, toTransfer.FromAddress,
-                    SystemContractName.TokenContract, "Transfer", transferInput);
-
+                var (txId, newTransaction) = await _contractProvider.CreateTransactionAsync(toTransfer.ChainId,
+                    _chainOptions.Value.ChainInfos[toTransfer.ChainId].ReleaseAccount,
+                    CommonConstant.ETransferTokenPoolContractName, CommonConstant.ETransferReleaseToken,
+                    releaseTokenInput);
+                
                 toTransfer.TxId = txId.ToHex();
                 rawTransaction = newTransaction;
                 orderDto.FromRawTransaction = newTransaction.ToByteArray().ToHex();
