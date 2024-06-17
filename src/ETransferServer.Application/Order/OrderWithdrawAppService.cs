@@ -28,7 +28,6 @@ using ETransferServer.WithdrawOrder.Dtos;
 using Google.Protobuf;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Orleans;
@@ -135,16 +134,17 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             var decimals = DecimalHelper.GetDecimals(request.Symbol);
             var (feeAmount, expireAt) = (0M, DateTime.UtcNow.AddSeconds(_coBoOptions.Value.CoinExpireSeconds).ToUtcMilliSeconds());
             withdrawInfoDto.TransactionFee = feeAmount.ToString();
-            if (!string.IsNullOrEmpty(request.Network) && !VerifyAElfChain(request.Network))
+            if (!VerifyAElfChain(request.Network))
             {
                 var thirdPartFeeTask = request.Network.IsNullOrEmpty()
                     ? CalculateThirdPartFeesWithCacheAsync(userId, request.Symbol)
                     : CalculateThirdPartFeeAsync(userId, request.Network, request.Symbol);
 
                 (feeAmount, expireAt) = await thirdPartFeeTask;
-                withdrawInfoDto.TransactionFee = feeAmount.ToString(decimals, DecimalHelper.RoundingOption.Ceiling);
             }
 
+            feeAmount = await GetTransactionFeeAsync(request, userId, feeAmount);
+            withdrawInfoDto.TransactionFee = feeAmount.ToString(decimals, DecimalHelper.RoundingOption.Ceiling);
             withdrawInfoDto.TransactionUnit = request.Symbol;
             withdrawInfoDto.ExpiredTimestamp = expireAt.ToString();
 
@@ -211,6 +211,20 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         }
     }
 
+    private async Task<decimal> GetTransactionFeeAsync(GetWithdrawListRequestDto request, Guid userId, decimal feeAmount)
+    {
+        var network = string.IsNullOrEmpty(request.Network) ? ChainId.AELF : request.Network;
+        var networkConfig = _networkInfoOptions.Value.NetworkMap[request.Symbol]
+            .FirstOrDefault(t => t.NetworkInfo.Network == network);
+        var specialWithdrawFee = networkConfig != null && networkConfig.WithdrawInfo.SpecialWithdrawFeeDisplay
+            ? decimal.Parse(networkConfig.WithdrawInfo.SpecialWithdrawFee)
+            : feeAmount;
+
+        await SetFeeCacheAsync(userId, request.Network, request.Symbol, specialWithdrawFee);
+        return string.IsNullOrEmpty(request.Network)
+            ? Math.Min(specialWithdrawFee, feeAmount)
+            : specialWithdrawFee;
+    }
 
     private async Task<Tuple<decimal, long>> CalculateThirdPartFeesWithCacheAsync(Guid userId, string symbol)
     {
@@ -264,14 +278,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
     {
         var (estimateFee, coin) = await _networkAppService.CalculateNetworkFeeAsync(network, symbol);
 
-        var coinFeeCacheKey = CacheKey(FeeInfo.FeeName.CoBoFee, userId.ToString(), network, symbol);
-        var decimals = DecimalHelper.GetDecimals(symbol);
-        await _coBoCoinCache.SetAsync(coinFeeCacheKey, new CoBoCoinDto { AbsEstimateFee = estimateFee.ToString(decimals, DecimalHelper.RoundingOption.Ceiling) }, 
-            new DistributedCacheEntryOptions
-            {
-                AbsoluteExpiration = DateTimeOffset.UtcNow.AddSeconds(_withdrawInfoOptions.Value.ThirdPartCacheFeeExpireSeconds)
-            });
-        _logger.LogDebug("Cobo fee set cache: {fee}, {expireSeconds}", estimateFee, _withdrawInfoOptions.Value.ThirdPartCacheFeeExpireSeconds);
+        await SetFeeCacheAsync(userId, network, symbol, estimateFee);
             
         var monitorCacheKey = CacheKey(FeeInfo.FeeName.CoBoFee, network);
         if (null == await _coBoCoinCache.GetAsync(monitorCacheKey))
@@ -286,6 +293,19 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         }
 
         return Tuple.Create(estimateFee, coin.ExpireTime);
+    }
+
+    private async Task SetFeeCacheAsync(Guid userId, string network, string symbol, decimal fee)
+    {
+        if (network.IsNullOrEmpty()) return;
+        var coinFeeCacheKey = CacheKey(FeeInfo.FeeName.CoBoFee, userId.ToString(), network, symbol);
+        var decimals = DecimalHelper.GetDecimals(symbol);
+        await _coBoCoinCache.SetAsync(coinFeeCacheKey, new CoBoCoinDto { AbsEstimateFee = fee.ToString(decimals, DecimalHelper.RoundingOption.Ceiling) }, 
+            new DistributedCacheEntryOptions
+            {
+                AbsoluteExpiration = DateTimeOffset.UtcNow.AddSeconds(_withdrawInfoOptions.Value.ThirdPartCacheFeeExpireSeconds)
+            });
+        _logger.LogDebug("Cobo fee set cache: {fee}, {expireSeconds}", fee, _withdrawInfoOptions.Value.ThirdPartCacheFeeExpireSeconds);
     }
 
     public async Task DoMonitorAsync(string network, decimal estimateFee, string symbol)
