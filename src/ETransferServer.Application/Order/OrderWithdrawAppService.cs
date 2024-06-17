@@ -216,14 +216,14 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         var network = string.IsNullOrEmpty(request.Network) ? ChainId.AELF : request.Network;
         var networkConfig = _networkInfoOptions.Value.NetworkMap[request.Symbol]
             .FirstOrDefault(t => t.NetworkInfo.Network == network);
-        var specialWithdrawFee = networkConfig != null && networkConfig.WithdrawInfo.SpecialWithdrawFeeDisplay
+        var withdrawFee = networkConfig != null && networkConfig.WithdrawInfo.SpecialWithdrawFeeDisplay
             ? decimal.Parse(networkConfig.WithdrawInfo.SpecialWithdrawFee)
             : feeAmount;
 
-        await SetFeeCacheAsync(userId, request.Network, request.Symbol, specialWithdrawFee);
+        await SetFeeCacheAsync(userId, request.Network, request.Symbol, withdrawFee);
         return string.IsNullOrEmpty(request.Network)
-            ? Math.Min(specialWithdrawFee, feeAmount)
-            : specialWithdrawFee;
+            ? Math.Min(withdrawFee, feeAmount)
+            : withdrawFee;
     }
 
     private async Task<Tuple<decimal, long>> CalculateThirdPartFeesWithCacheAsync(Guid userId, string symbol)
@@ -440,18 +440,17 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             var userDto = await userGrain.GetUser();
             AssertHelper.IsTrue(userDto.Success, ErrorResult.JwtInvalidCode);
 
-            var inputThirdPartFee = 0M;
             var thirdPartFee = 0M;
+            var coBoCoinCacheKey =
+                CacheKey(FeeInfo.FeeName.CoBoFee, userId.ToString(), request.Network, request.Symbol);
+            var thirdPartFeeDto = await _coBoCoinCache.GetAsync(coBoCoinCacheKey);
+            AssertHelper.IsTrue(thirdPartFeeDto != null, ErrorResult.FeeExpiredCode);
+            _logger.LogDebug("Cobo fee get cache: {fee}", thirdPartFeeDto.AbsEstimateFee);
+            var inputThirdPartFee = thirdPartFeeDto.AbsEstimateFee.SafeToDecimal(-1);
+            AssertHelper.IsTrue(inputThirdPartFee >= 0, ErrorResult.FeeInvalidCode);
+            
             if (!VerifyAElfChain(request.Network))
-            {
-                var coBoCoinCacheKey =
-                    CacheKey(FeeInfo.FeeName.CoBoFee, userId.ToString(), request.Network, request.Symbol);
-                var thirdPartFeeDto = await _coBoCoinCache.GetAsync(coBoCoinCacheKey);
-                AssertHelper.IsTrue(thirdPartFeeDto != null, ErrorResult.FeeExpiredCode);
-                _logger.LogDebug("Cobo fee get cache: {fee}", thirdPartFeeDto.AbsEstimateFee);
-                inputThirdPartFee = thirdPartFeeDto.AbsEstimateFee.SafeToDecimal(-1);
-                AssertHelper.IsTrue(inputThirdPartFee >= 0, ErrorResult.FeeInvalidCode);
-                
+            { 
                 // query fees async
                 thirdPartFee = (await CalculateThirdPartFeeAsync(userId, request.Network, request.Symbol)).Item1;
                 AssertHelper.IsTrue(
