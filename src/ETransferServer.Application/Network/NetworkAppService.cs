@@ -12,7 +12,6 @@ using ETransferServer.Models;
 using ETransferServer.Options;
 using ETransferServer.Network.Dtos;
 using ETransferServer.ThirdPart.Exchange;
-using Newtonsoft.Json;
 using Orleans;
 using Volo.Abp;
 using Volo.Abp.Auditing;
@@ -27,23 +26,24 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
     private readonly ILogger<NetworkAppService> _logger;
     private readonly IOptionsSnapshot<NetworkOptions> _networkOptions;
     private readonly CoinGeckoOptions _coinGeckoOptions;
-    private readonly IOptionsSnapshot<ExchangeOptions> _exchangeOptions;
+    private readonly IOptionsSnapshot<WithdrawInfoOptions> _withdrawInfoOptions;
     private readonly IObjectMapper _objectMapper;
     private readonly IClusterClient _clusterClient;
     private const int ThirdPartDigitals = 4;
+    private const decimal DefaultMinThirdPartFee = 0.1M;
 
     public NetworkAppService(ILogger<NetworkAppService> logger, 
         IOptionsSnapshot<NetworkOptions> networkOptions,
         IOptionsSnapshot<CoinGeckoOptions> coinGeckoOptions,
         IObjectMapper objectMapper,
-        IClusterClient clusterClient, IOptionsSnapshot<ExchangeOptions> exchangeOptions)
+        IClusterClient clusterClient, IOptionsSnapshot<WithdrawInfoOptions> withdrawInfoOptions)
     {
         _logger = logger;
         _networkOptions = networkOptions;
         _coinGeckoOptions = coinGeckoOptions.Value;
         _objectMapper = objectMapper;
         _clusterClient = clusterClient;
-        _exchangeOptions = exchangeOptions;
+        _withdrawInfoOptions = withdrawInfoOptions;
     }
 
     public async Task<GetNetworkListDto> GetNetworkListAsync(GetNetworkListRequestDto request)
@@ -194,6 +194,13 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
         return avgExchange;
     }
 
+    public Task<decimal> GetMinThirdPartFeeAsync(string symbol)
+    {
+        return Task.FromResult(_withdrawInfoOptions.Value.MinThirdPartFee.ContainsKey(symbol)
+            ? _withdrawInfoOptions.Value.MinThirdPartFee[symbol]
+            : DefaultMinThirdPartFee);
+    }
+
     private async Task<List<NetworkDto>> CalculateNetworkFeeListAsync(List<NetworkDto> networkList, string symbol)
     {
         var exchangeSymbolPair = networkList.ConvertAll(item => item.Network).ToList().JoinAsString(CommonConstant.Underline);
@@ -209,8 +216,9 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
             }
             else
             {
-                network.WithdrawFee = (network.WithdrawFee.SafeToDecimal() *
-                                       exchange[_coinGeckoOptions.CoinIdMapping[network.WithdrawFeeUnit]].Exchange)
+                network.WithdrawFee = Math.Max(await GetMinThirdPartFeeAsync(symbol),
+                        network.WithdrawFee.SafeToDecimal() *
+                        exchange[_coinGeckoOptions.CoinIdMapping[network.WithdrawFeeUnit]].Exchange)
                     .ToString(ThirdPartDigitals, DecimalHelper.GetDecimals(symbol),
                         DecimalHelper.RoundingOption.Ceiling);
             }
@@ -230,12 +238,14 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
             {
                 network.WithdrawFee = network.SpecialWithdrawFee;
             }
-            else {
-                
+            else
+            {
                 var avgExchange = await GetAvgExchangeAsync(network.Network, symbol);
 
-                network.WithdrawFee = (network.WithdrawFee.SafeToDecimal() * avgExchange)
-                .ToString(ThirdPartDigitals, DecimalHelper.GetDecimals(symbol), DecimalHelper.RoundingOption.Ceiling);
+                network.WithdrawFee = Math.Max(await GetMinThirdPartFeeAsync(symbol),
+                        network.WithdrawFee.SafeToDecimal() * avgExchange)
+                    .ToString(ThirdPartDigitals, DecimalHelper.GetDecimals(symbol),
+                        DecimalHelper.RoundingOption.Ceiling);
             }
 
             network.WithdrawFeeUnit = symbol;

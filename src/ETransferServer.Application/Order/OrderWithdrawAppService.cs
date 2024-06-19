@@ -18,7 +18,6 @@ using ETransferServer.Grains.Grain.Order.Withdraw;
 using ETransferServer.Grains.Grain.Token;
 using ETransferServer.Grains.Grain.TokenLimit;
 using ETransferServer.Grains.Grain.Users;
-using ETransferServer.Grains.Options;
 using ETransferServer.Models;
 using ETransferServer.Network;
 using ETransferServer.Options;
@@ -64,11 +63,9 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
     private readonly IOptionsSnapshot<WithdrawInfoOptions> _withdrawInfoOptions;
     private readonly IOptionsSnapshot<NetworkOptions> _networkInfoOptions;
     private readonly IOptionsSnapshot<ChainOptions> _chainOptions;
-    private readonly IOptionsSnapshot<WithdrawOptions> _withdrawOptions;
     private readonly IOptionsSnapshot<CoBoOptions> _coBoOptions;
     private readonly IDistributedCache<CoBoCoinDto> _coBoCoinCache;
     private readonly IDistributedCache<Tuple<decimal, long>> _minThirdPartFeeCache;
-
 
     public OrderWithdrawAppService(INESTRepository<Orders.OrderIndex, Guid> withdrawOrderIndexRepository,
         IObjectMapper objectMapper,
@@ -79,7 +76,6 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         IContractProvider contractProvider,
         IOptionsSnapshot<WithdrawInfoOptions> withdrawInfoOptions,
         IOptionsSnapshot<ChainOptions> chainOptions, 
-        IOptionsSnapshot<WithdrawOptions> withdrawOptions,
         IOptionsSnapshot<CoBoOptions> coBoOptions,
         IDistributedCache<CoBoCoinDto> coBoCoinCache, 
         IDistributedCache<Tuple<decimal, long>> minThirdPartFeeCache
@@ -94,7 +90,6 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         _contractProvider = contractProvider;
         _withdrawInfoOptions = withdrawInfoOptions;
         _chainOptions = chainOptions;
-        _withdrawOptions = withdrawOptions;
         _coBoOptions = coBoOptions;
         _coBoCoinCache = coBoCoinCache;
         _minThirdPartFeeCache = minThirdPartFeeCache;
@@ -156,7 +151,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             var minAmount = withdrawInfoDto.TransactionUnit == withdrawInfoDto.AelfTransactionUnit
                 ? feeAmount + networkFee
                 : feeAmount;
-            withdrawInfoDto.MinAmount = Math.Max(minAmount, _withdrawOptions.Value.MinThirdPartFee)
+            withdrawInfoDto.MinAmount = Math.Max(minAmount, _withdrawInfoOptions.Value.MinWithdraw)
                 .ToString(2, DecimalHelper.RoundingOption.Ceiling);
             withdrawInfoDto.ReceiveAmount = receiveAmount > 0
                 ? receiveAmount.ToString(decimals, DecimalHelper.RoundingOption.Ceiling)
@@ -243,7 +238,8 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
     private async Task<Tuple<decimal, long>> CalculateThirdPartFeesAsync(Guid userId, string symbol)
     {
         Dictionary<string, Task<Tuple<decimal, long>>> fees = new();
-        foreach (var network in _networkInfoOptions.Value.WithdrawFeeNetwork)
+        var networkList = GetThirdPartNetworkList(symbol);
+        foreach (var network in networkList)
         {
             fees.Add(network, CalculateThirdPartFeeAsync(userId, network, symbol));
         }
@@ -263,13 +259,24 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
                 _logger.LogWarning(e, "Query fee error, network={Network} symbol={Symbol}", network, symbol);
             }
         }
-
+        
+        var minThirdPartFee = await _networkAppService.GetMinThirdPartFeeAsync(symbol);
         return Tuple.Create(
-            minFee < 0 ? _withdrawOptions.Value.MinThirdPartFee : minFee,
+            minFee < minThirdPartFee ? minThirdPartFee : minFee,
             minFee < 0
-                ? DateTime.Now.ToUtcMilliSeconds() + _withdrawOptions.Value.ThirdPartFeeExpireSeconds * 1000
+                ? DateTime.Now.ToUtcMilliSeconds() + _withdrawInfoOptions.Value.ThirdPartFeeExpireSeconds * 1000
                 : expireAt
         );
+    }
+
+    private List<string> GetThirdPartNetworkList(string symbol)
+    {
+        var networkConfigList = _networkInfoOptions.Value.NetworkMap[symbol].Where(t =>
+                t.SupportType.Contains(OrderTypeEnum.Withdraw.ToString()) && t.NetworkInfo.Network != ChainId.AELF &&
+                t.NetworkInfo.Network != ChainId.tDVV && t.NetworkInfo.Network != ChainId.tDVW)
+            .Select(t => t.NetworkInfo.Network).ToList();
+        var networkList = networkConfigList.Intersect(_networkInfoOptions.Value.WithdrawFeeNetwork).ToList();
+        return networkList.Count == 0 ? networkConfigList : networkList;
     }
 
     // Estimate transaction fee
@@ -277,9 +284,10 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
     private async Task<Tuple<decimal, long>> CalculateThirdPartFeeAsync(Guid userId, string network, string symbol)
     {
         var (estimateFee, coin) = await _networkAppService.CalculateNetworkFeeAsync(network, symbol);
+        estimateFee = Math.Max(estimateFee, await _networkAppService.GetMinThirdPartFeeAsync(symbol));
 
         await SetFeeCacheAsync(userId, network, symbol, estimateFee);
-            
+
         var monitorCacheKey = CacheKey(FeeInfo.FeeName.CoBoFee, network);
         if (null == await _coBoCoinCache.GetAsync(monitorCacheKey))
         {
@@ -455,7 +463,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
                 thirdPartFee = (await CalculateThirdPartFeeAsync(userId, request.Network, request.Symbol)).Item1;
                 AssertHelper.IsTrue(
                     Math.Abs(inputThirdPartFee - thirdPartFee) / thirdPartFee <=
-                    _withdrawOptions.Value.FeeFluctuationPercent,
+                    _withdrawInfoOptions.Value.FeeFluctuationPercent,
                     ErrorResult.FeeExceedCode, null, request.Network);
             }
 
@@ -463,7 +471,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             var withdrawAmount = request.Amount - inputThirdPartFee;
             AssertHelper.IsTrue(withdrawAmount > 0, ErrorResult.AmountInsufficientCode);
 
-            var minWithdraw = Math.Max(thirdPartFee, _withdrawOptions.Value.MinThirdPartFee)
+            var minWithdraw = Math.Max(thirdPartFee, _withdrawInfoOptions.Value.MinWithdraw)
                 .ToString(2, DecimalHelper.RoundingOption.Ceiling)
                 .SafeToDecimal();
             AssertHelper.IsTrue(request.Amount >= minWithdraw, ErrorResult.AmountInsufficientCode);

@@ -297,7 +297,7 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
 
         var withdrawAmount = amount - realFee;
         AssertHelper.IsTrue(withdrawAmount > 0, ErrorResult.AmountInsufficientCode);
-        var minWithdraw = Math.Max(realFee, _withdrawOption.Value.MinThirdPartFee)
+        var minWithdraw = Math.Max(realFee, _withdrawOption.Value.MinWithdraw)
             .ToString(2, DecimalHelper.RoundingOption.Ceiling)
             .SafeToDecimal();
         AssertHelper.IsTrue(amount >= minWithdraw, ErrorResult.AmountInsufficientCode);
