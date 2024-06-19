@@ -27,6 +27,7 @@ public interface IWithdrawQueryTimerGrain : IGrainWithGuidKey
 public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdrawQueryTimerGrain
 {
     private const int PageSize = 50;
+    private const decimal DefaultMinThirdPartFee = 0.1M;
     private DateTime? _lastCallbackTime;
 
     private readonly ILogger<WithdrawQueryTimerGrain> _logger;
@@ -274,7 +275,12 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
     
     private async Task<decimal> CalculateNetworkFeeAsync(string network, string symbol)
     {
-        if (VerifyAElfChain(network)) return 0M;
+        if (VerifyAElfChain(network))
+        {
+            return _withdrawOption.Value.Homogeneous.ContainsKey(symbol)
+                ? _withdrawOption.Value.Homogeneous[symbol].WithdrawFee
+                : 0M;
+        }
         var coBoCoinGrain = GrainFactory.GetGrain<ICoBoCoinGrain>(ICoBoCoinGrain.Id(network, symbol));
         var coin = await coBoCoinGrain.GetAsync();
         AssertHelper.NotNull(coin, "CoBo coin detail not found");
@@ -285,6 +291,7 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
 
         var avgExchange = await GetAvgExchangeAsync(feeSymbol, symbol);
         var estimateFee = coin.AbsEstimateFee.SafeToDecimal() * avgExchange;
+        estimateFee = Math.Max(estimateFee, await GetMinThirdPartFeeAsync(symbol));
         return estimateFee;
     }
 
@@ -297,7 +304,7 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
 
         var withdrawAmount = amount - realFee;
         AssertHelper.IsTrue(withdrawAmount > 0, ErrorResult.AmountInsufficientCode);
-        var minWithdraw = Math.Max(realFee, _withdrawOption.Value.MinThirdPartFee)
+        var minWithdraw = Math.Max(realFee, _withdrawOption.Value.MinWithdraw)
             .ToString(2, DecimalHelper.RoundingOption.Ceiling)
             .SafeToDecimal();
         AssertHelper.IsTrue(amount >= minWithdraw, ErrorResult.AmountInsufficientCode);
@@ -328,6 +335,13 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
         } while (retry <= _withdrawOption.Value.ToTransferMaxRetry);
 
         return Tuple.Create(withdrawAmount, realFee, false);
+    }
+    
+    public Task<decimal> GetMinThirdPartFeeAsync(string symbol)
+    {
+        return Task.FromResult(_withdrawOption.Value.MinThirdPartFee.ContainsKey(symbol)
+            ? _withdrawOption.Value.MinThirdPartFee[symbol]
+            : DefaultMinThirdPartFee);
     }
 
     private async Task AddAfter(TransferRecordDto transferRecord)
