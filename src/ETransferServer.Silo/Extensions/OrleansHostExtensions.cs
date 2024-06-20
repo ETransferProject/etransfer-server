@@ -52,8 +52,14 @@ public static class OrleansHostExtensions
         {
             //Configure OrleansSnapshot
             var configSection = context.Configuration.GetSection("Orleans");
+            
+            var IsRunningInKubernetes = configSection.GetValue<bool>("IsRunningInKubernetes");
+            var advertisedIP = IsRunningInKubernetes ?  Environment.GetEnvironmentVariable("POD_IP") :configSection.GetValue<string>("AdvertisedIP");
+            var clusterId = IsRunningInKubernetes ? Environment.GetEnvironmentVariable("ORLEANS_CLUSTER_ID") : configSection.GetValue<string>("ClusterId");
+            var serviceId = IsRunningInKubernetes ? Environment.GetEnvironmentVariable("ORLEANS_SERVICE_ID") : configSection.GetValue<string>("ServiceId");
+            
             siloBuilder
-                .ConfigureEndpoints(advertisedIP: IPAddress.Parse(configSection.GetValue<string>("AdvertisedIP")),
+                .ConfigureEndpoints(advertisedIP: IPAddress.Parse(advertisedIP),
                     siloPort: configSection.GetValue<int>("SiloPort"),
                     gatewayPort: configSection.GetValue<int>("GatewayPort"), listenOnAnyHostAddress: true)
                 .UseMongoDBClient(configSection.GetValue<string>("MongoDBClient"))
@@ -83,8 +89,8 @@ public static class OrleansHostExtensions
                 })
                 .Configure<ClusterOptions>(options =>
                 {
-                    options.ClusterId = configSection.GetValue<string>("ClusterId");
-                    options.ServiceId = configSection.GetValue<string>("ServiceId");
+                    options.ClusterId = clusterId;
+                    options.ServiceId = serviceId;
                 })
                 .AddMemoryGrainStorage("PubSubStore")
                 .ConfigureApplicationParts(parts => parts.AddFromApplicationBaseDirectory())
