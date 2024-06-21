@@ -12,7 +12,7 @@ namespace ETransferServer.SignatureServer.Controllers;
 
 [RemoteService]
 [ApiController]
-[Route("api/app/signature")]
+[Route("api/etransfer/signature")]
 public class SignatureController : AbpControllerBase
 {
     private readonly ILogger<SignatureController> _logger;
