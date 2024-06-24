@@ -11,7 +11,9 @@ public static class ApolloConfigurationExtension
         return builder
             .ConfigureAppConfiguration(config =>
             {
-                Log.Information("Apollo json: {apollo}", config.Build().GetSection("apollo"));
+                var apolloOption = config.Build().GetSection("apollo");
+                if (!apolloOption.GetSection("UseApollo").Get<bool>()) return;
+                
                 config.AddApollo(config.Build().GetSection("apollo"));
             });
     }
