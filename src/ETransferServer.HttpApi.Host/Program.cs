@@ -32,7 +32,9 @@ namespace ETransferServer
                 builder.Configuration.AddJsonFile("charge.json");
                 builder.Host.AddAppSettingsSecretsJson()
                     .UseAutofac()
+                #if !DEBUG
                     .UseApollo()
+                #endif
                     .UseSerilog();
 
                 await builder.AddApplicationAsync<ETransferServerHttpApiHostModule>();

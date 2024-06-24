@@ -33,7 +33,9 @@ public class Program
             builder.Configuration.AddJsonFile("apollo.appsettings.json");
             builder.Host.AddAppSettingsSecretsJson()
                 .UseAutofac()
+#if !DEBUG
                 .UseApollo()
+#endif
                 .UseSerilog();
             await builder.AddApplicationAsync<ETransferAuthServerModule>();
             var app = builder.Build();
