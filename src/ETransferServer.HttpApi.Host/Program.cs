@@ -24,7 +24,11 @@ namespace ETransferServer
             try
             {
                 Log.Information("Starting ETransferServer.HttpApi.Host");
-
+                #if !DEBUG
+                    Log.Information("ETransferServer.HttpApi.Host, Use Apollo");
+                #else
+                    Log.Information("ETransferServer.HttpApi.Host, Not Use Apollo");
+                #endif
                 var builder = WebApplication.CreateBuilder(args);
                 builder.Configuration.AddJsonFile("apollo.appsettings.json");
                 builder.Configuration.AddJsonFile("token.json");
@@ -33,7 +37,6 @@ namespace ETransferServer
                 builder.Host.AddAppSettingsSecretsJson()
                     .UseAutofac()
                 #if !DEBUG
-                    Log.Information("ETransferServer.HttpApi.Host, User Apollo");
                    .UseApollo()
                 #endif
                     .UseSerilog();
