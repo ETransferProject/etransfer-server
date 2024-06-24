@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
-using Serilog;
 
 namespace ETransferServer;
 
@@ -14,7 +13,7 @@ public static class ApolloConfigurationExtension
                 var apolloOption = config.Build().GetSection("apollo");
                 if (!apolloOption.GetSection("UseApollo").Get<bool>()) return;
                 
-                config.AddApollo(config.Build().GetSection("apollo"));
+                config.AddApollo(apolloOption);
             });
     }
 }
