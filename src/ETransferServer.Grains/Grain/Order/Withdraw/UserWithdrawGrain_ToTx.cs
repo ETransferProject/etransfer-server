@@ -49,6 +49,7 @@ public partial class UserWithdrawGrain
                     releaseTokenInput);
                 
                 toTransfer.TxId = txId.ToHex();
+                _logger.LogInformation("Withdraw retry: {orderId},{txId}", orderDto.Id, txId.ToHex());
                 rawTransaction = newTransaction;
                 orderDto.FromRawTransaction = newTransaction.ToByteArray().ToHex();
             }

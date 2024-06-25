@@ -166,9 +166,10 @@ public class ContractProvider : IContractProvider, ISingletonDependency
         var client = Client(chainId);
         var status = await client.GetChainStatusAsync();
 
-        var prevHeight = status.BestChainHeight - 8;
+        var prevHeight = status.BestChainHeight - 1008;
         var prevBlock = await client.GetBlockByHeightAsync(prevHeight);
 
+        _logger.LogInformation("Withdraw retry height: {prevHeight}", prevHeight);
         // create raw transaction
         return new Transaction
         {
