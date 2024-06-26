@@ -17,6 +17,7 @@ public static class CoBoConstant
     public const string WithdrawInfoByRequestId = "/v1/custody/withdraw_info_by_request_id/";
 
     public const string ResponseNull = "ResponseNull";
+    public const string ResponseParseError = "Response parse error";
     public const int WithdrawQueryInterval = 30;
     
     public static class CoBoTransactionSideEnum

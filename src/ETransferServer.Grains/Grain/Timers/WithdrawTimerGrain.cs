@@ -379,8 +379,16 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
                 return (true, string.Empty);
             }
 
-            _logger.LogError(e, "withdraw order {Id} stream error, request to withdraw error.", orderDto.Id);
-            return (false, e.Message);
+            try
+            {
+                _logger.LogError(e, "withdraw order {Id} stream error, request to withdraw error.", orderDto.Id);
+                return (false, e.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(CoBoConstant.ResponseParseError);
+                return (false, CoBoConstant.ResponseParseError);
+            }
         }
     }
 

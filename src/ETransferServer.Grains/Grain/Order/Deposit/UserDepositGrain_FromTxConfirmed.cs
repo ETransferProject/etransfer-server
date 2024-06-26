@@ -26,7 +26,7 @@ public partial class UserDepositGrain
             return await ToStartSwapTx(orderDto);
         }
 
-        return await ToStartTransfer(orderDto);
+        return await ToStartTransfer(orderDto, true);
     }
 
     private async Task<DepositOrderChangeDto> ToStartTransfer(DepositOrderDto orderDto, bool withNewTx = false)
@@ -159,7 +159,7 @@ public partial class UserDepositGrain
         _logger.LogInformation("Before calling the ToStartTransfer method, after resetting the properties of the order, order: {order}",
             JsonConvert.SerializeObject(orderDto));
         
-        return await ToStartTransfer(orderDto);
+        return await ToStartTransfer(orderDto, true);
     }
 
     private bool NeedSwap(DepositOrderDto orderDto)
