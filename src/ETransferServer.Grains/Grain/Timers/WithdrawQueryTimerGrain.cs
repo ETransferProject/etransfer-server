@@ -272,7 +272,7 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
     {
         return chainId == ChainId.AELF || chainId == ChainId.tDVV || chainId == ChainId.tDVW;
     }
-    
+
     private async Task<decimal> CalculateNetworkFeeAsync(string network, string symbol)
     {
         if (VerifyAElfChain(network))
@@ -281,6 +281,7 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
                 ? _withdrawOption.Value.Homogeneous[symbol].WithdrawFee
                 : 0M;
         }
+
         var coBoCoinGrain = GrainFactory.GetGrain<ICoBoCoinGrain>(ICoBoCoinGrain.Id(network, symbol));
         var coin = await coBoCoinGrain.GetAsync();
         AssertHelper.NotNull(coin, "CoBo coin detail not found");
@@ -291,7 +292,8 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
 
         var avgExchange = await GetAvgExchangeAsync(feeSymbol, symbol);
         var estimateFee = coin.AbsEstimateFee.SafeToDecimal() * avgExchange;
-        estimateFee = Math.Max(estimateFee, await GetMinThirdPartFeeAsync(symbol));
+        estimateFee = Math.Max(estimateFee, await GetMinThirdPartFeeAsync(symbol))
+            .ToString(DecimalHelper.GetDecimals(symbol), DecimalHelper.RoundingOption.Ceiling).SafeToDecimal();
         return estimateFee;
     }
 
@@ -321,7 +323,7 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
             try
             {
                 ++retry;
-                _logger.LogInformation("Retry amount:{amount}, maxEstimateFee:{maxEstimateFee}, realFee:{}",
+                _logger.LogInformation("Retry amount:{amount}, maxEstimateFee:{maxEstimateFee}, realFee:{realFee}",
                     amount, estimateFee, realFee);
                 realFee = await CalculateNetworkFeeAsync(chainId, symbol);
                 withdrawAmount = AssertWithdrawAmount(amount, estimateFee, realFee);
