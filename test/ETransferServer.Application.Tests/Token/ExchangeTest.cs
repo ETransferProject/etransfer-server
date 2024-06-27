@@ -70,13 +70,13 @@ public class ExchangeTest : ETransferServerApplicationTestBase
         // var exchange = await exchangeGrain.GetAsync();
         // Output.WriteLine(JsonConvert.SerializeObject(exchange));
         
-        var gateIoProvider = ServiceProvider.GetRequiredService<GateIoProvider>();
-        var gateIoExchange = await gateIoProvider.LatestAsync("ELF", "USDT");
-        Output.WriteLine(JsonConvert.SerializeObject(gateIoExchange));
-        
-        var uniswapV3Provider = ServiceProvider.GetRequiredService<UniswapV3Provider>();
-        var uniswapExchange = await uniswapV3Provider.LatestAsync("USDC", "USDT");
-        Output.WriteLine(JsonConvert.SerializeObject(uniswapExchange));
+        // var gateIoProvider = ServiceProvider.GetRequiredService<GateIoProvider>();
+        // var gateIoExchange = await gateIoProvider.LatestAsync("ELF", "USDT");
+        // Output.WriteLine(JsonConvert.SerializeObject(gateIoExchange));
+        //
+        // var uniswapV3Provider = ServiceProvider.GetRequiredService<UniswapV3Provider>();
+        // var uniswapExchange = await uniswapV3Provider.LatestAsync("USDC", "USDT");
+        // Output.WriteLine(JsonConvert.SerializeObject(uniswapExchange));
 
         
     }
