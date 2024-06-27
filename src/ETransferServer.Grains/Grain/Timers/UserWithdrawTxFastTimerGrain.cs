@@ -50,7 +50,7 @@ public class UserWithdrawTxFastTimerGrain : AbstractTxFastTimerGrain<WithdrawOrd
     internal override async Task<WithdrawOrderDto> GetOrder(Guid orderId)
     {
         var recordGrain = GrainFactory.GetGrain<IUserWithdrawRecordGrain>(orderId);
-        var res = await recordGrain.GetAsync();
+        var res = await recordGrain.Get();
         if (!res.Success)
         {
             _logger.LogWarning("Withdraw order {OrderId} not found", orderId);

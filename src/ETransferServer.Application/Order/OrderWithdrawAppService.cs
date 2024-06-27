@@ -45,15 +45,6 @@ namespace ETransferServer.Order;
 [DisableAuditing]
 public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppService
 {
-    private const string TokenPoolContractName = "ETransfer.Contracts.TokenPool";
-    private const string CaContractName = "Portkey.Contracts.CA";
-    private const string CaContractName2 = "Portkey.Contracts.CA2";
-    private const string ManagerForwardCall = "ManagerForwardCall";
-    private const string TransferToken = "TransferToken";
-    private const string PortKeyVersion = "v1";
-    private const string PortKeyVersion2 = "v2";
-    private const int ElfDecimals = 8;
-
     private readonly INESTRepository<Orders.OrderIndex, Guid> _withdrawOrderIndexRepository;
     private readonly IObjectMapper _objectMapper;
     private readonly ILogger<OrderWithdrawAppService> _logger;
@@ -107,11 +98,13 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.Symbol),
                 "Symbol is not exist. Please refresh and try again.");
             AssertHelper.IsTrue(
-                string.IsNullOrWhiteSpace(request.Version) || PortKeyVersion.Equals(request.Version) ||
-                PortKeyVersion2.Equals(request.Version), "Version is invalid. Please refresh and try again.");
+                string.IsNullOrWhiteSpace(request.Version) ||
+                CommonConstant.DefaultConst.PortKeyVersion.Equals(request.Version) ||
+                CommonConstant.DefaultConst.PortKeyVersion2.Equals(request.Version),
+                "Version is invalid. Please refresh and try again.");
             if (VerifyAElfChain(request.Network) && !_withdrawInfoOptions.Value.CanCrossSameChain)
             {
-                AssertHelper.IsTrue(request.ChainId != request.Network, 
+                AssertHelper.IsTrue(request.ChainId != request.Network,
                     "Network is invalid. Please refresh and try again.");
             }
 
@@ -127,7 +120,8 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             // query async
             var networkFeeTask = CalculateNetworkFeeAsync(request.ChainId, request.Version);
             var decimals = DecimalHelper.GetDecimals(request.Symbol);
-            var (feeAmount, expireAt) = (0M, DateTime.UtcNow.AddSeconds(_coBoOptions.Value.CoinExpireSeconds).ToUtcMilliSeconds());
+            var (feeAmount, expireAt) = (0M,
+                DateTime.UtcNow.AddSeconds(_coBoOptions.Value.CoinExpireSeconds).ToUtcMilliSeconds());
             withdrawInfoDto.TransactionFee = feeAmount.ToString();
             if (!VerifyAElfChain(request.Network))
             {
@@ -144,7 +138,8 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             withdrawInfoDto.ExpiredTimestamp = expireAt.ToString();
 
             var networkFee = await networkFeeTask;
-            withdrawInfoDto.AelfTransactionFee = networkFee.ToString(ElfDecimals, DecimalHelper.RoundingOption.Ceiling);
+            withdrawInfoDto.AelfTransactionFee = networkFee.ToString(CommonConstant.DefaultConst.ElfDecimals,
+                DecimalHelper.RoundingOption.Ceiling);
             withdrawInfoDto.AelfTransactionUnit = CommonConstant.Symbol.Elf;
 
             var receiveAmount = Math.Max(0, request.Amount) - decimal.Parse(withdrawInfoDto.TransactionFee);
@@ -176,9 +171,11 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
                 if (networkFee > 0)
                 {
                     avgExchange =
-                        await _networkAppService.GetAvgExchangeAsync(CommonConstant.Symbol.Elf, CommonConstant.Symbol.USD);
+                        await _networkAppService.GetAvgExchangeAsync(CommonConstant.Symbol.Elf,
+                            CommonConstant.Symbol.USD);
                     fee += networkFee * avgExchange;
                 }
+
                 withdrawInfoDto.FeeUsd = fee.ToString(decimals, DecimalHelper.RoundingOption.Ceiling);
             }
             catch (Exception e)
@@ -352,7 +349,9 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             address = addressInfo?.Address.IsNullOrEmpty() ?? true
                 ? ConvertVirtualAddressToContractAddress(Hash.LoadFromHex(userDto.Data.CaHash),
                     Address.FromBase58(await _contractProvider.GetContractAddressAsync(chainId,
-                        PortKeyVersion2.Equals(version) ? CaContractName2 : CaContractName)))
+                        CommonConstant.DefaultConst.PortKeyVersion2.Equals(version)
+                            ? CommonConstant.DefaultConst.CaContractName2
+                            : CommonConstant.DefaultConst.CaContractName)))
                 : Address.FromBase58(addressInfo.Address);
             _logger.LogInformation(
                 "Get address when calculate fee: {address}, userId: {userId}, chainId: {chainId}, version: {version}",
@@ -634,21 +633,21 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             TransferTokenInput transferTokenInput;
             switch (transaction.MethodName)
             {
-                case ManagerForwardCall:
-                    var caContractAddress1 = await _contractProvider.GetContractAddressAsync(chainId, CaContractName);
-                    var caContractAddress2 = await _contractProvider.GetContractAddressAsync(chainId, CaContractName2);
+                case CommonConstant.DefaultConst.ManagerForwardCall:
+                    var caContractAddress1 = await _contractProvider.GetContractAddressAsync(chainId, CommonConstant.DefaultConst.CaContractName);
+                    var caContractAddress2 = await _contractProvider.GetContractAddressAsync(chainId, CommonConstant.DefaultConst.CaContractName2);
                     AssertHelper.IsTrue(caContractAddress1 == transaction.To.ToBase58()
                                         || caContractAddress2 == transaction.To.ToBase58(),
                         "Invalid caContract address");
 
                     var param = ManagerForwardCallInput.Parser.ParseFrom(transaction.Params);
-                    AssertHelper.IsTrue(param.MethodName == TransferToken, "Invalid ManagerForwardCall method {Mtd}",
+                    AssertHelper.IsTrue(param.MethodName == CommonConstant.DefaultConst.TransferToken, "Invalid ManagerForwardCall method {Mtd}",
                         param.MethodName);
                     AssertHelper.IsTrue(param.ContractAddress != new Address(), "Invalid ManagerForwardCall address");
                     AssertHelper.IsTrue(!param.Args.IsNullOrEmpty(), "Invalid ManagerForwardCall param");
 
                     var tokenPoolContractAddress =
-                        await _contractProvider.GetContractAddressAsync(chainId, TokenPoolContractName);
+                        await _contractProvider.GetContractAddressAsync(chainId, CommonConstant.DefaultConst.TokenPoolContractName);
                     AssertHelper.IsTrue(tokenPoolContractAddress == param.ContractAddress.ToBase58(),
                         "Invalid tokenPoolContract address");
                     AssertHelper.IsTrue(param.CaHash.ToHex() == caHash, "caHash not match");
@@ -657,9 +656,9 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
                     AssertHelper.IsTrue(transferTokenInput.Amount > 0, "Tx Token amount {amount} invalid",
                         transferTokenInput.Amount);
                     break;
-                case TransferToken:
+                case CommonConstant.DefaultConst.TransferToken:
                     tokenPoolContractAddress =
-                        await _contractProvider.GetContractAddressAsync(chainId, TokenPoolContractName);
+                        await _contractProvider.GetContractAddressAsync(chainId, CommonConstant.DefaultConst.TokenPoolContractName);
                     AssertHelper.IsTrue(tokenPoolContractAddress == transaction.To.ToBase58(),
                         "Invalid tokenPoolContract address");
 

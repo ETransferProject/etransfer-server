@@ -43,7 +43,7 @@ public class SwapAppService : ApplicationService, ISwapAppService
         var swapAmountsGrain =
             _clusterClient.GetGrain<ISwapAmountsOutGrain>(
                 ISwapAmountsOutGrain.GenGrainId(chainId, symbolIn, symbolOut, swapInfo.Router));
-        var (_, amountOut,_,_) = await swapAmountsGrain.GetAmountsOutAsync(1, swapInfo.Path, true);
+        var (_, amountOut,_,_) = await swapAmountsGrain.GetAmountsOut(1, swapInfo.Path, true);
         return amountOut;
     }
 
@@ -68,7 +68,7 @@ public class SwapAppService : ApplicationService, ISwapAppService
         var swapAmountsGrain =
             _clusterClient.GetGrain<ISwapAmountsOutGrain>(
                 ISwapAmountsOutGrain.GenGrainId(chainId, symbolIn, symbolOut, swapInfo.Router));
-        var (_, amountOut,_,_) = await swapAmountsGrain.GetAmountsOutAsync(amountIn, swapInfo.Path);
+        var (_, amountOut,_,_) = await swapAmountsGrain.GetAmountsOut(amountIn, swapInfo.Path);
         result.AmountOut = amountOut;
         result.MinAmountOut = GetMinOutAmount(amountOut, symbolIn, symbolOut);
         return result;

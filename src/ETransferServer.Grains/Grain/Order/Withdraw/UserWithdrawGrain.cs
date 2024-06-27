@@ -152,7 +152,7 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         Dictionary<string, string> externalInfo = null)
     {
         // save withdraw order to Grain
-        var res = await _recordGrain.AddOrUpdateAsync(orderDto);
+        var res = await _recordGrain.AddOrUpdate(orderDto);
         if (!res.Success)
         {
             _logger.LogError("save order data error, orderId = {Id}", orderDto.Id);

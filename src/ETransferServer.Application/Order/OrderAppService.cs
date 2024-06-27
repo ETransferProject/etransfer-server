@@ -137,7 +137,7 @@ public class OrderAppService : ApplicationService, IOrderAppService
             {
                 var maxCreateTime = orderIndexDtoPageResult.Items.Max(item => item.CreateTime);
                 var userOrderActionGrain = _clusterClient.GetGrain<IUserOrderActionGrain>(userId.ToString());
-                await userOrderActionGrain.AddOrUpdateAsync(maxCreateTime);
+                await userOrderActionGrain.AddOrUpdate(maxCreateTime);
             }
             
             return orderIndexDtoPageResult;
@@ -161,7 +161,7 @@ public class OrderAppService : ApplicationService, IOrderAppService
             }
 
             var userOrderActionGrain = _clusterClient.GetGrain<IUserOrderActionGrain>(userId.ToString());
-            var lastModifyTime = await userOrderActionGrain.GetAsync();
+            var lastModifyTime = await userOrderActionGrain.Get();
 
             var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>
             {

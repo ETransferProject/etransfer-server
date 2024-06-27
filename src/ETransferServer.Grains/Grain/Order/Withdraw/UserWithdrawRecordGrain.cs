@@ -14,9 +14,9 @@ namespace ETransferServer.Grains.Grain.Order.Withdraw;
 
 public interface IUserWithdrawRecordGrain : IGrainWithGuidKey
 {
-    Task<CommonResponseDto<WithdrawOrderDto>> AddOrUpdateAsync(WithdrawOrderDto orderDto);
+    Task<CommonResponseDto<WithdrawOrderDto>> AddOrUpdate(WithdrawOrderDto orderDto);
     
-    Task<CommonResponseDto<WithdrawOrderDto>> GetAsync();
+    Task<CommonResponseDto<WithdrawOrderDto>> Get();
 }
 
 public class UserWithdrawRecordGrain : Grain<WithdrawOrderState>, IUserWithdrawRecordGrain
@@ -40,7 +40,7 @@ public class UserWithdrawRecordGrain : Grain<WithdrawOrderState>, IUserWithdrawR
         _withdrawOptions = withdrawOptions;
     }
 
-    public async Task<CommonResponseDto<WithdrawOrderDto>> AddOrUpdateAsync(WithdrawOrderDto orderDto)
+    public async Task<CommonResponseDto<WithdrawOrderDto>> AddOrUpdate(WithdrawOrderDto orderDto)
     {
         try
         {
@@ -95,7 +95,7 @@ public class UserWithdrawRecordGrain : Grain<WithdrawOrderState>, IUserWithdrawR
         }
     }
     
-    public Task<CommonResponseDto<WithdrawOrderDto>> GetAsync()
+    public Task<CommonResponseDto<WithdrawOrderDto>> Get()
     {
         return State.Id == Guid.Empty
             ? Task.FromResult(new CommonResponseDto<WithdrawOrderDto>(null!))

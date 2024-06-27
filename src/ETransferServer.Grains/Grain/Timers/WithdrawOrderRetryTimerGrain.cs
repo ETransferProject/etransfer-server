@@ -44,7 +44,7 @@ public class WithdrawOrderRetryTimerGrain : AbstractOrderRetryTimerGrain<Withdra
     protected override async Task<WithdrawOrderDto> GetOrder(Guid orderId)
     {
         var withdrawRecordGrain = GrainFactory.GetGrain<IUserWithdrawRecordGrain>(orderId);
-        var res = await withdrawRecordGrain.GetAsync();
+        var res = await withdrawRecordGrain.Get();
         if (!res.Success)
         {
             _logger.LogError("Get pending retry order {OrderId} error, message={Msg}", res.Message);

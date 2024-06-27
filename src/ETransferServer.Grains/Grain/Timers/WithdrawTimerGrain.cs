@@ -87,7 +87,7 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
             foreach (var withdrawRequest in State.WithdrawRequestMap)
             {
                 var orderGrain = GrainFactory.GetGrain<IUserWithdrawRecordGrain>(withdrawRequest.Key);
-                var orderResult = await orderGrain.GetAsync();
+                var orderResult = await orderGrain.Get();
                 if (orderResult?.Data == null)
                 {
                     _logger.LogWarning("order not exists, orderId:{orderId}", withdrawRequest.Key);
@@ -133,7 +133,7 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
         try
         {
             var orderGrain = GrainFactory.GetGrain<IUserWithdrawRecordGrain>(order.Id);
-            var orderResult = await orderGrain.GetAsync();
+            var orderResult = await orderGrain.Get();
             if (orderResult?.Data == null)
             {
                 _logger.LogWarning("add to request fail, order not exists, orderId:{orderId}", order.Id);
@@ -271,7 +271,7 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
 
         var orderGrain = GrainFactory.GetGrain<IUserWithdrawRecordGrain>(orderId);
         var userWithdrawGrain = GrainFactory.GetGrain<IUserWithdrawGrain>(orderId);
-        var orderResult = await orderGrain.GetAsync();
+        var orderResult = await orderGrain.Get();
         if (orderResult?.Data == null)
         {
             _logger.LogWarning("order not exists, orderId:{orderId}", orderId);

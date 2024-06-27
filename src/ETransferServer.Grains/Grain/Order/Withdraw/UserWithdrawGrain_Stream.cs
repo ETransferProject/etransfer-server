@@ -196,7 +196,7 @@ public partial class UserWithdrawGrain
     private async Task<long> GetOrderCreateTime(Guid orderId)
     {
         var recordGrain = GrainFactory.GetGrain<IUserWithdrawRecordGrain>(orderId);
-        var res = await recordGrain.GetAsync();
+        var res = await recordGrain.Get();
         if (!res.Success)
         {
             _logger.LogWarning("Withdraw order {OrderId} not found when revert token limit", orderId);

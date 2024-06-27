@@ -10,7 +10,7 @@ namespace ETransferServer.Grains.Grain.Swap;
 
 public interface IEvmTransactionGrain : IGrainWithStringKey
 {
-    Task<GrainResultDto<long>> GetTransactionTimeAsync(string chainId, string blockHash, string txId, int retryTime = 0);
+    Task<GrainResultDto<long>> GetTransactionTime(string chainId, string blockHash, string txId, int retryTime = 0);
 }
 
 public class EvmTransactionGrain : Grain<EvmTransactionState>, IEvmTransactionGrain
@@ -27,7 +27,7 @@ public class EvmTransactionGrain : Grain<EvmTransactionState>, IEvmTransactionGr
         _swapInfosOptions = swapInfosOptions.Value;
     }
 
-    public async Task<GrainResultDto<long>> GetTransactionTimeAsync(string chainId, string blockHash, string txId,
+    public async Task<GrainResultDto<long>> GetTransactionTime(string chainId, string blockHash, string txId,
         int retryTime = 0)
     {
         if (retryTime > _swapInfosOptions.CallTxRetryTimes)
@@ -102,7 +102,7 @@ public class EvmTransactionGrain : Grain<EvmTransactionState>, IEvmTransactionGr
             _logger.LogError(e, "Failed to get {chainId} transaction time.{grainId}", chainId,
                 this.GetPrimaryKeyString());
             retryTime += 1;
-            await GetTransactionTimeAsync(chainId, blockHash, txId, retryTime);
+            await GetTransactionTime(chainId, blockHash, txId, retryTime);
         }
 
         return new GrainResultDto<long>
