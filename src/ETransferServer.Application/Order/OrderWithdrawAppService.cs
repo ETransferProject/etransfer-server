@@ -119,7 +119,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
 
             // query async
             var networkFeeTask = CalculateNetworkFeeAsync(request.ChainId, request.Version);
-            var decimals = DecimalHelper.GetDecimals(request.Symbol);
+            var decimals = await _networkAppService.GetDecimalsAsync(request.ChainId, request.Symbol);
             var (feeAmount, expireAt) = (0M,
                 DateTime.UtcNow.AddSeconds(_coBoOptions.Value.CoinExpireSeconds).ToUtcMilliSeconds());
             withdrawInfoDto.TransactionFee = feeAmount.ToString();
@@ -304,7 +304,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
     {
         if (network.IsNullOrEmpty()) return;
         var coinFeeCacheKey = CacheKey(FeeInfo.FeeName.CoBoFee, userId.ToString(), network, symbol);
-        var decimals = DecimalHelper.GetDecimals(symbol);
+        var decimals = await _networkAppService.GetDecimalsAsync(ChainId.AELF, symbol);
         await _coBoCoinCache.SetAsync(coinFeeCacheKey, new CoBoCoinDto { AbsEstimateFee = fee.ToString(decimals, DecimalHelper.RoundingOption.Ceiling) }, 
             new DistributedCacheEntryOptions
             {

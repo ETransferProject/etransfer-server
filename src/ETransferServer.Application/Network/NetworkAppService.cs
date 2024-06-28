@@ -27,6 +27,7 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
     private readonly IOptionsSnapshot<NetworkOptions> _networkOptions;
     private readonly CoinGeckoOptions _coinGeckoOptions;
     private readonly IOptionsSnapshot<WithdrawInfoOptions> _withdrawInfoOptions;
+    private readonly IOptionsSnapshot<TokenOptions> _tokenOptions;
     private readonly IObjectMapper _objectMapper;
     private readonly IClusterClient _clusterClient;
 
@@ -34,7 +35,9 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
         IOptionsSnapshot<NetworkOptions> networkOptions,
         IOptionsSnapshot<CoinGeckoOptions> coinGeckoOptions,
         IObjectMapper objectMapper,
-        IClusterClient clusterClient, IOptionsSnapshot<WithdrawInfoOptions> withdrawInfoOptions)
+        IClusterClient clusterClient, 
+        IOptionsSnapshot<WithdrawInfoOptions> withdrawInfoOptions,
+        IOptionsSnapshot<TokenOptions> tokenOptions)
     {
         _logger = logger;
         _networkOptions = networkOptions;
@@ -42,6 +45,7 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
         _objectMapper = objectMapper;
         _clusterClient = clusterClient;
         _withdrawInfoOptions = withdrawInfoOptions;
+        _tokenOptions = tokenOptions;
     }
 
     public async Task<GetNetworkListDto> GetNetworkListAsync(GetNetworkListRequestDto request)
@@ -61,8 +65,8 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
             try
             {
                 getNetworkListDto.NetworkList = request.Symbol == CommonConstant.Symbol.USDT ?
-                    await CalculateNetworkFeeListAsync(getNetworkListDto.NetworkList, request.Symbol)
-                    : await CalculateAvgNetworkFeeListAsync(getNetworkListDto.NetworkList, request.Symbol);
+                    await CalculateNetworkFeeListAsync(getNetworkListDto.NetworkList, request.ChainId, request.Symbol)
+                    : await CalculateAvgNetworkFeeListAsync(getNetworkListDto.NetworkList, request.ChainId, request.Symbol);
             }
             catch (Exception e)
             {
@@ -199,7 +203,16 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
             : CommonConstant.DefaultConst.DefaultMinThirdPartFee);
     }
 
-    private async Task<List<NetworkDto>> CalculateNetworkFeeListAsync(List<NetworkDto> networkList, string symbol)
+    public Task<int> GetDecimalsAsync(string chainId, string symbol)
+    {
+        return Task.FromResult((_tokenOptions.Value.Withdraw.ContainsKey(chainId)
+                ? _tokenOptions.Value.Withdraw[chainId]
+                : null)
+            ?.FirstOrDefault(t => t.Symbol == symbol)
+            ?.Decimals ?? DecimalHelper.GetDecimals(symbol));
+    }
+
+    private async Task<List<NetworkDto>> CalculateNetworkFeeListAsync(List<NetworkDto> networkList, string chainId, string symbol)
     {
         var exchangeSymbolPair = networkList.ConvertAll(item => item.Network).ToList().JoinAsString(CommonConstant.Underline);
         var exchangeGrain = _clusterClient.GetGrain<ITokenExchangeGrain>(exchangeSymbolPair);
@@ -217,7 +230,7 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
                 network.WithdrawFee = Math.Max(await GetMinThirdPartFeeAsync(symbol),
                         network.WithdrawFee.SafeToDecimal() *
                         exchange[_coinGeckoOptions.CoinIdMapping[network.WithdrawFeeUnit]].Exchange)
-                    .ToString(CommonConstant.DefaultConst.ThirdPartDigitals, DecimalHelper.GetDecimals(symbol),
+                    .ToString(CommonConstant.DefaultConst.ThirdPartDigitals, await GetDecimalsAsync(chainId, symbol),
                         DecimalHelper.RoundingOption.Ceiling);
             }
 
@@ -228,7 +241,7 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
     }
     
 
-    private async Task<List<NetworkDto>> CalculateAvgNetworkFeeListAsync(List<NetworkDto> networkList, string symbol)
+    private async Task<List<NetworkDto>> CalculateAvgNetworkFeeListAsync(List<NetworkDto> networkList, string chainId, string symbol)
     {
         foreach (var network in networkList)
         {
@@ -242,7 +255,7 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
 
                 network.WithdrawFee = Math.Max(await GetMinThirdPartFeeAsync(symbol),
                         network.WithdrawFee.SafeToDecimal() * avgExchange)
-                    .ToString(CommonConstant.DefaultConst.ThirdPartDigitals, DecimalHelper.GetDecimals(symbol),
+                    .ToString(CommonConstant.DefaultConst.ThirdPartDigitals, await GetDecimalsAsync(chainId, symbol),
                         DecimalHelper.RoundingOption.Ceiling);
             }
 

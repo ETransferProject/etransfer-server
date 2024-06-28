@@ -293,8 +293,15 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
         var avgExchange = await GetAvgExchangeAsync(feeSymbol, symbol);
         var estimateFee = coin.AbsEstimateFee.SafeToDecimal() * avgExchange;
         estimateFee = Math.Max(estimateFee, await GetMinThirdPartFeeAsync(symbol))
-            .ToString(DecimalHelper.GetDecimals(symbol), DecimalHelper.RoundingOption.Ceiling).SafeToDecimal();
+            .ToString(GetDecimals(symbol), DecimalHelper.RoundingOption.Ceiling).SafeToDecimal();
         return estimateFee;
+    }
+
+    private int GetDecimals(string symbol)
+    {
+        return _withdrawOption.Value.TokenInfo.ContainsKey(symbol)
+            ? _withdrawOption.Value.TokenInfo[symbol]
+            : DecimalHelper.GetDecimals(symbol);
     }
 
     private decimal AssertWithdrawAmount(decimal amount, decimal estimateFee, decimal realFee)

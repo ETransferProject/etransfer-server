@@ -98,7 +98,7 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
                 _logger.LogInformation("New swap transaction will struct.{grainId}", this.GetPrimaryKey().ToString());
                 if (dto.FromTransfer.TxTime == null && State.TimeStamp == null)
                 {
-                    var timeRes = await GetTransactionTime(dto.FromTransfer.Network,
+                    var timeRes = await GetTransactionTimeAsync(dto.FromTransfer.Network,
                         dto.FromTransfer.BlockHash,
                         fromTransfer.TxId);
                     if (!timeRes.Success)
@@ -209,7 +209,7 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
         }
     }
 
-    private async Task<GrainResultDto<long>> GetTransactionTime(string chainId, string blockHash, string txId)
+    private async Task<GrainResultDto<long>> GetTransactionTimeAsync(string chainId, string blockHash, string txId)
     {
         try
         {
