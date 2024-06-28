@@ -170,6 +170,6 @@ public partial class UserDepositGrain
     private async Task DepositSwapFailureAlarmAsync(DepositOrderDto orderDto, string reason)
     {
         var depositSwapMonitorGrain = GrainFactory.GetGrain<IDepositSwapMonitorGrain>(orderDto.Id.ToString());
-        await depositSwapMonitorGrain.DoMonitorAsync(DepositSwapMonitorDto.Create(orderDto, reason));
+        await depositSwapMonitorGrain.DoMonitor(DepositSwapMonitorDto.Create(orderDto, reason));
     }
 }

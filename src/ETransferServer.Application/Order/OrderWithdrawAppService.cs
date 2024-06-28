@@ -238,7 +238,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         var networkList = GetThirdPartNetworkList(symbol);
         foreach (var network in networkList)
         {
-            fees.Add(network, CalculateThirdPartFeeAsync(userId, network, symbol));
+            fees.Add(network, CalculateThirdPartFeeAsync(userId, network, symbol, false));
         }
 
         decimal minFee = -1;
@@ -278,7 +278,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
 
     // Estimate transaction fee
     // feeAmount in symbol => expire at milliseconds timestamp
-    private async Task<Tuple<decimal, long>> CalculateThirdPartFeeAsync(Guid userId, string network, string symbol)
+    private async Task<Tuple<decimal, long>> CalculateThirdPartFeeAsync(Guid userId, string network, string symbol, bool isNotify = true)
     {
         var (estimateFee, coin) = await _networkAppService.CalculateNetworkFeeAsync(network, symbol);
         estimateFee = Math.Max(estimateFee, await _networkAppService.GetMinThirdPartFeeAsync(symbol));
@@ -290,7 +290,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         {
             // If new data is generated
             // go through the monitoring logic.
-            await DoMonitorAsync(network, coin.AbsEstimateFee.SafeToDecimal(), coin.FeeCoin);
+            await DoMonitorAsync(network, coin.AbsEstimateFee.SafeToDecimal(), coin.FeeCoin, isNotify);
             _coBoCoinCache.GetOrAdd(monitorCacheKey, () => coin, () => new DistributedCacheEntryOptions
             {
                 AbsoluteExpiration = DateTimeOffset.FromUnixTimeMilliseconds(coin.ExpireTime)
@@ -313,9 +313,10 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         _logger.LogDebug("Cobo fee set cache: {fee}, {expireSeconds}", fee, _withdrawInfoOptions.Value.ThirdPartCacheFeeExpireSeconds);
     }
 
-    public async Task DoMonitorAsync(string network, decimal estimateFee, string symbol)
+    public async Task DoMonitorAsync(string network, decimal estimateFee, string symbol, bool isNotify)
     {
-        _logger.LogDebug("Withdraw fee monitor, network={Network}, fee={Fee}, symbol={Symbol}", network, estimateFee, symbol);
+        _logger.LogDebug("Withdraw fee monitor, network={Network}, fee={Fee}, symbol={Symbol}, isNotify={isNotify}", 
+            network, estimateFee, symbol, isNotify);
         await _clusterClient
             .GetGrain<IWithdrawFeeMonitorGrain>(IWithdrawFeeMonitorGrain.GrainId(ThirdPartServiceNameEnum.Cobo,
                 network, symbol))
@@ -323,7 +324,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             {
                 Symbol = symbol,
                 Amount = estimateFee.ToString(CultureInfo.InvariantCulture)
-            });
+            }, isNotify);
     }
 
 

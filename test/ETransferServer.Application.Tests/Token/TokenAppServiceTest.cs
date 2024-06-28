@@ -61,6 +61,50 @@ public class TokenAppServiceTest : ETransferServerApplicationTestBase
             e.ShouldNotBeNull();
         }
     }
+    
+    [Fact]
+    public async Task IsValidDepositTest()
+    {
+        try
+        {
+            var result = _tokenAppService.IsValidDeposit("AELF", "USDT", "USDT");
+            result.ShouldBeFalse();
+            
+            result = _tokenAppService.IsValidDeposit("AELF", "USDT", "ELF");
+            result.ShouldBeTrue();
+            
+            result = _tokenAppService.IsValidDeposit("AELF", "USDT", "SGR-1");
+            result.ShouldBeFalse();
+        }
+        catch (Exception e)
+        {
+            e.ShouldNotBeNull();
+        }
+    }
+    
+    [Fact]
+    public async Task GetTokenOptionListTest()
+    {
+        try
+        {
+            var result = await _tokenAppService.GetTokenOptionListAsync(new GetTokenOptionListRequestDto()
+            {
+                Type = "Deposit"
+            });
+
+            result.ShouldNotBeNull();
+            result.TokenList.ShouldNotBeNull();
+            
+            await _tokenAppService.GetTokenOptionListAsync(new GetTokenOptionListRequestDto()
+            {
+                Type = "Withdraw"
+            });
+        }
+        catch (Exception e)
+        {
+            e.ShouldNotBeNull();
+        }
+    }
 
     private IOptionsSnapshot<TokenOptions> MockTokenOptions()
     {
@@ -77,6 +121,24 @@ public class TokenAppServiceTest : ETransferServerApplicationTestBase
                             Symbol = "USDT",
                             Name = "USDT",
                             Decimals = 6
+                        }
+                    }
+                },
+                DepositSwap = new List<TokenSwapConfig>()
+                {
+                    new TokenSwapConfig()
+                    {
+                        Symbol = "USDT",
+                        Name = "USDT",
+                        Decimals = 6,
+                        ToTokenList = new List<ToTokenConfig>()
+                        {
+                            new ToTokenConfig()
+                            {
+                                Symbol = "ELF",
+                                Name = "ELF",
+                                ChainIdList = new List<string>() { "AELF" }
+                            }
                         }
                     }
                 }

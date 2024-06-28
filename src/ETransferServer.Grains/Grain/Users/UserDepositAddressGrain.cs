@@ -105,7 +105,7 @@ public class UserDepositAddressGrain : Grain<TokenDepositAddressState>, IUserDep
 
     private async Task<IUserDepositAddressGrain> GetUserDepositGrainAsync(string coin, GetUserDepositAddressInput input)
     {
-        var split = coin.Split(DepositAddressOptions.DefaultDelimiter);
+        var split = coin.Split(CommonConstant.Underline);
         return split.Length >= 2 && !(split[0] == input.NetWork && split[1] == input.Symbol)
             ? GetUserDepositGrain(input, split)
             : null;
