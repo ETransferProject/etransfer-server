@@ -1,4 +1,5 @@
 using AElf.Client.Dto;
+using ETransfer.Contracts.TokenPool;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans;
@@ -10,6 +11,7 @@ using ETransferServer.Grains.GraphQL;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.State.Order;
 using ETransferServer.Options;
+using Google.Protobuf;
 using Volo.Abp;
 
 namespace ETransferServer.Grains.Grain.Timers;
@@ -205,6 +207,8 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
             }
             else
             {
+                order.FromTransfer.FromAddress = transfer.FromAddress;
+                order.FromTransfer.ToAddress = transfer.ToAddress;
                 order.FromTransfer.Status = OrderTransferStatusEnum.Confirmed.ToString();
                 order.Status = OrderStatusEnum.FromTransferConfirmed.ToString();
             }
@@ -281,6 +285,15 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
                     if (!IsTxConfirmed(txStatus.BlockNumber, chainStatus)) return false;
 
                     // LIB confirmed, return order to stream
+                    if (!isToTransfer)
+                    {
+                        var (from, to) = await ParseFromLogEvent(txStatus.Logs);
+                        if (!from.IsNullOrEmpty())
+                        {
+                            transferInfo.FromAddress = from;
+                            transferInfo.ToAddress = to;
+                        }
+                    }
                     transferInfo.Status = OrderTransferStatusEnum.Confirmed.ToString();
                     order.Status = isToTransfer
                         ? OrderStatusEnum.ToTransferConfirmed.ToString()
@@ -348,7 +361,23 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
         }
     }
 
-
+    private async Task<Tuple<string, string>> ParseFromLogEvent(LogEventDto[] logs)
+    {
+        try
+        {
+            var param = TokenPoolTransferred.Parser.ParseFrom(
+                ByteString.FromBase64(logs.FirstOrDefault(l => l.Name == nameof(TokenPoolTransferred))?.NonIndexed));
+            _logger.LogInformation(
+                "TxOrderTimer ParseFromLogEvent, from={from}, to={to}", param.From.ToBase58(), param.To.ToBase58());
+            return Tuple.Create(param.From.ToBase58(), param.To.ToBase58());
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "TxOrderTimer ParseFromLogEvent error");
+            return Tuple.Create(string.Empty, string.Empty);
+        }
+    }
+    
     private bool IndexerAvailable(string chainId, Dictionary<string, ChainStatusDto> chainStatus,
         Dictionary<string, long> indexerBlockHeight)
     {

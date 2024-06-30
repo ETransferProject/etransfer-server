@@ -174,7 +174,7 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
                 Id = OrderIdHelper.WithdrawOrderId(transferRecord.Id, transferRecord.ToChainId,
                     transferRecord.ToAddress),
                 Status = OrderStatusEnum.FromTransferring.ToString(),
-                UserId = await GetUserIdAsync(transferRecord.From) ?? Guid.Empty,
+                UserId = await GetUserIdAsync(transferRecord.From),
                 OrderType = OrderTypeEnum.Withdraw.ToString(),
                 AmountUsd = amountUsd,
                 FromTransfer = new TransferInfo
@@ -262,10 +262,10 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
         return avgExchange;
     }
 
-    private async Task<Guid?> GetUserIdAsync(string address)
+    private async Task<Guid> GetUserIdAsync(string address)
     {
         var user = await _userAppService.GetUserByAddressAsync(address);
-        return user?.Id;
+        return user?.Id ?? OrderIdHelper.WithdrawUserId(address);
     }
     
     private bool VerifyAElfChain(string chainId)

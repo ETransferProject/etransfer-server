@@ -288,6 +288,7 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
 
         order.ToTransfer.TxTime = result.LastTime;
         order.ToTransfer.Status = result.Status;
+        order.ToTransfer.FromAddress = result.SourceAddress;
 
         order.ExtensionInfo = ExtensionBuilder.New()
             .Add(ExtensionKey.RequestId, result.RequestId)
