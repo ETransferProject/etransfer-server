@@ -21,6 +21,7 @@ public partial class UserWithdrawGrain
 
             if (orderDto.FromRawTransaction.IsNullOrEmpty() || withNewTx)
             {
+                _logger.LogInformation("only OnToStartTransfer1: {dto}", JsonConvert.SerializeObject(orderDto));
                 var tokenGrain =
                     GrainFactory.GetGrain<ITokenGrain>(ITokenGrain.GenGrainId(toTransfer.Symbol, toTransfer.ChainId));
                 var tokenInfo = await tokenGrain.GetToken();
@@ -54,6 +55,7 @@ public partial class UserWithdrawGrain
             }
             else
             {
+                _logger.LogInformation("only OnToStartTransfer2: {dto}", JsonConvert.SerializeObject(orderDto));
                 rawTransaction = Transaction.Parser.ParseFrom(ByteStringHelper.FromHexString(orderDto.FromRawTransaction));
             }
 
@@ -68,6 +70,7 @@ public partial class UserWithdrawGrain
                 .Build());
 
             // send 
+            _logger.LogInformation("send OnToStartTransfer1: {dto}", JsonConvert.SerializeObject(orderDto));
             var (isSuccess, error) = await _contractProvider.SendTransactionAsync(toTransfer.ChainId, rawTransaction);
             AssertHelper.IsTrue(isSuccess, error);
 

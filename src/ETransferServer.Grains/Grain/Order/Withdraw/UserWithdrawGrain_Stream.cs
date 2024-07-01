@@ -117,7 +117,7 @@ public partial class UserWithdrawGrain
     {
         if (isAElf)
         {
-            var order = await OnToStartTransfer(orderDto, true);
+            var order = await OnToStartTransfer(orderDto);
             await AddOrUpdateOrder(order.WithdrawOrder, order.ExtensionData);
         }
         else
