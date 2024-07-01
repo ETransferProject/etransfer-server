@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
+using ETransferServer.Dtos.Transaction;
 using ETransferServer.Service.Transaction;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Volo.Abp;
 
@@ -26,5 +26,11 @@ public class TransactionController : ETransferController
     {
         var result = await _transactionAppService.TransactionNotificationAsync(timestamp, signature);
         return Content(result);
+    }
+    
+    [HttpGet("check")]
+    public async Task<TransactionCheckResult> TransactionCheckAsync(GetTransactionCheckRequestDto request)
+    {
+        return await _transactionAppService.TransactionCheckAsync(request);
     }
 }
