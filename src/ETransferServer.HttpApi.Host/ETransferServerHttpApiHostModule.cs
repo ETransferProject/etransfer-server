@@ -65,6 +65,7 @@ namespace ETransferServer
             Configure<ChainOptions>(configuration.GetSection("Chains"));
             Configure<TokenOptions>(configuration.GetSection("TokenOptions"));
             Configure<NetworkOptions>(configuration.GetSection("NetworkOptions"));
+            Configure<DepositInfoOptions>(configuration.GetSection("DepositInfo"));
             Configure<WithdrawInfoOptions>(configuration.GetSection("WithdrawInfo"));
             Configure<CoinGeckoOptions>(configuration.GetSection("CoinGecko"));
             Configure<CoBoOptions>(configuration.GetSection("CoBo"));
