@@ -18,7 +18,7 @@ public interface IWithdrawFeeMonitorGrain : IGrainWithStringKey
         return string.Join(CommonConstant.Underline, serviceName, network, symbol);
     }
 
-    public Task DoMonitor(FeeInfo feeInfo);
+    public Task DoMonitor(FeeInfo feeInfo, bool isNotify = true);
 }
 
 public class WithdrawFeeMonitorGrain : Grain<WithdrawFeeMonitorDto>, IWithdrawFeeMonitorGrain
@@ -38,7 +38,7 @@ public class WithdrawFeeMonitorGrain : Grain<WithdrawFeeMonitorDto>, IWithdrawFe
         _notifyProvider = notifyProvider.ToDictionary(p => p.NotifyType().ToString());
     }
 
-    public async Task DoMonitor(FeeInfo feeInfo)
+    public async Task DoMonitor(FeeInfo feeInfo, bool isNotify = true)
     {
         try
         {
@@ -72,7 +72,7 @@ public class WithdrawFeeMonitorGrain : Grain<WithdrawFeeMonitorDto>, IWithdrawFe
             _logger.LogDebug(
                 "Withdraw fee monitor, latest={Latest}, current={Current}, percent={Percent}, Network={Network}, Symbol={Symbol}",
                 latestFeeAmount, currentFeeAmount, percent, network, feeInfo.Symbol);
-            if (percent <= netWorkInfo.FeeAlarmPercent) return;
+            if (percent <= netWorkInfo.FeeAlarmPercent || !isNotify) return;
 
             var sendSuccess =
                 await SendNotifyAsync(network, feeInfo.Symbol, currentFee, latestFee, latestFeeTime, percent);

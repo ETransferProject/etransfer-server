@@ -27,7 +27,20 @@ public static class CommonConstant
     
     public const string PortKeyAppId = "PortKey";
     public const string NightElfAppId = "NightElf";
-    
+
+    public static class DefaultConst {
+        public const int ThirdPartDigitals = 4;
+        public const int ElfDecimals = 8;
+        public const decimal DefaultMinThirdPartFee = 0.1M;
+        public const string TokenPoolContractName = "ETransfer.Contracts.TokenPool";
+        public const string CaContractName = "Portkey.Contracts.CA";
+        public const string CaContractName2 = "Portkey.Contracts.CA2";
+        public const string ManagerForwardCall = "ManagerForwardCall";
+        public const string TransferToken = "TransferToken";
+        public const string PortKeyVersion = "v1";
+        public const string PortKeyVersion2 = "v2";
+    }
+
     public static class ChainId
     {
         public const string AElfMainChain = "AELF";

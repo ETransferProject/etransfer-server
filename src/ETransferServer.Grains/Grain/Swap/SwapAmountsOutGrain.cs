@@ -12,7 +12,7 @@ namespace ETransferServer.Grains.Grain.Swap;
 
 public interface ISwapAmountsOutGrain : IGrainWithStringKey
 {
-    Task<(decimal, decimal, long, long)> GetAmountsOutAsync(decimal amountIn, List<string> path,
+    Task<(decimal, decimal, long, long)> GetAmountsOut(decimal amountIn, List<string> path,
         bool isConversionRate = false);
 
     public static string GenGrainId(string chainId, string symbolIn, string symbolOut, string router)
@@ -35,7 +35,7 @@ public class SwapAmountsOutGrain : Grain<SwapAmountsState>, ISwapAmountsOutGrain
         _logger = logger;
     }
 
-    public async Task<(decimal, decimal, long, long)> GetAmountsOutAsync(decimal amountIn, List<string> path,
+    public async Task<(decimal, decimal, long, long)> GetAmountsOut(decimal amountIn, List<string> path,
         bool isConversionRate = false)
     {
         var grainId = SwapAmountsGrainId.FromGrainId(this.GetPrimaryKeyString());

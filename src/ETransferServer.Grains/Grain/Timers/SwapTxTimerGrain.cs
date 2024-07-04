@@ -213,7 +213,7 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
                 orderId, pendingTx.TxId);
             var transfer = indexerTx[pendingTx.TxId];
             var swapGrain = GrainFactory.GetGrain<ISwapGrain>(order.Id);
-            order.ToTransfer.Amount =  await swapGrain.RecordAmountOutAsync(transfer.AmountOut);
+            order.ToTransfer.Amount =  await swapGrain.RecordAmountOut(transfer.AmountOut);
             _logger.LogInformation("SwapTxTimer toTransfer amount: {Amount}", order.ToTransfer.Amount);
             order.ToTransfer.Status = OrderTransferStatusEnum.Confirmed.ToString();
             order.Status = OrderStatusEnum.ToTransferConfirmed.ToString();
@@ -324,7 +324,7 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
                     transferInfo.Status = OrderTransferStatusEnum.Confirmed.ToString();
                     order.Status = OrderStatusEnum.ToTransferConfirmed.ToString();
                     var swapGrain = GrainFactory.GetGrain<ISwapGrain>(order.Id);
-                    transferInfo.Amount =  await swapGrain.ParseReturnValueAsync(txStatus.Logs);
+                    transferInfo.Amount =  await swapGrain.ParseReturnValue(txStatus.Logs);
                     _logger.LogInformation("After ParseReturnValueAsync: {Amount}", transferInfo.Amount);
                     
                     await SaveOrder(order, ExtensionBuilder.New()
@@ -430,6 +430,6 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
     private async Task DepositSwapFailureAlarmAsync(DepositOrderDto orderDto, string reason)
     {
         var depositSwapMonitorGrain = GrainFactory.GetGrain<IDepositSwapMonitorGrain>(orderDto.Id.ToString());
-        await depositSwapMonitorGrain.DoMonitorAsync(DepositSwapMonitorDto.Create(orderDto, reason));
+        await depositSwapMonitorGrain.DoMonitor(DepositSwapMonitorDto.Create(orderDto, reason));
     }
 }

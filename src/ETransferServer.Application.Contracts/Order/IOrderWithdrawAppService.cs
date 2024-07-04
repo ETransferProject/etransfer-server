@@ -12,5 +12,5 @@ public interface IOrderWithdrawAppService : IApplicationService
     Task<bool> AddOrUpdateAsync(WithdrawOrderDto dto);
     Task<GetWithdrawInfoDto> GetWithdrawInfoAsync(GetWithdrawListRequestDto request);
     Task<CreateWithdrawOrderDto> CreateWithdrawOrderInfoAsync(GetWithdrawOrderRequestDto request);
-    Task DoMonitorAsync(string network, decimal estimateFee, string feeSymbol);
+    Task DoMonitorAsync(string network, decimal estimateFee, string feeSymbol, bool isNotify);
 }

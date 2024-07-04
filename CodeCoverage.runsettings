@@ -24,8 +24,12 @@
           ,**/src/ETransferServer.Silo/**/*.cs
           ,**/src/ETransferServer.Grains/**/*.cs
           ,**/src/ETransferServer.Application/Properties/*.cs
+          ,**/src/ETransferServer.Application/ChainsClient/**/*.cs
+          ,**/src/ETransferServer.Application/GraphQL/*.cs
           ,**/src/ETransferServer.Application/Options/*.cs
           ,**/src/ETransferServer.Application/Protobuf/**/*.cs
+          ,**/src/ETransferServer.Application/Swap/*.cs
+          ,**/src/ETransferServer.Application/Transaction/*.cs
           ,**/src/ETransferServer.Application/User/UserAddressOptions.cs
           ,**/src/ETransferServer.Application/User/UserAppService.cs
           ,**/src/ETransferServer.Application/Order/OrderWithdrawAppService.cs

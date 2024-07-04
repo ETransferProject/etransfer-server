@@ -8,9 +8,7 @@ public class ETransferServerPermissionDefinitionProvider : PermissionDefinitionP
 {
     public override void Define(IPermissionDefinitionContext context)
     {
-        var myGroup = context.AddGroup(ETransferServerPermissions.GroupName);
-        //Define your own permissions here. Example:
-        //myGroup.AddPermission(ETransferServerPermissions.MyPermission1, L("Permission:MyPermission1"));
+        context.AddGroup(ETransferServerPermissions.GroupName);
     }
 
     private static LocalizableString L(string name)

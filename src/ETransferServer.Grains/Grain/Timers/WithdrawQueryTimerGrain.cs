@@ -126,7 +126,7 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
 
             // Query existing orders first to prevent repeated additions.
             var userWithdrawRecordGrain = GrainFactory.GetGrain<IUserWithdrawRecordGrain>(orderDto.Id);
-            var orderExists = await userWithdrawRecordGrain.GetAsync();
+            var orderExists = await userWithdrawRecordGrain.Get();
             AssertHelper.IsTrue(orderExists.Success, "Query withdraw exists order failed {Msg}", orderExists.Message);
             AssertHelper.IsNull(orderExists.Data, "Withdraw order {OrderId} exists", orderDto.Id);
 
@@ -174,7 +174,7 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
                 Id = OrderIdHelper.WithdrawOrderId(transferRecord.Id, transferRecord.ToChainId,
                     transferRecord.ToAddress),
                 Status = OrderStatusEnum.FromTransferring.ToString(),
-                UserId = await GetUserIdAsync(transferRecord.From) ?? Guid.Empty,
+                UserId = await GetUserIdAsync(transferRecord.From),
                 OrderType = OrderTypeEnum.Withdraw.ToString(),
                 AmountUsd = amountUsd,
                 FromTransfer = new TransferInfo
@@ -262,10 +262,10 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
         return avgExchange;
     }
 
-    private async Task<Guid?> GetUserIdAsync(string address)
+    private async Task<Guid> GetUserIdAsync(string address)
     {
         var user = await _userAppService.GetUserByAddressAsync(address);
-        return user?.Id;
+        return user?.Id ?? OrderIdHelper.WithdrawUserId(address);
     }
     
     private bool VerifyAElfChain(string chainId)
@@ -283,7 +283,7 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
         }
 
         var coBoCoinGrain = GrainFactory.GetGrain<ICoBoCoinGrain>(ICoBoCoinGrain.Id(network, symbol));
-        var coin = await coBoCoinGrain.GetAsync();
+        var coin = await coBoCoinGrain.Get();
         AssertHelper.NotNull(coin, "CoBo coin detail not found");
         _logger.LogDebug("CoBo AbsEstimateFee={Fee}, FeeCoin={Coin}, expireTime={Ts}", coin.AbsEstimateFee,
             coin.FeeCoin, coin.ExpireTime);
@@ -293,8 +293,15 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
         var avgExchange = await GetAvgExchangeAsync(feeSymbol, symbol);
         var estimateFee = coin.AbsEstimateFee.SafeToDecimal() * avgExchange;
         estimateFee = Math.Max(estimateFee, await GetMinThirdPartFeeAsync(symbol))
-            .ToString(DecimalHelper.GetDecimals(symbol), DecimalHelper.RoundingOption.Ceiling).SafeToDecimal();
+            .ToString(GetDecimals(symbol), DecimalHelper.RoundingOption.Ceiling).SafeToDecimal();
         return estimateFee;
+    }
+
+    private int GetDecimals(string symbol)
+    {
+        return _withdrawOption.Value.TokenInfo.ContainsKey(symbol)
+            ? _withdrawOption.Value.TokenInfo[symbol]
+            : DecimalHelper.GetDecimals(symbol);
     }
 
     private decimal AssertWithdrawAmount(decimal amount, decimal estimateFee, decimal realFee)
@@ -356,7 +363,7 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
     private async Task WithdrawOrderFailAlarmAsync(TransferRecordDto recordDto, string reason)
     {
         var withdrawOrderMonitorGrain = GrainFactory.GetGrain<IWithdrawOrderMonitorGrain>(recordDto.Id);
-        await withdrawOrderMonitorGrain.DoMonitorAsync(WithdrawOrderMonitorDto.Create(recordDto, reason));
+        await withdrawOrderMonitorGrain.DoMonitor(WithdrawOrderMonitorDto.Create(recordDto, reason));
     }
 
     public Task<DateTime> GetLastCallbackTime()
