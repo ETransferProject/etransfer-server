@@ -6,4 +6,5 @@ public class GetTransactionCheckRequestDto
 {
     [Required]
     public string Address { get; set; }
+    public int? Type { get; set; }
 }

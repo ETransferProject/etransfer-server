@@ -25,18 +25,21 @@ public class TransactionAppService : ETransferServerAppService, ITransactionAppS
     private readonly INESTRepository<OrderIndex, Guid> _orderIndexRepository;
     private readonly ILogger<TransactionAppService> _logger;
     private readonly IClusterClient _clusterClient;
+    private readonly IOptionsSnapshot<DepositInfoOptions> _depositInfoOptions;
     private readonly IOptionsSnapshot<CoBoOptions> _options;
     private readonly IHttpContextAccessor _httpContextAccessor;
 
     public TransactionAppService(INESTRepository<OrderIndex, Guid> orderIndexRepository,
         ILogger<TransactionAppService> logger, 
         IClusterClient clusterClient,
+        IOptionsSnapshot<DepositInfoOptions> depositInfoOptions, 
         IOptionsSnapshot<CoBoOptions> options, 
         IHttpContextAccessor httpContextAccessor)
     {
         _orderIndexRepository = orderIndexRepository;
         _logger = logger;
         _clusterClient = clusterClient;
+        _depositInfoOptions = depositInfoOptions;
         _options = options;
         _httpContextAccessor = httpContextAccessor;
     }
@@ -76,10 +79,37 @@ public class TransactionAppService : ETransferServerAppService, ITransactionAppS
         var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
         mustQuery.Add(q => q.Term(i =>
             i.Field(f => f.OrderType).Value(OrderTypeEnum.Deposit.ToString())));
-        mustQuery.Add(q => q.Term(i =>
-            i.Field(f => f.FromTransfer.Symbol).Value(CommonConstant.Symbol.USDT)));
-        mustQuery.Add(q => q.Term(i =>
-            i.Field(f => f.ToTransfer.Symbol).Value(CommonConstant.Symbol.SGR)));
+        if (!request.Type.HasValue)
+        {
+            mustQuery.Add(q => q.Term(i =>
+                i.Field(f => f.FromTransfer.Symbol).Value(CommonConstant.Symbol.USDT)));
+            mustQuery.Add(q => q.Term(i =>
+                i.Field(f => f.ToTransfer.Symbol).Value(CommonConstant.Symbol.SGR)));
+        }
+        else if (_depositInfoOptions.Value.TxPairType.ContainsKey(request.Type.Value.ToString()))
+        {
+            var tokenPairs = _depositInfoOptions.Value.TxPairType[request.Type.Value.ToString()]
+                .Split(CommonConstant.Underline);
+            if (tokenPairs.Length <= 1)
+            {
+                return new TransactionCheckResult
+                {
+                    Result = false
+                };
+            }
+            mustQuery.Add(q => q.Term(i =>
+                i.Field(f => f.FromTransfer.Symbol).Value(tokenPairs[0])));
+            mustQuery.Add(q => q.Term(i =>
+                i.Field(f => f.ToTransfer.Symbol).Value(tokenPairs[1])));
+        }
+        else
+        {
+            return new TransactionCheckResult
+            {
+                Result = false
+            };
+        }
+
         mustQuery.Add(q => q.Terms(i =>
             i.Field(f => f.Status).Terms(new List<string>
             {
