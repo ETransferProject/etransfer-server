@@ -15,7 +15,7 @@ namespace ETransferServer.Grains.Grain.Swap;
 
 public interface ISwapReserveGrain : IGrainWithStringKey
 {
-    Task<GrainResultDto<ReserveDto>> GetReserveAsync(Guid orderId, long timeStamp, int skipCount, int maxResultCount);
+    Task<GrainResultDto<ReserveDto>> GetReserve(Guid orderId, long timeStamp, int skipCount, int maxResultCount);
 
     public static string GenGrainId(string chainId, string symbolIn, string symbolOut, string router)
     {
@@ -42,7 +42,7 @@ public class SwapReserveGrain : Grain<SwapReserveState>, ISwapReserveGrain
         _swapInfosOptions = swapInfosOptions.Value;
     }
 
-    public async Task<GrainResultDto<ReserveDto>> GetReserveAsync(Guid orderId, long timeStamp, int skipCount,
+    public async Task<GrainResultDto<ReserveDto>> GetReserve(Guid orderId, long timeStamp, int skipCount,
         int maxResultCount)
     {
         var result = new GrainResultDto<ReserveDto>();

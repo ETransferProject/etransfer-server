@@ -1,4 +1,5 @@
 using AElf.Client.Dto;
+using ETransfer.Contracts.TokenPool;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans;
@@ -10,6 +11,7 @@ using ETransferServer.Grains.GraphQL;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.State.Order;
 using ETransferServer.Options;
+using Google.Protobuf;
 using Volo.Abp;
 
 namespace ETransferServer.Grains.Grain.Timers;
@@ -124,8 +126,7 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> 
             yield return locations.GetRange(i, Math.Min(nSize, locations.Count - i));
         }
     }
-
-
+    
     internal abstract Task SaveOrder(TOrder order, Dictionary<string, string> externalInfo);
 
     internal abstract Task<TOrder> GetOrder(Guid orderId);
@@ -186,6 +187,8 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> 
             }
             else
             {
+                order.FromTransfer.FromAddress = transfer.FromAddress;
+                order.FromTransfer.ToAddress = transfer.ToAddress;
                 order.FromTransfer.Status = OrderTransferStatusEnum.Transferred.ToString();
                 order.Status = OrderStatusEnum.FromTransferConfirmed.ToString();
             }
@@ -280,7 +283,16 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> 
             if (txStatus.Status == CommonConstant.TransactionState.Mined)
             {
                 if (!IsTxFastConfirmed(timerTx, order, txStatus.BlockNumber, chainStatus)) return false;
-                
+
+                if (!isToTransfer)
+                {
+                    var (from, to) = await ParseFromLogEvent(txStatus.Logs);
+                    if (!from.IsNullOrEmpty())
+                    {
+                        transferInfo.FromAddress = from;
+                        transferInfo.ToAddress = to;
+                    }
+                }
                 transferInfo.Status = OrderTransferStatusEnum.Transferred.ToString();
                 order.Status = isToTransfer
                     ? OrderStatusEnum.ToTransferConfirmed.ToString()
@@ -329,6 +341,23 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> 
                 order.Id,
                 timerTx.TxTime, timerTx.TxTime);
             return false;
+        }
+    }
+
+    private async Task<Tuple<string, string>> ParseFromLogEvent(LogEventDto[] logs)
+    {
+        try
+        {
+            var param = TokenPoolTransferred.Parser.ParseFrom(
+                ByteString.FromBase64(logs.FirstOrDefault(l => l.Name == nameof(TokenPoolTransferred))?.NonIndexed));
+            _logger.LogInformation(
+                "TxFastOrderTimer ParseFromLogEvent, from={from}, to={to}", param.From.ToBase58(), param.To.ToBase58());
+            return Tuple.Create(param.From.ToBase58(), param.To.ToBase58());
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "TxFastOrderTimer ParseFromLogEvent error");
+            return Tuple.Create(string.Empty, string.Empty);
         }
     }
 

@@ -68,7 +68,7 @@ public class TokenAddressTimerGrain: Grain<TokenAddressState>, ITokenAddressTime
         {
             try
             {
-                var split = item.Split(DepositAddressOptions.DefaultDelimiter);
+                var split = item.Split(CommonConstant.Underline);
                 if (split.Length < 2) continue;
                 _logger.LogDebug("CoBoProvider.GetAddressesAsync before.");
                 var addresses = await _coBoProvider.GetAddressesAsync(item, _depositAddressOptions.Value.MaxRequestNewAddressCount);

@@ -103,12 +103,14 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
 
             try
             {
+
                 var avgExchange =
                     await _networkAppService.GetAvgExchangeAsync(request.Symbol, CommonConstant.Symbol.USD);
+                var decimals =
+                    await _networkAppService.GetDecimalsAsync(request.ChainId, request.Symbol);
                 getDepositInfoDto.DepositInfo.MinAmountUsd =
                     (depositInfo.MinDeposit.SafeToDecimal() * avgExchange).ToString(
-                        DecimalHelper.GetDecimals(request.Symbol),
-                        DecimalHelper.RoundingOption.Ceiling);
+                        decimals, DecimalHelper.RoundingOption.Ceiling);
             }
             catch (Exception e)
             {

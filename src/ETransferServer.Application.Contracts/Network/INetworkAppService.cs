@@ -14,4 +14,5 @@ public interface INetworkAppService : IApplicationService
     Task<Tuple<decimal, CoBoCoinDto>> CalculateNetworkFeeAsync(string network, string symbol);
     Task<decimal> GetAvgExchangeAsync(string fromSymbol, string toSymbol);
     Task<decimal> GetMinThirdPartFeeAsync(string symbol);
+    Task<int> GetDecimalsAsync(string chainId, string symbol);
 }

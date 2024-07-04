@@ -14,7 +14,7 @@ namespace ETransferServer.Grains.Grain.Order.Deposit;
 
 public interface IDepositSwapMonitorGrain : IGrainWithStringKey
 {
-    Task DoMonitorAsync(DepositSwapMonitorDto depositSwapMonitorDto);
+    Task DoMonitor(DepositSwapMonitorDto depositSwapMonitorDto);
 }
 
 public class DepositSwapMonitorGrain : Grain<DepositSwapMonitorState>, IDepositSwapMonitorGrain
@@ -30,7 +30,7 @@ public class DepositSwapMonitorGrain : Grain<DepositSwapMonitorState>, IDepositS
         _notifyProvider = notifyProvider.ToDictionary(p => p.NotifyType().ToString());
     }
     
-    public async Task DoMonitorAsync(DepositSwapMonitorDto dto)
+    public async Task DoMonitor(DepositSwapMonitorDto dto)
     {
         try
         {

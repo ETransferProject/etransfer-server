@@ -28,11 +28,11 @@ namespace ETransferServer.Grains.Grain.Swap;
 
 public interface ISwapGrain : IGrainWithGuidKey
 {
-    Task<GrainResultDto<DepositOrderChangeDto>> SwapAsync(DepositOrderDto dto);
+    Task<GrainResultDto<DepositOrderChangeDto>> Swap(DepositOrderDto dto);
 
-    // Task<GrainResultDto<DepositOrderChangeDto>> SubsidyTransferAsync(DepositOrderDto dto，string returnValue);
-    Task<decimal> ParseReturnValueAsync(LogEventDto[] logs);
-    Task<decimal> RecordAmountOutAsync(long amount);
+    // Task<GrainResultDto<DepositOrderChangeDto>> SubsidyTransfer(DepositOrderDto dto，string returnValue);
+    Task<decimal> ParseReturnValue(LogEventDto[] logs);
+    Task<decimal> RecordAmountOut(long amount);
 }
 
 public class SwapGrain : Grain<SwapState>, ISwapGrain
@@ -61,7 +61,7 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
         .WithCamelCasePropertyNamesResolver()
         .Build();
 
-    public async Task<GrainResultDto<DepositOrderChangeDto>> SwapAsync(DepositOrderDto dto)
+    public async Task<GrainResultDto<DepositOrderChangeDto>> Swap(DepositOrderDto dto)
     {
         var result = new GrainResultDto<DepositOrderChangeDto>()
         {
@@ -215,7 +215,7 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
         {
             var grain = GrainFactory.GetGrain<IEvmTransactionGrain>(string.Join(CommonConstant.Underline, chainId,
                 blockHash));
-            var resultDto = await grain.GetTransactionTimeAsync(chainId, blockHash, txId);
+            var resultDto = await grain.GetTransactionTime(chainId, blockHash, txId);
             return resultDto;
         }
         catch (Exception e)
@@ -353,7 +353,7 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
             toTransfer.ChainId,
             fromTransfer.Symbol, toTransfer.Symbol, swapInfo.Router));
         var (amountIn, amountOut, amountInActual, amountOutActual) =
-            await swapAmountsGrain.GetAmountsOutAsync(fromTransfer.Amount, swapInfo.Path);
+            await swapAmountsGrain.GetAmountsOut(fromTransfer.Amount, swapInfo.Path);
         State.AmountOutNow = amountOut;
         await WriteStateAsync();
         return (amountIn, amountOut, amountInActual, amountOutActual);
@@ -388,7 +388,7 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
         var reserveGrain = GrainFactory.GetGrain<ISwapReserveGrain>(ISwapReserveGrain.GenGrainId(
             chainId,
             fromSymbol, toSymbol, router));
-        var reserveResult = await reserveGrain.GetReserveAsync(orderId, createTime, 0, 10);
+        var reserveResult = await reserveGrain.GetReserve(orderId, createTime, 0, 10);
         return reserveResult;
     }
 
@@ -402,7 +402,7 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
         return tokenInfo;
     }
 
-    public async Task<decimal> ParseReturnValueAsync(LogEventDto[] logs)
+    public async Task<decimal> ParseReturnValue(LogEventDto[] logs)
     {
         decimal actualSwappedAmountOut = 0;
         try
@@ -428,7 +428,7 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
         return actualSwappedAmountOut;
     }
 
-    public async Task<decimal> RecordAmountOutAsync(long amount)
+    public async Task<decimal> RecordAmountOut(long amount)
     {
         decimal actualSwappedAmountOut = 0;
         try

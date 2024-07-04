@@ -27,16 +27,17 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
     private readonly IOptionsSnapshot<NetworkOptions> _networkOptions;
     private readonly CoinGeckoOptions _coinGeckoOptions;
     private readonly IOptionsSnapshot<WithdrawInfoOptions> _withdrawInfoOptions;
+    private readonly IOptionsSnapshot<TokenOptions> _tokenOptions;
     private readonly IObjectMapper _objectMapper;
     private readonly IClusterClient _clusterClient;
-    private const int ThirdPartDigitals = 4;
-    private const decimal DefaultMinThirdPartFee = 0.1M;
 
     public NetworkAppService(ILogger<NetworkAppService> logger, 
         IOptionsSnapshot<NetworkOptions> networkOptions,
         IOptionsSnapshot<CoinGeckoOptions> coinGeckoOptions,
         IObjectMapper objectMapper,
-        IClusterClient clusterClient, IOptionsSnapshot<WithdrawInfoOptions> withdrawInfoOptions)
+        IClusterClient clusterClient, 
+        IOptionsSnapshot<WithdrawInfoOptions> withdrawInfoOptions,
+        IOptionsSnapshot<TokenOptions> tokenOptions)
     {
         _logger = logger;
         _networkOptions = networkOptions;
@@ -44,6 +45,7 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
         _objectMapper = objectMapper;
         _clusterClient = clusterClient;
         _withdrawInfoOptions = withdrawInfoOptions;
+        _tokenOptions = tokenOptions;
     }
 
     public async Task<GetNetworkListDto> GetNetworkListAsync(GetNetworkListRequestDto request)
@@ -63,8 +65,8 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
             try
             {
                 getNetworkListDto.NetworkList = request.Symbol == CommonConstant.Symbol.USDT ?
-                    await CalculateNetworkFeeListAsync(getNetworkListDto.NetworkList, request.Symbol)
-                    : await CalculateAvgNetworkFeeListAsync(getNetworkListDto.NetworkList, request.Symbol);
+                    await CalculateNetworkFeeListAsync(getNetworkListDto.NetworkList, request.ChainId, request.Symbol)
+                    : await CalculateAvgNetworkFeeListAsync(getNetworkListDto.NetworkList, request.ChainId, request.Symbol);
             }
             catch (Exception e)
             {
@@ -165,7 +167,7 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
     public async Task<Tuple<decimal, CoBoCoinDto>> CalculateNetworkFeeAsync(string network, string symbol)
     {
         var coBoCoinGrain = _clusterClient.GetGrain<ICoBoCoinGrain>(ICoBoCoinGrain.Id( network, symbol));
-        var coin = await coBoCoinGrain.GetAsync();
+        var coin = await coBoCoinGrain.Get();
         AssertHelper.NotNull(coin, "CoBo coin detail not found");
         _logger.LogDebug("CoBo AbsEstimateFee={Fee}, FeeCoin={Coin}, expireTime={Ts}", coin.AbsEstimateFee,
             coin.FeeCoin, coin.ExpireTime);
@@ -198,10 +200,19 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
     {
         return Task.FromResult(_withdrawInfoOptions.Value.MinThirdPartFee.ContainsKey(symbol)
             ? _withdrawInfoOptions.Value.MinThirdPartFee[symbol]
-            : DefaultMinThirdPartFee);
+            : CommonConstant.DefaultConst.DefaultMinThirdPartFee);
     }
 
-    private async Task<List<NetworkDto>> CalculateNetworkFeeListAsync(List<NetworkDto> networkList, string symbol)
+    public Task<int> GetDecimalsAsync(string chainId, string symbol)
+    {
+        return Task.FromResult((_tokenOptions.Value.Withdraw.ContainsKey(chainId)
+                ? _tokenOptions.Value.Withdraw[chainId]
+                : null)
+            ?.FirstOrDefault(t => t.Symbol == symbol)
+            ?.Decimals ?? DecimalHelper.GetDecimals(symbol));
+    }
+
+    private async Task<List<NetworkDto>> CalculateNetworkFeeListAsync(List<NetworkDto> networkList, string chainId, string symbol)
     {
         var exchangeSymbolPair = networkList.ConvertAll(item => item.Network).ToList().JoinAsString(CommonConstant.Underline);
         var exchangeGrain = _clusterClient.GetGrain<ITokenExchangeGrain>(exchangeSymbolPair);
@@ -219,7 +230,7 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
                 network.WithdrawFee = Math.Max(await GetMinThirdPartFeeAsync(symbol),
                         network.WithdrawFee.SafeToDecimal() *
                         exchange[_coinGeckoOptions.CoinIdMapping[network.WithdrawFeeUnit]].Exchange)
-                    .ToString(ThirdPartDigitals, DecimalHelper.GetDecimals(symbol),
+                    .ToString(CommonConstant.DefaultConst.ThirdPartDigitals, await GetDecimalsAsync(chainId, symbol),
                         DecimalHelper.RoundingOption.Ceiling);
             }
 
@@ -230,7 +241,7 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
     }
     
 
-    private async Task<List<NetworkDto>> CalculateAvgNetworkFeeListAsync(List<NetworkDto> networkList, string symbol)
+    private async Task<List<NetworkDto>> CalculateAvgNetworkFeeListAsync(List<NetworkDto> networkList, string chainId, string symbol)
     {
         foreach (var network in networkList)
         {
@@ -244,7 +255,7 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
 
                 network.WithdrawFee = Math.Max(await GetMinThirdPartFeeAsync(symbol),
                         network.WithdrawFee.SafeToDecimal() * avgExchange)
-                    .ToString(ThirdPartDigitals, DecimalHelper.GetDecimals(symbol),
+                    .ToString(CommonConstant.DefaultConst.ThirdPartDigitals, await GetDecimalsAsync(chainId, symbol),
                         DecimalHelper.RoundingOption.Ceiling);
             }
 
@@ -257,7 +268,7 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
     private async Task<string> GetCacheFeeAsync(string network, string symbol)
     {
         var coBoCoinGrain = _clusterClient.GetGrain<ICoBoCoinGrain>(ICoBoCoinGrain.Id(network, symbol));
-        var coin = await coBoCoinGrain.GetCacheAsync();
+        var coin = await coBoCoinGrain.GetCache();
         return coin?.AbsEstimateFee;
     }
 

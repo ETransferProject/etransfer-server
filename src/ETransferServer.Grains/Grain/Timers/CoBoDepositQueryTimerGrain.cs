@@ -168,7 +168,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         catch (Exception e)
         {
             var coBoDepositGrain = GrainFactory.GetGrain<ICoBoDepositGrain>(coBoTransaction.Id);
-            if (await coBoDepositGrain.NotUpdatedAsync())
+            if (await coBoDepositGrain.NotUpdated())
             {
                 await AddCheckDepositOrder(GuidHelper.GenerateCombinedId(coBoTransaction.Id, GetAlarmTemplate(e)));
             }

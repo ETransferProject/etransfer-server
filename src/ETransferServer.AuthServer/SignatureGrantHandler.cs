@@ -18,6 +18,7 @@ using Orleans;
 using Portkey.Contracts.CA;
 using ETransferServer.Auth.Dtos;
 using ETransferServer.Auth.Options;
+using ETransferServer.Common;
 using ETransferServer.Grains.Grain.Users;
 using ETransferServer.User.Dtos;
 using Newtonsoft.Json.Linq;
@@ -136,7 +137,7 @@ public class SignatureGrantHandler : ITokenExtensionGrant
             if (user == null)
             {
                 _logger.LogInformation("before  CreatePortKeyUserAsync(userManager, userId, caHash, version)");
-                var userId = Guid.NewGuid();
+                var userId = await GetUserIdAsync(chainId, caHash, version);
                 var createUserResult = await CreatePortKeyUserAsync(userManager, userId, caHash, version);
                 if (!createUserResult)
                 {
@@ -175,7 +176,6 @@ public class SignatureGrantHandler : ITokenExtensionGrant
             user = await userManager.FindByNameAsync(address);
             if (user == null)
             {
-                
                 _httpClient = context.HttpContext.RequestServices.GetRequiredService<IHttpClientFactory>().CreateClient();
                 var valid = !recaptchaToken.IsNullOrEmpty() && await IsCaptchaValid(recaptchaToken);
                 if (!valid)
@@ -183,7 +183,7 @@ public class SignatureGrantHandler : ITokenExtensionGrant
                     return GetForbidResult(OpenIddictConstants.Errors.InvalidRequest, "RecaptchaToken validation failed.");
                 }
                 
-                var userId = Guid.NewGuid();
+                var userId = GuidHelper.UniqGuid(address);
                 var createUserResult = await CreateEoaUserAsync(userManager, userId, address);
                 if (!createUserResult)
                 {
@@ -218,7 +218,6 @@ public class SignatureGrantHandler : ITokenExtensionGrant
                     });
                     _logger.LogInformation("save user success, userId:{userId}", user.Id.ToString());
                 }
-                
             }
         }
 
@@ -236,7 +235,27 @@ public class SignatureGrantHandler : ITokenExtensionGrant
 
         return new SignInResult(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme, claimsPrincipal);
     }
-    
+
+    private async Task<Guid> GetUserIdAsync(string chainId, string caHash, string version)
+    {
+        try
+        {
+            if (!AuthConstant.PortKeyVersion2.Equals(version)) return Guid.NewGuid();
+            var virtualAddress = Hash.LoadFromHex(caHash);
+            var contractAddress = Address.FromBase58(_chainOptions.Value.ChainInfos[chainId].ContractAddress2);
+            var address = Address.FromPublicKey(contractAddress.Value
+                .Concat(virtualAddress.Value.ToByteArray().ComputeHash())
+                .ToArray());
+            return GuidHelper.UniqGuid(address.ToBase58());
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "GetUserId error, chainId:{chainId}, caHash:{caHash}, version:{version}", 
+                chainId, caHash, version);
+            return Guid.NewGuid();
+        }
+    }
+
     private async Task<bool> IsCaptchaValid(string token)
     {
         _logger.LogInformation("method IsCaptchaValid, token: {token}", token);

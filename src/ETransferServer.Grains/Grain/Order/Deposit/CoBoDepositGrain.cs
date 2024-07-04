@@ -10,9 +10,9 @@ public interface ICoBoDepositGrain : IGrainWithStringKey
     Task AddOrUpdate(CoBoTransactionDto dto);
     Task<CoBoTransactionDto> Get();
 
-    Task<bool> NotExistAsync();
+    Task<bool> NotExist();
 
-    Task<bool> NotUpdatedAsync();
+    Task<bool> NotUpdated();
 }
 
 public class CoBoDepositGrain : Grain<CoBoTransactionState>, ICoBoDepositGrain
@@ -49,12 +49,12 @@ public class CoBoDepositGrain : Grain<CoBoTransactionState>, ICoBoDepositGrain
         return _objectMapper.Map<CoBoTransactionState, CoBoTransactionDto>(State);
     }
 
-    public async Task<bool> NotExistAsync()
+    public async Task<bool> NotExist()
     {
         return State == null || State?.Id == null;
     }
     
-    public async Task<bool> NotUpdatedAsync()
+    public async Task<bool> NotUpdated()
     {
         return State == null || State?.UpdateCount <= 0;
     }

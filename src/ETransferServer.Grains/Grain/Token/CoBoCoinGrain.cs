@@ -18,9 +18,9 @@ public interface ICoBoCoinGrain : IGrainWithStringKey
         return string.Join(CommonConstant.Underline, network, symbol);
     }
     
-    Task<CoBoCoinDto> GetAsync();
+    Task<CoBoCoinDto> Get();
     
-    Task<CoBoCoinDto> GetCacheAsync();
+    Task<CoBoCoinDto> GetCache();
 }
 
 public class CoBoCoinGrain: Grain<CoBoCoinState>, ICoBoCoinGrain
@@ -38,7 +38,7 @@ public class CoBoCoinGrain: Grain<CoBoCoinState>, ICoBoCoinGrain
         _coBoOptions = coBoOptions;
     }
 
-    public async Task<CoBoCoinDto> GetAsync()
+    public async Task<CoBoCoinDto> Get()
     {
         var now = DateTime.UtcNow.ToUtcMilliSeconds();
         if (State.Coin.NotNullOrEmpty() && State.ExpireTime > now)
@@ -57,7 +57,7 @@ public class CoBoCoinGrain: Grain<CoBoCoinState>, ICoBoCoinGrain
         return _objectMapper.Map<CoBoCoinState, CoBoCoinDto>(State);
     }
     
-    public async Task<CoBoCoinDto> GetCacheAsync()
+    public async Task<CoBoCoinDto> GetCache()
     {
         var now = DateTime.UtcNow.ToUtcMilliSeconds();
         if (State.Coin.NotNullOrEmpty() && State.ExpireTime > now)

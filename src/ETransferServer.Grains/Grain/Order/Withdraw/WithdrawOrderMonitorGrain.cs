@@ -13,7 +13,7 @@ namespace ETransferServer.Grains.Grain.Order.Withdraw;
 
 public interface IWithdrawOrderMonitorGrain : IGrainWithStringKey
 {
-    Task DoMonitorAsync(WithdrawOrderMonitorDto dto);
+    Task DoMonitor(WithdrawOrderMonitorDto dto);
 }
 
 public class WithdrawOrderMonitorGrain : Grain<WithdrawOrderMonitorState>, IWithdrawOrderMonitorGrain
@@ -30,7 +30,7 @@ public class WithdrawOrderMonitorGrain : Grain<WithdrawOrderMonitorState>, IWith
         _notifyProvider = notifyProvider.ToDictionary(p => p.NotifyType().ToString());
     }
     
-    public async Task DoMonitorAsync(WithdrawOrderMonitorDto dto)
+    public async Task DoMonitor(WithdrawOrderMonitorDto dto)
     {
         try
         {
@@ -67,7 +67,7 @@ public class WithdrawOrderMonitorGrain : Grain<WithdrawOrderMonitorState>, IWith
         {
             var orderId = OrderIdHelper.WithdrawOrderId(dto.Id, dto.ToChainId, dto.ToAddress);
             var withdrawRecordGrain = GrainFactory.GetGrain<IUserWithdrawRecordGrain>(orderId);
-            return  (await withdrawRecordGrain.GetAsync())?.Value != null;
+            return  (await withdrawRecordGrain.Get())?.Value != null;
         }
         catch (Exception e)
         {

@@ -129,7 +129,9 @@ public class OrderStatusReminderGrain : Orleans.Grain, IOrderStatusReminderGrain
                     ? fromTransfer?.ChainId
                     : fromTransfer?.Network,
                 [Keys.NetworkTo] = OrderTypeEnum.Withdraw.ToString().Equals(order.OrderType)
-                    ? toTransfer?.Network
+                    ? toTransfer?.Network == CommonConstant.Network.AElf 
+                        ? toTransfer?.ChainId
+                        : toTransfer?.Network
                     : toTransfer?.ChainId,
 
                 [Keys.FromAddressFrom] = fromTransfer?.FromAddress,
@@ -156,7 +158,7 @@ public class OrderStatusReminderGrain : Orleans.Grain, IOrderStatusReminderGrain
             {
                 case OrderTypeEnum.Withdraw:
                     var withdrawRecordGrain = GrainFactory.GetGrain<IUserWithdrawRecordGrain>(orderId);
-                    order = (await withdrawRecordGrain.GetAsync())?.Value;
+                    order = (await withdrawRecordGrain.Get())?.Value;
                     break;
                 case OrderTypeEnum.Deposit:
                     var depositRecordGrain = GrainFactory.GetGrain<IUserDepositRecordGrain>(orderId);

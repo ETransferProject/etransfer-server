@@ -83,9 +83,9 @@ public class UserAddressService : ApplicationService, IUserAddressService
         if (evmCoins.Contains(GuidHelper.GenerateId(input.NetWork, input.Symbol)) && evmCoins.Count > 0)
         {
             // first get new address from non-first evm lists of the config, then get from first evm of the config.
-            var evmsList = evmCoins.FindAll(e => e != evmCoins.First()).ConvertAll(e => e.Split(DepositAddressOptions.DefaultDelimiter)[0]);
-            var firstList = new List<string> { evmCoins.First().Split(DepositAddressOptions.DefaultDelimiter)[0] };
-            var firstSymbol = evmCoins.First().Split(DepositAddressOptions.DefaultDelimiter)[1];
+            var evmsList = evmCoins.FindAll(e => e != evmCoins.First()).ConvertAll(e => e.Split(CommonConstant.Underline)[0]);
+            var firstList = new List<string> { evmCoins.First().Split(CommonConstant.Underline)[0] };
+            var firstSymbol = evmCoins.First().Split(CommonConstant.Underline)[1];
             return evmsList.Count > 0 ? 
                 await GetNewAddressAsync(evmsList, firstSymbol)?? await GetNewAddressAsync(firstList, firstSymbol) 
                 : await GetNewAddressAsync(firstList, firstSymbol);
@@ -157,7 +157,7 @@ public class UserAddressService : ApplicationService, IUserAddressService
         
         foreach (var item in _depositAddressOptions.Value.SupportCoins)
         {
-            var split = item.Split(DepositAddressOptions.DefaultDelimiter);
+            var split = item.Split(CommonConstant.Underline);
             if (split.Length < 2) continue;
 
             var mustQuery = new List<Func<QueryContainerDescriptor<UserAddress>, QueryContainer>>();

@@ -73,7 +73,7 @@ public class NetworkAppServiceTest : ETransferServerApplicationTestBase
         var coboCoin = new Mock<ICoBoCoinGrain>();
 
         coboCoin
-            .Setup(x => x.GetCacheAsync())
+            .Setup(x => x.GetCache())
             .ReturnsAsync(new CoBoCoinDto()
             {
                 AbsEstimateFee = "10.01"

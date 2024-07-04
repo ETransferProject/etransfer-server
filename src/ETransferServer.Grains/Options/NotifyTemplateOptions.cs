@@ -1,14 +1,9 @@
-using ETransferServer.Grains.Provider.Notify;
-
 namespace ETransferServer.Grains.Options;
 
 public class NotifyTemplateOptions
 {
     public Dictionary<string, NotifyTemplate> Templates { get; set; }
-
 }
-
-
 
 public class NotifyTemplate
 {
