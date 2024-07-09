@@ -22,8 +22,10 @@ public class TransferInfoDto
     public string Symbol { get; set; }
     public string TxId { get; set; }
     public string Amount { get; set; }
+    public string AmountUsd { get; set; }
     public string FromAddress { get; set; }
     public string ToAddress { get; set; }
+    public string Status { get; set; }
     public List<FeeInfo> FeeInfo { get; set; } = new();
 }
 

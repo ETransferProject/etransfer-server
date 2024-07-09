@@ -178,12 +178,16 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
         var estimateFee = coin.AbsEstimateFee.SafeToDecimal() * avgExchange;
         return Tuple.Create(estimateFee, coin);
     }
-    
-    public async Task<decimal> GetAvgExchangeAsync(string fromSymbol, string toSymbol)
+
+    public async Task<decimal> GetAvgExchangeAsync(string fromSymbol, string toSymbol, long timestamp = 0L)
     {
-        var exchangeSymbolPair = string.Join(CommonConstant.Underline, fromSymbol, toSymbol);
+        var exchangeSymbolPair = timestamp > 0 
+        ? string.Join(CommonConstant.Underline, fromSymbol, toSymbol, timestamp)
+        : string.Join(CommonConstant.Underline, fromSymbol, toSymbol);
         var exchangeGrain = _clusterClient.GetGrain<ITokenExchangeGrain>(exchangeSymbolPair);
-        var exchange = await exchangeGrain.GetAsync();
+        var exchange = timestamp > 0 
+            ? await exchangeGrain.GetHistoryAsync() 
+            : await exchangeGrain.GetAsync();
         AssertHelper.NotEmpty(exchange, "Exchange data not found {}", exchangeSymbolPair);
 
         var avgExchange = exchange.Values

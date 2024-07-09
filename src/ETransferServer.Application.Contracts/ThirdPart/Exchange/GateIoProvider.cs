@@ -36,8 +36,6 @@ public class GateIoProvider : IExchangeProvider, ISingletonDependency
 
     public async Task<TokenExchangeDto> LatestAsync(string fromSymbol, string toSymbol)
     {
-
-
         var from = SymbolMapping(fromSymbol);
         var to = SymbolMapping(toSymbol);
         if (from == to)

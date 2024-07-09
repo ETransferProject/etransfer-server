@@ -110,7 +110,7 @@ public class BinanceProvider : IExchangeProvider
                 FromSymbol = fromToken,
                 ToSymbol = toToken,
                 Exchange = kLine.EndTime >= timestamp ? kLine.EndAmount.SafeToDecimal() : kLine.AvgAmount(),
-                Timestamp = DateTime.UtcNow.WithMicroSeconds(0).WithMilliSeconds(0).WithSeconds(0).ToUtcMilliSeconds()
+                Timestamp = timestamp
             };
         });
     }

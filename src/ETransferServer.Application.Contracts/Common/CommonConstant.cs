@@ -39,6 +39,7 @@ public static class CommonConstant
         public const string TransferToken = "TransferToken";
         public const string PortKeyVersion = "v1";
         public const string PortKeyVersion2 = "v2";
+        public const string All = "All";
     }
 
     public static class ChainId

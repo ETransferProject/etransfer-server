@@ -116,7 +116,7 @@ public class OkxProvider : IExchangeProvider
             FromSymbol = fromSymbol,
             ToSymbol = toSymbol,
             Exchange = kline.Finished ? kline.AvgAmount() : kline.EndAmount.SafeToDecimal(),
-            Timestamp = DateTime.UtcNow.WithSeconds(0).WithMicroSeconds(0).WithMilliSeconds(0).ToUtcMilliSeconds()
+            Timestamp = timestamp
         };
     }
 }
