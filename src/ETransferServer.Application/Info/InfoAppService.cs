@@ -485,7 +485,7 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
                 .DateHistogram("date", dh => dh
                     .Field(f => f.CreateTime)
                     .CalendarInterval(dateInterval)
-                    .Order(HistogramOrder.KeyDescending)
+                    .Order(HistogramOrder.KeyAscending)
                     .Aggregations(agg => agg
                         .Terms("order_type", ts => ts
                             .Field(f => f.OrderType)
@@ -525,17 +525,17 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
                 case DateInterval.Day:
                     if (item.DepositTx > 0 || item.WithdrawTx > 0) result.Transaction.Day.Add(item);
                     if (maxResultCount.HasValue)
-                        result.Transaction.Day = result.Transaction.Day.Take(maxResultCount.Value).ToList();
+                        result.Transaction.Day = result.Transaction.Day.TakeLast(maxResultCount.Value).ToList();
                     break;
                 case DateInterval.Week:
                     if (item.DepositTx > 0 || item.WithdrawTx > 0) result.Transaction.Week.Add(item);
                     if (maxResultCount.HasValue)
-                        result.Transaction.Week = result.Transaction.Week.Take(maxResultCount.Value).ToList();
+                        result.Transaction.Week = result.Transaction.Week.TakeLast(maxResultCount.Value).ToList();
                     break;
                 case DateInterval.Month:
                     if (item.DepositTx > 0 || item.WithdrawTx > 0) result.Transaction.Month.Add(item);
                     if (maxResultCount.HasValue)
-                        result.Transaction.Month = result.Transaction.Month.Take(maxResultCount.Value).ToList();
+                        result.Transaction.Month = result.Transaction.Month.TakeLast(maxResultCount.Value).ToList();
                     break;
             }
         }
@@ -558,7 +558,7 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
                 .DateHistogram("date", dh => dh
                     .Field(f => f.CreateTime)
                     .CalendarInterval(dateInterval)
-                    .Order(HistogramOrder.KeyDescending)
+                    .Order(HistogramOrder.KeyAscending)
                     .Aggregations(agg => agg
                         .Terms("order_type", ts => ts
                             .Field(f => f.OrderType)
@@ -628,17 +628,17 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
                 case DateInterval.Day:
                     if (depositAmountUsd > 0 || withdrawAmountUsd > 0) result.Volume.Day.Add(item);
                     if (maxResultCount.HasValue)
-                        result.Volume.Day = result.Volume.Day.Take(maxResultCount.Value).ToList();
+                        result.Volume.Day = result.Volume.Day.TakeLast(maxResultCount.Value).ToList();
                     break;
                 case DateInterval.Week:
                     if (depositAmountUsd > 0 || withdrawAmountUsd > 0) result.Volume.Week.Add(item);
                     if (maxResultCount.HasValue)
-                        result.Volume.Week = result.Volume.Week.Take(maxResultCount.Value).ToList();
+                        result.Volume.Week = result.Volume.Week.TakeLast(maxResultCount.Value).ToList();
                     break;
                 case DateInterval.Month:
                     if (depositAmountUsd > 0 || withdrawAmountUsd > 0) result.Volume.Month.Add(item);
                     if (maxResultCount.HasValue)
-                        result.Volume.Month = result.Volume.Month.Take(maxResultCount.Value).ToList();
+                        result.Volume.Month = result.Volume.Month.TakeLast(maxResultCount.Value).ToList();
                     break;
             }
         }
