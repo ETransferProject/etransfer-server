@@ -6,3 +6,10 @@ public enum DateDimensionEnum
     Week,
     Month
 }
+
+public enum DateRangeEnum
+{
+    _24H = 0,
+     _7D,
+    Total
+}
