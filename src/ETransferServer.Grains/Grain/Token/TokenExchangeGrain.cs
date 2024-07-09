@@ -39,7 +39,8 @@ public class TokenExchangeGrain : Grain<TokenExchangeState>, ITokenExchangeGrain
     }
 
 
-    public async Task<Dictionary<string, TokenExchangeDto>> DoGetAsync(string fromSymbol, string toSymbol, long timestamp = 0L)
+    public async Task<Dictionary<string, TokenExchangeDto>> DoGetAsync(string fromSymbol, string toSymbol,
+        long timestamp = 0L)
     {
         var now = DateTime.UtcNow.ToUtcMilliSeconds();
         if (fromSymbol == toSymbol)
@@ -70,6 +71,9 @@ public class TokenExchangeGrain : Grain<TokenExchangeState>, ITokenExchangeGrain
         var providerOption = _exchangeOptions.Value.GetSymbolProviders(fromSymbol, toSymbol);
         var providers = _exchangeProviders.Values.Where(provider => providerOption.Contains(provider.Name().ToString()))
             .ToList();
+        _logger.LogInformation(
+            "exchange provider query, fromSymbol={fromSymbol}, toSymbol={toSymbol}, timestamp={timestamp}, count:{count}",
+            fromSymbol, toSymbol, timestamp, providers.Count);
         foreach (var provider in providers)
         {
             asyncTasks[provider.Name().ToString()] = timestamp > 0

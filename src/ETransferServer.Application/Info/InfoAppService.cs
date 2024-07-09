@@ -143,12 +143,12 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
                 var names = result[kvp.Key].Details.Select(d => d.Name).ToList();
                 result[kvp.Key].Icon = tokenConfigs.FirstOrDefault(t => t.Symbol == kvp.Key)?.Icon;
                 result[kvp.Key].Networks = networkConfigs.Where(n => names.Contains(n.NetworkInfo.Network))
-                    .Select(t => t.NetworkInfo.Name).ToList();
+                    .Select(t => t.NetworkInfo.Network).ToList();
                 result[kvp.Key].ChainIds = networkConfigs
                     .Where(n => names.Contains(n.NetworkInfo.Network) && (n.NetworkInfo.Network == ChainId.AELF ||
                                                                           n.NetworkInfo.Network == ChainId.tDVV ||
                                                                           n.NetworkInfo.Network == ChainId.tDVW))
-                    .Select(t => t.NetworkInfo.Name).ToList();
+                    .Select(t => t.NetworkInfo.Network).ToList();
                 result[kvp.Key].General.Amount24H = kvp.Value.Details.Sum(d => d.Item.Amount24H.SafeToDecimal())
                     .ToString(4, DecimalHelper.RoundingOption.Floor);
                 result[kvp.Key].General.Amount24HUsd = kvp.Value.Details.Sum(d => d.Item.Amount24HUsd.SafeToDecimal())
