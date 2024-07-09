@@ -580,6 +580,7 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
             _logger.LogError("QuerySumAggAsync error: {error}", searchResponse.ServerError?.Error);
 
         var agg = searchResponse.Aggregations.Histogram("date");
+        _logger.LogInformation("QuerySumAggAsync count: {count}", agg.Buckets.Count);
         foreach (var bucket in agg.Buckets)
         {
             var item = new OrderVolumeOverview
@@ -597,16 +598,24 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
                 var symbolAgg = orderTypeBucket.Terms("symbol");
                 foreach (var symbolBucket in symbolAgg.Buckets)
                 {
-                    var avgExchange =
-                        await _networkAppService.GetAvgExchangeAsync(symbolBucket.Key, CommonConstant.Symbol.USD, (long)bucket.Key);
-                    
-                    if (orderTypeBucket.Key == OrderTypeEnum.Deposit.ToString())
+                    try
                     {
-                        depositAmountUsd += (decimal)symbolBucket.Sum("sum_amount")?.Value * avgExchange;
+                        var avgExchange =
+                            await _networkAppService.GetAvgExchangeAsync(symbolBucket.Key, CommonConstant.Symbol.USD,
+                                (long)bucket.Key);
+
+                        if (orderTypeBucket.Key == OrderTypeEnum.Deposit.ToString())
+                        {
+                            depositAmountUsd += (decimal)symbolBucket.Sum("sum_amount")?.Value * avgExchange;
+                        }
+                        else
+                        {
+                            withdrawAmountUsd += (decimal)symbolBucket.Sum("sum_amount")?.Value * avgExchange;
+                        }
                     }
-                    else
+                    catch (Exception e)
                     {
-                        withdrawAmountUsd += (decimal)symbolBucket.Sum("sum_amount")?.Value * avgExchange;
+                        _logger.LogError(e, "QuerySumAggAsync exchange error");
                     }
                 }
             }
