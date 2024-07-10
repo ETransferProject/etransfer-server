@@ -12,7 +12,6 @@ using ETransferServer.Orders;
 using Microsoft.Extensions.Logging;
 using ETransferServer.Service.Info;
 using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Tokens;
 using Nest;
 using Volo.Abp;
 using Volo.Abp.Application.Dtos;
@@ -209,10 +208,14 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
                     OrderStatusEnum.ToTransferConfirmed.ToString(),
                     OrderStatusEnum.Finish.ToString()
                 })));
-            mustQuery.Add(q => q.Term(i =>
-                i.Field(f => f.OrderType)
-                    .Value(Enum.GetName(typeof(OrderTypeEnum), int.Parse(request.Type)))));
             
+            if (int.Parse(request.Type) > 0)
+            {
+                mustQuery.Add(q => q.Term(i =>
+                    i.Field(f => f.OrderType)
+                        .Value(Enum.GetName(typeof(OrderTypeEnum), int.Parse(request.Type)))));
+            }
+
             if (request.FromToken > 0 || request.FromChainId > 0 || request.ToToken > 0 || request.ToChainId > 0)
             {
                 var options = await GetNetworkOptionAsync();
@@ -279,7 +282,7 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
             {
                 Items = await LoopCollectionItemsAsync(
                     _objectMapper.Map<List<OrderIndex>, List<OrderIndexDto>>(list)),
-                TotalCount = count
+                TotalCount = count <= request.Limit ? count : request.Limit
             };
         }
         catch (Exception e)
@@ -340,7 +343,7 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
             }
             catch (Exception e)
             {
-                _logger.LogError(e, "GetOrderAmountAsync exchange error");
+                _logger.LogError(e, "GetOrderAmountAsync exchange error, {symbol}", bucket.Key);
             }
 
             amountUsd += (decimal)bucket.Sum("sum_amount")?.Value * avgExchange;
@@ -456,7 +459,7 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
             }
             catch (Exception e)
             {
-                _logger.LogError(e, "GetTokenAmountAsync exchange error");
+                _logger.LogError(e, "GetTokenAmountAsync exchange error, {symbol}", symbolBucket.Key);
             }
 
             var networkAgg = symbolBucket.Terms("network");
@@ -590,21 +593,23 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
                 {
                     OrderStatusEnum.ToTransferConfirmed.ToString(),
                     OrderStatusEnum.Finish.ToString()
-                })))
-            .Aggregations(a => a
+                })));
+        if (dateInterval == DateInterval.Day)
+        {
+            s.Aggregations(a => a
                 .DateHistogram("date", dh => dh
                     .Field(f => f.CreateTime)
                     .CalendarInterval(dateInterval)
                     .Order(HistogramOrder.KeyAscending)
                     .Aggregations(agg => agg
-                        .Terms("order_type", ts => ts
-                            .Field(f => f.OrderType)
-                            .Aggregations(symbolAgg => symbolAgg
-                                .Terms("symbol", terms => terms
-                                    .Field(f => f.FromTransfer.Symbol)
+                        .Terms("symbol", ts => ts
+                            .Field(f => f.FromTransfer.Symbol)
+                            .Aggregations(typeAgg => typeAgg
+                                .Terms("order_type", terms => terms
+                                    .Field(f => f.OrderType)
                                     .Aggregations(sumAgg => sumAgg
-                                    .Sum("sum_amount", sum => sum
-                                        .Field(f => f.FromTransfer.Amount))
+                                        .Sum("sum_amount", sum => sum
+                                            .Field(f => f.FromTransfer.Amount))
                                     )
                                 )
                             )
@@ -612,12 +617,44 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
                     )
                 )
             );
+        }
+        else
+        {
+            s.Aggregations(a => a
+                .DateHistogram("date", dh => dh
+                    .Field(f => f.CreateTime)
+                    .CalendarInterval(dateInterval)
+                    .Order(HistogramOrder.KeyAscending)
+                    .Aggregations(agg => agg
+                        .Terms("symbol", ts => ts
+                            .Field(f => f.FromTransfer.Symbol)
+                            .Aggregations(typeAgg => typeAgg
+                                .Terms("order_type", terms => terms
+                                    .Field(f => f.OrderType)
+                                    .Aggregations(dAgg => dAgg
+                                        .DateHistogram("dd", dd => dd
+                                            .Field(f => f.CreateTime)
+                                            .CalendarInterval(DateInterval.Day)
+                                            .Order(HistogramOrder.KeyAscending)
+                                            .Aggregations(sumAgg => sumAgg
+                                                .Sum("sum_amount", sum => sum
+                                                    .Field(f => f.FromTransfer.Amount))
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            );
+        }
+
         var searchResponse = await _orderIndexRepository.SearchAsync(s, 0, 0);
         if (!searchResponse.IsValid)
             _logger.LogError("QuerySumAggAsync error: {error}", searchResponse.ServerError?.Error);
 
         var agg = searchResponse.Aggregations.Histogram("date");
-        _logger.LogInformation("QuerySumAggAsync count: {count}", agg.Buckets.Count);
         foreach (var bucket in agg.Buckets)
         {
             var item = new OrderVolumeOverview
@@ -629,30 +666,70 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
             var depositAmountUsd = 0M;
             var withdrawAmountUsd = 0M;
             
-            var orderTypeAgg = bucket.Terms("order_type");
-            foreach (var orderTypeBucket in orderTypeAgg.Buckets)
+            var symbolAgg = bucket.Terms("symbol");
+            foreach (var symbolBucket in symbolAgg.Buckets)
             {
-                var symbolAgg = orderTypeBucket.Terms("symbol");
-                foreach (var symbolBucket in symbolAgg.Buckets)
+                var avgExchange = 0M;
+                if (dateInterval == DateInterval.Day)
                 {
                     try
                     {
-                        var avgExchange =
-                            await _networkAppService.GetAvgExchangeAsync(symbolBucket.Key, CommonConstant.Symbol.USD,
+                        avgExchange =
+                            await _networkAppService.GetAvgExchangeAsync(symbolBucket.Key,
+                                CommonConstant.Symbol.USD,
                                 (long)bucket.Key);
-
-                        if (orderTypeBucket.Key == OrderTypeEnum.Deposit.ToString())
-                        {
-                            depositAmountUsd += (decimal)symbolBucket.Sum("sum_amount")?.Value * avgExchange;
-                        }
-                        else
-                        {
-                            withdrawAmountUsd += (decimal)symbolBucket.Sum("sum_amount")?.Value * avgExchange;
-                        }
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError(e, "QuerySumAggAsync exchange error");
+                        _logger.LogError(e, "QuerySumAggAsync exchange error, {symbol}, {timestamp}",
+                            symbolBucket.Key, bucket.Key);
+                    }
+                }
+                
+                var orderTypeAgg = symbolBucket.Terms("order_type");
+                foreach (var orderTypeBucket in orderTypeAgg.Buckets)
+                {
+                    if (dateInterval == DateInterval.Day)
+                    {
+                        if (orderTypeBucket.Key == OrderTypeEnum.Deposit.ToString())
+                        {
+                            depositAmountUsd += (decimal)orderTypeBucket.Sum("sum_amount")?.Value * avgExchange;
+                        }
+                        else
+                        {
+                            withdrawAmountUsd += (decimal)orderTypeBucket.Sum("sum_amount")?.Value * avgExchange;
+                        }
+                    }
+                    else
+                    {
+                        var ddAgg = orderTypeBucket.Histogram("dd");
+                        foreach (var ddBucket in ddAgg.Buckets)
+                        {
+                            avgExchange = 0M;
+                            try
+                            {
+                                if (ddBucket.Sum("sum_amount")?.Value > 0)
+                                {
+                                    avgExchange =
+                                        await _networkAppService.GetAvgExchangeAsync(symbolBucket.Key,
+                                            CommonConstant.Symbol.USD,
+                                            (long)ddBucket.Key);
+                                }
+                            }
+                            catch (Exception e)
+                            {
+                                _logger.LogError(e, "QuerySumAggAsync exchange error, {symbol}, {timestamp}", 
+                                    symbolBucket.Key, bucket.Key);
+                            }
+                            if (orderTypeBucket.Key == OrderTypeEnum.Deposit.ToString())
+                            {
+                                depositAmountUsd += (decimal)ddBucket.Sum("sum_amount")?.Value * avgExchange;
+                            }
+                            else
+                            {
+                                withdrawAmountUsd += (decimal)ddBucket.Sum("sum_amount")?.Value * avgExchange;
+                            }
+                        }
                     }
                 }
             }
@@ -726,7 +803,7 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
             }
             catch (Exception e)
             {
-                _logger.LogError(e, "LoopCollectionItemsAsync exchange error");
+                _logger.LogError(e, "LoopCollectionItemsAsync exchange error, {symbol}", item);
                 exchangeDic.Add(item, 0M);
             }
         }
