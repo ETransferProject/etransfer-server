@@ -54,7 +54,7 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
             result.Transaction.Latest = DateTime.UtcNow.Date.ToUtcString(TimeHelper.DatePattern);
             result.Transaction.TotalTx = await GetOrderCountAsync();
 
-            var dateDimension = (DateDimensionEnum)Enum.Parse(typeof(DateDimensionEnum), request.Type.ToString());
+            var dateDimension = (DateDimensionEnum)Enum.Parse(typeof(DateDimensionEnum), request.Type);
             switch (dateDimension)
             {
                 case DateDimensionEnum.Day:
@@ -84,7 +84,7 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
             result.Volume.Latest = DateTime.UtcNow.Date.ToUtcString(TimeHelper.DatePattern);
             result.Volume.TotalAmountUsd = await GetOrderAmountAsync();
 
-            var dateDimension = (DateDimensionEnum)Enum.Parse(typeof(DateDimensionEnum), request.Type.ToString());
+            var dateDimension = (DateDimensionEnum)Enum.Parse(typeof(DateDimensionEnum), request.Type);
             switch (dateDimension)
             {
                 case DateDimensionEnum.Day:
@@ -111,7 +111,7 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
         var result = new GetTokenResultDto();
         try
         {
-            var orderType = Enum.GetName(typeof(OrderTypeEnum), request.Type);
+            var orderType = Enum.GetName(typeof(OrderTypeEnum), int.Parse(request.Type));
             if (orderType.IsNullOrEmpty() || orderType == OrderTypeEnum.Deposit.ToString())
             {
                 result = await GetTokenAmountAsync(DateRangeEnum._24H, OrderTypeEnum.Deposit, string.Empty, result);
@@ -136,19 +136,19 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
             }
 
             var tokenConfigs = _tokenOptions.Value.Deposit[ChainId.AELF];
-            var networkConfigs = _networkOptions.Value.NetworkMap[CommonConstant.Symbol.USDT];
-            var networks = networkConfigs.Select(config => config.NetworkInfo.Network).ToList();
             foreach (var kvp in result)
             {
+                var networkConfigs = _networkOptions.Value.NetworkMap[kvp.Key];
+                var networks = networkConfigs.Select(config => config.NetworkInfo.Network).ToList();
                 var names = result[kvp.Key].Details.Select(d => d.Name).ToList();
                 result[kvp.Key].Icon = tokenConfigs.FirstOrDefault(t => t.Symbol == kvp.Key)?.Icon;
                 result[kvp.Key].Networks = networkConfigs.Where(n => names.Contains(n.NetworkInfo.Network))
-                    .Select(t => t.NetworkInfo.Name).ToList();
+                    .Select(t => t.NetworkInfo.Network).ToList();
                 result[kvp.Key].ChainIds = networkConfigs
                     .Where(n => names.Contains(n.NetworkInfo.Network) && (n.NetworkInfo.Network == ChainId.AELF ||
                                                                           n.NetworkInfo.Network == ChainId.tDVV ||
                                                                           n.NetworkInfo.Network == ChainId.tDVW))
-                    .Select(t => t.NetworkInfo.Name).ToList();
+                    .Select(t => t.NetworkInfo.Network).ToList();
                 result[kvp.Key].General.Amount24H = kvp.Value.Details.Sum(d => d.Item.Amount24H.SafeToDecimal())
                     .ToString(4, DecimalHelper.RoundingOption.Floor);
                 result[kvp.Key].General.Amount24HUsd = kvp.Value.Details.Sum(d => d.Item.Amount24HUsd.SafeToDecimal())
@@ -208,12 +208,12 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
                     OrderStatusEnum.ToTransferConfirmed.ToString(),
                     OrderStatusEnum.Finish.ToString()
                 })));
-
-            if (request.Type > 0)
+            
+            if (int.Parse(request.Type) > 0)
             {
                 mustQuery.Add(q => q.Term(i =>
                     i.Field(f => f.OrderType)
-                        .Value(Enum.GetName(typeof(OrderTypeEnum), request.Type))));
+                        .Value(Enum.GetName(typeof(OrderTypeEnum), int.Parse(request.Type)))));
             }
 
             if (request.FromToken > 0 || request.FromChainId > 0 || request.ToToken > 0 || request.ToChainId > 0)
@@ -222,6 +222,7 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
                 if (request.FromToken > 0)
                 {
                     var fromToken = options.TokenList.FirstOrDefault(t => t.Key == request.FromToken)?.Symbol;
+                    if (fromToken.IsNullOrEmpty()) return new PagedResultDto<OrderIndexDto>();
                     mustQuery.Add(q => q.Term(i =>
                         i.Field(f => f.FromTransfer.Symbol).Value(fromToken)));
                 }
@@ -229,6 +230,7 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
                 if (request.ToToken > 0)
                 {
                     var toToken = options.TokenList.FirstOrDefault(t => t.Key == request.ToToken)?.Symbol;
+                    if (toToken.IsNullOrEmpty()) return new PagedResultDto<OrderIndexDto>();
                     mustQuery.Add(q => q.Term(i =>
                         i.Field(f => f.ToTransfer.Symbol).Value(toToken)));
                 }
@@ -236,6 +238,7 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
                 if (request.FromChainId > 0)
                 {
                     var fromChainId = options.NetworkList.FirstOrDefault(t => t.Key == request.FromChainId)?.Network;
+                    if (fromChainId.IsNullOrEmpty()) return new PagedResultDto<OrderIndexDto>();
                     if (fromChainId == ChainId.AELF || fromChainId == ChainId.tDVV || fromChainId == ChainId.tDVW)
                     {
                         mustQuery.Add(q => q.Term(i =>
@@ -251,6 +254,7 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
                 if (request.ToChainId > 0)
                 {
                     var toChainId = options.NetworkList.FirstOrDefault(t => t.Key == request.ToChainId)?.Network;
+                    if (toChainId.IsNullOrEmpty()) return new PagedResultDto<OrderIndexDto>();
                     if (toChainId == ChainId.AELF || toChainId == ChainId.tDVV || toChainId == ChainId.tDVW)
                     {
                         mustQuery.Add(q => q.Term(i =>
@@ -278,7 +282,7 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
             {
                 Items = await LoopCollectionItemsAsync(
                     _objectMapper.Map<List<OrderIndex>, List<OrderIndexDto>>(list)),
-                TotalCount = count
+                TotalCount = count <= request.Limit ? count : request.Limit
             };
         }
         catch (Exception e)
@@ -331,10 +335,20 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
         var amountUsd = 0M;
         foreach (var bucket in agg.Buckets)
         {
-            var avgExchange =
-                await _networkAppService.GetAvgExchangeAsync(bucket.Key, CommonConstant.Symbol.USD);
+            var avgExchange = 0M;
+            try
+            {
+                avgExchange =
+                    await _networkAppService.GetAvgExchangeAsync(bucket.Key, CommonConstant.Symbol.USD);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "GetOrderAmountAsync exchange error, {symbol}", bucket.Key);
+            }
+
             amountUsd += (decimal)bucket.Sum("sum_amount")?.Value * avgExchange;
         }
+
         return amountUsd.ToString(2, DecimalHelper.RoundingOption.Floor);
     }
 
@@ -394,20 +408,37 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
                 );
                 break;
             case OrderTypeEnum.Withdraw:
-                s.Aggregations(agg => agg
-                    .Terms("symbol", ts => ts
-                        .Field(f => f.FromTransfer.Symbol)
-                        .Aggregations(networkAgg => networkAgg
-                            .Terms("network", terms => terms
-                                .Field(f => chainId.IsNullOrEmpty() ? f.ToTransfer.Network : f.ToTransfer.ChainId)
-                                .Aggregations(sumAgg => sumAgg
-                                    .Sum("sum_amount", sum => sum
-                                        .Field(f => f.FromTransfer.Amount))
+                if (chainId.IsNullOrEmpty())
+                    s.Aggregations(agg => agg
+                        .Terms("symbol", ts => ts
+                            .Field(f => f.FromTransfer.Symbol)
+                            .Aggregations(networkAgg => networkAgg
+                                .Terms("network", terms => terms
+                                    .Field(f => f.ToTransfer.Network)
+                                    .Aggregations(sumAgg => sumAgg
+                                        .Sum("sum_amount", sum => sum
+                                            .Field(f => f.FromTransfer.Amount))
+                                    )
                                 )
                             )
                         )
-                    )
-                );
+                    );
+                else
+                    s.Aggregations(agg => agg
+                        .Terms("symbol", ts => ts
+                            .Field(f => f.FromTransfer.Symbol)
+                            .Aggregations(networkAgg => networkAgg
+                                .Terms("network", terms => terms
+                                    .Field(f => f.ToTransfer.ChainId)
+                                    .Aggregations(sumAgg => sumAgg
+                                        .Sum("sum_amount", sum => sum
+                                            .Field(f => f.FromTransfer.Amount))
+                                    )
+                                )
+                            )
+                        )
+                    );
+
                 break;
         }
 
@@ -420,8 +451,17 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
         var symbolAgg = searchResponse.Aggregations.Terms("symbol");
         foreach (var symbolBucket in symbolAgg.Buckets)
         {
-            var avgExchange =
-                await _networkAppService.GetAvgExchangeAsync(symbolBucket.Key, CommonConstant.Symbol.USD);
+            var avgExchange = 0M;
+            try
+            {
+                avgExchange =
+                    await _networkAppService.GetAvgExchangeAsync(symbolBucket.Key, CommonConstant.Symbol.USD);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "GetTokenAmountAsync exchange error, {symbol}", symbolBucket.Key);
+            }
+
             var networkAgg = symbolBucket.Terms("network");
             foreach (var networkBucket in networkAgg.Buckets)
             {
@@ -485,7 +525,7 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
                 .DateHistogram("date", dh => dh
                     .Field(f => f.CreateTime)
                     .CalendarInterval(dateInterval)
-                    .Order(HistogramOrder.KeyDescending)
+                    .Order(HistogramOrder.KeyAscending)
                     .Aggregations(agg => agg
                         .Terms("order_type", ts => ts
                             .Field(f => f.OrderType)
@@ -525,17 +565,17 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
                 case DateInterval.Day:
                     if (item.DepositTx > 0 || item.WithdrawTx > 0) result.Transaction.Day.Add(item);
                     if (maxResultCount.HasValue)
-                        result.Transaction.Day = result.Transaction.Day.Take(maxResultCount.Value).ToList();
+                        result.Transaction.Day = result.Transaction.Day.TakeLast(maxResultCount.Value).ToList();
                     break;
                 case DateInterval.Week:
                     if (item.DepositTx > 0 || item.WithdrawTx > 0) result.Transaction.Week.Add(item);
                     if (maxResultCount.HasValue)
-                        result.Transaction.Week = result.Transaction.Week.Take(maxResultCount.Value).ToList();
+                        result.Transaction.Week = result.Transaction.Week.TakeLast(maxResultCount.Value).ToList();
                     break;
                 case DateInterval.Month:
                     if (item.DepositTx > 0 || item.WithdrawTx > 0) result.Transaction.Month.Add(item);
                     if (maxResultCount.HasValue)
-                        result.Transaction.Month = result.Transaction.Month.Take(maxResultCount.Value).ToList();
+                        result.Transaction.Month = result.Transaction.Month.TakeLast(maxResultCount.Value).ToList();
                     break;
             }
         }
@@ -553,21 +593,23 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
                 {
                     OrderStatusEnum.ToTransferConfirmed.ToString(),
                     OrderStatusEnum.Finish.ToString()
-                })))
-            .Aggregations(a => a
+                })));
+        if (dateInterval == DateInterval.Day)
+        {
+            s.Aggregations(a => a
                 .DateHistogram("date", dh => dh
                     .Field(f => f.CreateTime)
                     .CalendarInterval(dateInterval)
-                    .Order(HistogramOrder.KeyDescending)
+                    .Order(HistogramOrder.KeyAscending)
                     .Aggregations(agg => agg
-                        .Terms("order_type", ts => ts
-                            .Field(f => f.OrderType)
-                            .Aggregations(symbolAgg => symbolAgg
-                                .Terms("symbol", terms => terms
-                                    .Field(f => f.FromTransfer.Symbol)
+                        .Terms("symbol", ts => ts
+                            .Field(f => f.FromTransfer.Symbol)
+                            .Aggregations(typeAgg => typeAgg
+                                .Terms("order_type", terms => terms
+                                    .Field(f => f.OrderType)
                                     .Aggregations(sumAgg => sumAgg
-                                    .Sum("sum_amount", sum => sum
-                                        .Field(f => f.FromTransfer.Amount))
+                                        .Sum("sum_amount", sum => sum
+                                            .Field(f => f.FromTransfer.Amount))
                                     )
                                 )
                             )
@@ -575,6 +617,39 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
                     )
                 )
             );
+        }
+        else
+        {
+            s.Aggregations(a => a
+                .DateHistogram("date", dh => dh
+                    .Field(f => f.CreateTime)
+                    .CalendarInterval(dateInterval)
+                    .Order(HistogramOrder.KeyAscending)
+                    .Aggregations(agg => agg
+                        .Terms("symbol", ts => ts
+                            .Field(f => f.FromTransfer.Symbol)
+                            .Aggregations(typeAgg => typeAgg
+                                .Terms("order_type", terms => terms
+                                    .Field(f => f.OrderType)
+                                    .Aggregations(dAgg => dAgg
+                                        .DateHistogram("dd", dd => dd
+                                            .Field(f => f.CreateTime)
+                                            .CalendarInterval(DateInterval.Day)
+                                            .Order(HistogramOrder.KeyAscending)
+                                            .Aggregations(sumAgg => sumAgg
+                                                .Sum("sum_amount", sum => sum
+                                                    .Field(f => f.FromTransfer.Amount))
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            );
+        }
+
         var searchResponse = await _orderIndexRepository.SearchAsync(s, 0, 0);
         if (!searchResponse.IsValid)
             _logger.LogError("QuerySumAggAsync error: {error}", searchResponse.ServerError?.Error);
@@ -591,22 +666,70 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
             var depositAmountUsd = 0M;
             var withdrawAmountUsd = 0M;
             
-            var orderTypeAgg = bucket.Terms("order_type");
-            foreach (var orderTypeBucket in orderTypeAgg.Buckets)
+            var symbolAgg = bucket.Terms("symbol");
+            foreach (var symbolBucket in symbolAgg.Buckets)
             {
-                var symbolAgg = orderTypeBucket.Terms("symbol");
-                foreach (var symbolBucket in symbolAgg.Buckets)
+                var avgExchange = 0M;
+                if (dateInterval == DateInterval.Day)
                 {
-                    var avgExchange =
-                        await _networkAppService.GetAvgExchangeAsync(symbolBucket.Key, CommonConstant.Symbol.USD, (long)bucket.Key);
-                    
-                    if (orderTypeBucket.Key == OrderTypeEnum.Deposit.ToString())
+                    try
                     {
-                        depositAmountUsd += (decimal)symbolBucket.Sum("sum_amount")?.Value * avgExchange;
+                        avgExchange =
+                            await _networkAppService.GetAvgExchangeAsync(symbolBucket.Key,
+                                CommonConstant.Symbol.USD,
+                                (long)bucket.Key);
+                    }
+                    catch (Exception e)
+                    {
+                        _logger.LogError(e, "QuerySumAggAsync exchange error, {symbol}, {timestamp}",
+                            symbolBucket.Key, bucket.Key);
+                    }
+                }
+                
+                var orderTypeAgg = symbolBucket.Terms("order_type");
+                foreach (var orderTypeBucket in orderTypeAgg.Buckets)
+                {
+                    if (dateInterval == DateInterval.Day)
+                    {
+                        if (orderTypeBucket.Key == OrderTypeEnum.Deposit.ToString())
+                        {
+                            depositAmountUsd += (decimal)orderTypeBucket.Sum("sum_amount")?.Value * avgExchange;
+                        }
+                        else
+                        {
+                            withdrawAmountUsd += (decimal)orderTypeBucket.Sum("sum_amount")?.Value * avgExchange;
+                        }
                     }
                     else
                     {
-                        withdrawAmountUsd += (decimal)symbolBucket.Sum("sum_amount")?.Value * avgExchange;
+                        var ddAgg = orderTypeBucket.Histogram("dd");
+                        foreach (var ddBucket in ddAgg.Buckets)
+                        {
+                            avgExchange = 0M;
+                            try
+                            {
+                                if (ddBucket.Sum("sum_amount")?.Value > 0)
+                                {
+                                    avgExchange =
+                                        await _networkAppService.GetAvgExchangeAsync(symbolBucket.Key,
+                                            CommonConstant.Symbol.USD,
+                                            (long)ddBucket.Key);
+                                }
+                            }
+                            catch (Exception e)
+                            {
+                                _logger.LogError(e, "QuerySumAggAsync exchange error, {symbol}, {timestamp}", 
+                                    symbolBucket.Key, bucket.Key);
+                            }
+                            if (orderTypeBucket.Key == OrderTypeEnum.Deposit.ToString())
+                            {
+                                depositAmountUsd += (decimal)ddBucket.Sum("sum_amount")?.Value * avgExchange;
+                            }
+                            else
+                            {
+                                withdrawAmountUsd += (decimal)ddBucket.Sum("sum_amount")?.Value * avgExchange;
+                            }
+                        }
                     }
                 }
             }
@@ -619,17 +742,17 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
                 case DateInterval.Day:
                     if (depositAmountUsd > 0 || withdrawAmountUsd > 0) result.Volume.Day.Add(item);
                     if (maxResultCount.HasValue)
-                        result.Volume.Day = result.Volume.Day.Take(maxResultCount.Value).ToList();
+                        result.Volume.Day = result.Volume.Day.TakeLast(maxResultCount.Value).ToList();
                     break;
                 case DateInterval.Week:
                     if (depositAmountUsd > 0 || withdrawAmountUsd > 0) result.Volume.Week.Add(item);
                     if (maxResultCount.HasValue)
-                        result.Volume.Week = result.Volume.Week.Take(maxResultCount.Value).ToList();
+                        result.Volume.Week = result.Volume.Week.TakeLast(maxResultCount.Value).ToList();
                     break;
                 case DateInterval.Month:
                     if (depositAmountUsd > 0 || withdrawAmountUsd > 0) result.Volume.Month.Add(item);
                     if (maxResultCount.HasValue)
-                        result.Volume.Month = result.Volume.Month.Take(maxResultCount.Value).ToList();
+                        result.Volume.Month = result.Volume.Month.TakeLast(maxResultCount.Value).ToList();
                     break;
             }
         }
@@ -657,24 +780,11 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
         {
             item.Key = ++index;
         }
-        
-        dto.NetworkList.Insert(0, new NetworkOptionDto
-        {
-            Key = 0,
-            Name = CommonConstant.DefaultConst.All,
-            Network = CommonConstant.DefaultConst.All
-        });
         index = 0;
         foreach (var item in dto.TokenList)
         {
             item.Key = ++index;
         }
-        dto.TokenList.Insert(0, new TokenConfigOptionDto()
-        {
-            Key = 0,
-            Name = CommonConstant.DefaultConst.All,
-            Symbol = CommonConstant.DefaultConst.All
-        });
         return dto;
     }
 
@@ -687,7 +797,15 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
         var exchangeDic = new Dictionary<string, decimal>();
         foreach (var item in fromSymbolList)
         {
-            exchangeDic.Add(item, await _networkAppService.GetAvgExchangeAsync(item, CommonConstant.Symbol.USD));
+            try
+            {
+                exchangeDic.Add(item, await _networkAppService.GetAvgExchangeAsync(item, CommonConstant.Symbol.USD));
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "LoopCollectionItemsAsync exchange error, {symbol}", item);
+                exchangeDic.Add(item, 0M);
+            }
         }
 
         itemList.ForEach(item =>
