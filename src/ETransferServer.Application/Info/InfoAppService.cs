@@ -331,10 +331,20 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
         var amountUsd = 0M;
         foreach (var bucket in agg.Buckets)
         {
-            var avgExchange =
-                await _networkAppService.GetAvgExchangeAsync(bucket.Key, CommonConstant.Symbol.USD);
+            var avgExchange = 0M;
+            try
+            {
+                avgExchange =
+                    await _networkAppService.GetAvgExchangeAsync(bucket.Key, CommonConstant.Symbol.USD);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "GetOrderAmountAsync exchange error");
+            }
+
             amountUsd += (decimal)bucket.Sum("sum_amount")?.Value * avgExchange;
         }
+
         return amountUsd.ToString(2, DecimalHelper.RoundingOption.Floor);
     }
 
@@ -394,20 +404,37 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
                 );
                 break;
             case OrderTypeEnum.Withdraw:
-                s.Aggregations(agg => agg
-                    .Terms("symbol", ts => ts
-                        .Field(f => f.FromTransfer.Symbol)
-                        .Aggregations(networkAgg => networkAgg
-                            .Terms("network", terms => terms
-                                .Field(f => chainId.IsNullOrEmpty() ? f.ToTransfer.Network : f.ToTransfer.ChainId)
-                                .Aggregations(sumAgg => sumAgg
-                                    .Sum("sum_amount", sum => sum
-                                        .Field(f => f.FromTransfer.Amount))
+                if (chainId.IsNullOrEmpty())
+                    s.Aggregations(agg => agg
+                        .Terms("symbol", ts => ts
+                            .Field(f => f.FromTransfer.Symbol)
+                            .Aggregations(networkAgg => networkAgg
+                                .Terms("network", terms => terms
+                                    .Field(f => f.ToTransfer.Network)
+                                    .Aggregations(sumAgg => sumAgg
+                                        .Sum("sum_amount", sum => sum
+                                            .Field(f => f.FromTransfer.Amount))
+                                    )
                                 )
                             )
                         )
-                    )
-                );
+                    );
+                else
+                    s.Aggregations(agg => agg
+                        .Terms("symbol", ts => ts
+                            .Field(f => f.FromTransfer.Symbol)
+                            .Aggregations(networkAgg => networkAgg
+                                .Terms("network", terms => terms
+                                    .Field(f => f.ToTransfer.ChainId)
+                                    .Aggregations(sumAgg => sumAgg
+                                        .Sum("sum_amount", sum => sum
+                                            .Field(f => f.FromTransfer.Amount))
+                                    )
+                                )
+                            )
+                        )
+                    );
+
                 break;
         }
 
@@ -420,8 +447,17 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
         var symbolAgg = searchResponse.Aggregations.Terms("symbol");
         foreach (var symbolBucket in symbolAgg.Buckets)
         {
-            var avgExchange =
-                await _networkAppService.GetAvgExchangeAsync(symbolBucket.Key, CommonConstant.Symbol.USD);
+            var avgExchange = 0M;
+            try
+            {
+                avgExchange =
+                    await _networkAppService.GetAvgExchangeAsync(symbolBucket.Key, CommonConstant.Symbol.USD);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "GetTokenAmountAsync exchange error");
+            }
+
             var networkAgg = symbolBucket.Terms("network");
             foreach (var networkBucket in networkAgg.Buckets)
             {
@@ -696,7 +732,15 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
         var exchangeDic = new Dictionary<string, decimal>();
         foreach (var item in fromSymbolList)
         {
-            exchangeDic.Add(item, await _networkAppService.GetAvgExchangeAsync(item, CommonConstant.Symbol.USD));
+            try
+            {
+                exchangeDic.Add(item, await _networkAppService.GetAvgExchangeAsync(item, CommonConstant.Symbol.USD));
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "LoopCollectionItemsAsync exchange error");
+                exchangeDic.Add(item, 0M);
+            }
         }
 
         itemList.ForEach(item =>
