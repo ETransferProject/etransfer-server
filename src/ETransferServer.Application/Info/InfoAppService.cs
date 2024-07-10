@@ -136,10 +136,10 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
             }
 
             var tokenConfigs = _tokenOptions.Value.Deposit[ChainId.AELF];
-            var networkConfigs = _networkOptions.Value.NetworkMap[CommonConstant.Symbol.USDT];
-            var networks = networkConfigs.Select(config => config.NetworkInfo.Network).ToList();
             foreach (var kvp in result)
             {
+                var networkConfigs = _networkOptions.Value.NetworkMap[kvp.Key];
+                var networks = networkConfigs.Select(config => config.NetworkInfo.Network).ToList();
                 var names = result[kvp.Key].Details.Select(d => d.Name).ToList();
                 result[kvp.Key].Icon = tokenConfigs.FirstOrDefault(t => t.Symbol == kvp.Key)?.Icon;
                 result[kvp.Key].Networks = networkConfigs.Where(n => names.Contains(n.NetworkInfo.Network))
