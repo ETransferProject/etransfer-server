@@ -12,6 +12,7 @@ using ETransferServer.Orders;
 using Microsoft.Extensions.Logging;
 using ETransferServer.Service.Info;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 using Nest;
 using Volo.Abp;
 using Volo.Abp.Application.Dtos;
@@ -54,7 +55,7 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
             result.Transaction.Latest = DateTime.UtcNow.Date.ToUtcString(TimeHelper.DatePattern);
             result.Transaction.TotalTx = await GetOrderCountAsync();
 
-            var dateDimension = (DateDimensionEnum)Enum.Parse(typeof(DateDimensionEnum), request.Type.ToString());
+            var dateDimension = (DateDimensionEnum)Enum.Parse(typeof(DateDimensionEnum), request.Type);
             switch (dateDimension)
             {
                 case DateDimensionEnum.Day:
@@ -84,7 +85,7 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
             result.Volume.Latest = DateTime.UtcNow.Date.ToUtcString(TimeHelper.DatePattern);
             result.Volume.TotalAmountUsd = await GetOrderAmountAsync();
 
-            var dateDimension = (DateDimensionEnum)Enum.Parse(typeof(DateDimensionEnum), request.Type.ToString());
+            var dateDimension = (DateDimensionEnum)Enum.Parse(typeof(DateDimensionEnum), request.Type);
             switch (dateDimension)
             {
                 case DateDimensionEnum.Day:
@@ -111,7 +112,7 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
         var result = new GetTokenResultDto();
         try
         {
-            var orderType = Enum.GetName(typeof(OrderTypeEnum), request.Type);
+            var orderType = Enum.GetName(typeof(OrderTypeEnum), int.Parse(request.Type));
             if (orderType.IsNullOrEmpty() || orderType == OrderTypeEnum.Deposit.ToString())
             {
                 result = await GetTokenAmountAsync(DateRangeEnum._24H, OrderTypeEnum.Deposit, string.Empty, result);
@@ -208,20 +209,17 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
                     OrderStatusEnum.ToTransferConfirmed.ToString(),
                     OrderStatusEnum.Finish.ToString()
                 })));
-
-            if (request.Type > 0)
-            {
-                mustQuery.Add(q => q.Term(i =>
-                    i.Field(f => f.OrderType)
-                        .Value(Enum.GetName(typeof(OrderTypeEnum), request.Type))));
-            }
-
+            mustQuery.Add(q => q.Term(i =>
+                i.Field(f => f.OrderType)
+                    .Value(Enum.GetName(typeof(OrderTypeEnum), int.Parse(request.Type)))));
+            
             if (request.FromToken > 0 || request.FromChainId > 0 || request.ToToken > 0 || request.ToChainId > 0)
             {
                 var options = await GetNetworkOptionAsync();
                 if (request.FromToken > 0)
                 {
                     var fromToken = options.TokenList.FirstOrDefault(t => t.Key == request.FromToken)?.Symbol;
+                    if (fromToken.IsNullOrEmpty()) return new PagedResultDto<OrderIndexDto>();
                     mustQuery.Add(q => q.Term(i =>
                         i.Field(f => f.FromTransfer.Symbol).Value(fromToken)));
                 }
@@ -229,6 +227,7 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
                 if (request.ToToken > 0)
                 {
                     var toToken = options.TokenList.FirstOrDefault(t => t.Key == request.ToToken)?.Symbol;
+                    if (toToken.IsNullOrEmpty()) return new PagedResultDto<OrderIndexDto>();
                     mustQuery.Add(q => q.Term(i =>
                         i.Field(f => f.ToTransfer.Symbol).Value(toToken)));
                 }
@@ -236,6 +235,7 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
                 if (request.FromChainId > 0)
                 {
                     var fromChainId = options.NetworkList.FirstOrDefault(t => t.Key == request.FromChainId)?.Network;
+                    if (fromChainId.IsNullOrEmpty()) return new PagedResultDto<OrderIndexDto>();
                     if (fromChainId == ChainId.AELF || fromChainId == ChainId.tDVV || fromChainId == ChainId.tDVW)
                     {
                         mustQuery.Add(q => q.Term(i =>
@@ -251,6 +251,7 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
                 if (request.ToChainId > 0)
                 {
                     var toChainId = options.NetworkList.FirstOrDefault(t => t.Key == request.ToChainId)?.Network;
+                    if (toChainId.IsNullOrEmpty()) return new PagedResultDto<OrderIndexDto>();
                     if (toChainId == ChainId.AELF || toChainId == ChainId.tDVV || toChainId == ChainId.tDVW)
                     {
                         mustQuery.Add(q => q.Term(i =>
