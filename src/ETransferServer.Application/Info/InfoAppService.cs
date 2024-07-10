@@ -702,24 +702,11 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
         {
             item.Key = ++index;
         }
-        
-        dto.NetworkList.Insert(0, new NetworkOptionDto
-        {
-            Key = 0,
-            Name = CommonConstant.DefaultConst.All,
-            Network = CommonConstant.DefaultConst.All
-        });
         index = 0;
         foreach (var item in dto.TokenList)
         {
             item.Key = ++index;
         }
-        dto.TokenList.Insert(0, new TokenConfigOptionDto()
-        {
-            Key = 0,
-            Name = CommonConstant.DefaultConst.All,
-            Symbol = CommonConstant.DefaultConst.All
-        });
         return dto;
     }
 
