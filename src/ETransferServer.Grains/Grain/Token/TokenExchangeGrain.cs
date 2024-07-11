@@ -90,8 +90,9 @@ public class TokenExchangeGrain : Grain<TokenExchangeState>, ITokenExchangeGrain
                     isUsd == "from" ? 1 / (exchange.Exchange * usdtPriceInUsd.Exchange) : exchange.Exchange;
 
                 result.Add(providerName, exchange);
-                _logger.LogInformation("Token exchange: name={providerName}, exchange={exchange}, usdExchange={usdExchange}", 
-                    providerName, exchange.Exchange, usdtPriceInUsd?.Exchange);
+                _logger.LogInformation(
+                    "Token exchange: fromSymbol={fromSymbol}, toSymbol={toSymbol}, timestamp={timestamp}, name={providerName}, exchange={exchange}, usdExchange={usdExchange}",
+                    fromSymbol, toSymbol, timestamp, providerName, exchange.Exchange, usdtPriceInUsd?.Exchange);
             }
             catch (Exception e)
             {
