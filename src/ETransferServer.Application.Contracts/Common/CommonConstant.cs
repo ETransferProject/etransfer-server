@@ -38,8 +38,8 @@ public static class CommonConstant
         public const string ManagerForwardCall = "ManagerForwardCall";
         public const string TransferToken = "TransferToken";
         public const string PortKeyVersion = "v1";
-        public const string PortKeyVersion2 = "v2";
-        public const string All = "All";
+        public const string PortKeyVersion2 = "v2"; 
+        public const string LimitLogs = "candlesticks,from";
     }
 
     public static class ChainId

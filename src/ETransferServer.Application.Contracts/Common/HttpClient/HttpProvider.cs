@@ -6,9 +6,11 @@ using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 using System.Web;
+using ETransferServer.Options;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using ETransferServer.Samples.HttpClient;
+using Microsoft.Extensions.Options;
 using Volo.Abp.DependencyInjection;
 
 namespace ETransferServer.Common.HttpClient;
@@ -69,11 +71,15 @@ public class HttpProvider : IHttpProvider
 
     private const int DefaultTimeout = 5000;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IOptionsSnapshot<ExchangeOptions> _exchangeOption;
     private readonly ILogger<HttpProvider> _logger;
 
-    public HttpProvider(IHttpClientFactory httpClientFactory, ILogger<HttpProvider> logger)
+    public HttpProvider(IHttpClientFactory httpClientFactory, 
+        IOptionsSnapshot<ExchangeOptions> exchangeOption,
+        ILogger<HttpProvider> logger)
     {
         _httpClientFactory = httpClientFactory;
+        _exchangeOption = exchangeOption;
         _logger = logger;
     }
 
@@ -194,14 +200,22 @@ public class HttpProvider : IHttpProvider
         if (withLog)
             _logger.LogInformation(
                 "Request To {FullUrl}, statusCode={StatusCode}, time={Time}, query={Query}, body={Body}, resp={Content}",
-                fullUrl, response.StatusCode, time, builder.Query, body, content);
+                fullUrl, response.StatusCode, time, builder.Query, body, IsLimitLog(fullUrl, builder.Query) ? string.Empty : content);
         else if (debugLog)
             _logger.LogDebug(
                 "Request To {FullUrl}, statusCode={StatusCode}, time={Time}, query={Query}, body={Body}, resp={Content}",
-                fullUrl, response.StatusCode, time, builder.Query,  body, content);
+                fullUrl, response.StatusCode, time, builder.Query,  body, IsLimitLog(fullUrl, builder.Query) ? string.Empty : content);
         return response;
     }
 
+    private bool IsLimitLog(string url, string query)
+    {
+        return _exchangeOption.Value.LimitLogs.FirstOrDefault(t =>
+            url.Contains(t.Split(CommonConstant.Comma)[0]) &&
+            (query.IsNullOrEmpty() || t.Split(CommonConstant.Comma).Length < 2
+                                   || (t.Split(CommonConstant.Comma).Length > 1
+                                       && query.Contains(t.Split(CommonConstant.Comma)[1])))) != null;
+    }
 
     private static string PathParamUrl(string url, Dictionary<string, string> pathParams)
     {

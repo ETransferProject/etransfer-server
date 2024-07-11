@@ -91,7 +91,7 @@ public class BinanceProvider : IExchangeProvider
             var req = new KLineReq
             {
                 Symbol = fromToken.ToUpper() + toToken.ToUpper(),
-                Interval = Interval.Minute1,
+                Interval = Interval.Day1,
                 StartTime = time,
                 EndTime = time,
                 Limit = "1",
@@ -109,7 +109,7 @@ public class BinanceProvider : IExchangeProvider
             {
                 FromSymbol = fromToken,
                 ToSymbol = toToken,
-                Exchange = kLine.EndTime >= timestamp ? kLine.EndAmount.SafeToDecimal() : kLine.AvgAmount(),
+                Exchange = kLine.AvgAmount(),
                 Timestamp = timestamp
             };
         });
@@ -208,4 +208,5 @@ public static class Interval
     public static string Hour6 = "6h";
     public static string Hour8 = "8h";
     public static string Hour12 = "12h";
+    public static string Day1 = "1d";
 }
