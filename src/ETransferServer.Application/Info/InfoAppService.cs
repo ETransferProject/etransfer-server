@@ -82,19 +82,24 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
         try
         {
             result.Volume.Latest = DateTime.UtcNow.Date.ToUtcString(TimeHelper.DatePattern);
-            result.Volume.TotalAmountUsd = await GetOrderAmountAsync();
 
             var dateDimension = (DateDimensionEnum)Enum.Parse(typeof(DateDimensionEnum), request.Type);
             switch (dateDimension)
             {
                 case DateDimensionEnum.Day:
                     result = await QuerySumAggAsync(DateInterval.Day, request.MaxResultCount, result);
+                    result.Volume.TotalAmountUsd = result.Volume.Day
+                        .Sum(t => t.DepositAmountUsd.SafeToDecimal() + t.WithdrawAmountUsd.SafeToDecimal()).ToString();
                     break;
                 case DateDimensionEnum.Week:
                     result = await QuerySumAggAsync(DateInterval.Week, request.MaxResultCount, result);
+                    result.Volume.TotalAmountUsd = result.Volume.Week
+                        .Sum(t => t.DepositAmountUsd.SafeToDecimal() + t.WithdrawAmountUsd.SafeToDecimal()).ToString();
                     break;
                 case DateDimensionEnum.Month:
                     result = await QuerySumAggAsync(DateInterval.Month, request.MaxResultCount, result);
+                    result.Volume.TotalAmountUsd = result.Volume.Month
+                        .Sum(t => t.DepositAmountUsd.SafeToDecimal() + t.WithdrawAmountUsd.SafeToDecimal()).ToString();
                     break;
             }
         }
@@ -306,50 +311,6 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
         QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery));
         var countResponse = await _orderIndexRepository.CountAsync(Filter);
         return countResponse.Count;
-    }
-
-    private async Task<string> GetOrderAmountAsync()
-    {
-        var s = new SearchDescriptor<OrderIndex>()
-            .Size(0)
-            .Query(q => q.Terms(i =>
-                i.Field(f => f.Status).Terms(new List<string>
-                {
-                    OrderStatusEnum.ToTransferConfirmed.ToString(),
-                    OrderStatusEnum.Finish.ToString()
-                })))
-            .Aggregations(symbolAgg => symbolAgg
-                .Terms("symbol", terms => terms
-                    .Field(f => f.FromTransfer.Symbol)
-                    .Aggregations(sumAgg => sumAgg
-                        .Sum("sum_amount", sum => sum
-                            .Field(f => f.FromTransfer.Amount))
-                    )
-                )
-            );
-        var searchResponse = await _orderIndexRepository.SearchAsync(s, 0, 0);
-        if (!searchResponse.IsValid)
-            _logger.LogError("GetOrderAmountAsync error: {error}", searchResponse.ServerError?.Error);
-        
-        var agg = searchResponse.Aggregations.Terms("symbol");
-        var amountUsd = 0M;
-        foreach (var bucket in agg.Buckets)
-        {
-            var avgExchange = 0M;
-            try
-            {
-                avgExchange =
-                    await _networkAppService.GetAvgExchangeAsync(bucket.Key, CommonConstant.Symbol.USD);
-            }
-            catch (Exception e)
-            {
-                _logger.LogError(e, "GetOrderAmountAsync exchange error, {symbol}", bucket.Key);
-            }
-
-            amountUsd += (decimal)bucket.Sum("sum_amount")?.Value * avgExchange;
-        }
-
-        return amountUsd.ToString(2, DecimalHelper.RoundingOption.Floor);
     }
 
     private async Task<GetTokenResultDto> GetTokenAmountAsync(DateRangeEnum dateRangeEnum, OrderTypeEnum orderTypeEnum,
@@ -665,6 +626,8 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
             };
             var depositAmountUsd = 0M;
             var withdrawAmountUsd = 0M;
+            var depositDic = new Dictionary<long, decimal>();
+            var withdrawDic = new Dictionary<long, decimal>();
             
             var symbolAgg = bucket.Terms("symbol");
             foreach (var symbolBucket in symbolAgg.Buckets)
@@ -706,6 +669,7 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
                         foreach (var ddBucket in ddAgg.Buckets)
                         {
                             avgExchange = 0M;
+                            var dd = (long)ddBucket.Key;
                             try
                             {
                                 if (ddBucket.Sum("sum_amount")?.Value > 0)
@@ -723,34 +687,49 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
                             }
                             if (orderTypeBucket.Key == OrderTypeEnum.Deposit.ToString())
                             {
-                                depositAmountUsd += (decimal)ddBucket.Sum("sum_amount")?.Value * avgExchange;
+                                if (depositDic.ContainsKey(dd))
+                                    depositDic[dd] += (decimal)ddBucket.Sum("sum_amount")?.Value * avgExchange;
+                                else
+                                    depositDic.Add(dd, (decimal)ddBucket.Sum("sum_amount")?.Value * avgExchange);
                             }
                             else
                             {
-                                withdrawAmountUsd += (decimal)ddBucket.Sum("sum_amount")?.Value * avgExchange;
+                                if (withdrawDic.ContainsKey(dd))
+                                    withdrawDic[dd] += (decimal)ddBucket.Sum("sum_amount")?.Value * avgExchange;
+                                else
+                                    withdrawDic.Add(dd, (decimal)ddBucket.Sum("sum_amount")?.Value * avgExchange);
                             }
                         }
                     }
                 }
             }
 
-            item.DepositAmountUsd = depositAmountUsd.ToString(2, DecimalHelper.RoundingOption.Floor);
-            item.WithdrawAmountUsd = withdrawAmountUsd.ToString(2, DecimalHelper.RoundingOption.Floor);
-            
+            item.DepositAmountUsd = dateInterval == DateInterval.Day
+                ? depositAmountUsd.ToString(2, DecimalHelper.RoundingOption.Floor)
+                : depositDic.Sum(t => decimal.Parse(t.Value.ToString(2, DecimalHelper.RoundingOption.Floor)))
+                    .ToString(2, DecimalHelper.RoundingOption.Floor);
+            item.WithdrawAmountUsd = dateInterval == DateInterval.Day
+                ? withdrawAmountUsd.ToString(2, DecimalHelper.RoundingOption.Floor)
+                : withdrawDic.Sum(t => decimal.Parse(t.Value.ToString(2, DecimalHelper.RoundingOption.Floor)))
+                    .ToString(2, DecimalHelper.RoundingOption.Floor);
+
             switch (dateInterval)
             {
                 case DateInterval.Day:
-                    if (depositAmountUsd > 0 || withdrawAmountUsd > 0) result.Volume.Day.Add(item);
+                    if (decimal.Parse(item.DepositAmountUsd) > 0 || decimal.Parse(item.WithdrawAmountUsd) > 0)
+                        result.Volume.Day.Add(item);
                     if (maxResultCount.HasValue)
                         result.Volume.Day = result.Volume.Day.TakeLast(maxResultCount.Value).ToList();
                     break;
                 case DateInterval.Week:
-                    if (depositAmountUsd > 0 || withdrawAmountUsd > 0) result.Volume.Week.Add(item);
+                    if (decimal.Parse(item.DepositAmountUsd) > 0 || decimal.Parse(item.WithdrawAmountUsd) > 0)
+                        result.Volume.Week.Add(item);
                     if (maxResultCount.HasValue)
                         result.Volume.Week = result.Volume.Week.TakeLast(maxResultCount.Value).ToList();
                     break;
                 case DateInterval.Month:
-                    if (depositAmountUsd > 0 || withdrawAmountUsd > 0) result.Volume.Month.Add(item);
+                    if (decimal.Parse(item.DepositAmountUsd) > 0 || decimal.Parse(item.WithdrawAmountUsd) > 0)
+                        result.Volume.Month.Add(item);
                     if (maxResultCount.HasValue)
                         result.Volume.Month = result.Volume.Month.TakeLast(maxResultCount.Value).ToList();
                     break;
