@@ -310,7 +310,8 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
             {
                 OrderStatusEnum.ToTransferConfirmed.ToString(),
                 OrderStatusEnum.Finish.ToString()
-            }))
+            })),
+            q => q.Term(i => i.Field(f => f.OrderType).Value(orderTypeEnum.ToString()))
         };
         switch (dateRangeEnum)
         {
