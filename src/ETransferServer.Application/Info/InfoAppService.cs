@@ -52,19 +52,21 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
         try
         {
             result.Transaction.Latest = DateTime.UtcNow.Date.ToUtcString(TimeHelper.DatePattern);
-            result.Transaction.TotalTx = await GetOrderCountAsync();
 
             var dateDimension = (DateDimensionEnum)Enum.Parse(typeof(DateDimensionEnum), request.Type);
             switch (dateDimension)
             {
                 case DateDimensionEnum.Day:
                     result = await QueryCountAggAsync(DateInterval.Day, request.MaxResultCount, result);
+                    result.Transaction.TotalTx = result.Transaction.Day.Sum(t => t.DepositTx + t.WithdrawTx);
                     break;
                 case DateDimensionEnum.Week:
                     result = await QueryCountAggAsync(DateInterval.Week, request.MaxResultCount, result);
+                    result.Transaction.TotalTx = result.Transaction.Week.Sum(t => t.DepositTx + t.WithdrawTx);
                     break;
                 case DateDimensionEnum.Month:
                     result = await QueryCountAggAsync(DateInterval.Month, request.MaxResultCount, result);
+                    result.Transaction.TotalTx = result.Transaction.Month.Sum(t => t.DepositTx + t.WithdrawTx);
                     break;
             }
         }
@@ -297,20 +299,6 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
                 request.Type, request.FromToken, request.FromChainId, request.ToToken, request.ToChainId);
             return new PagedResultDto<OrderIndexDto>();
         }
-    }
-
-    private async Task<long> GetOrderCountAsync()
-    {
-        var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
-        mustQuery.Add(q => q.Terms(i =>
-            i.Field(f => f.Status).Terms(new List<string>
-            {
-                OrderStatusEnum.ToTransferConfirmed.ToString(),
-                OrderStatusEnum.Finish.ToString()
-            })));
-        QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery));
-        var countResponse = await _orderIndexRepository.CountAsync(Filter);
-        return countResponse.Count;
     }
 
     private async Task<GetTokenResultDto> GetTokenAmountAsync(DateRangeEnum dateRangeEnum, OrderTypeEnum orderTypeEnum,
