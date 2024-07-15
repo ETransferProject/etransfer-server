@@ -434,6 +434,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
                 ErrorResult.SymbolInvalidCode, null, request.Symbol);
             AssertHelper.IsTrue(await IsAddressSupport(request.FromChainId, request.Symbol, request.ToAddress),
                 ErrorResult.AddressInvalidCode);
+            AssertHelper.IsTrue(IsNetworkOpen(request.Symbol, request.Network), ErrorResult.CoinSuspendedTemporarily);
 
             var networkConfig = _networkInfoOptions.Value.NetworkMap[request.Symbol]
                 .FirstOrDefault(t => t.NetworkInfo.Network == request.Network);
@@ -509,6 +510,12 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         }
     }
 
+    private bool IsNetworkOpen(string symbol, string network)
+    {
+        return _networkInfoOptions.Value.NetworkMap[symbol].Exists(t =>
+            t.NetworkInfo.Network == network && t.SupportType.Contains(OrderTypeEnum.Withdraw.ToString()) &&
+            t.WithdrawInfo.IsOpen);
+    }
 
     private async Task<CreateWithdrawOrderDto> DoCreateOrderAsync(GetWithdrawOrderRequestDto request,
         Transaction transaction, decimal withdrawAmount, string feeStr)

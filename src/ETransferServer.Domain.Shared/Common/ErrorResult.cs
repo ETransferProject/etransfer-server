@@ -17,6 +17,7 @@ public static class ErrorResult
     public const int WithdrawLimitInsufficientCode = 40013;
     public const int TransactionFailCode = 40014;
     public const int OrderSaveFailCode = 40015;
+    public const int CoinSuspendedTemporarily = 40016;
     public const int AddressFormatWrongCode = 40100;
     public const int NetworkNotSupportCode = 40101;
     public const int CoBoCoinInvalid = 40201;
@@ -42,6 +43,7 @@ public static class ErrorResult
         { 40013, "The remaining withdrawal quota for today is insufficient, with {amount} available. Please try again after {number} hours or consider transferring a smaller amount." },
         { 40014, "Transaction failed. The ETransfer team is actively looking into this issue. Please be assured that your accounts and assets will remain unaffected." },
         { 40015, "Failed to synchronise data. The ETransfer team is actively looking into this issue. Please be assured that your accounts and assets will remain unaffected." },
+        { 40016, "Coin is suspended temporarily" },
         { 40100, "Please enter a correct address." },
         { 40101, "If you're withdrawing to {Networks}, please wait a while for the service to be restored and try again later." },
         { 40201, "CoBo coin {coBoCoin} invalid" },
