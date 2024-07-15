@@ -24,7 +24,7 @@ namespace ETransferServer
 
             try
             {
-                Log.Information("Starting ETransferServer.SignatureApi.Host");
+                Log.Information("Starting ETransferServer.HttpApi.Host");
 
                 var builder = WebApplication.CreateBuilder(args);
                 builder.Configuration.AddJsonFile("apollo.appsettings.json");
@@ -34,7 +34,7 @@ namespace ETransferServer
                 builder.Host.AddAppSettingsSecretsJson()
                     .UseAutofac()
                 #if !DEBUG
-                   .UseApollo()
+                    .UseApollo()
                 #endif
                     .UseSerilog();
 
