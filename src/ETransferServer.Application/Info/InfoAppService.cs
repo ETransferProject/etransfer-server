@@ -145,6 +145,15 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
             var tokenConfigs = _tokenOptions.Value.Deposit[ChainId.AELF];
             foreach (var kvp in result)
             {
+                kvp.Value.Details.ForEach(item =>
+                {
+                    item.Item.Amount24H = item.Item.Amount24H.SafeToDecimal().ToString(4, DecimalHelper.RoundingOption.Floor);
+                    item.Item.Amount24HUsd = item.Item.Amount24HUsd.SafeToDecimal().ToString(2, DecimalHelper.RoundingOption.Floor);
+                    item.Item.Amount7D = item.Item.Amount7D.SafeToDecimal().ToString(4, DecimalHelper.RoundingOption.Floor);
+                    item.Item.Amount7DUsd = item.Item.Amount7DUsd.SafeToDecimal().ToString(2, DecimalHelper.RoundingOption.Floor);
+                    item.Item.AmountTotal = item.Item.AmountTotal.SafeToDecimal().ToString(4, DecimalHelper.RoundingOption.Floor);
+                    item.Item.AmountTotalUsd = item.Item.AmountTotalUsd.SafeToDecimal().ToString(2, DecimalHelper.RoundingOption.Floor);
+                });
                 var networkConfigs = _networkOptions.Value.NetworkMap[kvp.Key];
                 var networks = networkConfigs.Select(config => config.NetworkInfo.Network).ToList();
                 var names = result[kvp.Key].Details.Select(d => d.Name).ToList();
@@ -310,7 +319,8 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
             {
                 OrderStatusEnum.ToTransferConfirmed.ToString(),
                 OrderStatusEnum.Finish.ToString()
-            }))
+            })),
+            q => q.Term(i => i.Field(f => f.OrderType).Value(orderTypeEnum.ToString()))
         };
         switch (dateRangeEnum)
         {
@@ -439,18 +449,18 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
                 {
                     case DateRangeEnum._24H:
                         amount += detail.Item.Amount24H.IsNullOrEmpty() ? 0M : detail.Item.Amount24H.SafeToDecimal();
-                        detail.Item.Amount24H = amount.ToString(4, DecimalHelper.RoundingOption.Floor);
-                        detail.Item.Amount24HUsd = (amount * avgExchange).ToString(2, DecimalHelper.RoundingOption.Floor);
+                        detail.Item.Amount24H = amount.ToString();
+                        detail.Item.Amount24HUsd = (amount * avgExchange).ToString();
                         break;
                     case DateRangeEnum._7D:
                         amount += detail.Item.Amount7D.IsNullOrEmpty() ? 0M : detail.Item.Amount7D.SafeToDecimal();
-                        detail.Item.Amount7D = amount.ToString(4, DecimalHelper.RoundingOption.Floor);
-                        detail.Item.Amount7DUsd = (amount * avgExchange).ToString(2, DecimalHelper.RoundingOption.Floor);
+                        detail.Item.Amount7D = amount.ToString();
+                        detail.Item.Amount7DUsd = (amount * avgExchange).ToString();
                         break;
                     default:
                         amount += detail.Item.AmountTotal.IsNullOrEmpty() ? 0M : detail.Item.AmountTotal.SafeToDecimal();
-                        detail.Item.AmountTotal = amount.ToString(4, DecimalHelper.RoundingOption.Floor);
-                        detail.Item.AmountTotalUsd = (amount * avgExchange).ToString(2, DecimalHelper.RoundingOption.Floor);
+                        detail.Item.AmountTotal = amount.ToString();
+                        detail.Item.AmountTotalUsd = (amount * avgExchange).ToString();
                         break;
                 }
             }
