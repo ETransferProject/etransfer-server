@@ -28,6 +28,7 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
     private readonly INetworkAppService _networkAppService;
     private readonly IOptionsSnapshot<NetworkOptions> _networkOptions;
     private readonly IOptionsSnapshot<TokenOptions> _tokenOptions;
+    private readonly IOptionsSnapshot<TokenInfoOptions> _tokenInfoOptions;
     private readonly IObjectMapper _objectMapper;
     private readonly ILogger<InfoAppService> _logger;
 
@@ -35,6 +36,7 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
         INetworkAppService networkAppService, 
         IOptionsSnapshot<NetworkOptions> networkOptions,
         IOptionsSnapshot<TokenOptions> tokenOptions,
+        IOptionsSnapshot<TokenInfoOptions> tokenInfoOptions,
         IObjectMapper objectMapper,
         ILogger<InfoAppService> logger)
     {
@@ -42,6 +44,7 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
         _networkAppService = networkAppService;
         _networkOptions = networkOptions;
         _tokenOptions = tokenOptions;
+        _tokenInfoOptions = tokenInfoOptions;
         _objectMapper = objectMapper;
         _logger = logger;
     }
@@ -160,11 +163,21 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
                 result[kvp.Key].Icon = tokenConfigs.FirstOrDefault(t => t.Symbol == kvp.Key)?.Icon;
                 result[kvp.Key].Networks = networkConfigs.Where(n => names.Contains(n.NetworkInfo.Network))
                     .Select(t => t.NetworkInfo.Network).ToList();
-                result[kvp.Key].ChainIds = networkConfigs
-                    .Where(n => names.Contains(n.NetworkInfo.Network) && (n.NetworkInfo.Network == ChainId.AELF ||
-                                                                          n.NetworkInfo.Network == ChainId.tDVV ||
-                                                                          n.NetworkInfo.Network == ChainId.tDVW))
-                    .Select(t => t.NetworkInfo.Network).ToList();
+                if (orderType.IsNullOrEmpty())
+                {
+                    result[kvp.Key].ChainIds = _tokenInfoOptions.Value[kvp.Key].Deposit
+                        .Concat(_tokenInfoOptions.Value[kvp.Key].Withdraw).Distinct().OrderBy(d =>
+                            new List<string> { ChainId.AELF, ChainId.tDVV, ChainId.tDVW }.IndexOf(d)).ToList();
+                }
+                else if (orderType == OrderTypeEnum.Deposit.ToString())
+                {
+                    result[kvp.Key].ChainIds = _tokenInfoOptions.Value[kvp.Key].Deposit;
+                }
+                else if (orderType == OrderTypeEnum.Withdraw.ToString())
+                {
+                    result[kvp.Key].ChainIds = _tokenInfoOptions.Value[kvp.Key].Withdraw;
+                }
+
                 result[kvp.Key].General.Amount24H = kvp.Value.Details.Sum(d => d.Item.Amount24H.SafeToDecimal())
                     .ToString(4, DecimalHelper.RoundingOption.Floor);
                 result[kvp.Key].General.Amount24HUsd = kvp.Value.Details.Sum(d => d.Item.Amount24HUsd.SafeToDecimal())
