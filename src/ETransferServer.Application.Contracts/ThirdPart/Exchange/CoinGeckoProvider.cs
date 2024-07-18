@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
+using CoinGecko.Entities.Response.Coins;
 using CoinGecko.Entities.Response.Simple;
 using ETransferServer.Common;
 using ETransferServer.Common.HttpClient;
@@ -17,6 +18,7 @@ public class CoinGeckoProvider : IExchangeProvider
 {
     private const string FiatCurrency = "usd";
     private const string SimplePriceUri = "/simple/price";
+    private const string HistoryPriceUri = "/coins/{}/history";
 
     private readonly ILogger<CoinGeckoProvider> _logger;
     private readonly IOptionsSnapshot<CoinGeckoOptions> _coinGeckoOptions;
@@ -124,8 +126,40 @@ public class CoinGeckoProvider : IExchangeProvider
             : sourceSymbol;
     }
 
-    public Task<TokenExchangeDto> HistoryAsync(string fromSymbol, string toSymbol, long timestamp)
+    public async Task<TokenExchangeDto> HistoryAsync(string fromSymbol, string toSymbol, long timestamp)
     {
-        throw new NotSupportedException();
+        var from = MappingSymbol(fromSymbol);
+        var to = MappingSymbol(toSymbol);
+        if (from == to)
+        {
+            return TokenExchangeDto.One(fromSymbol, toSymbol, timestamp);
+        }
+        var url = _coinGeckoOptions.Value.BaseUrl + HistoryPriceUri;
+        url = url.Replace("{}", from);
+        _logger.LogDebug("CoinGecko history url {Url}", url);
+
+        var price = await _httpProvider.InvokeAsync<MarketData>(HttpMethod.Get,
+            url,
+            header: new Dictionary<string, string>
+            {
+                ["x-cg-pro-api-key"] = _coinGeckoOptions.Value.ApiKey
+            },
+            param: new Dictionary<string, string>
+            {
+                ["date"] = TimeHelper.ToUtcString(DateTimeHelper.FromUnixTimeMilliseconds(timestamp), "dd-MM-yyyy"),
+                ["localization"] = false.ToString()
+            });
+        AssertHelper.NotNull(price.CurrentPrice, "CoinGecko not support symbol {}", from);
+        AssertHelper.IsTrue(
+            string.Equals(to, FiatCurrency, StringComparison.CurrentCultureIgnoreCase) && price.CurrentPrice.ContainsKey(to),
+            "CoinGecko not support symbol {}", to);
+        var exchange = price.CurrentPrice[to];
+        return new TokenExchangeDto
+        {
+            FromSymbol = fromSymbol,
+            ToSymbol = toSymbol,
+            Exchange = (decimal)exchange,
+            Timestamp = timestamp
+        };
     }
 }

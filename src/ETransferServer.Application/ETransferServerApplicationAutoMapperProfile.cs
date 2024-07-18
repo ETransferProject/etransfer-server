@@ -1,5 +1,6 @@
 using AutoMapper;
 using ETransferServer.Common;
+using ETransferServer.Dtos.Info;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Dtos.User;
 using ETransferServer.Entities;
@@ -28,12 +29,14 @@ public class ETransferServerApplicationAutoMapperProfile : Profile
         CreateMap<OrderIndex, OrderIndexDto>().ReverseMap();
         CreateMap<Transfer, TransferInfoDto>().ReverseMap();
         CreateMap<TokenConfig, TokenConfigDto>().ReverseMap();
+        CreateMap<TokenConfig, TokenConfigOptionDto>().ReverseMap();
         CreateMap<TokenSwapConfig, TokenOptionConfigDto>().ReverseMap();
         CreateMap<ToTokenConfig, ToTokenOptionConfigDto>().ReverseMap();
         CreateMap<NetworkInfo, NetworkDto>()
             .ForMember(des => des.MultiConfirmTime, opt =>
                 opt.MapFrom(src => TimeHelper.SecondsToMinute((int)src.MultiConfirmSeconds)))
             .ReverseMap();
+        CreateMap<NetworkInfo, NetworkOptionDto>().ReverseMap();
         CreateMap<OrderStatusFlowDto, OrderStatusFlow>().ReverseMap();
     }
 }

@@ -8,6 +8,7 @@ public static class TimeHelper
 {
     public const string DefaultPattern = "yyyy-MM-dd HH:mm:ss";
     public const string DatePattern = "yyyy-MM-dd";
+    public const string DateMonthPattern = "yyyy-MM";
     public const string UtcPattern = "yyyy-MM-ddTHH:mm:ss.fffZ";
     
     public static DateTime GetDateTimeFromTimeStamp(long timeStamp)

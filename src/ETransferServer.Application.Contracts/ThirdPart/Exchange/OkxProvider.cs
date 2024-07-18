@@ -94,8 +94,8 @@ public class OkxProvider : IExchangeProvider
         {
             InstId = string.Join("-", fromSymbol.ToUpper(), toSymbol.ToUpper()),
             After = TimeHelper.GetDateTimeFromTimeStamp(timestamp).WithSeconds(0).WithMicroSeconds(0)
-                .WithMilliSeconds(1).ToUtcMilliSeconds().ToString(),
-            Bar = Bar.Minute1,
+                .WithMilliSeconds(0).ToUtcMilliSeconds().ToString(),
+            Bar = Bar.Day1,
             Limit = "1"
         };
 
@@ -116,7 +116,7 @@ public class OkxProvider : IExchangeProvider
             FromSymbol = fromSymbol,
             ToSymbol = toSymbol,
             Exchange = kline.Finished ? kline.AvgAmount() : kline.EndAmount.SafeToDecimal(),
-            Timestamp = DateTime.UtcNow.WithSeconds(0).WithMicroSeconds(0).WithMilliSeconds(0).ToUtcMilliSeconds()
+            Timestamp = timestamp
         };
     }
 }
@@ -161,6 +161,7 @@ public class OkxKLine
             : bar == Bar.Hour1 ? startTime.AddHours(1).ToUtcMilliSeconds().ToString()
             : bar == Bar.Hour2 ? startTime.AddHours(2).ToUtcMilliSeconds().ToString()
             : bar == Bar.Hour4 ? startTime.AddHours(4).ToUtcMilliSeconds().ToString()
+            : bar == Bar.Day1 ? startTime.AddDays(1).ToUtcMilliSeconds().ToString()
             : null;
         AssertHelper.NotEmpty(EndTime, "Invalid bar {Bar}", bar);
     }
@@ -197,4 +198,5 @@ public static class Bar
     public static string Hour1 = "1H";
     public static string Hour2 = "2H";
     public static string Hour4 = "4H";
+    public static string Day1 = "1D";
 }

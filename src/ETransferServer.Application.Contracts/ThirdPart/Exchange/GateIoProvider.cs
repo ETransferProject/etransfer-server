@@ -36,8 +36,6 @@ public class GateIoProvider : IExchangeProvider, ISingletonDependency
 
     public async Task<TokenExchangeDto> LatestAsync(string fromSymbol, string toSymbol)
     {
-
-
         var from = SymbolMapping(fromSymbol);
         var to = SymbolMapping(toSymbol);
         if (from == to)
@@ -88,7 +86,7 @@ public class GateIoProvider : IExchangeProvider, ISingletonDependency
             {
                 ["currency_pair"] = string.Join(CommonConstant.Underline, from, to),
                 ["from"] = (timestamp / 1000).ToString(),
-                ["interval"] = Interval.Hour1
+                ["interval"] = Interval.Day1
             });
         AssertHelper.NotEmpty(resp, "Empty result");
         var klineData = new CandlesticksResponse(resp[0]);
@@ -97,7 +95,7 @@ public class GateIoProvider : IExchangeProvider, ISingletonDependency
             FromSymbol = fromSymbol,
             ToSymbol = toSymbol,
             Timestamp = klineData.TimestampSeconds * 1000,
-            Exchange = klineData.WindowClosed ? (klineData.OpeningPrice + klineData.ClosingPrice) / 2 : klineData.ClosingPrice
+            Exchange = klineData.WindowClosed ? (klineData.LowestPrice + klineData.HighestPrice) / 2 : klineData.ClosingPrice
         };
     }
 
