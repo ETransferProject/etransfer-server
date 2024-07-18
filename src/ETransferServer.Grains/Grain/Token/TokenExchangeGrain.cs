@@ -17,6 +17,7 @@ public interface ITokenExchangeGrain : IGrainWithStringKey
     }
 
     Task<Dictionary<string, TokenExchangeDto>> GetAsync();
+    Task<Dictionary<string, TokenExchangeDto>> GetHistoryAsync();
     Task<Dictionary<string, TokenExchangeDto>> GetByProviderAsync(ExchangeProviderName name, string symbol);
 }
 
@@ -38,7 +39,7 @@ public class TokenExchangeGrain : Grain<TokenExchangeState>, ITokenExchangeGrain
     }
 
 
-    public async Task<Dictionary<string, TokenExchangeDto>> DoGetAsync(string fromSymbol, string toSymbol)
+    public async Task<Dictionary<string, TokenExchangeDto>> DoGetAsync(string fromSymbol, string toSymbol, long timestamp = 0L)
     {
         var now = DateTime.UtcNow.ToUtcMilliSeconds();
         if (fromSymbol == toSymbol)
@@ -50,7 +51,7 @@ public class TokenExchangeGrain : Grain<TokenExchangeState>, ITokenExchangeGrain
                     FromSymbol = fromSymbol,
                     ToSymbol = toSymbol,
                     Exchange = 1,
-                    Timestamp = now
+                    Timestamp = timestamp > 0 ? timestamp : now
                 }
             };
         }
@@ -65,13 +66,15 @@ public class TokenExchangeGrain : Grain<TokenExchangeState>, ITokenExchangeGrain
             (fromSymbol, toSymbol) = (toSymbol, fromSymbol);
         }
 
-        var usdToUsdtTask = isUsd != "none" ? ExchangeFromUsdtToUsd() : null;
+        var usdToUsdtTask = isUsd != "none" ? ExchangeFromUsdtToUsd(timestamp) : null;
         var providerOption = _exchangeOptions.Value.GetSymbolProviders(fromSymbol, toSymbol);
         var providers = _exchangeProviders.Values.Where(provider => providerOption.Contains(provider.Name().ToString()))
             .ToList();
         foreach (var provider in providers)
         {
-            asyncTasks[provider.Name().ToString()] = provider.LatestAsync(fromSymbol, toSymbol);
+            asyncTasks[provider.Name().ToString()] = timestamp > 0
+                ? provider.HistoryAsync(fromSymbol, toSymbol, timestamp)
+                : provider.LatestAsync(fromSymbol, toSymbol);
         }
 
         var result = new Dictionary<string, TokenExchangeDto>();
@@ -87,6 +90,9 @@ public class TokenExchangeGrain : Grain<TokenExchangeState>, ITokenExchangeGrain
                     isUsd == "from" ? 1 / (exchange.Exchange * usdtPriceInUsd.Exchange) : exchange.Exchange;
 
                 result.Add(providerName, exchange);
+                _logger.LogInformation(
+                    "Token exchange: fromSymbol={fromSymbol}, toSymbol={toSymbol}, timestamp={timestamp}, name={providerName}, exchange={exchange}, usdExchange={usdExchange}",
+                    fromSymbol, toSymbol, timestamp, providerName, exchange.Exchange, usdtPriceInUsd?.Exchange);
             }
             catch (Exception e)
             {
@@ -113,15 +119,15 @@ public class TokenExchangeGrain : Grain<TokenExchangeState>, ITokenExchangeGrain
             FromSymbol = fromSymbol,
             ToSymbol = toSymbol,
             Exchange = bottomExchange.SafeToDecimal(),
-            Timestamp = now
+            Timestamp = timestamp > 0 ? timestamp : now
         });
         return result;
     }
 
-    public async Task<Dictionary<string, TokenExchangeDto>> GetViaUsdt(string fromSymbol, string toSymbol)
+    public async Task<Dictionary<string, TokenExchangeDto>> GetViaUsdt(string fromSymbol, string toSymbol, long timestamp = 0L)
     {
-        var fromToUsdtTask = DoGetAsync(fromSymbol, CommonConstant.Symbol.USDT);
-        var toToUsdtTask = DoGetAsync(toSymbol, CommonConstant.Symbol.USDT);
+        var fromToUsdtTask = DoGetAsync(fromSymbol, CommonConstant.Symbol.USDT, timestamp);
+        var toToUsdtTask = DoGetAsync(toSymbol, CommonConstant.Symbol.USDT, timestamp);
 
         var fromToUsdt = await fromToUsdtTask;
         var toToUsdt = await toToUsdtTask;
@@ -171,16 +177,47 @@ public class TokenExchangeGrain : Grain<TokenExchangeState>, ITokenExchangeGrain
         await WriteStateAsync();
         return State.ExchangeInfos;
     }
+    
+    public async Task<Dictionary<string, TokenExchangeDto>> GetHistoryAsync()
+    {
+        if (State.LastModifyTime > 0)
+        {
+            return State.ExchangeInfos;
+        }
+
+        var symbolValue = this.GetPrimaryKeyString().Split(CommonConstant.Underline);
+        if (symbolValue.Length < 3)
+        {
+            return new Dictionary<string, TokenExchangeDto>();
+        }
+
+        var fromSymbol = MappingSymbol(symbolValue[0].ToUpper());
+        var toSymbol = MappingSymbol(symbolValue[1].ToUpper());
+        var timestamp = long.Parse(symbolValue[2]);
+
+        State.ExchangeInfos =
+            _exchangeOptions.Value.SymbolExchangeViaUSDT.Contains(fromSymbol) ||
+            _exchangeOptions.Value.SymbolExchangeViaUSDT.Contains(toSymbol)
+                ? await GetViaUsdt(fromSymbol, toSymbol, timestamp)
+                : await DoGetAsync(fromSymbol, toSymbol, timestamp);
+
+        State.LastModifyTime = DateTime.UtcNow.ToUtcMilliSeconds();
+        await WriteStateAsync();
+        return State.ExchangeInfos;
+    }
 
 
-    private async Task<TokenExchangeDto> ExchangeFromUsdtToUsd()
+    private async Task<TokenExchangeDto> ExchangeFromUsdtToUsd(long timestamp)
     {
         try
         {
             AssertHelper.IsTrue(_exchangeProviders.ContainsKey(ExchangeProviderName.CoinGecko.ToString()),
                 "CoinGecko not support");
-            var resp = await _exchangeProviders.GetValueOrDefault(ExchangeProviderName.CoinGecko.ToString())
-                .LatestAsync(CommonConstant.Symbol.USDT, CommonConstant.Symbol.USD);
+            var resp = timestamp > 0
+                ? await _exchangeProviders.GetValueOrDefault(ExchangeProviderName.CoinGecko.ToString())
+                    .HistoryAsync(CommonConstant.Symbol.USDT, CommonConstant.Symbol.USD, timestamp)
+                : await _exchangeProviders.GetValueOrDefault(ExchangeProviderName.CoinGecko.ToString())
+                    .LatestAsync(CommonConstant.Symbol.USDT, CommonConstant.Symbol.USD);
             return resp;
         }
         catch (Exception e)
@@ -190,7 +227,7 @@ public class TokenExchangeGrain : Grain<TokenExchangeState>, ITokenExchangeGrain
             {
                 FromSymbol = CommonConstant.Symbol.USD,
                 ToSymbol = CommonConstant.Symbol.USDT,
-                Timestamp = DateTime.UtcNow.ToUtcMilliSeconds(),
+                Timestamp = timestamp > 0 ? timestamp : DateTime.UtcNow.ToUtcMilliSeconds(),
                 Exchange = 1M
             };
         }

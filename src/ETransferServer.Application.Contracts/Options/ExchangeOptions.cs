@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using ETransferServer.Common;
 using ETransferServer.ThirdPart.Exchange;
 
 namespace ETransferServer.Options;
@@ -27,6 +28,11 @@ public class ExchangeOptions
 
     public List<string> SymbolExchangeViaUSDT { get; set; } = new();
 
+    public List<string> LimitLogs { get; set; } = new()
+    {
+        CommonConstant.DefaultConst.LimitLogs
+    };
+    
     public List<string> GetSymbolProviders(string fromSymbol, string toSymbol)
     {
         return SymbolProviders.TryGetValue(fromSymbol.ToUpper(), out var fromProvider) ? fromProvider :
