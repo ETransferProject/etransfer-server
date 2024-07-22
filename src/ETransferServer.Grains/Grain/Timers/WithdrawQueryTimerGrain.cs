@@ -77,45 +77,45 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
         _lastCallbackTime = DateTime.UtcNow;
         _logger.LogInformation("WithdrawQueryTimerGrain callback, {Time}", DateTime.UtcNow.ToUtc8String());
 
-        var offset = 0;
-        var now = DateTime.UtcNow.ToUtcMilliSeconds();
-        var maxTime = State.LastTime;
-
-        while (true)
-        {
-            var list = new PagedResultDto<TransferRecordDto>();
-            try
-            {
-                list = await _tokenTransferProvider.GetTokenPoolRecordListAsync(State.LastTime,
-                    now, PageSize, offset);
-            }
-            catch (Exception e)
-            {
-                _logger.LogError(e, "get withdraw records error.");
-            }
-
-            if (list.Items.IsNullOrEmpty()) break;
-            offset += list.Items.Count;
-            maxTime = list.Items.Max(t => t.Timestamp);
-            foreach (var transferRecord in list.Items)
-            {
-                if (State.ExistOrders.Contains(transferRecord.TransactionId))
-                {
-                    _logger.LogInformation("order already handle: {id}", transferRecord.TransactionId);
-                    continue;
-                }
-
-                await AddAfter(transferRecord);
-                _logger.LogInformation("create withdraw order, orderInfo:{orderInfo}",
-                    JsonConvert.SerializeObject(transferRecord));
-                await CreateWithdrawOrder(transferRecord);
-            }
-
-            if (list.Items.Count < PageSize) break;
-        }
-
-        State.LastTime = maxTime;
-        await WriteStateAsync();
+        // var offset = 0;
+        // var now = DateTime.UtcNow.ToUtcMilliSeconds();
+        // var maxTime = State.LastTime;
+        //
+        // while (true)
+        // {
+        //     var list = new PagedResultDto<TransferRecordDto>();
+        //     try
+        //     {
+        //         list = await _tokenTransferProvider.GetTokenPoolRecordListAsync(State.LastTime,
+        //             now, PageSize, offset);
+        //     }
+        //     catch (Exception e)
+        //     {
+        //         _logger.LogError(e, "get withdraw records error.");
+        //     }
+        //
+        //     if (list.Items.IsNullOrEmpty()) break;
+        //     offset += list.Items.Count;
+        //     maxTime = list.Items.Max(t => t.Timestamp);
+        //     foreach (var transferRecord in list.Items)
+        //     {
+        //         if (State.ExistOrders.Contains(transferRecord.TransactionId))
+        //         {
+        //             _logger.LogInformation("order already handle: {id}", transferRecord.TransactionId);
+        //             continue;
+        //         }
+        //
+        //         await AddAfter(transferRecord);
+        //         _logger.LogInformation("create withdraw order, orderInfo:{orderInfo}",
+        //             JsonConvert.SerializeObject(transferRecord));
+        //         await CreateWithdrawOrder(transferRecord);
+        //     }
+        //
+        //     if (list.Items.Count < PageSize) break;
+        // }
+        //
+        // State.LastTime = maxTime;
+        // await WriteStateAsync();
     }
 
     private async Task CreateWithdrawOrder(TransferRecordDto transferRecord)
