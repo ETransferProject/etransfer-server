@@ -37,7 +37,6 @@ public class OrderController : ETransferController
         _orderAppService = orderAppService;
     }
     
-    [Authorize]
     [HttpGet("network/list")]
     public async Task<GetNetworkListDto> GetNetworkListAsync(GetNetworkListRequestDto request)
     {
@@ -51,7 +50,6 @@ public class OrderController : ETransferController
         return await _depositOrderAppService.GetDepositInfoAsync(request);
     }
     
-    [Authorize]
     [HttpGet("deposit/calculator")]
     public async Task<CalculateDepositRateDto> CalculateDepositRateAsync(GetCalculateDepositRateRequestDto request)
     {
