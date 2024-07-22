@@ -138,7 +138,7 @@ public class CoinGeckoProvider : IExchangeProvider
         url = url.Replace("{}", from);
         _logger.LogDebug("CoinGecko history url {Url}", url);
 
-        var price = await _httpProvider.InvokeAsync<MarketData>(HttpMethod.Get,
+        var price = await _httpProvider.InvokeAsync<CoinFullData>(HttpMethod.Get,
             url,
             header: new Dictionary<string, string>
             {
@@ -149,11 +149,11 @@ public class CoinGeckoProvider : IExchangeProvider
                 ["date"] = TimeHelper.ToUtcString(DateTimeHelper.FromUnixTimeMilliseconds(timestamp), "dd-MM-yyyy"),
                 ["localization"] = false.ToString()
             });
-        AssertHelper.NotNull(price.CurrentPrice, "CoinGecko not support symbol {}", from);
+        AssertHelper.NotNull(price.MarketData?.CurrentPrice, "CoinGecko not support symbol {}", from);
         AssertHelper.IsTrue(
-            string.Equals(to, FiatCurrency, StringComparison.CurrentCultureIgnoreCase) && price.CurrentPrice.ContainsKey(to),
+            string.Equals(to, FiatCurrency, StringComparison.CurrentCultureIgnoreCase) && price.MarketData.CurrentPrice.ContainsKey(to.ToLower()),
             "CoinGecko not support symbol {}", to);
-        var exchange = price.CurrentPrice[to];
+        var exchange = price.MarketData.CurrentPrice[to.ToLower()];
         return new TokenExchangeDto
         {
             FromSymbol = fromSymbol,
