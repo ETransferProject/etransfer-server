@@ -9,7 +9,7 @@ namespace ETransferServer.Controllers;
 [RemoteService]
 [Area("app")]
 [ControllerName("User")]
-[Route("api/app/user")]
+[Route("api/etransfer/user")]
 public class UserController
 {
     private readonly IUserAppService _userAppService;
