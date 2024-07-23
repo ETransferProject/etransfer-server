@@ -11,7 +11,7 @@ namespace ETransferServer.Controllers;
 [RemoteService]
 [Area("app")]
 [ControllerName("Info")]
-[Route("api/app/info")]
+[Route("api/etransfer/info")]
 public class InfoController : ETransferController
 {
     private readonly IInfoAppService _infoAppService;
