@@ -17,7 +17,7 @@ namespace ETransferServer.Controllers;
 [RemoteService]
 [Area("app")]
 [ControllerName("Order")]
-[Route("api/app/")]
+[Route("api/etransfer/")]
 [IgnoreAntiforgeryToken]
 public class OrderController : ETransferController
 {

@@ -9,7 +9,7 @@ namespace ETransferServer.Controllers;
 [RemoteService]
 [Area("app")]
 [ControllerName("Transaction")]
-[Route("api/app/transaction")]
+[Route("api/etransfer/transaction")]
 public class TransactionController : ETransferController
 {
     private readonly ITransactionAppService _transactionAppService;

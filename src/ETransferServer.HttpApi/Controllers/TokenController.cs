@@ -13,7 +13,7 @@ namespace ETransferServer.Controllers;
 [RemoteService]
 [Area("app")]
 [ControllerName("Token")]
-[Route("api/app/token")]
+[Route("api/etransfer/token")]
 public class TokenController : ETransferController
 {
     private readonly ITokenAppService _tokenAppService;
