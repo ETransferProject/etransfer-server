@@ -1,10 +1,8 @@
-using System.Collections.Generic;
-
 namespace ETransferServer.Token.Dtos;
 
 public class GetTokenPriceListRequestDto
 {
-    public List<string> Symbols { get; set; }
+    public string Symbols { get; set; }
 }
 
 public class TokenPriceDataDto

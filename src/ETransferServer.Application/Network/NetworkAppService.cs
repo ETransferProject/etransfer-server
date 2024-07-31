@@ -220,11 +220,14 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
 
     public async Task<ListResultDto<TokenPriceDataDto>> GetTokenPriceListAsync(GetTokenPriceListRequestDto request)
     {
+        if (string.IsNullOrWhiteSpace(request.Symbols)) return new ListResultDto<TokenPriceDataDto>();
         var list = new List<TokenPriceDataDto>();
-        foreach (var symbol in request.Symbols)
+        var symbols = request.Symbols.Split(CommonConstant.Comma, StringSplitOptions.TrimEntries).Distinct().ToList();
+        foreach (var symbol in symbols)
         {
             try
             {
+                if (symbol.IsNullOrWhiteSpace()) continue;
                 list.Add(new TokenPriceDataDto
                 {
                     Symbol = symbol,
@@ -241,6 +244,7 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
                 });
             }
         }
+
         return new ListResultDto<TokenPriceDataDto>(list);
     }
 
