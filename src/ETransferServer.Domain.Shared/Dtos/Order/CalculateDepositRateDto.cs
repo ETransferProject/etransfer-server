@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace ETransferServer.Deposit.Dtos;
 
 public class CalculateDepositRateDto
@@ -14,4 +12,5 @@ public class ConversionRate
     public decimal FromAmount { get; set; }
     public decimal ToAmount { get; set; }
     public decimal MinimumReceiveAmount { get; set; }
+    public ExtraInfo ExtraInfo { get; set; }
 }

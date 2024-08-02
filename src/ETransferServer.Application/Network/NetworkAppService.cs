@@ -12,8 +12,10 @@ using ETransferServer.Models;
 using ETransferServer.Options;
 using ETransferServer.Network.Dtos;
 using ETransferServer.ThirdPart.Exchange;
+using ETransferServer.Token.Dtos;
 using Orleans;
 using Volo.Abp;
+using Volo.Abp.Application.Dtos;
 using Volo.Abp.Auditing;
 using Volo.Abp.ObjectMapping;
 
@@ -214,6 +216,36 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
                 : null)
             ?.FirstOrDefault(t => t.Symbol == symbol)
             ?.Decimals ?? DecimalHelper.GetDecimals(symbol));
+    }
+
+    public async Task<ListResultDto<TokenPriceDataDto>> GetTokenPriceListAsync(GetTokenPriceListRequestDto request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Symbols)) return new ListResultDto<TokenPriceDataDto>();
+        var list = new List<TokenPriceDataDto>();
+        var symbols = request.Symbols.Split(CommonConstant.Comma, StringSplitOptions.TrimEntries).Distinct().ToList();
+        foreach (var symbol in symbols)
+        {
+            try
+            {
+                if (symbol.IsNullOrWhiteSpace()) continue;
+                list.Add(new TokenPriceDataDto
+                {
+                    Symbol = symbol,
+                    PriceUsd = await GetAvgExchangeAsync(symbol, CommonConstant.Symbol.USD)
+                });
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "GetTokenPriceListAsync error, {symbol}", symbol);
+                list.Add(new TokenPriceDataDto
+                {
+                    Symbol = symbol,
+                    PriceUsd = 0M
+                });
+            }
+        }
+
+        return new ListResultDto<TokenPriceDataDto>(list);
     }
 
     private async Task<List<NetworkDto>> CalculateNetworkFeeListAsync(List<NetworkDto> networkList, string chainId, string symbol)

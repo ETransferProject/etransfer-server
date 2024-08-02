@@ -207,7 +207,11 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
                     ToSymbol = request.ToSymbol,
                     FromAmount = request.FromAmount,
                     ToAmount = DepositSwapAmountHelper.AmountZero,
-                    MinimumReceiveAmount = DepositSwapAmountHelper.AmountZero
+                    MinimumReceiveAmount = DepositSwapAmountHelper.AmountZero,
+                    ExtraInfo = new ExtraInfo
+                    {
+                        Slippage = _swapAppService.GetSlippage(request.FromSymbol, request.ToSymbol)
+                    }
                 }
             };
         }
@@ -221,7 +225,11 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
                 ToSymbol = request.ToSymbol,
                 FromAmount = request.FromAmount,
                 ToAmount = Math.Round(calculateAmountsOut.AmountOut, await GetToSymbolDecimalsAsync(request.ToChainId, request.FromSymbol, request.ToSymbol)),
-                MinimumReceiveAmount = Math.Round(calculateAmountsOut.MinAmountOut, await GetToSymbolDecimalsAsync(request.ToChainId, request.FromSymbol, request.ToSymbol))
+                MinimumReceiveAmount = Math.Round(calculateAmountsOut.MinAmountOut, await GetToSymbolDecimalsAsync(request.ToChainId, request.FromSymbol, request.ToSymbol)),
+                ExtraInfo = new ExtraInfo
+                {
+                    Slippage = _swapAppService.GetSlippage(request.FromSymbol, request.ToSymbol)
+                }
             }
         };
     }
