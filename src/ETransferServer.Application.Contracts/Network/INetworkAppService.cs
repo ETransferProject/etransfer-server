@@ -3,6 +3,8 @@ using System.Threading.Tasks;
 using ETransferServer.Dtos.Token;
 using ETransferServer.Models;
 using ETransferServer.Network.Dtos;
+using ETransferServer.Token.Dtos;
+using Volo.Abp.Application.Dtos;
 using Volo.Abp.Application.Services;
 
 namespace ETransferServer.Network;
@@ -15,4 +17,5 @@ public interface INetworkAppService : IApplicationService
     Task<decimal> GetAvgExchangeAsync(string fromSymbol, string toSymbol, long timestamp = 0L);
     Task<decimal> GetMinThirdPartFeeAsync(string symbol);
     Task<int> GetDecimalsAsync(string chainId, string symbol);
+    Task<ListResultDto<TokenPriceDataDto>> GetTokenPriceListAsync(GetTokenPriceListRequestDto request);
 }

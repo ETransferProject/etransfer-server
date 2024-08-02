@@ -131,7 +131,7 @@ public static class TimeHelper
     public static string SecondsToMinute(int seconds)
     {
         int minute = (seconds + 59) / 60;
-        return minute > 1 ? minute + "mins" : minute + "min";
+        return minute > 1 ? minute + " mins" : minute + " min";
     }
     
 }
