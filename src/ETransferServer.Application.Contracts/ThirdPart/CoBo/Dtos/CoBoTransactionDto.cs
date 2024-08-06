@@ -11,6 +11,7 @@ public class CoBoTransactionDto
     public string Description { get; set; }
     public int Decimal { get; set; }
     public string Address { get; set; }
+    public string Memo { get; set; }
     [JsonProperty("source_address")] public string SourceAddress { get; set; }
     public string Side { get; set; }
     public string Amount { get; set; }
