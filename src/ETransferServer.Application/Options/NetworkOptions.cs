@@ -18,6 +18,7 @@ public class NetworkConfig
     public WithdrawInfo WithdrawInfo { get; set; }
     public List<string> SupportType { get; set; }
     public List<string> SupportChain { get; set; }
+    public List<string> SupportWhiteList { get; set; }
 }
 
 public class NetworkInfo

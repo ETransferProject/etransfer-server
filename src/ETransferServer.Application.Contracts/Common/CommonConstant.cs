@@ -11,6 +11,7 @@ public static class CommonConstant
     public const string Comma = ",";
     public const string At = "@";
     public const string Slash = "/";
+    public const string V = "v";
     public const string WithdrawRequestErrorKey = "WithdrawRequestErrorKey";
     public const string WithdrawThirdPartErrorKey = "WithdrawThirdPartError";
     public const string SignatureClientName = "Signature";

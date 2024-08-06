@@ -102,6 +102,8 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
                 CommonConstant.DefaultConst.PortKeyVersion.Equals(request.Version) ||
                 CommonConstant.DefaultConst.PortKeyVersion2.Equals(request.Version),
                 "Version is invalid. Please refresh and try again.");
+            AssertHelper.IsTrue(VerifyMemo(request.Memo), ErrorResult.MemoInvalidCode);
+            
             if (VerifyAElfChain(request.Network) && !_withdrawInfoOptions.Value.CanCrossSameChain)
             {
                 AssertHelper.IsTrue(request.ChainId != request.Network,
@@ -421,7 +423,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         }
     }
 
-    public async Task<CreateWithdrawOrderDto> CreateWithdrawOrderInfoAsync(GetWithdrawOrderRequestDto request)
+    public async Task<CreateWithdrawOrderDto> CreateWithdrawOrderInfoAsync(string version, GetWithdrawOrderRequestDto request)
     {
         try
         {
@@ -435,7 +437,8 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             AssertHelper.IsTrue(await IsAddressSupport(request.FromChainId, request.Symbol, request.ToAddress),
                 ErrorResult.AddressInvalidCode);
             AssertHelper.IsTrue(IsNetworkOpen(request.Symbol, request.Network), ErrorResult.CoinSuspendedTemporarily);
-
+            AssertHelper.IsTrue(VerifyMemo(request.Memo), ErrorResult.MemoInvalidCode);
+            
             var networkConfig = _networkInfoOptions.Value.NetworkMap[request.Symbol]
                 .FirstOrDefault(t => t.NetworkInfo.Network == request.Network);
             AssertHelper.NotNull(networkConfig, ErrorResult.NetworkInvalidCode);
@@ -480,7 +483,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             // Verify that the transaction information matches the order
             var transaction =
                 Transaction.Parser.ParseFrom(ByteArrayHelper.HexStringToByteArray(request.RawTransaction));
-            var resp = await VerifyTransactionAsync(request.FromChainId, userDto.Data.CaHash, transaction);
+            var resp = await VerifyTransactionAsync(request, version, userDto.Data.CaHash, transaction);
             AssertHelper.IsTrue(resp.Success, resp.Message);
             var transferTokenInput = resp.Value;
 
@@ -561,6 +564,12 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
                 }
             };
 
+            if (!string.IsNullOrWhiteSpace(request.Memo))
+            {
+                withdrawOrderDto.ExtensionInfo = new Dictionary<string, string>();
+                withdrawOrderDto.ExtensionInfo.Add(ExtensionKey.Memo, request.Memo);
+            }
+
             var order = await grain.CreateOrder(withdrawOrderDto);
             var getWithdrawOrderInfoDto = new CreateWithdrawOrderDto()
             {
@@ -633,8 +642,39 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         return chainId == ChainId.AELF || chainId == ChainId.tDVV || chainId == ChainId.tDVW;
     }
 
-    private async Task<CommonResponseDto<TransferTokenInput>> VerifyTransactionAsync(string chainId, string caHash,
-        Transaction transaction)
+    private bool VerifyMemoVersion(string version)
+    {
+        if (string.IsNullOrWhiteSpace(version)) return false;
+        try
+        {
+            return new Version(version.ToLower().Replace(CommonConstant.V, string.Empty))
+                   >= new Version(_withdrawInfoOptions.Value.MinMemoVersion);
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "VerifyMemoVersion error, version: {}", version);
+            return false;
+        }
+    }
+
+    private bool VerifyMemo(string memo)
+    {
+        if (string.IsNullOrEmpty(memo)) return true;
+        var isValid = true;
+        foreach (char c in memo)
+        {
+            if (!char.IsLetterOrDigit(c))
+            {
+                isValid = false;
+                break;
+            }
+        }
+
+        return isValid;
+    }
+
+    private async Task<CommonResponseDto<TransferTokenInput>> VerifyTransactionAsync(GetWithdrawOrderRequestDto request,
+        string version, string caHash, Transaction transaction)
     {
         try
         {
@@ -642,8 +682,8 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             switch (transaction.MethodName)
             {
                 case CommonConstant.DefaultConst.ManagerForwardCall:
-                    var caContractAddress1 = await _contractProvider.GetContractAddressAsync(chainId, CommonConstant.DefaultConst.CaContractName);
-                    var caContractAddress2 = await _contractProvider.GetContractAddressAsync(chainId, CommonConstant.DefaultConst.CaContractName2);
+                    var caContractAddress1 = await _contractProvider.GetContractAddressAsync(request.FromChainId, CommonConstant.DefaultConst.CaContractName);
+                    var caContractAddress2 = await _contractProvider.GetContractAddressAsync(request.FromChainId, CommonConstant.DefaultConst.CaContractName2);
                     AssertHelper.IsTrue(caContractAddress1 == transaction.To.ToBase58()
                                         || caContractAddress2 == transaction.To.ToBase58(),
                         "Invalid caContract address");
@@ -655,7 +695,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
                     AssertHelper.IsTrue(!param.Args.IsNullOrEmpty(), "Invalid ManagerForwardCall param");
 
                     var tokenPoolContractAddress =
-                        await _contractProvider.GetContractAddressAsync(chainId, CommonConstant.DefaultConst.TokenPoolContractName);
+                        await _contractProvider.GetContractAddressAsync(request.FromChainId, CommonConstant.DefaultConst.TokenPoolContractName);
                     AssertHelper.IsTrue(tokenPoolContractAddress == param.ContractAddress.ToBase58(),
                         "Invalid tokenPoolContract address");
                     AssertHelper.IsTrue(param.CaHash.ToHex() == caHash, "caHash not match");
@@ -663,16 +703,22 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
                     transferTokenInput = TransferTokenInput.Parser.ParseFrom(param.Args);
                     AssertHelper.IsTrue(transferTokenInput.Amount > 0, "Tx Token amount {amount} invalid",
                         transferTokenInput.Amount);
+                    AssertHelper.IsTrue((!VerifyMemoVersion(version) && string.IsNullOrEmpty(transferTokenInput.Memo) && string.IsNullOrEmpty(request.Memo))
+                        || (VerifyMemoVersion(version) && transferTokenInput.Memo == request.Memo), "Memo {Memo} invalid",
+                        transferTokenInput.Memo);
                     break;
                 case CommonConstant.DefaultConst.TransferToken:
                     tokenPoolContractAddress =
-                        await _contractProvider.GetContractAddressAsync(chainId, CommonConstant.DefaultConst.TokenPoolContractName);
+                        await _contractProvider.GetContractAddressAsync(request.FromChainId, CommonConstant.DefaultConst.TokenPoolContractName);
                     AssertHelper.IsTrue(tokenPoolContractAddress == transaction.To.ToBase58(),
                         "Invalid tokenPoolContract address");
 
                     transferTokenInput = TransferTokenInput.Parser.ParseFrom(transaction.Params);
                     AssertHelper.IsTrue(transferTokenInput.Amount > 0, "Tx Token amount {amount} invalid",
                         transferTokenInput.Amount);
+                    AssertHelper.IsTrue((!VerifyMemoVersion(version) && string.IsNullOrEmpty(transferTokenInput.Memo) && string.IsNullOrEmpty(request.Memo))
+                        || (VerifyMemoVersion(version) && transferTokenInput.Memo == request.Memo), "Memo {Memo} invalid",
+                        transferTokenInput.Memo);
                     break;
                 default:
                     throw new UserFriendlyException("invalid method name");

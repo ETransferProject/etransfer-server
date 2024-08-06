@@ -18,6 +18,7 @@ public static class ErrorResult
     public const int TransactionFailCode = 40014;
     public const int OrderSaveFailCode = 40015;
     public const int CoinSuspendedTemporarily = 40016;
+    public const int MemoInvalidCode = 40017;
     public const int AddressFormatWrongCode = 40100;
     public const int NetworkNotSupportCode = 40101;
     public const int CoBoCoinInvalid = 40201;
@@ -44,6 +45,7 @@ public static class ErrorResult
         { 40014, "Transaction failed. The ETransfer team is actively looking into this issue. Please be assured that your accounts and assets will remain unaffected." },
         { 40015, "Failed to synchronise data. The ETransfer team is actively looking into this issue. Please be assured that your accounts and assets will remain unaffected." },
         { 40016, "Coin is suspended temporarily" },
+        { 40017, "Memo only supports numbers and English characters" },
         { 40100, "Please enter a correct address." },
         { 40101, "If you're withdrawing to {Networks}, please wait a while for the service to be restored and try again later." },
         { 40201, "CoBo coin {coBoCoin} invalid" },

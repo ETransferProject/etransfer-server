@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Token;
 using ETransferServer.Grains.Grain.Token;
+using ETransferServer.Grains.Grain.Users;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using ETransferServer.Models;
@@ -18,6 +19,7 @@ using Volo.Abp;
 using Volo.Abp.Application.Dtos;
 using Volo.Abp.Auditing;
 using Volo.Abp.ObjectMapping;
+using Volo.Abp.Users;
 
 namespace ETransferServer.Network;
 
@@ -129,6 +131,7 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
         var networkConfigs = _networkOptions.Value.NetworkMap[request.Symbol].Where(a =>
                 a.SupportType.Contains(request.Type) && a.SupportChain.Contains(request.ChainId))
             .ToList();
+        networkConfigs = await FilterByWhiteList(networkConfigs);
 
         var networkInfos = networkConfigs.Select(config => config.NetworkInfo).ToList();
         var withdrawInfo = networkConfigs
@@ -306,6 +309,35 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
         var coBoCoinGrain = _clusterClient.GetGrain<ICoBoCoinGrain>(ICoBoCoinGrain.Id(network, symbol));
         var coin = await coBoCoinGrain.GetCache();
         return coin?.AbsEstimateFee;
+    }
+
+    private async Task<List<NetworkConfig>> FilterByWhiteList(List<NetworkConfig> networkConfigs)
+    {
+        var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
+        if (userId.HasValue)
+        {
+            _logger.LogInformation("GetNetworkList currentUser:{userId}", userId.HasValue);
+            var userGrain = _clusterClient.GetGrain<IUserGrain>(userId.Value);
+            var userDto = await userGrain.GetUser();
+            if (userDto.Success && userDto.Data != null && !userDto.Data.AddressInfos.IsNullOrEmpty())
+            {
+                networkConfigs = networkConfigs.Where(config =>
+                        config.SupportWhiteList.IsNullOrEmpty() ||
+                        config.SupportWhiteList.Any(t =>
+                            userDto.Data.AddressInfos.Exists(a => a.Address.ToLower() == t.ToLower())))
+                    .ToList();
+            }
+            else
+            {
+                networkConfigs = networkConfigs.Where(config => config.SupportWhiteList.IsNullOrEmpty()).ToList();
+            }
+        }
+        else
+        {
+            networkConfigs = networkConfigs.Where(config => config.SupportWhiteList.IsNullOrEmpty()).ToList();
+        }
+
+        return networkConfigs;
     }
 
     private void FillMultiConfirmMinutes(string type, List<NetworkDto> networkList, List<NetworkConfig> networkConfigs)

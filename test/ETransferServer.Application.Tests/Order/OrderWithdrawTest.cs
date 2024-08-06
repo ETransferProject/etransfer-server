@@ -84,7 +84,7 @@ public class OrderWithdrawTest : ETransferServerApplicationTestBase
     {
         try
         {
-            var result = await _withdrawAppService.CreateWithdrawOrderInfoAsync(new GetWithdrawOrderRequestDto
+            var result = await _withdrawAppService.CreateWithdrawOrderInfoAsync("", new GetWithdrawOrderRequestDto
             {
                 FromChainId = "AELF",
                 Network = "ETH",
