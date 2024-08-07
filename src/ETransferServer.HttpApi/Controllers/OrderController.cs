@@ -38,9 +38,10 @@ public class OrderController : ETransferController
     }
     
     [HttpGet("network/list")]
-    public async Task<GetNetworkListDto> GetNetworkListAsync(GetNetworkListRequestDto request)
+    public async Task<GetNetworkListDto> GetNetworkListAsync(GetNetworkListRequestDto request, 
+        [FromHeader(Name = "version")] string version = null)
     {
-        return await _networkAppService.GetNetworkListAsync(request);
+        return await _networkAppService.GetNetworkListAsync(request, version);
     }
 
     [Authorize]
@@ -58,17 +59,18 @@ public class OrderController : ETransferController
 
     [Authorize]
     [HttpGet("withdraw/info")]
-    public async Task<GetWithdrawInfoDto> GetWithdrawInfoAsync(GetWithdrawListRequestDto request)
+    public async Task<GetWithdrawInfoDto> GetWithdrawInfoAsync(GetWithdrawListRequestDto request,
+        [FromHeader(Name = "version")] string version = null)
     {
-        return await _withdrawOrderAppService.GetWithdrawInfoAsync(request);
+        return await _withdrawOrderAppService.GetWithdrawInfoAsync(request, version);
     }
      
     [Authorize]
     [HttpPost("withdraw/order")]
-    public async Task<CreateWithdrawOrderDto> CreateWithdrawOrderInfoAsync(
-        [FromHeader(Name = "version")] string version, GetWithdrawOrderRequestDto request)
+    public async Task<CreateWithdrawOrderDto> CreateWithdrawOrderInfoAsync(GetWithdrawOrderRequestDto request, 
+        [FromHeader(Name = "version")] string version = null)
     {
-        return await _withdrawOrderAppService.CreateWithdrawOrderInfoAsync(version, request);
+        return await _withdrawOrderAppService.CreateWithdrawOrderInfoAsync(request, version);
     }
 
     [Authorize]

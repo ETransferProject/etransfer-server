@@ -280,7 +280,7 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
 
         var order = (WithdrawOrderDto)orderResult.Data;
 
-        var result = await GetWithdrawInfoByRequest(order.ToTransfer.TxId);
+        var result = await GetWithdrawInfoByRequest(order.Id.ToString());
         if (result == null)
         {
             return PENDING;
@@ -361,7 +361,6 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
             {
                 requestDto.Memo = orderDto.ExtensionInfo[ExtensionKey.Memo];
             }
-            orderDto.ToTransfer.TxId = requestDto.RequestId;
             orderDto.ThirdPartServiceName = ThirdPartServiceNameEnum.Cobo.ToString();
             var response = await _coBoProvider.WithdrawAsync(requestDto);
 
@@ -419,7 +418,6 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
             {
                 requestDto.Memo = orderDto.ExtensionInfo[ExtensionKey.Memo];
             }
-            orderDto.ToTransfer.TxId = requestDto.RequestId;
             var response = await _coBoProvider.WithdrawAsync(requestDto);
 
             if (response == null)

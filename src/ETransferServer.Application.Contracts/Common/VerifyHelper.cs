@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using AElf;
 using AElf.Cryptography;
 using AElf.Types;
+using ETransferServer.Common;
 using Google.Protobuf;
 
 namespace CAServer.Commons;
@@ -48,5 +49,19 @@ public static class VerifyHelper
     public static bool IsEmail(string input)
     {
         return input.Count(c => c == '@') == 1;
+    }
+    
+    public static bool VerifyMemoVersion(string version, string anotherVersion)
+    {
+        if (string.IsNullOrWhiteSpace(version)) return false;
+        try
+        {
+            return new Version(version.ToLower().Replace(CommonConstant.V, string.Empty))
+                   >= new Version(anotherVersion);
+        }
+        catch (Exception e)
+        {
+            return false;
+        }
     }
 }

@@ -7,6 +7,7 @@ using AElf;
 using AElf.Contracts.MultiToken;
 using AElf.Indexing.Elasticsearch;
 using AElf.Types;
+using CAServer.Commons;
 using ETransfer.Contracts.TokenPool;
 using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
@@ -86,7 +87,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         _minThirdPartFeeCache = minThirdPartFeeCache;
     }
 
-    public async Task<GetWithdrawInfoDto> GetWithdrawInfoAsync(GetWithdrawListRequestDto request)
+    public async Task<GetWithdrawInfoDto> GetWithdrawInfoAsync(GetWithdrawListRequestDto request, string version = null)
     {
         try
         {
@@ -103,7 +104,14 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
                 CommonConstant.DefaultConst.PortKeyVersion2.Equals(request.Version),
                 "Version is invalid. Please refresh and try again.");
             AssertHelper.IsTrue(VerifyMemo(request.Memo), ErrorResult.MemoInvalidCode);
-            
+            if (!request.Network.IsNullOrEmpty())
+            {
+                var networkConfig = _networkInfoOptions.Value.NetworkMap[request.Symbol]
+                    .FirstOrDefault(t => t.NetworkInfo.Network == request.Network);
+                AssertHelper.NotNull(networkConfig, ErrorResult.NetworkInvalidCode);
+                AssertHelper.IsTrue(await VerifyByVersionAndWhiteList(networkConfig, userId, version), ErrorResult.VersionOrWhitelistVerifyFailCode);
+            }
+
             if (VerifyAElfChain(request.Network) && !_withdrawInfoOptions.Value.CanCrossSameChain)
             {
                 AssertHelper.IsTrue(request.ChainId != request.Network,
@@ -128,7 +136,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             if (!VerifyAElfChain(request.Network))
             {
                 var thirdPartFeeTask = request.Network.IsNullOrEmpty()
-                    ? CalculateThirdPartFeesWithCacheAsync(userId, request.Symbol)
+                    ? CalculateThirdPartFeesWithCacheAsync(userId, request.Symbol, version)
                     : CalculateThirdPartFeeAsync(userId, request.Network, request.Symbol);
 
                 (feeAmount, expireAt) = await thirdPartFeeTask;
@@ -220,13 +228,13 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             : withdrawFee;
     }
 
-    private async Task<Tuple<decimal, long>> CalculateThirdPartFeesWithCacheAsync(Guid userId, string symbol)
+    private async Task<Tuple<decimal, long>> CalculateThirdPartFeesWithCacheAsync(Guid userId, string symbol, string version = null)
     {
         var thirdFeeCacheKey = CacheKey("minThirdPartFee", symbol);
         var cachedData = await _minThirdPartFeeCache.GetAsync(thirdFeeCacheKey);
         if (cachedData != null) return cachedData;
 
-        var feeData = await CalculateThirdPartFeesAsync(userId, symbol);
+        var feeData = await CalculateThirdPartFeesAsync(userId, symbol, version);
         return _minThirdPartFeeCache.GetOrAdd(thirdFeeCacheKey, () => feeData,
             () => new DistributedCacheEntryOptions
             {
@@ -234,13 +242,18 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             });
     }
 
-    private async Task<Tuple<decimal, long>> CalculateThirdPartFeesAsync(Guid userId, string symbol)
+    private async Task<Tuple<decimal, long>> CalculateThirdPartFeesAsync(Guid userId, string symbol, string version = null)
     {
         Dictionary<string, Task<Tuple<decimal, long>>> fees = new();
         var networkList = GetThirdPartNetworkList(symbol);
         foreach (var network in networkList)
         {
-            fees.Add(network, CalculateThirdPartFeeAsync(userId, network, symbol, false));
+            var networkConfig = _networkInfoOptions.Value.NetworkMap[symbol].FirstOrDefault(t =>
+                t.NetworkInfo.Network == network);
+            if (await VerifyByVersionAndWhiteList(networkConfig, userId, version))
+            {
+                fees.Add(network, CalculateThirdPartFeeAsync(userId, network, symbol, false));
+            }
         }
 
         decimal minFee = -1;
@@ -423,7 +436,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         }
     }
 
-    public async Task<CreateWithdrawOrderDto> CreateWithdrawOrderInfoAsync(string version, GetWithdrawOrderRequestDto request)
+    public async Task<CreateWithdrawOrderDto> CreateWithdrawOrderInfoAsync(GetWithdrawOrderRequestDto request, string version = null)
     {
         try
         {
@@ -442,7 +455,8 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             var networkConfig = _networkInfoOptions.Value.NetworkMap[request.Symbol]
                 .FirstOrDefault(t => t.NetworkInfo.Network == request.Network);
             AssertHelper.NotNull(networkConfig, ErrorResult.NetworkInvalidCode);
-            
+            AssertHelper.IsTrue(await VerifyByVersionAndWhiteList(networkConfig, userId, version), ErrorResult.VersionOrWhitelistVerifyFailCode);
+
             if (VerifyAElfChain(request.Network) && !_withdrawInfoOptions.Value.CanCrossSameChain)
             {
                 AssertHelper.IsTrue(request.FromChainId != request.Network, ErrorResult.NetworkInvalidCode);
@@ -483,7 +497,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             // Verify that the transaction information matches the order
             var transaction =
                 Transaction.Parser.ParseFrom(ByteArrayHelper.HexStringToByteArray(request.RawTransaction));
-            var resp = await VerifyTransactionAsync(request, version, userDto.Data.CaHash, transaction);
+            var resp = await VerifyTransactionAsync(request, userDto.Data.CaHash, transaction);
             AssertHelper.IsTrue(resp.Success, resp.Message);
             var transferTokenInput = resp.Value;
 
@@ -642,21 +656,6 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         return chainId == ChainId.AELF || chainId == ChainId.tDVV || chainId == ChainId.tDVW;
     }
 
-    private bool VerifyMemoVersion(string version)
-    {
-        if (string.IsNullOrWhiteSpace(version)) return false;
-        try
-        {
-            return new Version(version.ToLower().Replace(CommonConstant.V, string.Empty))
-                   >= new Version(_withdrawInfoOptions.Value.MinMemoVersion);
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e, "VerifyMemoVersion error, version: {}", version);
-            return false;
-        }
-    }
-
     private bool VerifyMemo(string memo)
     {
         if (string.IsNullOrEmpty(memo)) return true;
@@ -673,8 +672,28 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
         return isValid;
     }
 
+    private async Task<bool> VerifyByVersionAndWhiteList(NetworkConfig networkConfig, Guid userId, string version)
+    {
+        _logger.LogInformation("VerifyByVersionAndWhiteList currentUser:{userId},version:{version}", userId, version);
+        var userGrain = _clusterClient.GetGrain<IUserGrain>(userId);
+        var userDto = await userGrain.GetUser();
+        if (userDto.Success && userDto.Data != null && !userDto.Data.AddressInfos.IsNullOrEmpty())
+        {
+            return networkConfig.NetworkInfo.MinShowVersion.IsNullOrEmpty()
+                   || (VerifyHelper.VerifyMemoVersion(version, networkConfig.NetworkInfo.MinShowVersion)
+                       && (networkConfig.SupportWhiteList.IsNullOrEmpty() ||
+                           networkConfig.SupportWhiteList.Any(t => userDto.Data.AddressInfos.Exists(a =>
+                               a.Address.ToLower() == t.ToLower()))));
+
+        }
+
+        return networkConfig.NetworkInfo.MinShowVersion.IsNullOrEmpty()
+               || (VerifyHelper.VerifyMemoVersion(version, networkConfig.NetworkInfo.MinShowVersion)
+                   && networkConfig.SupportWhiteList.IsNullOrEmpty());
+    }
+
     private async Task<CommonResponseDto<TransferTokenInput>> VerifyTransactionAsync(GetWithdrawOrderRequestDto request,
-        string version, string caHash, Transaction transaction)
+        string caHash, Transaction transaction)
     {
         try
         {
@@ -703,8 +722,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
                     transferTokenInput = TransferTokenInput.Parser.ParseFrom(param.Args);
                     AssertHelper.IsTrue(transferTokenInput.Amount > 0, "Tx Token amount {amount} invalid",
                         transferTokenInput.Amount);
-                    AssertHelper.IsTrue((!VerifyMemoVersion(version) && string.IsNullOrEmpty(transferTokenInput.Memo) && string.IsNullOrEmpty(request.Memo))
-                        || (VerifyMemoVersion(version) && transferTokenInput.Memo == request.Memo), "Memo {Memo} invalid",
+                    AssertHelper.IsTrue(transferTokenInput.Memo == request.Memo, "Memo {Memo} invalid", 
                         transferTokenInput.Memo);
                     break;
                 case CommonConstant.DefaultConst.TransferToken:
@@ -716,8 +734,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
                     transferTokenInput = TransferTokenInput.Parser.ParseFrom(transaction.Params);
                     AssertHelper.IsTrue(transferTokenInput.Amount > 0, "Tx Token amount {amount} invalid",
                         transferTokenInput.Amount);
-                    AssertHelper.IsTrue((!VerifyMemoVersion(version) && string.IsNullOrEmpty(transferTokenInput.Memo) && string.IsNullOrEmpty(request.Memo))
-                        || (VerifyMemoVersion(version) && transferTokenInput.Memo == request.Memo), "Memo {Memo} invalid",
+                    AssertHelper.IsTrue(transferTokenInput.Memo == request.Memo, "Memo {Memo} invalid", 
                         transferTokenInput.Memo);
                     break;
                 default:

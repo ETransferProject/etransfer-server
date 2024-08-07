@@ -8,12 +8,9 @@ using ETransferServer.Models;
 using ETransferServer.Network;
 using ETransferServer.Network.Dtos;
 using ETransferServer.Options;
-using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Moq;
-using NSubstitute;
-using Orleans.TestingHost;
 using Shouldly;
 using Xunit;
 using Xunit.Abstractions;
@@ -84,7 +81,7 @@ public class OrderWithdrawTest : ETransferServerApplicationTestBase
     {
         try
         {
-            var result = await _withdrawAppService.CreateWithdrawOrderInfoAsync("", new GetWithdrawOrderRequestDto
+            var result = await _withdrawAppService.CreateWithdrawOrderInfoAsync(new GetWithdrawOrderRequestDto
             {
                 FromChainId = "AELF",
                 Network = "ETH",
@@ -194,7 +191,7 @@ public class OrderWithdrawTest : ETransferServerApplicationTestBase
     {
         var network = new Mock<INetworkAppService>();
 
-        network.Setup(t => t.GetNetworkListAsync(It.IsAny<GetNetworkListRequestDto>())).ReturnsAsync(
+        network.Setup(t => t.GetNetworkListAsync(It.IsAny<GetNetworkListRequestDto>(), null)).ReturnsAsync(
             new GetNetworkListDto()
             {
                 NetworkList=new List<NetworkDto>()

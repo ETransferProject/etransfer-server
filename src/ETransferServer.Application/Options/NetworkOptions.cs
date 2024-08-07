@@ -30,6 +30,7 @@ public class NetworkInfo
     public string ContractAddress { get; set; }
     public decimal BlockGenerationSeconds { get; set; }
     public decimal AveragePendingSeconds { get; set; }
+    public string MinShowVersion { get; set; }
     public string ExplorerUrl { get; set; }
     public string Status { get; set; }
 }
