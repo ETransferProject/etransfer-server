@@ -205,6 +205,11 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
                     }
                 }
             };
+            if (!string.IsNullOrWhiteSpace(transferRecord.Memo))
+            {
+                withdrawOrderDto.ExtensionInfo = new Dictionary<string, string>();
+                withdrawOrderDto.ExtensionInfo.Add(ExtensionKey.Memo, transferRecord.Memo);
+            }
             return withdrawOrderDto;
         }
         catch (Exception e)
