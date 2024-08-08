@@ -66,6 +66,11 @@ public class EvmTransactionGrain : Grain<EvmTransactionState>, IEvmTransactionGr
                     AssertHelper.IsTrue(long.TryParse(block.BlockTimeStamp.ToString(), out time));
                     time *= 1000;
                     break;
+                case BlockchainType.Ton:
+                    block = await provider.GetBlockTimeAsync(chainId, blockHash, txId);
+                    AssertHelper.IsTrue(long.TryParse(block.BlockTimeStamp.ToString(), out time));
+                    time *= 1000;
+                    break;
                 case BlockchainType.Evm:
                 {
                     block = await provider.GetBlockTimeAsync(chainId, blockHash);

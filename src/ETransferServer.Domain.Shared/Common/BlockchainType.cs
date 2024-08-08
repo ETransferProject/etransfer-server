@@ -4,5 +4,6 @@ public enum BlockchainType
 {
     Evm,
     Tron,
-    Solana
+    Solana,
+    Ton
 }

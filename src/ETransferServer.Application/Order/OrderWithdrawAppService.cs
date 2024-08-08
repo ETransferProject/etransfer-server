@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using AElf;
 using AElf.Contracts.MultiToken;
@@ -196,7 +197,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             if (request.Address.IsNullOrEmpty())
                 return new GetWithdrawInfoDto { WithdrawInfo = withdrawInfoDto };
 
-            AssertHelper.IsTrue(await IsAddressSupport(request.ChainId, request.Symbol, request.Address),
+            AssertHelper.IsTrue(await IsAddressSupport(request.ChainId, request.Symbol, request.Address, version),
                 "Invalid address. Please refresh and try again.");
             return new GetWithdrawInfoDto
             {
@@ -417,7 +418,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             .ToArray());
     }
 
-    private async Task<bool> IsAddressSupport(string chainId, string symbol, string address)
+    private async Task<bool> IsAddressSupport(string chainId, string symbol, string address, string version = null)
     {
         try
         {
@@ -427,7 +428,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
                 ChainId = chainId,
                 Symbol = symbol,
                 Address = address
-            });
+            }, version);
             return network != null && !network.NetworkList.IsNullOrEmpty();
         }
         catch (Exception e)
@@ -447,7 +448,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
                 request.FromChainId == ChainId.tDVW, ErrorResult.ChainIdInvalidCode);
             AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.Symbol),
                 ErrorResult.SymbolInvalidCode, null, request.Symbol);
-            AssertHelper.IsTrue(await IsAddressSupport(request.FromChainId, request.Symbol, request.ToAddress),
+            AssertHelper.IsTrue(await IsAddressSupport(request.FromChainId, request.Symbol, request.ToAddress, version),
                 ErrorResult.AddressInvalidCode);
             AssertHelper.IsTrue(IsNetworkOpen(request.Symbol, request.Network), ErrorResult.CoinSuspendedTemporarily);
             AssertHelper.IsTrue(VerifyMemo(request.Memo), ErrorResult.MemoInvalidCode);
@@ -659,17 +660,8 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
     private bool VerifyMemo(string memo)
     {
         if (string.IsNullOrEmpty(memo)) return true;
-        var isValid = true;
-        foreach (char c in memo)
-        {
-            if (!char.IsLetterOrDigit(c))
-            {
-                isValid = false;
-                break;
-            }
-        }
-
-        return isValid;
+        var regex = new Regex("^[a-zA-Z0-9]+$");
+        return regex.IsMatch(memo);
     }
 
     private async Task<bool> VerifyByVersionAndWhiteList(NetworkConfig networkConfig, Guid userId, string version)
@@ -722,8 +714,8 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
                     transferTokenInput = TransferTokenInput.Parser.ParseFrom(param.Args);
                     AssertHelper.IsTrue(transferTokenInput.Amount > 0, "Tx Token amount {amount} invalid",
                         transferTokenInput.Amount);
-                    AssertHelper.IsTrue(transferTokenInput.Memo == request.Memo, "Memo {Memo} invalid", 
-                        transferTokenInput.Memo);
+                    AssertHelper.IsTrue((transferTokenInput.Memo.IsNullOrEmpty() && request.Memo.IsNullOrEmpty())
+                        || transferTokenInput.Memo == request.Memo, "Memo invalid");
                     break;
                 case CommonConstant.DefaultConst.TransferToken:
                     tokenPoolContractAddress =
@@ -734,8 +726,8 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
                     transferTokenInput = TransferTokenInput.Parser.ParseFrom(transaction.Params);
                     AssertHelper.IsTrue(transferTokenInput.Amount > 0, "Tx Token amount {amount} invalid",
                         transferTokenInput.Amount);
-                    AssertHelper.IsTrue(transferTokenInput.Memo == request.Memo, "Memo {Memo} invalid", 
-                        transferTokenInput.Memo);
+                    AssertHelper.IsTrue((transferTokenInput.Memo.IsNullOrEmpty() && request.Memo.IsNullOrEmpty())
+                        || transferTokenInput.Memo == request.Memo, "Memo invalid");
                     break;
                 default:
                     throw new UserFriendlyException("invalid method name");

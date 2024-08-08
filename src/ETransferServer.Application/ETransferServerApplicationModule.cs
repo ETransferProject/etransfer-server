@@ -1,5 +1,6 @@
 using ETransferServer.ChainsClient.Evm;
 using ETransferServer.ChainsClient.Solana;
+using ETransferServer.ChainsClient.Ton;
 using ETransferServer.ChainsClient.Tron;
 using ETransferServer.Common.AElfSdk;
 using ETransferServer.Common.ChainsClient;
@@ -43,5 +44,6 @@ public class ETransferServerApplicationModule : AbpModule
         context.Services.AddTransient<IBlockchainClientProvider, EvmClientProvider>();
         context.Services.AddTransient<IBlockchainClientProvider, TronClientProvider>();
         context.Services.AddTransient<IBlockchainClientProvider, SolanaClientProvider>();
+        context.Services.AddTransient<IBlockchainClientProvider, TonClientProvider>();
     }
 }
