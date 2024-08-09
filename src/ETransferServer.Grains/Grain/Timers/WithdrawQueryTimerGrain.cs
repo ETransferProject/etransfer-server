@@ -363,6 +363,7 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
     {
         _logger.LogInformation("VerifyByWhiteList fromAddress:{fromAddress},toChainId:{toChainId}", fromAddress, toChainId);
         return _withdrawOption.Value.SupportWhiteLists.IsNullOrEmpty()
+               || !_withdrawOption.Value.SupportWhiteLists.ContainsKey(toChainId)
                || (_withdrawOption.Value.SupportWhiteLists.ContainsKey(toChainId)
                    && _withdrawOption.Value.SupportWhiteLists[toChainId].Contains(fromAddress));
     }

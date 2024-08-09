@@ -93,6 +93,7 @@ public class EvmTransactionGrain : Grain<EvmTransactionState>, IEvmTransactionGr
                     throw new ArgumentOutOfRangeException();
             }
 
+            AssertHelper.IsTrue(time > 0, "Block time get fail, time:{time}", time);
             State.TxId = txId;
             State.BlockTime = time;
             await WriteStateAsync();

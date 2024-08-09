@@ -64,6 +64,11 @@ public class TonClientProvider : IBlockchainClientProvider
                         default:
                             throw new NotSupportedException();
                     }
+
+                    AssertHelper.IsTrue(
+                        result.BlockTimeStamp != null &&
+                        long.TryParse(result.BlockTimeStamp.ToString(), out var time) && time > 0,
+                        "GetBlockTimeAsync BlockTimeStamp, time:{time}", result.BlockTimeStamp);
                     return result;
                 }
                 catch (Exception e)
