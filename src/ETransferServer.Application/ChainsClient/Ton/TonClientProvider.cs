@@ -45,15 +45,11 @@ public class TonClientProvider : IBlockchainClientProvider
                     var (tonType, url, param) = ApiHelper.GetApiInfo(baseUrl, txId);
                     switch (tonType)
                     {
-                        case TonType.TonScan:
-                            var respScan = await _httpProvider.InvokeAsync<TonScanResponse>(HttpMethod.Get,
+                        case TonType.TonApi:
+                            var respApi = await _httpProvider.InvokeAsync<TonApiResponse>(HttpMethod.Get,
                                 url, param: param);
-                            AssertHelper.NotNull(respScan, "Empty tonScan result");
-                            var tx = respScan.Json?.Data?.Transactions;
-                            if (!tx.IsNullOrEmpty() && tx.ContainsKey(blockHash))
-                            {
-                                result.BlockTimeStamp = tx[blockHash].Utime;
-                            }
+                            AssertHelper.NotNull(respApi, "Empty tonApi result");
+                            result.BlockTimeStamp = respApi.Utime;
                             break;
                         case TonType.TonCenter:
                             var respCenter = await _httpProvider.InvokeAsync<TonCenterResponse>(HttpMethod.Get,
@@ -64,12 +60,6 @@ public class TonClientProvider : IBlockchainClientProvider
                             {
                                 result.BlockTimeStamp = txs[0].Now;
                             }
-                            break;
-                        case TonType.TonApi:
-                            var respApi = await _httpProvider.InvokeAsync<TonApiResponse>(HttpMethod.Get,
-                                url, param: param);
-                            AssertHelper.NotNull(respApi, "Empty tonApi result");
-                            result.BlockTimeStamp = respApi.Utime;
                             break;
                         default:
                             throw new NotSupportedException();
