@@ -23,6 +23,7 @@ public class NetWorkInfo
     public int ConfirmNum { get; set; }
     public int BlockingTime { get; set; }
     public int Decimal { get; set; }
+    public decimal Amount { get; set; } = 0;
     public decimal FeeAlarmPercent { get; set; } = 10;
     public int EstimatedArrivalTime { get; set; } = 1000;
 }
