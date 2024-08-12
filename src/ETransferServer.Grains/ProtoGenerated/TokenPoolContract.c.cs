@@ -11,7 +11,7 @@ using aelf = global::AElf.CSharp.Core;
 namespace ETransfer.Contracts.TokenPool {
 
   #region Events
-  public partial class TokenPoolTransferred : aelf::IEvent<TokenPoolTransferred>
+  internal partial class TokenPoolTransferred : aelf::IEvent<TokenPoolTransferred>
   {
     public global::System.Collections.Generic.IEnumerable<TokenPoolTransferred> GetIndexed()
     {
@@ -31,11 +31,12 @@ namespace ETransfer.Contracts.TokenPool {
         ToChainId = ToChainId,
         ToAddress = ToAddress,
         MaxEstimateFee = MaxEstimateFee,
+        Memo = Memo,
       };
     }
   }
 
-  public partial class TokenPoolReleased : aelf::IEvent<TokenPoolReleased>
+  internal partial class TokenPoolReleased : aelf::IEvent<TokenPoolReleased>
   {
     public global::System.Collections.Generic.IEnumerable<TokenPoolReleased> GetIndexed()
     {
@@ -57,7 +58,7 @@ namespace ETransfer.Contracts.TokenPool {
     }
   }
 
-  public partial class ReleaseControllerAdded : aelf::IEvent<ReleaseControllerAdded>
+  internal partial class ReleaseControllerAdded : aelf::IEvent<ReleaseControllerAdded>
   {
     public global::System.Collections.Generic.IEnumerable<ReleaseControllerAdded> GetIndexed()
     {
@@ -75,7 +76,7 @@ namespace ETransfer.Contracts.TokenPool {
     }
   }
 
-  public partial class ReleaseControllerRemoved : aelf::IEvent<ReleaseControllerRemoved>
+  internal partial class ReleaseControllerRemoved : aelf::IEvent<ReleaseControllerRemoved>
   {
     public global::System.Collections.Generic.IEnumerable<ReleaseControllerRemoved> GetIndexed()
     {
@@ -93,7 +94,7 @@ namespace ETransfer.Contracts.TokenPool {
     }
   }
 
-  public partial class TokenSwapped : aelf::IEvent<TokenSwapped>
+  internal partial class TokenSwapped : aelf::IEvent<TokenSwapped>
   {
     public global::System.Collections.Generic.IEnumerable<TokenSwapped> GetIndexed()
     {
@@ -114,11 +115,12 @@ namespace ETransfer.Contracts.TokenPool {
         Channel = Channel,
         SwapPath = SwapPath,
         From = From,
+        FeeRate = FeeRate,
       };
     }
   }
 
-  public partial class TokenPoolAdded : aelf::IEvent<TokenPoolAdded>
+  internal partial class TokenPoolAdded : aelf::IEvent<TokenPoolAdded>
   {
     public global::System.Collections.Generic.IEnumerable<TokenPoolAdded> GetIndexed()
     {
@@ -136,7 +138,7 @@ namespace ETransfer.Contracts.TokenPool {
     }
   }
 
-  public partial class TokenHolderAdded : aelf::IEvent<TokenHolderAdded>
+  internal partial class TokenHolderAdded : aelf::IEvent<TokenHolderAdded>
   {
     public global::System.Collections.Generic.IEnumerable<TokenHolderAdded> GetIndexed()
     {
@@ -156,7 +158,7 @@ namespace ETransfer.Contracts.TokenPool {
   }
 
   #endregion
-  public static partial class TokenPoolContractContainer
+  internal static partial class TokenPoolContractContainer
   {
     static readonly string __ServiceName = "TokenPoolContract";
 
@@ -312,7 +314,26 @@ namespace ETransfer.Contracts.TokenPool {
       }
     }
     #endregion
-    
+
+    public class TokenPoolContractReferenceState : global::AElf.Sdk.CSharp.State.ContractReferenceState
+    {
+      internal global::AElf.Sdk.CSharp.State.MethodReference<global::ETransfer.Contracts.TokenPool.InitializeInput, global::Google.Protobuf.WellKnownTypes.Empty> Initialize { get; set; }
+      internal global::AElf.Sdk.CSharp.State.MethodReference<global::ETransfer.Contracts.TokenPool.TransferTokenInput, global::Google.Protobuf.WellKnownTypes.Empty> TransferToken { get; set; }
+      internal global::AElf.Sdk.CSharp.State.MethodReference<global::ETransfer.Contracts.TokenPool.ReleaseTokenInput, global::Google.Protobuf.WellKnownTypes.Empty> ReleaseToken { get; set; }
+      internal global::AElf.Sdk.CSharp.State.MethodReference<global::AElf.Types.Address, global::Google.Protobuf.WellKnownTypes.Empty> SetAdmin { get; set; }
+      internal global::AElf.Sdk.CSharp.State.MethodReference<global::ETransfer.Contracts.TokenPool.ControllerInput, global::Google.Protobuf.WellKnownTypes.Empty> AddReleaseController { get; set; }
+      internal global::AElf.Sdk.CSharp.State.MethodReference<global::ETransfer.Contracts.TokenPool.ControllerInput, global::Google.Protobuf.WellKnownTypes.Empty> RemoveReleaseController { get; set; }
+      internal global::AElf.Sdk.CSharp.State.MethodReference<global::ETransfer.Contracts.TokenPool.WithdrawInput, global::Google.Protobuf.WellKnownTypes.Empty> Withdraw { get; set; }
+      internal global::AElf.Sdk.CSharp.State.MethodReference<global::ETransfer.Contracts.TokenPool.AddTokenPoolInput, global::Google.Protobuf.WellKnownTypes.Empty> AddTokenPool { get; set; }
+      internal global::AElf.Sdk.CSharp.State.MethodReference<global::ETransfer.Contracts.TokenPool.AddTokenHolderInput, global::Google.Protobuf.WellKnownTypes.Empty> AddTokenHolders { get; set; }
+      internal global::AElf.Sdk.CSharp.State.MethodReference<global::ETransfer.Contracts.TokenPool.SetSwapContractAddressInput, global::Google.Protobuf.WellKnownTypes.Empty> SetSwapContractAddress { get; set; }
+      internal global::AElf.Sdk.CSharp.State.MethodReference<global::ETransfer.Contracts.TokenPool.SwapTokenInput, global::Google.Protobuf.WellKnownTypes.Empty> SwapToken { get; set; }
+      internal global::AElf.Sdk.CSharp.State.MethodReference<global::Google.Protobuf.WellKnownTypes.Empty, global::AElf.Types.Address> GetAdmin { get; set; }
+      internal global::AElf.Sdk.CSharp.State.MethodReference<global::Google.Protobuf.WellKnownTypes.Empty, global::ETransfer.Contracts.TokenPool.ControllerOutput> GetReleaseControllers { get; set; }
+      internal global::AElf.Sdk.CSharp.State.MethodReference<global::ETransfer.Contracts.TokenPool.GetPoolInfoInput, global::ETransfer.Contracts.TokenPool.PoolInfo> GetPoolInfo { get; set; }
+      internal global::AElf.Sdk.CSharp.State.MethodReference<global::Google.Protobuf.WellKnownTypes.Empty, global::ETransfer.Contracts.TokenPool.TokenSymbolList> GetSymbolTokens { get; set; }
+      internal global::AElf.Sdk.CSharp.State.MethodReference<global::Google.Protobuf.WellKnownTypes.Int64Value, global::AElf.Types.Address> GetSwapContracts { get; set; }
+    }
   }
 }
 #endregion

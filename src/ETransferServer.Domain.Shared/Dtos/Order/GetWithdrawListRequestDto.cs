@@ -11,6 +11,7 @@ public class GetWithdrawListRequestDto : IValidatableObject
     public decimal Amount { get; set; }
     public string? Address { get; set; }
     public string? Version { get; set; }
+    public string? Memo { get; set; }
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {

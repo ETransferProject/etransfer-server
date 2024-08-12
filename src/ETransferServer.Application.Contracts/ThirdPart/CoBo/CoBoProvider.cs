@@ -97,9 +97,8 @@ public class CoBoProvider : ICoBoProvider, ISingletonDependency
     {
         input.Coin = GetRequestCoin(input.Coin);
         _logger.LogInformation(
-            "send withdraw request to cobo, requestId:{requestId}, coin:{coin}, address:{address}, amount:{amount}",
-            input.RequestId,
-            input.Coin, input.Address, input.Amount);
+            "send withdraw request to cobo, requestId:{requestId}, coin:{coin}, address:{address}, amount:{amount}, memo:{memo}",
+            input.RequestId, input.Coin, input.Address, input.Amount, input.Memo);
         var dicParam = ObjToDicParam(input);
         return await _proxyCoBoClientProvider.PostAsync<string>(CoBoConstant.Withdraw, dicParam);
     }

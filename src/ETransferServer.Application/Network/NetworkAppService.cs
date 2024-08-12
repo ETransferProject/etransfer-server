@@ -3,9 +3,11 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
+using CAServer.Commons;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Token;
 using ETransferServer.Grains.Grain.Token;
+using ETransferServer.Grains.Grain.Users;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using ETransferServer.Models;
@@ -18,6 +20,7 @@ using Volo.Abp;
 using Volo.Abp.Application.Dtos;
 using Volo.Abp.Auditing;
 using Volo.Abp.ObjectMapping;
+using Volo.Abp.Users;
 
 namespace ETransferServer.Network;
 
@@ -50,11 +53,11 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
         _tokenOptions = tokenOptions;
     }
 
-    public async Task<GetNetworkListDto> GetNetworkListAsync(GetNetworkListRequestDto request)
+    public async Task<GetNetworkListDto> GetNetworkListAsync(GetNetworkListRequestDto request, string version = null)
     {
         try
         {
-            var getNetworkListDto = await GetNetworkListWithLocalFeeAsync(request);
+            var getNetworkListDto = await GetNetworkListWithLocalFeeAsync(request, version);
             if (request.Type == OrderTypeEnum.Deposit.ToString()) return getNetworkListDto;
 
             // fill withdraw fee
@@ -114,7 +117,7 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
         return networkListDto;
     }
 
-    public async Task<GetNetworkListDto> GetNetworkListWithLocalFeeAsync(GetNetworkListRequestDto request)
+    public async Task<GetNetworkListDto> GetNetworkListWithLocalFeeAsync(GetNetworkListRequestDto request, string version = null)
     {
         AssertHelper.NotNull(request, "Request empty. Please refresh and try again.");
         AssertHelper.NotEmpty(request.ChainId, "Invalid chainId. Please refresh and try again.");
@@ -129,6 +132,7 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
         var networkConfigs = _networkOptions.Value.NetworkMap[request.Symbol].Where(a =>
                 a.SupportType.Contains(request.Type) && a.SupportChain.Contains(request.ChainId))
             .ToList();
+        networkConfigs = await FilterByVersionAndWhiteList(networkConfigs, version);
 
         var networkInfos = networkConfigs.Select(config => config.NetworkInfo).ToList();
         var withdrawInfo = networkConfigs
@@ -306,6 +310,30 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
         var coBoCoinGrain = _clusterClient.GetGrain<ICoBoCoinGrain>(ICoBoCoinGrain.Id(network, symbol));
         var coin = await coBoCoinGrain.GetCache();
         return coin?.AbsEstimateFee;
+    }
+    
+    private async Task<List<NetworkConfig>> FilterByVersionAndWhiteList(List<NetworkConfig> networkConfigs, string version = null)
+    {
+        var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
+        if (userId.HasValue)
+        {
+            _logger.LogInformation("GetNetworkList currentUser:{userId},version:{version}", userId.Value, version);
+            var userGrain = _clusterClient.GetGrain<IUserGrain>(userId.Value);
+            var userDto = await userGrain.GetUser();
+            if (userDto.Success && userDto.Data != null && !userDto.Data.AddressInfos.IsNullOrEmpty())
+            {
+                return networkConfigs.Where(config =>
+                    config.NetworkInfo.MinShowVersion.IsNullOrEmpty()
+                    || (VerifyHelper.VerifyMemoVersion(version, config.NetworkInfo.MinShowVersion)
+                        && (config.SupportWhiteList.IsNullOrEmpty() ||
+                            config.SupportWhiteList.Any(t => userDto.Data.AddressInfos.Exists(a =>
+                                a.Address.ToLower() == t.ToLower()))))).ToList();
+            }
+        }
+        return networkConfigs.Where(config =>
+            config.NetworkInfo.MinShowVersion.IsNullOrEmpty()
+            || (VerifyHelper.VerifyMemoVersion(version, config.NetworkInfo.MinShowVersion)
+                && config.SupportWhiteList.IsNullOrEmpty())).ToList();
     }
 
     private void FillMultiConfirmMinutes(string type, List<NetworkDto> networkList, List<NetworkConfig> networkConfigs)

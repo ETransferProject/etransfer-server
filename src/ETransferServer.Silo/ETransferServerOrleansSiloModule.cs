@@ -34,6 +34,7 @@ public class ETransferServerOrleansSiloModule : AbpModule
         var configuration = context.Services.GetConfiguration();
         Configure<ChainOptions>(configuration.GetSection("Chains"));
         Configure<SignatureServiceOption>(configuration.GetSection("SignatureService"));
+        Configure<SyncStateServiceOption>(configuration.GetSection("SyncStateService"));
         Configure<TimerOptions>(configuration.GetSection("Timer"));
         Configure<DepositOptions>(configuration.GetSection("Deposit"));
         Configure<WithdrawOptions>(configuration.GetSection("Withdraw"));

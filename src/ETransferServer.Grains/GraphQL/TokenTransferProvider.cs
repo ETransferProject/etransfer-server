@@ -1,8 +1,12 @@
 using GraphQL;
 using Microsoft.Extensions.Logging;
 using ETransferServer.Common;
+using ETransferServer.Common.HttpClient;
 using ETransferServer.Dtos.GraphQL;
+using ETransferServer.Options;
 using ETransferServer.Samples.GraphQL;
+using ETransferServer.Samples.HttpClient;
+using Microsoft.Extensions.Options;
 using Volo.Abp.Application.Dtos;
 using Volo.Abp.DependencyInjection;
 
@@ -20,12 +24,21 @@ public interface ITokenTransferProvider
 
 public class TokenTransferProvider : ITokenTransferProvider, ISingletonDependency
 {
+    private ApiInfo _syncStateUri => new (HttpMethod.Get, _syncStateServiceOption.Value.SyncStateUri);
+
     private readonly IGraphQlHelper _graphQlHelper;
+    private readonly HttpProvider _httpProvider;
+    private readonly IOptionsSnapshot<SyncStateServiceOption> _syncStateServiceOption;
     private readonly ILogger<TokenTransferProvider> _logger;
 
-    public TokenTransferProvider(IGraphQlHelper graphQlHelper, ILogger<TokenTransferProvider> logger)
+    public TokenTransferProvider(IGraphQlHelper graphQlHelper, 
+        HttpProvider httpProvider,
+        IOptionsSnapshot<SyncStateServiceOption> syncStateServiceOption,
+        ILogger<TokenTransferProvider> logger)
     {
         _graphQlHelper = graphQlHelper;
+        _httpProvider = httpProvider;
+        _syncStateServiceOption = syncStateServiceOption;
         _logger = logger;
     }
     
@@ -33,20 +46,8 @@ public class TokenTransferProvider : ITokenTransferProvider, ISingletonDependenc
     {
         try
         {
-            var res = await _graphQlHelper.QueryAsync<GraphQLResponse<SyncStateDto>>(new GraphQLRequest
-            {
-                Query = @"
-			    query($chainId:String,$filterType:BlockFilterType!) {
-                    data:syncState(input: {chainId:$chainId,filterType:$filterType}){
-                        confirmedBlockHeight}
-                    }",
-                Variables = new
-                {
-                    chainId,
-                    filterType = BlockFilterType.TRANSACTION
-                }
-            });
-            return res.Data.ConfirmedBlockHeight;
+            var res = await _httpProvider.InvokeAsync<SyncStateResponse>(_syncStateServiceOption.Value.BaseUrl, _syncStateUri);
+            return res.CurrentVersion.Items.FirstOrDefault(i => i.ChainId == chainId)?.LastIrreversibleBlockHeight ?? 0;
         }
         catch (Exception e)
         {
@@ -69,7 +70,7 @@ public class TokenTransferProvider : ITokenTransferProvider, ISingletonDependenc
                         chainId: $chainId
                     }
                 ){
-                    chainId,blockHash, blockHeight, previousBlockHash, blockTime, confirmed
+                    chainId, blockHash, blockHeight, blockTime, confirmed
                 }
             }",
                 Variables = new
@@ -118,8 +119,8 @@ public class TokenTransferProvider : ITokenTransferProvider, ISingletonDependenc
                     $timestampMax:Long!,
                     $startBlockHeight:Long!,
                     $endBlockHeight:Long!,
-                    $skipCount:Int!,
-                    $maxResultCount:Int!,
+                    $skipCount:Int,
+                    $maxResultCount:Int,
                     $isFilterEmpty: Boolean!,
                     $transferType: TokenTransferType!
                 ) {
@@ -138,7 +139,7 @@ public class TokenTransferProvider : ITokenTransferProvider, ISingletonDependenc
                         items:data{
                             id,transactionId,methodName,from,to,
                             toChainId,toAddress,symbol,amount,maxEstimateFee,
-                            timestamp,transferType,chainId,blockHash,blockHeight
+                            timestamp,transferType,chainId,blockHash,blockHeight,memo
                         },
                         totalCount
                     }
@@ -174,11 +175,11 @@ public class TokenTransferProvider : ITokenTransferProvider, ISingletonDependenc
             {
                 Query = @"
 			    query(
-                    $txIds:[String],
+                    $txIds:[String!]!,
                     $startBlockHeight:Long!,
                     $endBlockHeight:Long!,
-                    $skipCount:Int!,
-                    $maxResultCount:Int!
+                    $skipCount:Int,
+                    $maxResultCount:Int
                 ) {
                     data:getTransaction(
                         input: {
@@ -192,8 +193,7 @@ public class TokenTransferProvider : ITokenTransferProvider, ISingletonDependenc
                         items:data{
                             id,transactionId,methodName,timestamp,chainId,
                             blockHash,blockHeight,amount,symbol,fromAddress,from,
-                            toAddress,to,params,signature,index,
-                            status
+                            toAddress,to,params,index,status
                         },
                         totalCount
                     }
@@ -226,11 +226,11 @@ public class TokenTransferProvider : ITokenTransferProvider, ISingletonDependenc
             {
                 Query = @"
 			    query(
-                    $txIds:[String],
-                    $startBlockHeight:Long!,
-                    $endBlockHeight:Long!,
-                    $skipCount:Int!,
-                    $maxResultCount:Int!
+                    $txIds:[String!]!,
+                    $startBlockHeight:Long,
+                    $endBlockHeight:Long,
+                    $skipCount:Int,
+                    $maxResultCount:Int
                 ) {
                     data:getSwapTokenRecord(
                         input: {
@@ -241,7 +241,7 @@ public class TokenTransferProvider : ITokenTransferProvider, ISingletonDependenc
                             maxResultCount:$maxResultCount
                         }
                     ){
-                        items {
+                        items:data{
                             transactionId,symbolIn,symbolOut,amountIn,amountOut,
                             fromAddress,toAddress,channel,feeRate,blockHeight
                         },

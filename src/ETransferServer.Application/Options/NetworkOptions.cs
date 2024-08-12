@@ -18,6 +18,7 @@ public class NetworkConfig
     public WithdrawInfo WithdrawInfo { get; set; }
     public List<string> SupportType { get; set; }
     public List<string> SupportChain { get; set; }
+    public List<string> SupportWhiteList { get; set; }
 }
 
 public class NetworkInfo
@@ -29,6 +30,7 @@ public class NetworkInfo
     public string ContractAddress { get; set; }
     public decimal BlockGenerationSeconds { get; set; }
     public decimal AveragePendingSeconds { get; set; }
+    public string MinShowVersion { get; set; }
     public string ExplorerUrl { get; set; }
     public string Status { get; set; }
 }
