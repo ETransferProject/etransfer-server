@@ -6,7 +6,7 @@ namespace ETransferServer.ThirdPart.CoBo;
 
 public interface ICoBoProvider
 {
-    Task<CoBoCoinDetailDto> GetCoinDetailAsync(string coin);
+    Task<CoBoCoinDetailDto> GetCoinDetailAsync(string coin, string amount = null);
     Task<AccountDetailDto> GetAccountDetailAsync();
     Task<List<CoBoTransactionDto>> GetTransactionsByTimeExAsync(TransactionRequestDto input);
     Task<CoBoTransactionDto> GetTransactionAsync(string id);
