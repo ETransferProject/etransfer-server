@@ -91,7 +91,7 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
         {
             chainStatus[chainId] = await _contractProvider.GetChainStatusAsync(chainId);
             if (chainStatus[chainId] != null)
-                _logger.LogDebug("TxTimer node chainId={ChainId}, Height= {Height}, LibHeight= {Height},", 
+                _logger.LogDebug("TxTimer node chainId={ChainId}, Height= {Height}, LibHeight= {libHeight}", 
                     chainId, chainStatus[chainId].LongestChainHeight, chainStatus[chainId].LastIrreversibleBlockHeight);
 
             var indexerLatestBlock = await _transferProvider.GetLatestBlockAsync(chainId);
