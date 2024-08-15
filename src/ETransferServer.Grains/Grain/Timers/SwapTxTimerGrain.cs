@@ -104,8 +104,8 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
             chainStatus[chainId] = await _contractProvider.GetChainStatusAsync(chainId);
             if (chainStatus[chainId] != null)
             {
-                _logger.LogDebug("SwapTxTimer node chainId={ChainId}, Height= {Height}", chainId,
-                    chainStatus[chainId].LongestChainHeight);
+                _logger.LogDebug("SwapTxTimer node chainId={ChainId}, Height= {Height}, LibHeight= {libHeight}", 
+                    chainId, chainStatus[chainId].LongestChainHeight, chainStatus[chainId].LastIrreversibleBlockHeight);
 
                 indexerLatestHeight[chainId] = chainStatus[chainId].BestChainHeight;
                 _logger.LogDebug("SwapTxTimer indexer chainId={ChainId}, Height= {Height}", chainId,

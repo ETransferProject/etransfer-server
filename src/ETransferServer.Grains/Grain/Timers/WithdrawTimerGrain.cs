@@ -190,6 +190,8 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
             var requestTime = DateTime.UtcNow.AddMinutes(1).ToUtcSeconds();
             if (netWorkInfo != null)
             {
+                _logger.LogDebug("WithdrawTimerGrain requestTime, {blockingTime}, {confirmNum}", 
+                    netWorkInfo.BlockingTime, netWorkInfo.ConfirmNum);
                 requestTime = DateTime.UtcNow.ToUtcSeconds() + netWorkInfo.BlockingTime * netWorkInfo.ConfirmNum;
             }
 
