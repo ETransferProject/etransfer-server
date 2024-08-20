@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -27,14 +28,16 @@ public class CoBoProvider : ICoBoProvider, ISingletonDependency
         _options = options;
     }
 
-    public async Task<CoBoCoinDetailDto> GetCoinDetailAsync(string coin)
+    public async Task<CoBoCoinDetailDto> GetCoinDetailAsync(string coin, string amount = null)
     {
         coin = GetRequestCoin(coin);
-
+        var uriParam = !amount.IsNullOrEmpty() && amount.SafeToDecimal() > 0 
+            ? "amount=" + amount + "&coin=" + coin 
+            : "coin=" + coin;
         var result =
-            await _proxyCoBoClientProvider.GetAsync<CoBoCoinDetailDto>(CoBoConstant.GetCoinDetail + "?coin=" + coin);
-        _logger.LogInformation("get coin detail coin={Coin}, feeCoin={FeeCoin}, absFeeAmount={FeeAmount}", coin,
-            result.FeeCoin, result.AbsEstimateFee);
+            await _proxyCoBoClientProvider.GetAsync<CoBoCoinDetailDto>(CoBoConstant.GetCoinDetail + "?" + uriParam);
+        _logger.LogInformation("get coin detail coin={Coin}, amount={amount}, feeCoin={FeeCoin}, absFeeAmount={FeeAmount}", 
+            coin, amount, result.FeeCoin, result.AbsEstimateFee);
         result.Coin = GetResponseCoin(result.Coin);
         return result;
     }
@@ -97,9 +100,8 @@ public class CoBoProvider : ICoBoProvider, ISingletonDependency
     {
         input.Coin = GetRequestCoin(input.Coin);
         _logger.LogInformation(
-            "send withdraw request to cobo, requestId:{requestId}, coin:{coin}, address:{address}, amount:{amount}",
-            input.RequestId,
-            input.Coin, input.Address, input.Amount);
+            "send withdraw request to cobo, requestId:{requestId}, coin:{coin}, address:{address}, amount:{amount}, memo:{memo}",
+            input.RequestId, input.Coin, input.Address, input.Amount, input.Memo);
         var dicParam = ObjToDicParam(input);
         return await _proxyCoBoClientProvider.PostAsync<string>(CoBoConstant.Withdraw, dicParam);
     }

@@ -66,6 +66,11 @@ public class EvmTransactionGrain : Grain<EvmTransactionState>, IEvmTransactionGr
                     AssertHelper.IsTrue(long.TryParse(block.BlockTimeStamp.ToString(), out time));
                     time *= 1000;
                     break;
+                case BlockchainType.Ton:
+                    block = await provider.GetBlockTimeAsync(chainId, blockHash, txId);
+                    AssertHelper.IsTrue(long.TryParse(block.BlockTimeStamp.ToString(), out time));
+                    time *= 1000;
+                    break;
                 case BlockchainType.Evm:
                 {
                     block = await provider.GetBlockTimeAsync(chainId, blockHash);
@@ -88,6 +93,7 @@ public class EvmTransactionGrain : Grain<EvmTransactionState>, IEvmTransactionGr
                     throw new ArgumentOutOfRangeException();
             }
 
+            AssertHelper.IsTrue(time > 0, "Block time get fail, time:{time}", time);
             State.TxId = txId;
             State.BlockTime = time;
             await WriteStateAsync();

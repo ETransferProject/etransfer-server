@@ -412,7 +412,7 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
                 var swapLog = logs.FirstOrDefault(l => l.Name == nameof(TokenSwapped))?.NonIndexed;
                 if (!swapLog.IsNullOrWhiteSpace())
                 {
-                    var amountsOut = TokenSwapped.Parser.ParseFrom(ByteArrayHelper.HexStringToByteArray(swapLog)).AmountOut;
+                    var amountsOut = TokenSwapped.Parser.ParseFrom(ByteString.FromBase64(swapLog)).AmountOut;
                     _logger.LogInformation("Amounts out parsed:{amount}",amountsOut.AmountOut.Last());
                     var tokenInfo = await GetTokenAsync(State.SymbolOut, State.ToChainId);
                     actualSwappedAmountOut = (amountsOut.AmountOut.Last() / (decimal)Math.Pow(10, tokenInfo.Decimals));

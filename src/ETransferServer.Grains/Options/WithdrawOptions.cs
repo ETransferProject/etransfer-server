@@ -7,6 +7,7 @@ public class WithdrawOptions
     public bool IsOpen { get; set; } = true;
     public long WithdrawThreshold { get; set; } = 100000;
     public string OrderChangeTopic { get; set; }
+    public Dictionary<string, List<string>> SupportWhiteLists { get; set; }
     public Dictionary<string, decimal> MinThirdPartFee { get; set; } = new();
     public decimal MinWithdraw { get; set; } = new (0.2);
     public decimal FeeFluctuationPercent { get; set; } = (decimal)0.1;

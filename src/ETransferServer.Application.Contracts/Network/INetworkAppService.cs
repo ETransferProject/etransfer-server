@@ -11,8 +11,8 @@ namespace ETransferServer.Network;
 
 public interface INetworkAppService : IApplicationService
 {
-    Task<GetNetworkListDto> GetNetworkListAsync(GetNetworkListRequestDto request);
-    Task<GetNetworkListDto> GetNetworkListWithLocalFeeAsync(GetNetworkListRequestDto request);
+    Task<GetNetworkListDto> GetNetworkListAsync(GetNetworkListRequestDto request, string version = null);
+    Task<GetNetworkListDto> GetNetworkListWithLocalFeeAsync(GetNetworkListRequestDto request, string version = null);
     Task<Tuple<decimal, CoBoCoinDto>> CalculateNetworkFeeAsync(string network, string symbol);
     Task<decimal> GetAvgExchangeAsync(string fromSymbol, string toSymbol, long timestamp = 0L);
     Task<decimal> GetMinThirdPartFeeAsync(string symbol);

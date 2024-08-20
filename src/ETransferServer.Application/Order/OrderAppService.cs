@@ -6,6 +6,7 @@ using AElf.Indexing.Elasticsearch;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Grains.Grain.Users;
+using ETransferServer.Network;
 using ETransferServer.Options;
 using ETransferServer.Orders;
 using Microsoft.Extensions.Logging;
@@ -28,16 +29,19 @@ public class OrderAppService : ApplicationService, IOrderAppService
     private readonly IClusterClient _clusterClient;
     private readonly IObjectMapper _objectMapper;
     private readonly ILogger<OrderAppService> _logger;
+    private readonly INetworkAppService _networkAppService;
 
     public OrderAppService(INESTRepository<OrderIndex, Guid> orderIndexRepository,
         IClusterClient clusterClient,
         IObjectMapper objectMapper,
-        ILogger<OrderAppService> logger)
+        ILogger<OrderAppService> logger,
+        INetworkAppService networkAppService)
     {
         _orderIndexRepository = orderIndexRepository;
         _clusterClient = clusterClient;
         _objectMapper = objectMapper;
         _logger = logger;
+        _networkAppService = networkAppService;
     }
 
     public async Task<PagedResultDto<OrderIndexDto>> GetOrderRecordListAsync(GetOrderRecordRequestDto request)
@@ -235,7 +239,7 @@ public class OrderAppService : ApplicationService, IOrderAppService
 
     private async Task<List<OrderIndexDto>> LoopCollectionItemsAsync(List<OrderIndexDto> itemList)
     {
-        itemList.ForEach(item =>
+        foreach (var item in itemList)
         {
             var status = Enum.Parse<OrderStatusEnum>(item.Status);
             switch (status)
@@ -256,7 +260,15 @@ public class OrderAppService : ApplicationService, IOrderAppService
                     item.Status = OrderStatusResponseEnum.Processing.ToString();
                     break;
             }
-        });
+
+            item.FromTransfer.Amount = item.FromTransfer.Amount.SafeToDecimal(0M).ToString(
+                await _networkAppService.GetDecimalsAsync(ChainId.AELF, item.FromTransfer.Symbol),
+                DecimalHelper.RoundingOption.Floor);
+            item.ToTransfer.Amount = item.ToTransfer.Amount.SafeToDecimal(0M).ToString(
+                await _networkAppService.GetDecimalsAsync(ChainId.AELF, item.ToTransfer.Symbol),
+                DecimalHelper.RoundingOption.Floor);
+        }
+
         return itemList;
     }
 }

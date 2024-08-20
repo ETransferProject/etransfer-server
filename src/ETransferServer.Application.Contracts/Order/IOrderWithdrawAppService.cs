@@ -10,7 +10,7 @@ namespace ETransferServer.Order;
 public interface IOrderWithdrawAppService : IApplicationService
 {
     Task<bool> AddOrUpdateAsync(WithdrawOrderDto dto);
-    Task<GetWithdrawInfoDto> GetWithdrawInfoAsync(GetWithdrawListRequestDto request);
-    Task<CreateWithdrawOrderDto> CreateWithdrawOrderInfoAsync(GetWithdrawOrderRequestDto request);
+    Task<GetWithdrawInfoDto> GetWithdrawInfoAsync(GetWithdrawListRequestDto request, string version = null);
+    Task<CreateWithdrawOrderDto> CreateWithdrawOrderInfoAsync(GetWithdrawOrderRequestDto request, string version = null);
     Task DoMonitorAsync(string network, decimal estimateFee, string feeSymbol, bool isNotify);
 }

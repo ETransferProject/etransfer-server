@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Order;
-using FluentAssertions;
+using ETransferServer.Options;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Moq;
 using NSubstitute;
 using Shouldly;
 using Volo.Abp.Users;
@@ -30,6 +32,7 @@ public class OrderAppServiceTest : ETransferServerApplicationTestBase
 
     protected override void AfterAddApplication(IServiceCollection services)
     {
+        services.AddSingleton(MockTokenOptions());
         base.AfterAddApplication(services);
         _currentUser = Substitute.For<ICurrentUser>();
         services.AddSingleton(_currentUser);
@@ -164,5 +167,45 @@ public class OrderAppServiceTest : ETransferServerApplicationTestBase
         input.Sorting = " ";
         result = await _orderAppService.GetOrderRecordListAsync(input);
         result.TotalCount.ShouldBeGreaterThan(0);
+    }
+    
+    private IOptionsSnapshot<TokenOptions> MockTokenOptions()
+    {
+        var mockOptionsSnapshot = new Mock<IOptionsSnapshot<TokenOptions>>();
+        mockOptionsSnapshot.Setup(o => o.Value).Returns(
+            new TokenOptions
+            {
+                Withdraw = new Dictionary<string, List<TokenConfig>>()
+                {
+                    ["AELF"] = new List<TokenConfig>()
+                    {
+                        new TokenConfig()
+                        {
+                            Symbol = "USDT",
+                            Name = "USDT",
+                            Decimals = 6
+                        }
+                    }
+                },
+                DepositSwap = new List<TokenSwapConfig>()
+                {
+                    new TokenSwapConfig()
+                    {
+                        Symbol = "USDT",
+                        Name = "USDT",
+                        Decimals = 6,
+                        ToTokenList = new List<ToTokenConfig>()
+                        {
+                            new ToTokenConfig()
+                            {
+                                Symbol = "ELF",
+                                Name = "ELF",
+                                ChainIdList = new List<string>() { "AELF" }
+                            }
+                        }
+                    }
+                }
+            });
+        return mockOptionsSnapshot.Object;
     }
 }

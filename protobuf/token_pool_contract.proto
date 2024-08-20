@@ -70,6 +70,7 @@ message TransferTokenInput {
     string to_chain_id = 3;
     string to_address = 4;
     int64 max_estimate_fee = 5;
+    string memo = 6;
 }
 
 message ReleaseTokenInput {
@@ -96,6 +97,7 @@ message WithdrawInput {
     string symbol = 1;
     int64 amount = 2;
     aelf.Hash virtual_hash = 3;
+    string memo = 4;
 }
 
 message TokenSymbolList {
@@ -159,6 +161,7 @@ message TokenPoolTransferred {
     string to_chain_id = 5;
     string to_address = 6;
     int64 max_estimate_fee = 7;
+    string memo = 8;
 }
 
 message TokenPoolReleased {

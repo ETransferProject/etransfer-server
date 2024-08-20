@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using AElf.Client.Service;
 using ETransferServer.Common.ChainsClient;
 using ETransferServer.Options;
 using Microsoft.Extensions.Options;

@@ -10,6 +10,7 @@ public class GetWithdrawOrderRequestDto : IValidatableObject
     [Required] public string RawTransaction { get; set; }
     [Required] public string FromChainId { get; set; }
     [Required] public string ToAddress { get; set; }
+    public string? Memo { get; set; }
 
     public decimal Amount { get; set; }
     

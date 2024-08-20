@@ -168,6 +168,7 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
             AssertHelper.IsTrue(isGo,
                 "Invalid amount/fee, amount:{amount}, maxEstimateFee:{maxEstimateFee}, realFee:{realFee}", 
                 amountDecimal, maxEstimateFee, realFee);
+            AssertHelper.IsTrue(VerifyByWhiteList(transferRecord.From, transferRecord.ToChainId), "The whitelist is not allowed");
 
             var withdrawOrderDto = new WithdrawOrderDto
             {
@@ -204,6 +205,11 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
                     }
                 }
             };
+            if (!string.IsNullOrWhiteSpace(transferRecord.Memo))
+            {
+                withdrawOrderDto.ExtensionInfo = new Dictionary<string, string>();
+                withdrawOrderDto.ExtensionInfo.Add(ExtensionKey.Memo, transferRecord.Memo);
+            }
             return withdrawOrderDto;
         }
         catch (Exception e)
@@ -351,6 +357,15 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
         return Task.FromResult(_withdrawOption.Value.MinThirdPartFee.ContainsKey(symbol)
             ? _withdrawOption.Value.MinThirdPartFee[symbol]
             : DefaultMinThirdPartFee);
+    }
+    
+    private bool VerifyByWhiteList(string fromAddress, string toChainId)
+    {
+        _logger.LogInformation("VerifyByWhiteList fromAddress:{fromAddress},toChainId:{toChainId}", fromAddress, toChainId);
+        return _withdrawOption.Value.SupportWhiteLists.IsNullOrEmpty()
+               || !_withdrawOption.Value.SupportWhiteLists.ContainsKey(toChainId)
+               || (_withdrawOption.Value.SupportWhiteLists.ContainsKey(toChainId)
+                   && _withdrawOption.Value.SupportWhiteLists[toChainId].Contains(fromAddress));
     }
 
     private async Task AddAfter(TransferRecordDto transferRecord)

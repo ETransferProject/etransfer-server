@@ -190,6 +190,8 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
             var requestTime = DateTime.UtcNow.AddMinutes(1).ToUtcSeconds();
             if (netWorkInfo != null)
             {
+                _logger.LogDebug("WithdrawTimerGrain requestTime, {blockingTime}, {confirmNum}", 
+                    netWorkInfo.BlockingTime, netWorkInfo.ConfirmNum);
                 requestTime = DateTime.UtcNow.ToUtcSeconds() + netWorkInfo.BlockingTime * netWorkInfo.ConfirmNum;
             }
 
@@ -280,7 +282,7 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
 
         var order = (WithdrawOrderDto)orderResult.Data;
 
-        var result = await GetWithdrawInfoByRequest(order.ToTransfer.TxId);
+        var result = await GetWithdrawInfoByRequest(order.Id.ToString());
         if (result == null)
         {
             return PENDING;
@@ -290,7 +292,7 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
         order.ToTransfer.Status = result.Status;
         order.ToTransfer.FromAddress = result.SourceAddress;
 
-        order.ExtensionInfo = ExtensionBuilder.New()
+        var extensionInfo = ExtensionBuilder.New()
             .Add(ExtensionKey.RequestId, result.RequestId)
             .Add(ExtensionKey.ToTransferTxId, result.TxId)
             .Build();
@@ -306,14 +308,15 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
                     order.ThirdPartFee.Add(new FeeInfo(result.FeeCoin, result.FeeAmount, result.FeeDecimal,
                         FeeInfo.FeeName.CoBoFee));
                 }
-                await userWithdrawGrain.AddOrUpdateOrder(order, order.ExtensionInfo);
+                await userWithdrawGrain.AddOrUpdateOrder(order, extensionInfo);
                 break;
             case FAIL:
                 order.ToTransfer.TxId = result.TxId;
                 order.Status = OrderStatusEnum.ToTransferFailed.ToString();
+                order.ExtensionInfo ??= new Dictionary<string, string>();
                 order.ExtensionInfo.TryAdd(CommonConstant.WithdrawThirdPartErrorKey,
                     ThirdPartOrderStatusEnum.Fail.ToString());
-                await userWithdrawGrain.AddOrUpdateOrder(order, order.ExtensionInfo);
+                await userWithdrawGrain.AddOrUpdateOrder(order, extensionInfo);
                 break;
             case PENDING:
                 withdrawInfo.RequestTime =
@@ -356,7 +359,10 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
             };
 
             orderDto.ExtensionInfo ??= new Dictionary<string, string>();
-            orderDto.ToTransfer.TxId = requestDto.RequestId;
+            if (orderDto.ExtensionInfo.ContainsKey(ExtensionKey.Memo))
+            {
+                requestDto.Memo = orderDto.ExtensionInfo[ExtensionKey.Memo];
+            }
             orderDto.ThirdPartServiceName = ThirdPartServiceNameEnum.Cobo.ToString();
             var response = await _coBoProvider.WithdrawAsync(requestDto);
 
@@ -410,7 +416,10 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
             };
 
             orderDto.ExtensionInfo ??= new Dictionary<string, string>();
-            orderDto.ToTransfer.TxId = requestDto.RequestId;
+            if (orderDto.ExtensionInfo.ContainsKey(ExtensionKey.Memo))
+            {
+                requestDto.Memo = orderDto.ExtensionInfo[ExtensionKey.Memo];
+            }
             var response = await _coBoProvider.WithdrawAsync(requestDto);
 
             if (response == null)
@@ -442,6 +451,7 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
         }
 
         order.Status = OrderStatusEnum.ToTransferFailed.ToString();
+        order.ExtensionInfo ??= new Dictionary<string, string>();
         foreach (var errorInfo in withdrawRequest.Value.ErrorDic)
         {
             order.ExtensionInfo.TryAdd(errorInfo.Key, errorInfo.Value);

@@ -12,7 +12,7 @@ using scg = global::System.Collections.Generic;
 namespace ETransfer.Contracts.TokenPool {
 
   /// <summary>Holder for reflection information generated from token_pool_contract.proto</summary>
-  public static partial class TokenPoolContractReflection {
+  internal static partial class TokenPoolContractReflection {
 
     #region Descriptor
     /// <summary>File descriptor for token_pool_contract.proto</summary>
@@ -29,89 +29,90 @@ namespace ETransfer.Contracts.TokenPool {
             "b2J1Zi9lbXB0eS5wcm90bxofZ29vZ2xlL3Byb3RvYnVmL3RpbWVzdGFtcC5w",
             "cm90bxoeZ29vZ2xlL3Byb3RvYnVmL3dyYXBwZXJzLnByb3RvIlwKD0luaXRp",
             "YWxpemVJbnB1dBIcCgVhZG1pbhgBIAEoCzINLmFlbGYuQWRkcmVzcxIrChF0",
-            "b2tlbl9zeW1ib2xfbGlzdBgCIAEoCzIQLlRva2VuU3ltYm9sTGlzdCJ3ChJU",
-            "cmFuc2ZlclRva2VuSW5wdXQSDgoGc3ltYm9sGAEgASgJEg4KBmFtb3VudBgC",
-            "IAEoAxITCgt0b19jaGFpbl9pZBgDIAEoCRISCgp0b19hZGRyZXNzGAQgASgJ",
-            "EhgKEG1heF9lc3RpbWF0ZV9mZWUYBSABKAMieQoRUmVsZWFzZVRva2VuSW5w",
-            "dXQSDgoGc3ltYm9sGAEgASgJEg4KBmFtb3VudBgCIAEoAxIbCgRmcm9tGAMg",
-            "ASgLMg0uYWVsZi5BZGRyZXNzEhkKAnRvGAQgASgLMg0uYWVsZi5BZGRyZXNz",
-            "EgwKBG1lbW8YBSABKAkiMQoPQ29udHJvbGxlcklucHV0Eh4KB2FkZHJlc3MY",
-            "ASABKAsyDS5hZWxmLkFkZHJlc3MiNAoQQ29udHJvbGxlck91dHB1dBIgCglh",
-            "ZGRyZXNzZXMYASADKAsyDS5hZWxmLkFkZHJlc3MiNAoOQ29udHJvbGxlckxp",
-            "c3QSIgoLY29udHJvbGxlcnMYASADKAsyDS5hZWxmLkFkZHJlc3MiUQoNV2l0",
-            "aGRyYXdJbnB1dBIOCgZzeW1ib2wYASABKAkSDgoGYW1vdW50GAIgASgDEiAK",
-            "DHZpcnR1YWxfaGFzaBgDIAEoCzIKLmFlbGYuSGFzaCIgCg9Ub2tlblN5bWJv",
-            "bExpc3QSDQoFdmFsdWUYASADKAkiIwoRQWRkVG9rZW5Qb29sSW5wdXQSDgoG",
-            "c3ltYm9sGAEgASgJIjsKE0FkZFRva2VuSG9sZGVySW5wdXQSDgoGc3ltYm9s",
-            "GAEgASgJEhQKDGhvbGRlcl9jb3VudBgCIAEoBSI7ChtTZXRTd2FwQ29udHJh",
-            "Y3RBZGRyZXNzSW5wdXQSHAoFdmFsdWUYASADKAsyDS5Td2FwQ29udHJhY3Qi",
-            "TgoMU3dhcENvbnRyYWN0EhAKCGZlZV9yYXRlGAEgASgDEiwKFXN3YXBfY29u",
-            "dHJhY3RfYWRkcmVzcxgCIAEoCzINLmFlbGYuQWRkcmVzcyLSAQoOU3dhcFRv",
-            "a2VuSW5wdXQSEAoIZmVlX3JhdGUYASABKAMSEQoJYW1vdW50X2luGAIgASgD",
-            "EhYKDmFtb3VudF9vdXRfbWluGAMgASgDEgwKBHBhdGgYBCADKAkSGQoCdG8Y",
-            "BSABKAsyDS5hZWxmLkFkZHJlc3MSLAoIZGVhZGxpbmUYBiABKAsyGi5nb29n",
-            "bGUucHJvdG9idWYuVGltZXN0YW1wEg8KB2NoYW5uZWwYByABKAkSGwoEZnJv",
-            "bRgIIAEoCzINLmFlbGYuQWRkcmVzcyIiChBHZXRQb29sSW5mb0lucHV0Eg4K",
-            "BnN5bWJvbBgBIAEoCSI/CghQb29sSW5mbxIOCgZzeW1ib2wYASABKAkSIwoN",
-            "dG9rZW5faG9sZGVycxgCIAMoCzIMLlRva2VuSG9sZGVyIi4KD1Rva2VuSG9s",
-            "ZGVyTGlzdBIbCgV2YWx1ZRgBIAMoCzIMLlRva2VuSG9sZGVyIk8KC1Rva2Vu",
-            "SG9sZGVyEiAKDHZpcnR1YWxfaGFzaBgBIAEoCzIKLmFlbGYuSGFzaBIeCgdh",
-            "ZGRyZXNzGAIgASgLMg0uYWVsZi5BZGRyZXNzIrcBChRUb2tlblBvb2xUcmFu",
-            "c2ZlcnJlZBIOCgZzeW1ib2wYASABKAkSDgoGYW1vdW50GAIgASgDEhsKBGZy",
+            "b2tlbl9zeW1ib2xfbGlzdBgCIAEoCzIQLlRva2VuU3ltYm9sTGlzdCKFAQoS",
+            "VHJhbnNmZXJUb2tlbklucHV0Eg4KBnN5bWJvbBgBIAEoCRIOCgZhbW91bnQY",
+            "AiABKAMSEwoLdG9fY2hhaW5faWQYAyABKAkSEgoKdG9fYWRkcmVzcxgEIAEo",
+            "CRIYChBtYXhfZXN0aW1hdGVfZmVlGAUgASgDEgwKBG1lbW8YBiABKAkieQoR",
+            "UmVsZWFzZVRva2VuSW5wdXQSDgoGc3ltYm9sGAEgASgJEg4KBmFtb3VudBgC",
+            "IAEoAxIbCgRmcm9tGAMgASgLMg0uYWVsZi5BZGRyZXNzEhkKAnRvGAQgASgL",
+            "Mg0uYWVsZi5BZGRyZXNzEgwKBG1lbW8YBSABKAkiMQoPQ29udHJvbGxlcklu",
+            "cHV0Eh4KB2FkZHJlc3MYASABKAsyDS5hZWxmLkFkZHJlc3MiNAoQQ29udHJv",
+            "bGxlck91dHB1dBIgCglhZGRyZXNzZXMYASADKAsyDS5hZWxmLkFkZHJlc3Mi",
+            "NAoOQ29udHJvbGxlckxpc3QSIgoLY29udHJvbGxlcnMYASADKAsyDS5hZWxm",
+            "LkFkZHJlc3MiXwoNV2l0aGRyYXdJbnB1dBIOCgZzeW1ib2wYASABKAkSDgoG",
+            "YW1vdW50GAIgASgDEiAKDHZpcnR1YWxfaGFzaBgDIAEoCzIKLmFlbGYuSGFz",
+            "aBIMCgRtZW1vGAQgASgJIiAKD1Rva2VuU3ltYm9sTGlzdBINCgV2YWx1ZRgB",
+            "IAMoCSIjChFBZGRUb2tlblBvb2xJbnB1dBIOCgZzeW1ib2wYASABKAkiOwoT",
+            "QWRkVG9rZW5Ib2xkZXJJbnB1dBIOCgZzeW1ib2wYASABKAkSFAoMaG9sZGVy",
+            "X2NvdW50GAIgASgFIjsKG1NldFN3YXBDb250cmFjdEFkZHJlc3NJbnB1dBIc",
+            "CgV2YWx1ZRgBIAMoCzINLlN3YXBDb250cmFjdCJOCgxTd2FwQ29udHJhY3QS",
+            "EAoIZmVlX3JhdGUYASABKAMSLAoVc3dhcF9jb250cmFjdF9hZGRyZXNzGAIg",
+            "ASgLMg0uYWVsZi5BZGRyZXNzItIBCg5Td2FwVG9rZW5JbnB1dBIQCghmZWVf",
+            "cmF0ZRgBIAEoAxIRCglhbW91bnRfaW4YAiABKAMSFgoOYW1vdW50X291dF9t",
+            "aW4YAyABKAMSDAoEcGF0aBgEIAMoCRIZCgJ0bxgFIAEoCzINLmFlbGYuQWRk",
+            "cmVzcxIsCghkZWFkbGluZRgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1l",
+            "c3RhbXASDwoHY2hhbm5lbBgHIAEoCRIbCgRmcm9tGAggASgLMg0uYWVsZi5B",
+            "ZGRyZXNzIiIKEEdldFBvb2xJbmZvSW5wdXQSDgoGc3ltYm9sGAEgASgJIj8K",
+            "CFBvb2xJbmZvEg4KBnN5bWJvbBgBIAEoCRIjCg10b2tlbl9ob2xkZXJzGAIg",
+            "AygLMgwuVG9rZW5Ib2xkZXIiLgoPVG9rZW5Ib2xkZXJMaXN0EhsKBXZhbHVl",
+            "GAEgAygLMgwuVG9rZW5Ib2xkZXIiTwoLVG9rZW5Ib2xkZXISIAoMdmlydHVh",
+            "bF9oYXNoGAEgASgLMgouYWVsZi5IYXNoEh4KB2FkZHJlc3MYAiABKAsyDS5h",
+            "ZWxmLkFkZHJlc3MixQEKFFRva2VuUG9vbFRyYW5zZmVycmVkEg4KBnN5bWJv",
+            "bBgBIAEoCRIOCgZhbW91bnQYAiABKAMSGwoEZnJvbRgDIAEoCzINLmFlbGYu",
+            "QWRkcmVzcxIZCgJ0bxgEIAEoCzINLmFlbGYuQWRkcmVzcxITCgt0b19jaGFp",
+            "bl9pZBgFIAEoCRISCgp0b19hZGRyZXNzGAYgASgJEhgKEG1heF9lc3RpbWF0",
+            "ZV9mZWUYByABKAMSDAoEbWVtbxgIIAEoCToEoLsYASJ/ChFUb2tlblBvb2xS",
+            "ZWxlYXNlZBIOCgZzeW1ib2wYASABKAkSDgoGYW1vdW50GAIgASgDEhsKBGZy",
             "b20YAyABKAsyDS5hZWxmLkFkZHJlc3MSGQoCdG8YBCABKAsyDS5hZWxmLkFk",
-            "ZHJlc3MSEwoLdG9fY2hhaW5faWQYBSABKAkSEgoKdG9fYWRkcmVzcxgGIAEo",
-            "CRIYChBtYXhfZXN0aW1hdGVfZmVlGAcgASgDOgSguxgBIn8KEVRva2VuUG9v",
-            "bFJlbGVhc2VkEg4KBnN5bWJvbBgBIAEoCRIOCgZhbW91bnQYAiABKAMSGwoE",
-            "ZnJvbRgDIAEoCzINLmFlbGYuQWRkcmVzcxIZCgJ0bxgEIAEoCzINLmFlbGYu",
-            "QWRkcmVzcxIMCgRtZW1vGAUgASgJOgSguxgBIj4KFlJlbGVhc2VDb250cm9s",
-            "bGVyQWRkZWQSHgoHYWRkcmVzcxgBIAEoCzINLmFlbGYuQWRkcmVzczoEoLsY",
-            "ASJAChhSZWxlYXNlQ29udHJvbGxlclJlbW92ZWQSHgoHYWRkcmVzcxgBIAEo",
-            "CzINLmFlbGYuQWRkcmVzczoEoLsYASLWAQoMVG9rZW5Td2FwcGVkEhEKCXN5",
-            "bWJvbF9pbhgBIAEoCRISCgpzeW1ib2xfb3V0GAIgASgJEhEKCWFtb3VudF9p",
-            "bhgDIAEoAxIfCgphbW91bnRfb3V0GAQgASgLMgsuQW1vdW50c091dBIZCgJ0",
-            "bxgFIAEoCzINLmFlbGYuQWRkcmVzcxIPCgdjaGFubmVsGAYgASgJEhwKCXN3",
-            "YXBfcGF0aBgHIAEoCzIJLlN3YXBQYXRoEhsKBGZyb20YCCABKAsyDS5hZWxm",
-            "LkFkZHJlc3M6BKC7GAEiGAoIU3dhcFBhdGgSDAoEcGF0aBgBIAMoCSIgCgpB",
-            "bW91bnRzT3V0EhIKCmFtb3VudF9vdXQYASADKAMiJgoOVG9rZW5Qb29sQWRk",
-            "ZWQSDgoGc3ltYm9sGAEgASgJOgSguxgBIlEKEFRva2VuSG9sZGVyQWRkZWQS",
-            "DgoGc3ltYm9sGAEgASgJEicKDXRva2VuX2hvbGRlcnMYAiABKAsyEC5Ub2tl",
-            "bkhvbGRlckxpc3Q6BKC7GAEy2wgKEVRva2VuUG9vbENvbnRyYWN0EjgKCklu",
-            "aXRpYWxpemUSEC5Jbml0aWFsaXplSW5wdXQaFi5nb29nbGUucHJvdG9idWYu",
-            "RW1wdHkiABI+Cg1UcmFuc2ZlclRva2VuEhMuVHJhbnNmZXJUb2tlbklucHV0",
-            "GhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5IgASPAoMUmVsZWFzZVRva2VuEhIu",
-            "UmVsZWFzZVRva2VuSW5wdXQaFi5nb29nbGUucHJvdG9idWYuRW1wdHkiABIz",
-            "CghTZXRBZG1pbhINLmFlbGYuQWRkcmVzcxoWLmdvb2dsZS5wcm90b2J1Zi5F",
-            "bXB0eSIAEkIKFEFkZFJlbGVhc2VDb250cm9sbGVyEhAuQ29udHJvbGxlcklu",
-            "cHV0GhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5IgASRQoXUmVtb3ZlUmVsZWFz",
-            "ZUNvbnRyb2xsZXISEC5Db250cm9sbGVySW5wdXQaFi5nb29nbGUucHJvdG9i",
-            "dWYuRW1wdHkiABI0CghXaXRoZHJhdxIOLldpdGhkcmF3SW5wdXQaFi5nb29n",
-            "bGUucHJvdG9idWYuRW1wdHkiABI8CgxBZGRUb2tlblBvb2wSEi5BZGRUb2tl",
-            "blBvb2xJbnB1dBoWLmdvb2dsZS5wcm90b2J1Zi5FbXB0eSIAEkEKD0FkZFRv",
-            "a2VuSG9sZGVycxIULkFkZFRva2VuSG9sZGVySW5wdXQaFi5nb29nbGUucHJv",
-            "dG9idWYuRW1wdHkiABJQChZTZXRTd2FwQ29udHJhY3RBZGRyZXNzEhwuU2V0",
-            "U3dhcENvbnRyYWN0QWRkcmVzc0lucHV0GhYuZ29vZ2xlLnByb3RvYnVmLkVt",
-            "cHR5IgASNgoJU3dhcFRva2VuEg8uU3dhcFRva2VuSW5wdXQaFi5nb29nbGUu",
-            "cHJvdG9idWYuRW1wdHkiABI4CghHZXRBZG1pbhIWLmdvb2dsZS5wcm90b2J1",
-            "Zi5FbXB0eRoNLmFlbGYuQWRkcmVzcyIFiIn3AQESSQoVR2V0UmVsZWFzZUNv",
-            "bnRyb2xsZXJzEhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5GhEuQ29udHJvbGxl",
-            "ck91dHB1dCIFiIn3AQESMgoLR2V0UG9vbEluZm8SES5HZXRQb29sSW5mb0lu",
-            "cHV0GgkuUG9vbEluZm8iBYiJ9wEBEkIKD0dldFN5bWJvbFRva2VucxIWLmdv",
-            "b2dsZS5wcm90b2J1Zi5FbXB0eRoQLlRva2VuU3ltYm9sTGlzdCIFiIn3AQES",
-            "RQoQR2V0U3dhcENvbnRyYWN0cxIbLmdvb2dsZS5wcm90b2J1Zi5JbnQ2NFZh",
-            "bHVlGg0uYWVsZi5BZGRyZXNzIgWIifcBARpJssz2ATRFVHJhbnNmZXIuQ29u",
-            "dHJhY3RzLlRva2VuUG9vbC5Ub2tlblBvb2xDb250cmFjdFN0YXRlysr2AQth",
-            "Y3MxMi5wcm90b0IgqgIdRVRyYW5zZmVyLkNvbnRyYWN0cy5Ub2tlblBvb2xi",
-            "BnByb3RvMw=="));
+            "ZHJlc3MSDAoEbWVtbxgFIAEoCToEoLsYASI+ChZSZWxlYXNlQ29udHJvbGxl",
+            "ckFkZGVkEh4KB2FkZHJlc3MYASABKAsyDS5hZWxmLkFkZHJlc3M6BKC7GAEi",
+            "QAoYUmVsZWFzZUNvbnRyb2xsZXJSZW1vdmVkEh4KB2FkZHJlc3MYASABKAsy",
+            "DS5hZWxmLkFkZHJlc3M6BKC7GAEi6AEKDFRva2VuU3dhcHBlZBIRCglzeW1i",
+            "b2xfaW4YASABKAkSEgoKc3ltYm9sX291dBgCIAEoCRIRCglhbW91bnRfaW4Y",
+            "AyABKAMSHwoKYW1vdW50X291dBgEIAEoCzILLkFtb3VudHNPdXQSGQoCdG8Y",
+            "BSABKAsyDS5hZWxmLkFkZHJlc3MSDwoHY2hhbm5lbBgGIAEoCRIcCglzd2Fw",
+            "X3BhdGgYByABKAsyCS5Td2FwUGF0aBIbCgRmcm9tGAggASgLMg0uYWVsZi5B",
+            "ZGRyZXNzEhAKCGZlZV9yYXRlGAkgASgDOgSguxgBIhgKCFN3YXBQYXRoEgwK",
+            "BHBhdGgYASADKAkiIAoKQW1vdW50c091dBISCgphbW91bnRfb3V0GAEgAygD",
+            "IiYKDlRva2VuUG9vbEFkZGVkEg4KBnN5bWJvbBgBIAEoCToEoLsYASJRChBU",
+            "b2tlbkhvbGRlckFkZGVkEg4KBnN5bWJvbBgBIAEoCRInCg10b2tlbl9ob2xk",
+            "ZXJzGAIgASgLMhAuVG9rZW5Ib2xkZXJMaXN0OgSguxgBMtsIChFUb2tlblBv",
+            "b2xDb250cmFjdBI4CgpJbml0aWFsaXplEhAuSW5pdGlhbGl6ZUlucHV0GhYu",
+            "Z29vZ2xlLnByb3RvYnVmLkVtcHR5IgASPgoNVHJhbnNmZXJUb2tlbhITLlRy",
+            "YW5zZmVyVG9rZW5JbnB1dBoWLmdvb2dsZS5wcm90b2J1Zi5FbXB0eSIAEjwK",
+            "DFJlbGVhc2VUb2tlbhISLlJlbGVhc2VUb2tlbklucHV0GhYuZ29vZ2xlLnBy",
+            "b3RvYnVmLkVtcHR5IgASMwoIU2V0QWRtaW4SDS5hZWxmLkFkZHJlc3MaFi5n",
+            "b29nbGUucHJvdG9idWYuRW1wdHkiABJCChRBZGRSZWxlYXNlQ29udHJvbGxl",
+            "chIQLkNvbnRyb2xsZXJJbnB1dBoWLmdvb2dsZS5wcm90b2J1Zi5FbXB0eSIA",
+            "EkUKF1JlbW92ZVJlbGVhc2VDb250cm9sbGVyEhAuQ29udHJvbGxlcklucHV0",
+            "GhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5IgASNAoIV2l0aGRyYXcSDi5XaXRo",
+            "ZHJhd0lucHV0GhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5IgASPAoMQWRkVG9r",
+            "ZW5Qb29sEhIuQWRkVG9rZW5Qb29sSW5wdXQaFi5nb29nbGUucHJvdG9idWYu",
+            "RW1wdHkiABJBCg9BZGRUb2tlbkhvbGRlcnMSFC5BZGRUb2tlbkhvbGRlcklu",
+            "cHV0GhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5IgASUAoWU2V0U3dhcENvbnRy",
+            "YWN0QWRkcmVzcxIcLlNldFN3YXBDb250cmFjdEFkZHJlc3NJbnB1dBoWLmdv",
+            "b2dsZS5wcm90b2J1Zi5FbXB0eSIAEjYKCVN3YXBUb2tlbhIPLlN3YXBUb2tl",
+            "bklucHV0GhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5IgASOAoIR2V0QWRtaW4S",
+            "Fi5nb29nbGUucHJvdG9idWYuRW1wdHkaDS5hZWxmLkFkZHJlc3MiBYiJ9wEB",
+            "EkkKFUdldFJlbGVhc2VDb250cm9sbGVycxIWLmdvb2dsZS5wcm90b2J1Zi5F",
+            "bXB0eRoRLkNvbnRyb2xsZXJPdXRwdXQiBYiJ9wEBEjIKC0dldFBvb2xJbmZv",
+            "EhEuR2V0UG9vbEluZm9JbnB1dBoJLlBvb2xJbmZvIgWIifcBARJCCg9HZXRT",
+            "eW1ib2xUb2tlbnMSFi5nb29nbGUucHJvdG9idWYuRW1wdHkaEC5Ub2tlblN5",
+            "bWJvbExpc3QiBYiJ9wEBEkUKEEdldFN3YXBDb250cmFjdHMSGy5nb29nbGUu",
+            "cHJvdG9idWYuSW50NjRWYWx1ZRoNLmFlbGYuQWRkcmVzcyIFiIn3AQEaSbLM",
+            "9gE0RVRyYW5zZmVyLkNvbnRyYWN0cy5Ub2tlblBvb2wuVG9rZW5Qb29sQ29u",
+            "dHJhY3RTdGF0ZcrK9gELYWNzMTIucHJvdG9CIKoCHUVUcmFuc2Zlci5Db250",
+            "cmFjdHMuVG9rZW5Qb29sYgZwcm90bzM="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::AElf.Types.CoreReflection.Descriptor, global::AElf.OptionsReflection.Descriptor, global::AElf.Standards.ACS12.Acs12Reflection.Descriptor, global::Google.Protobuf.WellKnownTypes.EmptyReflection.Descriptor, global::Google.Protobuf.WellKnownTypes.TimestampReflection.Descriptor, global::Google.Protobuf.WellKnownTypes.WrappersReflection.Descriptor, },
           new pbr::GeneratedClrTypeInfo(null, null, new pbr::GeneratedClrTypeInfo[] {
             new pbr::GeneratedClrTypeInfo(typeof(global::ETransfer.Contracts.TokenPool.InitializeInput), global::ETransfer.Contracts.TokenPool.InitializeInput.Parser, new[]{ "Admin", "TokenSymbolList" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::ETransfer.Contracts.TokenPool.TransferTokenInput), global::ETransfer.Contracts.TokenPool.TransferTokenInput.Parser, new[]{ "Symbol", "Amount", "ToChainId", "ToAddress", "MaxEstimateFee" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::ETransfer.Contracts.TokenPool.TransferTokenInput), global::ETransfer.Contracts.TokenPool.TransferTokenInput.Parser, new[]{ "Symbol", "Amount", "ToChainId", "ToAddress", "MaxEstimateFee", "Memo" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::ETransfer.Contracts.TokenPool.ReleaseTokenInput), global::ETransfer.Contracts.TokenPool.ReleaseTokenInput.Parser, new[]{ "Symbol", "Amount", "From", "To", "Memo" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::ETransfer.Contracts.TokenPool.ControllerInput), global::ETransfer.Contracts.TokenPool.ControllerInput.Parser, new[]{ "Address" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::ETransfer.Contracts.TokenPool.ControllerOutput), global::ETransfer.Contracts.TokenPool.ControllerOutput.Parser, new[]{ "Addresses" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::ETransfer.Contracts.TokenPool.ControllerList), global::ETransfer.Contracts.TokenPool.ControllerList.Parser, new[]{ "Controllers" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::ETransfer.Contracts.TokenPool.WithdrawInput), global::ETransfer.Contracts.TokenPool.WithdrawInput.Parser, new[]{ "Symbol", "Amount", "VirtualHash" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::ETransfer.Contracts.TokenPool.WithdrawInput), global::ETransfer.Contracts.TokenPool.WithdrawInput.Parser, new[]{ "Symbol", "Amount", "VirtualHash", "Memo" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::ETransfer.Contracts.TokenPool.TokenSymbolList), global::ETransfer.Contracts.TokenPool.TokenSymbolList.Parser, new[]{ "Value" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::ETransfer.Contracts.TokenPool.AddTokenPoolInput), global::ETransfer.Contracts.TokenPool.AddTokenPoolInput.Parser, new[]{ "Symbol" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::ETransfer.Contracts.TokenPool.AddTokenHolderInput), global::ETransfer.Contracts.TokenPool.AddTokenHolderInput.Parser, new[]{ "Symbol", "HolderCount" }, null, null, null, null),
@@ -122,11 +123,11 @@ namespace ETransfer.Contracts.TokenPool {
             new pbr::GeneratedClrTypeInfo(typeof(global::ETransfer.Contracts.TokenPool.PoolInfo), global::ETransfer.Contracts.TokenPool.PoolInfo.Parser, new[]{ "Symbol", "TokenHolders" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::ETransfer.Contracts.TokenPool.TokenHolderList), global::ETransfer.Contracts.TokenPool.TokenHolderList.Parser, new[]{ "Value" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::ETransfer.Contracts.TokenPool.TokenHolder), global::ETransfer.Contracts.TokenPool.TokenHolder.Parser, new[]{ "VirtualHash", "Address" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::ETransfer.Contracts.TokenPool.TokenPoolTransferred), global::ETransfer.Contracts.TokenPool.TokenPoolTransferred.Parser, new[]{ "Symbol", "Amount", "From", "To", "ToChainId", "ToAddress", "MaxEstimateFee" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::ETransfer.Contracts.TokenPool.TokenPoolTransferred), global::ETransfer.Contracts.TokenPool.TokenPoolTransferred.Parser, new[]{ "Symbol", "Amount", "From", "To", "ToChainId", "ToAddress", "MaxEstimateFee", "Memo" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::ETransfer.Contracts.TokenPool.TokenPoolReleased), global::ETransfer.Contracts.TokenPool.TokenPoolReleased.Parser, new[]{ "Symbol", "Amount", "From", "To", "Memo" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::ETransfer.Contracts.TokenPool.ReleaseControllerAdded), global::ETransfer.Contracts.TokenPool.ReleaseControllerAdded.Parser, new[]{ "Address" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::ETransfer.Contracts.TokenPool.ReleaseControllerRemoved), global::ETransfer.Contracts.TokenPool.ReleaseControllerRemoved.Parser, new[]{ "Address" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::ETransfer.Contracts.TokenPool.TokenSwapped), global::ETransfer.Contracts.TokenPool.TokenSwapped.Parser, new[]{ "SymbolIn", "SymbolOut", "AmountIn", "AmountOut", "To", "Channel", "SwapPath", "From" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::ETransfer.Contracts.TokenPool.TokenSwapped), global::ETransfer.Contracts.TokenPool.TokenSwapped.Parser, new[]{ "SymbolIn", "SymbolOut", "AmountIn", "AmountOut", "To", "Channel", "SwapPath", "From", "FeeRate" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::ETransfer.Contracts.TokenPool.SwapPath), global::ETransfer.Contracts.TokenPool.SwapPath.Parser, new[]{ "Path" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::ETransfer.Contracts.TokenPool.AmountsOut), global::ETransfer.Contracts.TokenPool.AmountsOut.Parser, new[]{ "AmountOut" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::ETransfer.Contracts.TokenPool.TokenPoolAdded), global::ETransfer.Contracts.TokenPool.TokenPoolAdded.Parser, new[]{ "Symbol" }, null, null, null, null),
@@ -137,7 +138,7 @@ namespace ETransfer.Contracts.TokenPool {
 
   }
   #region Messages
-  public sealed partial class InitializeInput : pb::IMessage<InitializeInput>
+  internal sealed partial class InitializeInput : pb::IMessage<InitializeInput>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
@@ -381,7 +382,7 @@ namespace ETransfer.Contracts.TokenPool {
 
   }
 
-  public sealed partial class TransferTokenInput : pb::IMessage<TransferTokenInput>
+  internal sealed partial class TransferTokenInput : pb::IMessage<TransferTokenInput>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
@@ -420,6 +421,7 @@ namespace ETransfer.Contracts.TokenPool {
       toChainId_ = other.toChainId_;
       toAddress_ = other.toAddress_;
       maxEstimateFee_ = other.maxEstimateFee_;
+      memo_ = other.memo_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -489,6 +491,18 @@ namespace ETransfer.Contracts.TokenPool {
       }
     }
 
+    /// <summary>Field number for the "memo" field.</summary>
+    public const int MemoFieldNumber = 6;
+    private string memo_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string Memo {
+      get { return memo_; }
+      set {
+        memo_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
@@ -509,6 +523,7 @@ namespace ETransfer.Contracts.TokenPool {
       if (ToChainId != other.ToChainId) return false;
       if (ToAddress != other.ToAddress) return false;
       if (MaxEstimateFee != other.MaxEstimateFee) return false;
+      if (Memo != other.Memo) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -521,6 +536,7 @@ namespace ETransfer.Contracts.TokenPool {
       if (ToChainId.Length != 0) hash ^= ToChainId.GetHashCode();
       if (ToAddress.Length != 0) hash ^= ToAddress.GetHashCode();
       if (MaxEstimateFee != 0L) hash ^= MaxEstimateFee.GetHashCode();
+      if (Memo.Length != 0) hash ^= Memo.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -559,6 +575,10 @@ namespace ETransfer.Contracts.TokenPool {
         output.WriteRawTag(40);
         output.WriteInt64(MaxEstimateFee);
       }
+      if (Memo.Length != 0) {
+        output.WriteRawTag(50);
+        output.WriteString(Memo);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -589,6 +609,10 @@ namespace ETransfer.Contracts.TokenPool {
         output.WriteRawTag(40);
         output.WriteInt64(MaxEstimateFee);
       }
+      if (Memo.Length != 0) {
+        output.WriteRawTag(50);
+        output.WriteString(Memo);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -613,6 +637,9 @@ namespace ETransfer.Contracts.TokenPool {
       }
       if (MaxEstimateFee != 0L) {
         size += 1 + pb::CodedOutputStream.ComputeInt64Size(MaxEstimateFee);
+      }
+      if (Memo.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(Memo);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -640,6 +667,9 @@ namespace ETransfer.Contracts.TokenPool {
       }
       if (other.MaxEstimateFee != 0L) {
         MaxEstimateFee = other.MaxEstimateFee;
+      }
+      if (other.Memo.Length != 0) {
+        Memo = other.Memo;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -674,6 +704,10 @@ namespace ETransfer.Contracts.TokenPool {
           }
           case 40: {
             MaxEstimateFee = input.ReadInt64();
+            break;
+          }
+          case 50: {
+            Memo = input.ReadString();
             break;
           }
         }
@@ -711,6 +745,10 @@ namespace ETransfer.Contracts.TokenPool {
             MaxEstimateFee = input.ReadInt64();
             break;
           }
+          case 50: {
+            Memo = input.ReadString();
+            break;
+          }
         }
       }
     }
@@ -718,7 +756,7 @@ namespace ETransfer.Contracts.TokenPool {
 
   }
 
-  public sealed partial class ReleaseTokenInput : pb::IMessage<ReleaseTokenInput>
+  internal sealed partial class ReleaseTokenInput : pb::IMessage<ReleaseTokenInput>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
@@ -1073,7 +1111,7 @@ namespace ETransfer.Contracts.TokenPool {
 
   }
 
-  public sealed partial class ControllerInput : pb::IMessage<ControllerInput>
+  internal sealed partial class ControllerInput : pb::IMessage<ControllerInput>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
@@ -1271,7 +1309,7 @@ namespace ETransfer.Contracts.TokenPool {
 
   }
 
-  public sealed partial class ControllerOutput : pb::IMessage<ControllerOutput>
+  internal sealed partial class ControllerOutput : pb::IMessage<ControllerOutput>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
@@ -1449,7 +1487,7 @@ namespace ETransfer.Contracts.TokenPool {
 
   }
 
-  public sealed partial class ControllerList : pb::IMessage<ControllerList>
+  internal sealed partial class ControllerList : pb::IMessage<ControllerList>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
@@ -1627,7 +1665,7 @@ namespace ETransfer.Contracts.TokenPool {
 
   }
 
-  public sealed partial class WithdrawInput : pb::IMessage<WithdrawInput>
+  internal sealed partial class WithdrawInput : pb::IMessage<WithdrawInput>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
@@ -1664,6 +1702,7 @@ namespace ETransfer.Contracts.TokenPool {
       symbol_ = other.symbol_;
       amount_ = other.amount_;
       virtualHash_ = other.virtualHash_ != null ? other.virtualHash_.Clone() : null;
+      memo_ = other.memo_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -1709,6 +1748,18 @@ namespace ETransfer.Contracts.TokenPool {
       }
     }
 
+    /// <summary>Field number for the "memo" field.</summary>
+    public const int MemoFieldNumber = 4;
+    private string memo_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string Memo {
+      get { return memo_; }
+      set {
+        memo_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
@@ -1727,6 +1778,7 @@ namespace ETransfer.Contracts.TokenPool {
       if (Symbol != other.Symbol) return false;
       if (Amount != other.Amount) return false;
       if (!object.Equals(VirtualHash, other.VirtualHash)) return false;
+      if (Memo != other.Memo) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -1737,6 +1789,7 @@ namespace ETransfer.Contracts.TokenPool {
       if (Symbol.Length != 0) hash ^= Symbol.GetHashCode();
       if (Amount != 0L) hash ^= Amount.GetHashCode();
       if (virtualHash_ != null) hash ^= VirtualHash.GetHashCode();
+      if (Memo.Length != 0) hash ^= Memo.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -1767,6 +1820,10 @@ namespace ETransfer.Contracts.TokenPool {
         output.WriteRawTag(26);
         output.WriteMessage(VirtualHash);
       }
+      if (Memo.Length != 0) {
+        output.WriteRawTag(34);
+        output.WriteString(Memo);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -1789,6 +1846,10 @@ namespace ETransfer.Contracts.TokenPool {
         output.WriteRawTag(26);
         output.WriteMessage(VirtualHash);
       }
+      if (Memo.Length != 0) {
+        output.WriteRawTag(34);
+        output.WriteString(Memo);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -1807,6 +1868,9 @@ namespace ETransfer.Contracts.TokenPool {
       }
       if (virtualHash_ != null) {
         size += 1 + pb::CodedOutputStream.ComputeMessageSize(VirtualHash);
+      }
+      if (Memo.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(Memo);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -1831,6 +1895,9 @@ namespace ETransfer.Contracts.TokenPool {
           VirtualHash = new global::AElf.Types.Hash();
         }
         VirtualHash.MergeFrom(other.VirtualHash);
+      }
+      if (other.Memo.Length != 0) {
+        Memo = other.Memo;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -1860,6 +1927,10 @@ namespace ETransfer.Contracts.TokenPool {
               VirtualHash = new global::AElf.Types.Hash();
             }
             input.ReadMessage(VirtualHash);
+            break;
+          }
+          case 34: {
+            Memo = input.ReadString();
             break;
           }
         }
@@ -1892,6 +1963,10 @@ namespace ETransfer.Contracts.TokenPool {
             input.ReadMessage(VirtualHash);
             break;
           }
+          case 34: {
+            Memo = input.ReadString();
+            break;
+          }
         }
       }
     }
@@ -1899,7 +1974,7 @@ namespace ETransfer.Contracts.TokenPool {
 
   }
 
-  public sealed partial class TokenSymbolList : pb::IMessage<TokenSymbolList>
+  internal sealed partial class TokenSymbolList : pb::IMessage<TokenSymbolList>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
@@ -2077,7 +2152,7 @@ namespace ETransfer.Contracts.TokenPool {
 
   }
 
-  public sealed partial class AddTokenPoolInput : pb::IMessage<AddTokenPoolInput>
+  internal sealed partial class AddTokenPoolInput : pb::IMessage<AddTokenPoolInput>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
@@ -2266,7 +2341,7 @@ namespace ETransfer.Contracts.TokenPool {
 
   }
 
-  public sealed partial class AddTokenHolderInput : pb::IMessage<AddTokenHolderInput>
+  internal sealed partial class AddTokenHolderInput : pb::IMessage<AddTokenHolderInput>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
@@ -2492,7 +2567,7 @@ namespace ETransfer.Contracts.TokenPool {
 
   }
 
-  public sealed partial class SetSwapContractAddressInput : pb::IMessage<SetSwapContractAddressInput>
+  internal sealed partial class SetSwapContractAddressInput : pb::IMessage<SetSwapContractAddressInput>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
@@ -2670,7 +2745,7 @@ namespace ETransfer.Contracts.TokenPool {
 
   }
 
-  public sealed partial class SwapContract : pb::IMessage<SwapContract>
+  internal sealed partial class SwapContract : pb::IMessage<SwapContract>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
@@ -2905,7 +2980,7 @@ namespace ETransfer.Contracts.TokenPool {
 
   }
 
-  public sealed partial class SwapTokenInput : pb::IMessage<SwapTokenInput>
+  internal sealed partial class SwapTokenInput : pb::IMessage<SwapTokenInput>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
@@ -3369,7 +3444,7 @@ namespace ETransfer.Contracts.TokenPool {
 
   }
 
-  public sealed partial class GetPoolInfoInput : pb::IMessage<GetPoolInfoInput>
+  internal sealed partial class GetPoolInfoInput : pb::IMessage<GetPoolInfoInput>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
@@ -3558,7 +3633,7 @@ namespace ETransfer.Contracts.TokenPool {
 
   }
 
-  public sealed partial class PoolInfo : pb::IMessage<PoolInfo>
+  internal sealed partial class PoolInfo : pb::IMessage<PoolInfo>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
@@ -3773,7 +3848,7 @@ namespace ETransfer.Contracts.TokenPool {
 
   }
 
-  public sealed partial class TokenHolderList : pb::IMessage<TokenHolderList>
+  internal sealed partial class TokenHolderList : pb::IMessage<TokenHolderList>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
@@ -3951,7 +4026,7 @@ namespace ETransfer.Contracts.TokenPool {
 
   }
 
-  public sealed partial class TokenHolder : pb::IMessage<TokenHolder>
+  internal sealed partial class TokenHolder : pb::IMessage<TokenHolder>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
@@ -4198,7 +4273,7 @@ namespace ETransfer.Contracts.TokenPool {
   /// <summary>
   /// event log
   /// </summary>
-  public sealed partial class TokenPoolTransferred : pb::IMessage<TokenPoolTransferred>
+  internal sealed partial class TokenPoolTransferred : pb::IMessage<TokenPoolTransferred>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
@@ -4239,6 +4314,7 @@ namespace ETransfer.Contracts.TokenPool {
       toChainId_ = other.toChainId_;
       toAddress_ = other.toAddress_;
       maxEstimateFee_ = other.maxEstimateFee_;
+      memo_ = other.memo_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -4332,6 +4408,18 @@ namespace ETransfer.Contracts.TokenPool {
       }
     }
 
+    /// <summary>Field number for the "memo" field.</summary>
+    public const int MemoFieldNumber = 8;
+    private string memo_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string Memo {
+      get { return memo_; }
+      set {
+        memo_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
@@ -4354,6 +4442,7 @@ namespace ETransfer.Contracts.TokenPool {
       if (ToChainId != other.ToChainId) return false;
       if (ToAddress != other.ToAddress) return false;
       if (MaxEstimateFee != other.MaxEstimateFee) return false;
+      if (Memo != other.Memo) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -4368,6 +4457,7 @@ namespace ETransfer.Contracts.TokenPool {
       if (ToChainId.Length != 0) hash ^= ToChainId.GetHashCode();
       if (ToAddress.Length != 0) hash ^= ToAddress.GetHashCode();
       if (MaxEstimateFee != 0L) hash ^= MaxEstimateFee.GetHashCode();
+      if (Memo.Length != 0) hash ^= Memo.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -4414,6 +4504,10 @@ namespace ETransfer.Contracts.TokenPool {
         output.WriteRawTag(56);
         output.WriteInt64(MaxEstimateFee);
       }
+      if (Memo.Length != 0) {
+        output.WriteRawTag(66);
+        output.WriteString(Memo);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -4452,6 +4546,10 @@ namespace ETransfer.Contracts.TokenPool {
         output.WriteRawTag(56);
         output.WriteInt64(MaxEstimateFee);
       }
+      if (Memo.Length != 0) {
+        output.WriteRawTag(66);
+        output.WriteString(Memo);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -4482,6 +4580,9 @@ namespace ETransfer.Contracts.TokenPool {
       }
       if (MaxEstimateFee != 0L) {
         size += 1 + pb::CodedOutputStream.ComputeInt64Size(MaxEstimateFee);
+      }
+      if (Memo.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(Memo);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -4521,6 +4622,9 @@ namespace ETransfer.Contracts.TokenPool {
       }
       if (other.MaxEstimateFee != 0L) {
         MaxEstimateFee = other.MaxEstimateFee;
+      }
+      if (other.Memo.Length != 0) {
+        Memo = other.Memo;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -4569,6 +4673,10 @@ namespace ETransfer.Contracts.TokenPool {
           }
           case 56: {
             MaxEstimateFee = input.ReadInt64();
+            break;
+          }
+          case 66: {
+            Memo = input.ReadString();
             break;
           }
         }
@@ -4620,6 +4728,10 @@ namespace ETransfer.Contracts.TokenPool {
             MaxEstimateFee = input.ReadInt64();
             break;
           }
+          case 66: {
+            Memo = input.ReadString();
+            break;
+          }
         }
       }
     }
@@ -4627,7 +4739,7 @@ namespace ETransfer.Contracts.TokenPool {
 
   }
 
-  public sealed partial class TokenPoolReleased : pb::IMessage<TokenPoolReleased>
+  internal sealed partial class TokenPoolReleased : pb::IMessage<TokenPoolReleased>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
@@ -4982,7 +5094,7 @@ namespace ETransfer.Contracts.TokenPool {
 
   }
 
-  public sealed partial class ReleaseControllerAdded : pb::IMessage<ReleaseControllerAdded>
+  internal sealed partial class ReleaseControllerAdded : pb::IMessage<ReleaseControllerAdded>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
@@ -5180,7 +5292,7 @@ namespace ETransfer.Contracts.TokenPool {
 
   }
 
-  public sealed partial class ReleaseControllerRemoved : pb::IMessage<ReleaseControllerRemoved>
+  internal sealed partial class ReleaseControllerRemoved : pb::IMessage<ReleaseControllerRemoved>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
@@ -5378,7 +5490,7 @@ namespace ETransfer.Contracts.TokenPool {
 
   }
 
-  public sealed partial class TokenSwapped : pb::IMessage<TokenSwapped>
+  internal sealed partial class TokenSwapped : pb::IMessage<TokenSwapped>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
@@ -5420,6 +5532,7 @@ namespace ETransfer.Contracts.TokenPool {
       channel_ = other.channel_;
       swapPath_ = other.swapPath_ != null ? other.swapPath_.Clone() : null;
       from_ = other.from_ != null ? other.from_.Clone() : null;
+      feeRate_ = other.feeRate_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -5525,6 +5638,18 @@ namespace ETransfer.Contracts.TokenPool {
       }
     }
 
+    /// <summary>Field number for the "fee_rate" field.</summary>
+    public const int FeeRateFieldNumber = 9;
+    private long feeRate_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public long FeeRate {
+      get { return feeRate_; }
+      set {
+        feeRate_ = value;
+      }
+    }
+
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
@@ -5548,6 +5673,7 @@ namespace ETransfer.Contracts.TokenPool {
       if (Channel != other.Channel) return false;
       if (!object.Equals(SwapPath, other.SwapPath)) return false;
       if (!object.Equals(From, other.From)) return false;
+      if (FeeRate != other.FeeRate) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -5563,6 +5689,7 @@ namespace ETransfer.Contracts.TokenPool {
       if (Channel.Length != 0) hash ^= Channel.GetHashCode();
       if (swapPath_ != null) hash ^= SwapPath.GetHashCode();
       if (from_ != null) hash ^= From.GetHashCode();
+      if (FeeRate != 0L) hash ^= FeeRate.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -5613,6 +5740,10 @@ namespace ETransfer.Contracts.TokenPool {
         output.WriteRawTag(66);
         output.WriteMessage(From);
       }
+      if (FeeRate != 0L) {
+        output.WriteRawTag(72);
+        output.WriteInt64(FeeRate);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -5655,6 +5786,10 @@ namespace ETransfer.Contracts.TokenPool {
         output.WriteRawTag(66);
         output.WriteMessage(From);
       }
+      if (FeeRate != 0L) {
+        output.WriteRawTag(72);
+        output.WriteInt64(FeeRate);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -5688,6 +5823,9 @@ namespace ETransfer.Contracts.TokenPool {
       }
       if (from_ != null) {
         size += 1 + pb::CodedOutputStream.ComputeMessageSize(From);
+      }
+      if (FeeRate != 0L) {
+        size += 1 + pb::CodedOutputStream.ComputeInt64Size(FeeRate);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -5736,6 +5874,9 @@ namespace ETransfer.Contracts.TokenPool {
           From = new global::AElf.Types.Address();
         }
         From.MergeFrom(other.From);
+      }
+      if (other.FeeRate != 0L) {
+        FeeRate = other.FeeRate;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -5794,6 +5935,10 @@ namespace ETransfer.Contracts.TokenPool {
               From = new global::AElf.Types.Address();
             }
             input.ReadMessage(From);
+            break;
+          }
+          case 72: {
+            FeeRate = input.ReadInt64();
             break;
           }
         }
@@ -5855,6 +6000,10 @@ namespace ETransfer.Contracts.TokenPool {
             input.ReadMessage(From);
             break;
           }
+          case 72: {
+            FeeRate = input.ReadInt64();
+            break;
+          }
         }
       }
     }
@@ -5862,7 +6011,7 @@ namespace ETransfer.Contracts.TokenPool {
 
   }
 
-  public sealed partial class SwapPath : pb::IMessage<SwapPath>
+  internal sealed partial class SwapPath : pb::IMessage<SwapPath>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
@@ -6040,7 +6189,7 @@ namespace ETransfer.Contracts.TokenPool {
 
   }
 
-  public sealed partial class AmountsOut : pb::IMessage<AmountsOut>
+  internal sealed partial class AmountsOut : pb::IMessage<AmountsOut>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
@@ -6220,7 +6369,7 @@ namespace ETransfer.Contracts.TokenPool {
 
   }
 
-  public sealed partial class TokenPoolAdded : pb::IMessage<TokenPoolAdded>
+  internal sealed partial class TokenPoolAdded : pb::IMessage<TokenPoolAdded>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
@@ -6409,7 +6558,7 @@ namespace ETransfer.Contracts.TokenPool {
 
   }
 
-  public sealed partial class TokenHolderAdded : pb::IMessage<TokenHolderAdded>
+  internal sealed partial class TokenHolderAdded : pb::IMessage<TokenHolderAdded>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
