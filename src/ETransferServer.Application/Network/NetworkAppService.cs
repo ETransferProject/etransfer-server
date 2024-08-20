@@ -206,10 +206,11 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
         return avgExchange;
     }
 
-    public Task<decimal> GetMinThirdPartFeeAsync(string symbol)
+    public Task<decimal> GetMinThirdPartFeeAsync(string network, string symbol)
     {
-        return Task.FromResult(_withdrawInfoOptions.Value.MinThirdPartFee.ContainsKey(symbol)
-            ? _withdrawInfoOptions.Value.MinThirdPartFee[symbol]
+        var minFeeKey = string.Join(CommonConstant.Underline, network, symbol);
+        return Task.FromResult(_withdrawInfoOptions.Value.MinThirdPartFee.ContainsKey(minFeeKey)
+            ? _withdrawInfoOptions.Value.MinThirdPartFee[minFeeKey]
             : CommonConstant.DefaultConst.DefaultMinThirdPartFee);
     }
 
@@ -267,7 +268,7 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
             }
             else
             {
-                network.WithdrawFee = Math.Max(await GetMinThirdPartFeeAsync(symbol),
+                network.WithdrawFee = Math.Max(await GetMinThirdPartFeeAsync(network.Network, symbol),
                         network.WithdrawFee.SafeToDecimal() *
                         exchange[_coinGeckoOptions.CoinIdMapping[network.WithdrawFeeUnit]].Exchange)
                     .ToString(CommonConstant.DefaultConst.ThirdPartDigitals, await GetDecimalsAsync(chainId, symbol),
@@ -293,7 +294,7 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
             {
                 var avgExchange = await GetAvgExchangeAsync(network.Network, symbol);
 
-                network.WithdrawFee = Math.Max(await GetMinThirdPartFeeAsync(symbol),
+                network.WithdrawFee = Math.Max(await GetMinThirdPartFeeAsync(network.Network, symbol),
                         network.WithdrawFee.SafeToDecimal() * avgExchange)
                     .ToString(CommonConstant.DefaultConst.ThirdPartDigitals, await GetDecimalsAsync(chainId, symbol),
                         DecimalHelper.RoundingOption.Ceiling);

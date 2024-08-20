@@ -257,14 +257,16 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             }
         }
 
-        decimal minFee = -1;
-        long expireAt = -1;
+        var minFee = -1M;
+        var expireAt = -1L;
         foreach (var (network, feeTask) in fees)
         {
             try
             {
                 var fee = await feeTask;
-                minFee = minFee < 0 ? fee.Item1 : Math.Min(fee.Item1, minFee);
+                var minThirdPartFee = await _networkAppService.GetMinThirdPartFeeAsync(network, symbol);
+                var thirdPartFee = Math.Max(fee.Item1, minThirdPartFee);
+                minFee = minFee < 0 ? thirdPartFee : Math.Min(thirdPartFee, minFee);
                 expireAt = fee.Item2;
             }
             catch (Exception e)
@@ -273,9 +275,8 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             }
         }
         
-        var minThirdPartFee = await _networkAppService.GetMinThirdPartFeeAsync(symbol);
         return Tuple.Create(
-            minFee < minThirdPartFee ? minThirdPartFee : minFee,
+            minFee < 0 ? 0M : minFee,
             minFee < 0
                 ? DateTime.Now.ToUtcMilliSeconds() + _withdrawInfoOptions.Value.ThirdPartFeeExpireSeconds * 1000
                 : expireAt
@@ -297,7 +298,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
     private async Task<Tuple<decimal, long>> CalculateThirdPartFeeAsync(Guid userId, string network, string symbol, bool isNotify = true)
     {
         var (estimateFee, coin) = await _networkAppService.CalculateNetworkFeeAsync(network, symbol);
-        estimateFee = Math.Max(estimateFee, await _networkAppService.GetMinThirdPartFeeAsync(symbol));
+        estimateFee = Math.Max(estimateFee, await _networkAppService.GetMinThirdPartFeeAsync(network, symbol));
 
         await SetFeeCacheAsync(userId, network, symbol, estimateFee);
 
