@@ -298,7 +298,7 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
 
         var avgExchange = await GetAvgExchangeAsync(feeSymbol, symbol);
         var estimateFee = coin.AbsEstimateFee.SafeToDecimal() * avgExchange;
-        estimateFee = Math.Max(estimateFee, await GetMinThirdPartFeeAsync(symbol))
+        estimateFee = Math.Max(estimateFee, await GetMinThirdPartFeeAsync(network, symbol))
             .ToString(GetDecimals(symbol), DecimalHelper.RoundingOption.Ceiling).SafeToDecimal();
         return estimateFee;
     }
@@ -352,10 +352,11 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
         return Tuple.Create(withdrawAmount, realFee, false);
     }
     
-    public Task<decimal> GetMinThirdPartFeeAsync(string symbol)
+    public Task<decimal> GetMinThirdPartFeeAsync(string network, string symbol)
     {
-        return Task.FromResult(_withdrawOption.Value.MinThirdPartFee.ContainsKey(symbol)
-            ? _withdrawOption.Value.MinThirdPartFee[symbol]
+        var minFeeKey = ICoBoCoinGrain.Id(network, symbol);
+        return Task.FromResult(_withdrawOption.Value.MinThirdPartFee.ContainsKey(minFeeKey)
+            ? _withdrawOption.Value.MinThirdPartFee[minFeeKey]
             : DefaultMinThirdPartFee);
     }
     
