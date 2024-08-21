@@ -159,6 +159,10 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
                 : feeAmount;
             withdrawInfoDto.MinAmount = Math.Max(minAmount, _withdrawInfoOptions.Value.MinWithdraw)
                 .ToString(2, DecimalHelper.RoundingOption.Ceiling);
+            if (withdrawInfoDto.MinAmount.SafeToDecimal() <= withdrawInfoDto.TransactionFee.SafeToDecimal())
+            {
+                withdrawInfoDto.MinAmount = (withdrawInfoDto.MinAmount.SafeToDecimal() + 0.01M).ToString();
+            }
             withdrawInfoDto.ReceiveAmount = receiveAmount > 0
                 ? receiveAmount.ToString(decimals, DecimalHelper.RoundingOption.Ceiling)
                 : withdrawInfoDto.ReceiveAmount ?? default(int).ToString();
