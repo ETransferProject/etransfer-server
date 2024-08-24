@@ -3,8 +3,6 @@ using Orleans;
 using Orleans.Streams;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Order;
-using ETransferServer.Grains.State.Order;
-using Newtonsoft.Json;
 
 namespace ETransferServer.Grains.Grain.Order.Deposit;
 

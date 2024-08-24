@@ -4,6 +4,7 @@ using Orleans;
 using ETransferServer.Common;
 using ETransferServer.Common.Dtos;
 using ETransferServer.Dtos.Order;
+using ETransferServer.Grains.Options;
 using ETransferServer.Grains.State.Order;
 using ETransferServer.Options;
 using Volo.Abp.ObjectMapping;
@@ -22,14 +23,17 @@ public class UserDepositRecordGrain : Grain<DepositOrderState>, IUserDepositReco
     private readonly IObjectMapper _objectMapper;
     private readonly ILogger<UserDepositRecordGrain> _logger;
     private readonly IOptionsSnapshot<ChainOptions> _chainOptions;
+    private readonly IOptionsSnapshot<WithdrawNetworkOptions> _withdrawNetworkOptions;
 
     public UserDepositRecordGrain(IObjectMapper objectMapper, 
         ILogger<UserDepositRecordGrain> logger, 
-        IOptionsSnapshot<ChainOptions> chainOptions)
+        IOptionsSnapshot<ChainOptions> chainOptions,
+        IOptionsSnapshot<WithdrawNetworkOptions> withdrawNetworkOptions)
     {
         _objectMapper = objectMapper;
         _logger = logger;
         _chainOptions = chainOptions;
+        _withdrawNetworkOptions = withdrawNetworkOptions;
     }
 
     public async Task<CommonResponseDto<DepositOrderDto>> CreateOrUpdateAsync(DepositOrderDto orderDto)
@@ -40,7 +44,22 @@ public class UserDepositRecordGrain : Grain<DepositOrderState>, IUserDepositReco
             var createTime = State.CreateTime ?? DateTime.UtcNow.ToUtcMilliSeconds();
             var arrivalTime = State.ArrivalTime ?? DateTime.UtcNow.AddSeconds(
                 _chainOptions.Value.ChainInfos[orderDto.ToTransfer.ChainId].EstimatedArrivalTime).ToUtcMilliSeconds();
-            
+            if (orderDto.Status == OrderStatusEnum.FromTransferConfirmed.ToString() &&
+                State.Status == OrderStatusEnum.FromTransferring.ToString())
+            {
+                arrivalTime = DateTime.UtcNow.AddSeconds(
+                    _chainOptions.Value.ChainInfos[orderDto.ToTransfer.ChainId].EstimatedArrivalTime).ToUtcMilliSeconds();
+            }
+            if (!State.ArrivalTime.HasValue && orderDto.Status == OrderStatusEnum.FromTransferring.ToString())
+            {
+                var netWorkInfo = _withdrawNetworkOptions.Value.NetworkInfos.FirstOrDefault(t =>
+                    t.Coin.Equals(GuidHelper.GenerateId(orderDto.FromTransfer.Network,
+                        orderDto.FromTransfer.Symbol), StringComparison.OrdinalIgnoreCase));
+                arrivalTime = DateTime.UtcNow.AddSeconds(
+                        _chainOptions.Value.ChainInfos[orderDto.ToTransfer.ChainId].EstimatedArrivalTime)
+                    .AddSeconds(netWorkInfo.EstimatedArrivalTime).ToUtcMilliSeconds();
+            }
+
             _objectMapper.Map(orderDto, State);
             State.Id = this.GetPrimaryKey();
             State.CreateTime = orderDto.CreateTime = createTime;

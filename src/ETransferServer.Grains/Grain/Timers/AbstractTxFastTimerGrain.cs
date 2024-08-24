@@ -7,11 +7,13 @@ using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
 using ETransferServer.Dtos.GraphQL;
 using ETransferServer.Dtos.Order;
+using ETransferServer.Grains.Grain.Order.Withdraw;
 using ETransferServer.Grains.GraphQL;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.State.Order;
 using ETransferServer.Options;
 using Google.Protobuf;
+using NBitcoin;
 using Volo.Abp;
 
 namespace ETransferServer.Grains.Grain.Timers;
@@ -30,6 +32,7 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> 
     private readonly ILogger<AbstractTxFastTimerGrain<TOrder>> _logger;
     private readonly IContractProvider _contractProvider;
     private readonly ITokenTransferProvider _transferProvider;
+    private readonly IUserWithdrawProvider _userWithdrawProvider;
 
     private readonly IOptionsSnapshot<ChainOptions> _chainOptions;
     private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
@@ -37,7 +40,8 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> 
 
     protected AbstractTxFastTimerGrain(ILogger<AbstractTxFastTimerGrain<TOrder>> logger, IContractProvider contractProvider,
         IOptionsSnapshot<ChainOptions> chainOptions, IOptionsSnapshot<TimerOptions> timerOptions, 
-        IOptionsSnapshot<WithdrawOptions> withdrawOptions, ITokenTransferProvider transferProvider)
+        IOptionsSnapshot<WithdrawOptions> withdrawOptions, ITokenTransferProvider transferProvider,
+        IUserWithdrawProvider userWithdrawProvider)
     {
         _logger = logger;
         _contractProvider = contractProvider;
@@ -45,6 +49,7 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> 
         _timerOptions = timerOptions;
         _withdrawOptions = withdrawOptions;
         _transferProvider = transferProvider;
+        _userWithdrawProvider = userWithdrawProvider;
     }
 
 
@@ -127,6 +132,8 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> 
         }
     }
     
+    internal abstract Task SaveOrder(TOrder order);
+    
     internal abstract Task SaveOrder(TOrder order, Dictionary<string, string> externalInfo);
 
     internal abstract Task<TOrder> GetOrder(Guid orderId);
@@ -173,6 +180,10 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> 
             if (!IsTxFastConfirmed(pendingTx, order, indexerTx, chainStatusDict[pendingTx.ChainId]))
             {
                 result[orderId] = false;
+                if (pendingTx.TransferType == TransferTypeEnum.FromTransfer.ToString())
+                {
+                    await SaveOrder(order);
+                }
                 continue;
             }
 
@@ -275,6 +286,11 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> 
             _logger.LogInformation(
                 "TxFastOrderTimer order={OrderId}, txId={TxId}, status={Status}, txHeight={Height}, LIB={Lib}", order.Id,
                 timerTx.TxId, txStatus.Status, txStatus.BlockNumber, chainStatus.LastIrreversibleBlockHeight);
+
+            if (!isToTransfer)
+            {
+                order.ExtensionInfo.AddOrReplace(ExtensionKey.FromConfirmedNum, (chainStatus.BestChainHeight - txStatus.BlockNumber).ToString());
+            }
 
             // pending status, continue waiting
             if (txStatus.Status == CommonConstant.TransactionState.Pending) return false;
@@ -391,6 +407,10 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> 
 
             var indexerHeight = chainStatus.BestChainHeight;
             var txBlockHeight = indexerTx[pendingTx.TxId].BlockHeight;
+            if (pendingTx.TransferType == TransferTypeEnum.FromTransfer.ToString())
+            {
+                order.ExtensionInfo.AddOrReplace(ExtensionKey.FromConfirmedNum, (indexerHeight - txBlockHeight).ToString());
+            }
 
             _logger.LogDebug(
                 "TxFastTimer IsTxFastConfirmed: amount={amount}, symbol={symbol}, amountThreshold={amountThreshold}, " +

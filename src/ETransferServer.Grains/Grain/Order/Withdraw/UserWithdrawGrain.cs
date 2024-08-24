@@ -9,6 +9,7 @@ using ETransferServer.Grains.Grain.Timers;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.Provider;
 using ETransferServer.Options;
+using NBitcoin;
 using Newtonsoft.Json;
 
 namespace ETransferServer.Grains.Grain.Order.Withdraw;
@@ -145,7 +146,25 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         withdrawOrderDto.Id = this.GetPrimaryKey();
         withdrawOrderDto.Status = OrderStatusEnum.Created.ToString();
         withdrawOrderDto.FromTransfer.Network = CommonConstant.Network.AElf;
+        withdrawOrderDto.ExtensionInfo ??= new Dictionary<string, string>();
+        withdrawOrderDto.ExtensionInfo.AddOrReplace(ExtensionKey.FromConfirmingThreshold, GetFromConfirmingThreshold(withdrawOrderDto).ToString());
         return await AddOrUpdateOrder(withdrawOrderDto);
+    }
+
+    private long GetFromConfirmingThreshold(WithdrawOrderDto withdrawOrderDto)
+    {
+        var isAElf = withdrawOrderDto.ToTransfer.Network == CommonConstant.Network.AElf;
+        if (isAElf)
+        {
+            _withdrawOptions.Value.Homogeneous.TryGetValue(withdrawOrderDto.FromTransfer.Symbol, out var threshold);
+            var amountThreshold = threshold?.AmountThreshold ?? 0L;
+            var blockHeightUpperThreshold = threshold?.BlockHeightUpperThreshold ?? 0L;
+            var blockHeightLowerThreshold = threshold?.BlockHeightLowerThreshold ?? 0L;
+            return withdrawOrderDto.FromTransfer.Amount <= amountThreshold
+                ? blockHeightLowerThreshold
+                : blockHeightUpperThreshold;
+        }
+        return _chainOptions.Value.Contract.SafeBlockHeight;
     }
 
     public async Task<WithdrawOrderDto> AddOrUpdateOrder(WithdrawOrderDto orderDto,

@@ -5,6 +5,7 @@ using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Grains.Grain.Order.Deposit;
+using ETransferServer.Grains.Grain.Order.Withdraw;
 using ETransferServer.Grains.GraphQL;
 using ETransferServer.Grains.Options;
 using ETransferServer.Options;
@@ -22,7 +23,8 @@ public class UserDepositTxTimerGrain : AbstractTxTimerGrain<DepositOrderDto>, IU
 
     public UserDepositTxTimerGrain(ILogger<UserDepositTxTimerGrain> logger, IContractProvider contractProvider,
         IOptionsSnapshot<ChainOptions> chainOptions, IOptionsSnapshot<TimerOptions> timerOptions,
-        ITokenTransferProvider transferProvider) : base(logger, contractProvider, chainOptions, timerOptions, transferProvider)
+        ITokenTransferProvider transferProvider, IUserWithdrawProvider userWithdrawProvider) 
+        : base(logger, contractProvider, chainOptions, timerOptions, transferProvider, userWithdrawProvider)
     {
         _logger = logger;
         _timerOptions = timerOptions;
@@ -38,6 +40,10 @@ public class UserDepositTxTimerGrain : AbstractTxTimerGrain<DepositOrderDto>, IU
             TimeSpan.FromSeconds(_timerOptions.Value.DepositTimer.DelaySeconds),
             TimeSpan.FromSeconds(_timerOptions.Value.DepositTimer.PeriodSeconds)
         );
+    }
+    
+    internal override async Task SaveOrder(DepositOrderDto order)
+    {
     }
 
     internal override async Task SaveOrder(DepositOrderDto order, Dictionary<string, string> externalInfo)

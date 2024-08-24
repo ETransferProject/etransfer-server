@@ -13,6 +13,7 @@ using ETransferServer.Grains.State.Order;
 using ETransferServer.ThirdPart.CoBo;
 using ETransferServer.ThirdPart.CoBo.Dtos;
 using ETransferServer.User;
+using NBitcoin;
 using Volo.Abp;
 
 namespace ETransferServer.Grains.Grain.Timers;
@@ -20,7 +21,7 @@ namespace ETransferServer.Grains.Grain.Timers;
 public interface ICoBoDepositQueryTimerGrain : IGrainWithGuidKey
 {
     public Task<DateTime> GetLastCallbackTime();
-
+    Task SaveDepositRecord(CoBoTransactionDto depositOrder);
     Task CreateDepositRecord(CoBoTransactionDto depositOrder);
     Task Remove(string transactionId);
 }
@@ -39,11 +40,13 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
     private readonly IUserAddressService _userAddressService;
 
     private readonly ICoBoProvider _coBoProvider;
+    private readonly IUserDepositProvider _userDepositProvider;
     private IDepositOrderStatusReminderGrain _depositOrderStatusReminderGrain;
 
     public CoBoDepositQueryTimerGrain(ILogger<CoBoDepositQueryTimerGrain> logger,
         IOptionsSnapshot<TimerOptions> timerOptions, 
         ICoBoProvider coBoProvider,
+        IUserDepositProvider userDepositProvider,
         IOptionsSnapshot<DepositOptions> depositOption, 
         IOptionsSnapshot<DepositAddressOptions> depositAddressOption, 
         IOptionsSnapshot<NetworkOptions> networkOption,
@@ -53,6 +56,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         _logger = logger;
         _timerOptions = timerOptions;
         _coBoProvider = coBoProvider;
+        _userDepositProvider = userDepositProvider;
         _depositOption = depositOption;
         _depositAddressOption = depositAddressOption;
         _networkOption = networkOption;
@@ -158,7 +162,8 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
             var userDepositRecordGrain = GrainFactory.GetGrain<IUserDepositRecordGrain>(orderDto.Id);
             var orderExists = await userDepositRecordGrain.GetAsync();
             AssertHelper.IsTrue(orderExists.Success, "Query deposit exists order failed {Msg}", orderExists.Message);
-            AssertHelper.IsNull(orderExists.Data, "Deposit order {OrderId} exists", orderDto.Id);
+            AssertHelper.IsTrue(orderExists.Value == null || orderExists.Value.Status == OrderStatusEnum.FromTransferring.ToString(), 
+                "Deposit order {OrderId} exists", orderDto.Id);
 
             // Save the order, UserDepositGrain will process the database multi-write and put the order into the stream for processing.
             var userDepositGrain = GrainFactory.GetGrain<IUserDepositGrain>(orderDto.Id);
@@ -257,17 +262,19 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
             }
         };
 
-        return SpecialHandle(depositOrderDto, userAddress.ToSymbol, coBoTransaction.Memo);
+        return SpecialHandle(depositOrderDto, coBoTransaction, userAddress.ToSymbol);
     }
 
-    private DepositOrderDto SpecialHandle(DepositOrderDto dto, string symbol, string memo)
+    private DepositOrderDto SpecialHandle(DepositOrderDto dto, CoBoTransactionDto coBoTransaction, string symbol)
     {
         _logger.LogInformation("SpecialHandle, input dto: {dto}", JsonConvert.SerializeObject(dto));
         // Add ExtensionInfo
         dto.ExtensionInfo ??= new Dictionary<string, string>();
-        if (!memo.IsNullOrWhiteSpace())
+        dto.ExtensionInfo.AddOrReplace(ExtensionKey.FromConfirmedNum, coBoTransaction.ConfirmedNum.ToString());
+        dto.ExtensionInfo.AddOrReplace(ExtensionKey.FromConfirmingThreshold, coBoTransaction.TxDetail.ConfirmingThreshold.ToString());
+        if (!coBoTransaction.Memo.IsNullOrWhiteSpace())
         {
-            dto.ExtensionInfo.Add(ExtensionKey.Memo, memo);
+            dto.ExtensionInfo.Add(ExtensionKey.Memo, coBoTransaction.Memo);
         }
         
         if (symbol.IsNullOrEmpty() || _depositOption.Value.NoSwapSymbols.Contains(dto.FromTransfer.Symbol))
@@ -315,6 +322,28 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
     public Task<DateTime> GetLastCallbackTime()
     {
         return Task.FromResult(_lastCallbackTime ?? DateTime.MinValue);
+    }
+
+    public async Task SaveDepositRecord(CoBoTransactionDto coBoTransaction)
+    {
+        _logger.LogInformation("save deposit record, recordInfo:{recordInfo}",
+            JsonConvert.SerializeObject(coBoTransaction));
+        var coBoDepositGrain = GrainFactory.GetGrain<ICoBoDepositGrain>(coBoTransaction.Id);
+        await coBoDepositGrain.AddOrUpdate(coBoTransaction);
+        
+        if (_depositAddressOption.Value.AddressWhiteLists.Contains(coBoTransaction.Address))
+        {
+            _logger.LogInformation("save deposit hit address whiteList: {address}", coBoTransaction.Address);
+            return;
+        }
+
+        var orderDto = await ConvertToDepositOrderDto(coBoTransaction);
+        orderDto.Status = OrderStatusEnum.FromTransferring.ToString();
+        orderDto.FromTransfer.Status = OrderTransferStatusEnum.Transferring.ToString();
+        orderDto.ToTransfer.Status = string.Empty;
+        var userDepositRecordGrain = GrainFactory.GetGrain<IUserDepositRecordGrain>(orderDto.Id);
+        var res = await userDepositRecordGrain.CreateOrUpdateAsync(orderDto);
+        await _userDepositProvider.AddOrUpdateSync(res.Value);
     }
 
     public async Task CreateDepositRecord(CoBoTransactionDto coBoTransaction)

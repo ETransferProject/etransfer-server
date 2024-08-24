@@ -16,6 +16,7 @@ public static class CommonConstant
     public const string WithdrawThirdPartErrorKey = "WithdrawThirdPartError";
     public const string SignatureClientName = "Signature";
     public const string ThirdPartSignUrl = "/api/app/signature/thirdPart";
+    public const string PendingStatus = "pending";
     public const string SuccessStatus = "success";
     public const string Withdraw = "withdraw";
     public const string Deposit = "deposit";
