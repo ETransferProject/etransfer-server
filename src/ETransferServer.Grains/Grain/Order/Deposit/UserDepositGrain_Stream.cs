@@ -3,6 +3,7 @@ using Orleans;
 using Orleans.Streams;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Order;
+using ETransferServer.Etos.Order;
 
 namespace ETransferServer.Grains.Grain.Order.Deposit;
 
@@ -92,6 +93,7 @@ public partial class UserDepositGrain
                 _logger.LogInformation("Order {Id} stream end, current status={Status}", this.GetPrimaryKey(),
                     status.ToString());
                 await HandleDepositQueryGrain(orderDto.ThirdPartOrderId);
+                await _bus.Publish(_objectMapper.Map<DepositOrderDto, OrderChangeEto>(orderDto));
                 // await _orderChangeStream.OnCompletedAsync();
                 break;
 

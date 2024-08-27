@@ -7,5 +7,7 @@ namespace ETransferServer.Order;
 public interface IOrderAppService
 {
     Task<PagedResultDto<OrderIndexDto>> GetOrderRecordListAsync(GetOrderRecordRequestDto request);
+    Task<OrderDetailDto> GetOrderRecordDetailAsync(string id);
+    Task<UserOrderDto> GetUserOrderRecordListAsync(GetUserOrderRecordRequestDto request);
     Task<OrderStatusDto> GetOrderRecordStatusAsync();
 }

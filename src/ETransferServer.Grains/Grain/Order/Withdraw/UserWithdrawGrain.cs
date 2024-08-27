@@ -9,8 +9,10 @@ using ETransferServer.Grains.Grain.Timers;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.Provider;
 using ETransferServer.Options;
+using MassTransit;
 using NBitcoin;
 using Newtonsoft.Json;
+using Volo.Abp.ObjectMapping;
 
 namespace ETransferServer.Grains.Grain.Order.Withdraw;
 
@@ -66,6 +68,8 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
     private readonly IContractProvider _contractProvider;
     private readonly IUserWithdrawProvider _userWithdrawProvider;
     private readonly IOrderStatusFlowProvider _orderStatusFlowProvider;
+    private readonly IObjectMapper _objectMapper;
+    private readonly IBus _bus;
 
     internal JsonSerializerSettings JsonSettings = JsonSettingsBuilder.New()
         .WithAElfTypesConverters()
@@ -79,7 +83,9 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         ILogger<UserWithdrawGrain> logger, IOptionsSnapshot<ChainOptions> chainOptions,
         IOptionsSnapshot<WithdrawOptions> withdrawOptions, IContractProvider contractProvider,
         IOrderStatusFlowProvider orderStatusFlowProvider,
-        IOptionsSnapshot<WithdrawNetworkOptions> withdrawNetworkOptions)
+        IOptionsSnapshot<WithdrawNetworkOptions> withdrawNetworkOptions,
+        IObjectMapper objectMapper, 
+        IBus bus)
     {
         _userWithdrawProvider = userWithdrawProvider;
         _logger = logger;
@@ -88,6 +94,8 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         _contractProvider = contractProvider;
         _orderStatusFlowProvider = orderStatusFlowProvider;
         _withdrawNetworkOptions = withdrawNetworkOptions;
+        _objectMapper = objectMapper;
+        _bus = bus;
     }
 
     public override async Task OnActivateAsync()

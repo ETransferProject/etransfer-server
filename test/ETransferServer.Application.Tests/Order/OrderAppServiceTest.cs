@@ -183,7 +183,21 @@ public class OrderAppServiceTest : ETransferServerApplicationTestBase
                         {
                             Symbol = "USDT",
                             Name = "USDT",
-                            Decimals = 6
+                            Decimals = 6,
+                            Icon = "icon1"
+                        }
+                    }
+                },
+                Deposit = new Dictionary<string, List<TokenConfig>>()
+                {
+                    ["AELF"] = new List<TokenConfig>()
+                    {
+                        new TokenConfig()
+                        {
+                            Symbol = "USDT",
+                            Name = "USDT",
+                            Decimals = 6,
+                            Icon = "icon2"
                         }
                     }
                 },

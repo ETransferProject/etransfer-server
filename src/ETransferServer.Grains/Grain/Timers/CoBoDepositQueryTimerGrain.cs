@@ -5,6 +5,7 @@ using Orleans;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Dtos.User;
+using ETransferServer.Etos.Order;
 using ETransferServer.Grains.Common;
 using ETransferServer.Grains.Grain.Order.Deposit;
 using ETransferServer.Grains.Grain.Users;
@@ -13,8 +14,10 @@ using ETransferServer.Grains.State.Order;
 using ETransferServer.ThirdPart.CoBo;
 using ETransferServer.ThirdPart.CoBo.Dtos;
 using ETransferServer.User;
+using MassTransit;
 using NBitcoin;
 using Volo.Abp;
+using Volo.Abp.ObjectMapping;
 
 namespace ETransferServer.Grains.Grain.Timers;
 
@@ -42,6 +45,8 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
     private readonly ICoBoProvider _coBoProvider;
     private readonly IUserDepositProvider _userDepositProvider;
     private IDepositOrderStatusReminderGrain _depositOrderStatusReminderGrain;
+    private readonly IObjectMapper _objectMapper;
+    private readonly IBus _bus;
 
     public CoBoDepositQueryTimerGrain(ILogger<CoBoDepositQueryTimerGrain> logger,
         IOptionsSnapshot<TimerOptions> timerOptions, 
@@ -51,7 +56,9 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         IOptionsSnapshot<DepositAddressOptions> depositAddressOption, 
         IOptionsSnapshot<NetworkOptions> networkOption,
         IUserAppService userAppService, 
-        IUserAddressService userAddressService)
+        IUserAddressService userAddressService,
+        IObjectMapper objectMapper, 
+        IBus bus)
     {
         _logger = logger;
         _timerOptions = timerOptions;
@@ -62,6 +69,8 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         _networkOption = networkOption;
         _userAppService = userAppService;
         _userAddressService = userAddressService;
+        _objectMapper = objectMapper;
+        _bus = bus;
     }
 
     public override async Task OnActivateAsync()
@@ -164,7 +173,10 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
             AssertHelper.IsTrue(orderExists.Success, "Query deposit exists order failed {Msg}", orderExists.Message);
             AssertHelper.IsTrue(orderExists.Value == null || orderExists.Value.Status == OrderStatusEnum.FromTransferring.ToString(), 
                 "Deposit order {OrderId} exists", orderDto.Id);
-
+            if (orderExists.Value == null)
+            {
+                await _bus.Publish(_objectMapper.Map<DepositOrderDto, OrderChangeEto>(orderDto));
+            }
             // Save the order, UserDepositGrain will process the database multi-write and put the order into the stream for processing.
             var userDepositGrain = GrainFactory.GetGrain<IUserDepositGrain>(orderDto.Id);
             await userDepositGrain.AddOrUpdateOrder(orderDto);
@@ -342,6 +354,11 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         orderDto.FromTransfer.Status = OrderTransferStatusEnum.Transferring.ToString();
         orderDto.ToTransfer.Status = string.Empty;
         var userDepositRecordGrain = GrainFactory.GetGrain<IUserDepositRecordGrain>(orderDto.Id);
+        var recordDto = await userDepositRecordGrain.GetAsync();
+        if (recordDto.Value == null)
+        {
+            await _bus.Publish(_objectMapper.Map<DepositOrderDto, OrderChangeEto>(orderDto));
+        }
         var res = await userDepositRecordGrain.CreateOrUpdateAsync(orderDto);
         await _userDepositProvider.AddOrUpdateSync(res.Value);
     }
