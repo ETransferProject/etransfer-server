@@ -8,15 +8,15 @@ using Volo.Abp.AspNetCore.SignalR;
 
 namespace ETransferServer.Hubs
 {
-    public class ETransferHub : AbpHub
+    public class EtransferHub : AbpHub
     {
         private readonly IOrderAppService _orderAppService;
         private readonly IHubConnectionProvider _hubConnectionProvider;
-        private readonly ILogger<ETransferHub> _logger;
+        private readonly ILogger<EtransferHub> _logger;
 
-        public ETransferHub(IOrderAppService orderAppService,
+        public EtransferHub(IOrderAppService orderAppService,
             IHubConnectionProvider hubConnectionProvider,
-            ILogger<ETransferHub> logger)
+            ILogger<EtransferHub> logger)
         {
             _orderAppService = orderAppService;
             _hubConnectionProvider = hubConnectionProvider;
@@ -36,7 +36,7 @@ namespace ETransferServer.Hubs
             await Clients.Caller.SendAsync("ReceiveUserOrderRecords", records);
         }
 
-        public async Task UnsubscribeUserOrderRecord(string address, long? timestamp)
+        public async Task UnsubscribeUserOrderRecord(string address, long? minTimestamp)
         {
             _hubConnectionProvider.ClearUserConnection(address, Context.ConnectionId);
         }

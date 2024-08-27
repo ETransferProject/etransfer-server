@@ -14,14 +14,14 @@ namespace ETransferServer.Hubs
 {
     public class OrderChangeHandler : IConsumer<OrderChangeEto>, ITransientDependency
     {
-        private readonly IHubContext<ETransferHub> _hubContext;
+        private readonly IHubContext<EtransferHub> _hubContext;
         private readonly IHubConnectionProvider _hubConnectionProvider;
         private readonly IUserAppService _userAppService;
         private readonly IOrderAppService _orderAppService;
         private readonly ILogger<OrderChangeHandler> _logger;
         
         public OrderChangeHandler(IHubConnectionProvider hubConnectionProvider,
-            IHubContext<ETransferHub> hubContext,
+            IHubContext<EtransferHub> hubContext,
             IUserAppService userAppService,
             IOrderAppService orderAppService,
             ILogger<OrderChangeHandler> logger)

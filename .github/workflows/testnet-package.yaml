@@ -12,10 +12,10 @@ jobs:
       matrix:
         servicename:
           [
-            ETransferServer.Silo,
-            ETransferServer.AuthServer,
-            ETransferServer.HttpApi.Host,
-            ETransferServer.SignatureApi.Host
+#            ETransferServer.Silo,
+#            ETransferServer.AuthServer,
+            ETransferServer.HttpApi.Host
+#            ETransferServer.SignatureApi.Host
           ]
     steps:
       - uses: actions/checkout@v4
@@ -36,10 +36,10 @@ jobs:
       matrix:
         servicename:
           [
-            ETransferServer.Silo,
-            ETransferServer.AuthServer,
-            ETransferServer.HttpApi.Host,
-            ETransferServer.SignatureApi.Host
+#            ETransferServer.Silo,
+#            ETransferServer.AuthServer,
+            ETransferServer.HttpApi.Host
+#            ETransferServer.SignatureApi.Host
           ]
     permissions:
       contents: read
