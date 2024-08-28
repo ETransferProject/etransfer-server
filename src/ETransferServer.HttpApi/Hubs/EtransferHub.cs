@@ -23,24 +23,20 @@ namespace ETransferServer.Hubs
             _logger = logger;
         }
 
-        public async Task RequestUserOrderRecord(string address, long? minTimestamp)
+        public async Task RequestUserOrderRecord(GetUserOrderRecordRequestDto input)
         {
             _logger.LogInformation("RequestUserOrderRecord address: {address}, connectionId: {connectionId}",
-                address, Context.ConnectionId);
-            _hubConnectionProvider.AddUserConnection(address, Context.ConnectionId);
-            var records = await _orderAppService.GetUserOrderRecordListAsync(new GetUserOrderRecordRequestDto
-            {
-                Address = address,
-                MinTimestamp = minTimestamp
-            });
+                input.Address, Context.ConnectionId);
+            _hubConnectionProvider.AddUserConnection(input.Address, Context.ConnectionId);
+            var records = await _orderAppService.GetUserOrderRecordListAsync(input);
             _logger.LogInformation("RequestUserOrderRecord address: {address}, minTimestamp: {MinTimestamp}",
-                address, minTimestamp);
+                input.Address, input.MinTimestamp);
             await Clients.Caller.SendAsync("ReceiveUserOrderRecords", records);
         }
 
-        public async Task UnsubscribeUserOrderRecord(string address, long? minTimestamp)
+        public async Task UnsubscribeUserOrderRecord(GetUserOrderRecordRequestDto input)
         {
-            _hubConnectionProvider.ClearUserConnection(address, Context.ConnectionId);
+            _hubConnectionProvider.ClearUserConnection(input.Address, Context.ConnectionId);
         }
 
         public override async Task OnDisconnectedAsync(Exception? exception)
