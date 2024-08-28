@@ -122,6 +122,8 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
             {
                 var txIds = subList.Select(t => t.Value.TxId).Distinct().ToList();
                 var pager = await _transferProvider.GetTokenTransferInfoByTxIdsAsync(txIds, libHeight);
+                _logger.LogDebug("TxTimer gql txIds={txIds}, libHeight={Height}, count={count}", 
+                    string.Join(CommonConstant.Comma, txIds), libHeight, pager.TotalCount);
                 var indexerTxDict = pager.Items.ToDictionary(t => t.TransactionId, t => t);
                 var handleResult = await HandlePage(subList, chainStatus, indexerLatestHeight, indexerTxDict);
                 foreach (var (orderId, remove) in handleResult)

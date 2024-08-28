@@ -283,7 +283,9 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         // Add ExtensionInfo
         dto.ExtensionInfo ??= new Dictionary<string, string>();
         dto.ExtensionInfo.AddOrReplace(ExtensionKey.FromConfirmedNum, coBoTransaction.ConfirmedNum.ToString());
-        dto.ExtensionInfo.AddOrReplace(ExtensionKey.FromConfirmingThreshold, coBoTransaction.TxDetail.ConfirmingThreshold.ToString());
+        dto.ExtensionInfo.AddOrReplace(ExtensionKey.FromConfirmingThreshold, coBoTransaction.ConfirmingThreshold > 0
+            ? coBoTransaction.ConfirmingThreshold.ToString()
+            : coBoTransaction.TxDetail.ConfirmingThreshold.ToString());
         if (!coBoTransaction.Memo.IsNullOrWhiteSpace())
         {
             dto.ExtensionInfo.Add(ExtensionKey.Memo, coBoTransaction.Memo);

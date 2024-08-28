@@ -12,7 +12,7 @@ jobs:
       matrix:
         servicename:
           [
-#            ETransferServer.Silo,
+            ETransferServer.Silo,
 #            ETransferServer.AuthServer,
             ETransferServer.HttpApi.Host
 #            ETransferServer.SignatureApi.Host
@@ -36,7 +36,7 @@ jobs:
       matrix:
         servicename:
           [
-#            ETransferServer.Silo,
+            ETransferServer.Silo,
 #            ETransferServer.AuthServer,
             ETransferServer.HttpApi.Host
 #            ETransferServer.SignatureApi.Host

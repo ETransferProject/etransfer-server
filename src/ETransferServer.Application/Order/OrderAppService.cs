@@ -6,6 +6,7 @@ using AElf.Indexing.Elasticsearch;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Entities;
+using ETransferServer.Grains.Grain.Token;
 using ETransferServer.Grains.Grain.Users;
 using ETransferServer.Network;
 using ETransferServer.Options;
@@ -395,6 +396,39 @@ public class OrderAppService : ApplicationService, IOrderAppService
             orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.FromConfirmedNum))
             detailDto.Step.FromTransfer.ConfirmedNum =
                 int.Parse(orderIndex.ExtensionInfo[ExtensionKey.FromConfirmedNum]);
+        if (orderIndex.OrderType == OrderTypeEnum.Deposit.ToString() && detailDto.Step.FromTransfer.ConfirmingThreshold == 0)
+        {
+            if (orderIndex.FromTransfer.Status == OrderTransferStatusEnum.Confirmed.ToString()
+                || orderIndex.FromTransfer.Status == OrderTransferStatusEnum.Transferring.ToString()
+                || orderIndex.FromTransfer.Status == OrderTransferStatusEnum.Transferred.ToString())
+            {
+                var coBoCoinGrain =
+                    _clusterClient.GetGrain<ICoBoCoinGrain>(ICoBoCoinGrain.Id(orderIndex.FromTransfer.Network,
+                        orderIndex.FromTransfer.Symbol));
+                detailDto.Step.FromTransfer.ConfirmingThreshold = await coBoCoinGrain.GetConfirmingThreshold();
+            }
+        }
+        else if (orderIndex.OrderType == OrderTypeEnum.Withdraw.ToString() &&
+                 detailDto.Step.FromTransfer.ConfirmingThreshold == 0)
+        {
+            if (orderIndex.FromTransfer.Status == OrderTransferStatusEnum.Confirmed.ToString()
+                || orderIndex.FromTransfer.Status == OrderTransferStatusEnum.Transferring.ToString()
+                || orderIndex.FromTransfer.Status == OrderTransferStatusEnum.Transferred.ToString())
+            {
+                var coBoCoinGrain =
+                    _clusterClient.GetGrain<ICoBoCoinGrain>(ICoBoCoinGrain.Id(orderIndex.FromTransfer.Network,
+                        orderIndex.FromTransfer.Symbol));
+                detailDto.Step.FromTransfer.ConfirmingThreshold =
+                    await coBoCoinGrain.GetHomogeneousConfirmingThreshold(orderIndex.FromTransfer.Amount);
+            }
+        }
+
+        if (orderIndex.FromTransfer.Status == OrderTransferStatusEnum.Confirmed.ToString()
+            && detailDto.Step.FromTransfer.ConfirmedNum < detailDto.Step.FromTransfer.ConfirmingThreshold)
+        {
+            detailDto.Step.FromTransfer.ConfirmedNum = detailDto.Step.FromTransfer.ConfirmingThreshold;
+        }
+
         if (detailDto.Step.FromTransfer.ConfirmedNum > detailDto.Step.FromTransfer.ConfirmingThreshold)
             detailDto.Step.FromTransfer.ConfirmedNum = detailDto.Step.FromTransfer.ConfirmingThreshold;
 

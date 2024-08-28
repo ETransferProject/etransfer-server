@@ -11,11 +11,11 @@ namespace ETransferServer.Hubs
     public class EtransferHub : AbpHub
     {
         private readonly IOrderAppService _orderAppService;
-        private readonly IHubConnectionProvider _hubConnectionProvider;
+        private readonly IEtransferHubConnectionProvider _hubConnectionProvider;
         private readonly ILogger<EtransferHub> _logger;
 
         public EtransferHub(IOrderAppService orderAppService,
-            IHubConnectionProvider hubConnectionProvider,
+            IEtransferHubConnectionProvider hubConnectionProvider,
             ILogger<EtransferHub> logger)
         {
             _orderAppService = orderAppService;
@@ -25,6 +25,8 @@ namespace ETransferServer.Hubs
 
         public async Task RequestUserOrderRecord(string address, long? minTimestamp)
         {
+            _logger.LogInformation("RequestUserOrderRecord address: {address}, connectionId: {connectionId}",
+                address, Context.ConnectionId);
             _hubConnectionProvider.AddUserConnection(address, Context.ConnectionId);
             var records = await _orderAppService.GetUserOrderRecordListAsync(new GetUserOrderRecordRequestDto
             {

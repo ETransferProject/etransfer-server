@@ -3,7 +3,7 @@ using Volo.Abp.DependencyInjection;
 
 namespace ETransferServer.Hubs
 {
-    public interface IHubConnectionProvider
+    public interface IEtransferHubConnectionProvider
     {
         void AddUserConnection(string address, string connectionId);
         string GetUserConnection(string address);
@@ -11,7 +11,7 @@ namespace ETransferServer.Hubs
         void ClearUserConnection(string connectionId);
     }
     
-    public class HubConnectionProvider : IHubConnectionProvider, ISingletonDependency
+    public class EtransferHubConnectionProvider : IEtransferHubConnectionProvider, ISingletonDependency
     {
         private readonly ConcurrentDictionary<string, string> _userConnections = new();
         private readonly ConcurrentDictionary<string, string> _userConnectionIds = new();
