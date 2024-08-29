@@ -6,5 +6,5 @@ public class GetUserOrderRecordRequestDto
 {
     [Required]
     public string Address { get; set; }
-    public long? MinTimestamp { get; set; }
+    public long? Time { get; set; }
 }

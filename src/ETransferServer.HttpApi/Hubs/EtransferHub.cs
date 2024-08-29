@@ -1,9 +1,11 @@
 using System;
 using System.Threading.Tasks;
 using ETransferServer.Dtos.Order;
+using ETransferServer.Grains.Grain.Users;
 using ETransferServer.Order;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
+using Orleans;
 using Volo.Abp.AspNetCore.SignalR;
 
 namespace ETransferServer.Hubs
@@ -12,25 +14,28 @@ namespace ETransferServer.Hubs
     {
         private readonly IOrderAppService _orderAppService;
         private readonly IEtransferHubConnectionProvider _hubConnectionProvider;
+        private readonly IClusterClient _clusterClient;
         private readonly ILogger<EtransferHub> _logger;
 
         public EtransferHub(IOrderAppService orderAppService,
             IEtransferHubConnectionProvider hubConnectionProvider,
+            IClusterClient clusterClient,
             ILogger<EtransferHub> logger)
         {
             _orderAppService = orderAppService;
             _hubConnectionProvider = hubConnectionProvider;
+            _clusterClient = clusterClient;
             _logger = logger;
         }
 
         public async Task RequestUserOrderRecord(GetUserOrderRecordRequestDto input)
         {
-            _logger.LogInformation("RequestUserOrderRecord address: {address}, connectionId: {connectionId}",
-                input.Address, Context.ConnectionId);
+            _logger.LogInformation("RequestUserOrderRecord address: {address}, time: {time}, " +
+                                   "connectionId: {connectionId}", input.Address, input.Time, Context.ConnectionId);
             _hubConnectionProvider.AddUserConnection(input.Address, Context.ConnectionId);
+            var orderChangeGrain = _clusterClient.GetGrain<IUserOrderChangeGrain>(input.Address);
+            await orderChangeGrain.AddOrUpdate(input.Time);
             var records = await _orderAppService.GetUserOrderRecordListAsync(input);
-            _logger.LogInformation("RequestUserOrderRecord address: {address}, minTimestamp: {MinTimestamp}",
-                input.Address, input.MinTimestamp);
             await Clients.Caller.SendAsync("ReceiveUserOrderRecords", records);
         }
 

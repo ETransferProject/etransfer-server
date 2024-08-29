@@ -186,10 +186,11 @@ public class OrderAppService : ApplicationService, IOrderAppService
             mustQuery.Add(q => q.Term(i =>
                 i.Field(f => f.UserId).Value(userDto.UserId.ToString())));
 
-            if (request.MinTimestamp.HasValue && request.MinTimestamp.Value > 0)
+            if (request.Time.HasValue && request.Time.Value > 0)
             {
                 mustQuery.Add(q => q.Range(i =>
-                    i.Field(f => f.CreateTime).GreaterThanOrEquals(request.MinTimestamp.Value)));
+                    i.Field(f => f.CreateTime)
+                        .GreaterThanOrEquals(DateTime.UtcNow.AddHours(-1 * request.Time.Value).ToUtcMilliSeconds())));
             }
             else
             {
@@ -208,8 +209,8 @@ public class OrderAppService : ApplicationService, IOrderAppService
         }
         catch (Exception e)
         {
-            _logger.LogError(e, "Get user order record list failed, address={Address}, minTimestamp=" +
-                                "{MinTimestamp}", request.Address, request.MinTimestamp);
+            _logger.LogError(e, "Get user order record list failed, address={Address}, time=" +
+                                "{Time}", request.Address, request.Time);
             return userOrderDto;
         }
     }
@@ -396,7 +397,8 @@ public class OrderAppService : ApplicationService, IOrderAppService
             orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.FromConfirmedNum))
             detailDto.Step.FromTransfer.ConfirmedNum =
                 int.Parse(orderIndex.ExtensionInfo[ExtensionKey.FromConfirmedNum]);
-        if (orderIndex.OrderType == OrderTypeEnum.Deposit.ToString() && detailDto.Step.FromTransfer.ConfirmingThreshold == 0)
+        if (orderIndex.OrderType == OrderTypeEnum.Deposit.ToString() &&
+            detailDto.Step.FromTransfer.ConfirmingThreshold == 0)
         {
             if (orderIndex.FromTransfer.Status == OrderTransferStatusEnum.Confirmed.ToString()
                 || orderIndex.FromTransfer.Status == OrderTransferStatusEnum.Transferring.ToString()

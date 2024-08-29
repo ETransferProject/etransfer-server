@@ -2,12 +2,14 @@ using System.Linq;
 using System.Threading.Tasks;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Etos.Order;
+using ETransferServer.Grains.Grain.Users;
 using ETransferServer.Order;
 using ETransferServer.User;
 using MassTransit;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
+using Orleans;
 using Volo.Abp.DependencyInjection;
 
 namespace ETransferServer.Hubs
@@ -18,18 +20,21 @@ namespace ETransferServer.Hubs
         private readonly IEtransferHubConnectionProvider _hubConnectionProvider;
         private readonly IUserAppService _userAppService;
         private readonly IOrderAppService _orderAppService;
+        private readonly IClusterClient _clusterClient;
         private readonly ILogger<OrderChangeHandler> _logger;
         
         public OrderChangeHandler(IEtransferHubConnectionProvider hubConnectionProvider,
             IHubContext<EtransferHub> hubContext,
             IUserAppService userAppService,
             IOrderAppService orderAppService,
+            IClusterClient clusterClient,
             ILogger<OrderChangeHandler> logger)
         {
             _hubConnectionProvider = hubConnectionProvider;
             _hubContext = hubContext;
             _userAppService = userAppService;
             _orderAppService = orderAppService;
+            _clusterClient = clusterClient;
             _logger = logger;
         }
 
@@ -37,17 +42,21 @@ namespace ETransferServer.Hubs
         {
             var userDto = await _userAppService.GetUserByIdAsync(eventData.Message.UserId.ToString());
             var address = userDto?.AddressInfos?.FirstOrDefault()?.Address;
-            _logger.LogInformation("OrderChangeHandler, userId: {userId}, address: {address}", 
+            _logger.LogInformation("OrderChangeHandler, userId: {userId}, address: {address}",
                 eventData.Message.UserId, address);
             if (address.IsNullOrEmpty()) return;
             var connectionId = _hubConnectionProvider.GetUserConnection(address);
             _logger.LogInformation("OrderChangeHandler, connectionId: {connectionId}", connectionId);
             if (connectionId.IsNullOrEmpty()) return;
-            await _hubContext.Clients.Client(connectionId).SendAsync("ReceiveUserOrderRecords", 
+            var orderChangeGrain = _clusterClient.GetGrain<IUserOrderChangeGrain>(address);
+            var time = await orderChangeGrain.Get();
+            _logger.LogInformation("OrderChangeHandler, address: {address}, time: {time}", address, time);
+            await _hubContext.Clients.Client(connectionId).SendAsync("ReceiveUserOrderRecords",
                 await _orderAppService.GetUserOrderRecordListAsync(new GetUserOrderRecordRequestDto
-            {
-                Address = address
-            }));
+                {
+                    Address = address,
+                    Time = time
+                }));
         }
     }
 }
