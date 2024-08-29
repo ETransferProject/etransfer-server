@@ -70,6 +70,7 @@ namespace ETransferServer
             Configure<WithdrawInfoOptions>(configuration.GetSection("WithdrawInfo"));
             Configure<CoinGeckoOptions>(configuration.GetSection("CoinGecko"));
             Configure<CoBoOptions>(configuration.GetSection("CoBo"));
+            Configure<HubOptions>(configuration.GetSection("Hub"));
             Configure<SwapInfosOptions>(configuration.GetSection("SwapInfos"));
 
             ConfigureConventionalControllers();

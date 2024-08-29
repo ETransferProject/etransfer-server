@@ -17,13 +17,13 @@ namespace ETransferServer.Hubs
     public class OrderChangeHandler : IConsumer<OrderChangeEto>, ITransientDependency
     {
         private readonly IHubContext<EtransferHub> _hubContext;
-        private readonly IEtransferHubConnectionProvider _hubConnectionProvider;
+        private readonly IHubConnectionProvider _hubConnectionProvider;
         private readonly IUserAppService _userAppService;
         private readonly IOrderAppService _orderAppService;
         private readonly IClusterClient _clusterClient;
         private readonly ILogger<OrderChangeHandler> _logger;
         
-        public OrderChangeHandler(IEtransferHubConnectionProvider hubConnectionProvider,
+        public OrderChangeHandler(IHubConnectionProvider hubConnectionProvider,
             IHubContext<EtransferHub> hubContext,
             IUserAppService userAppService,
             IOrderAppService orderAppService,
@@ -45,7 +45,7 @@ namespace ETransferServer.Hubs
             _logger.LogInformation("OrderChangeHandler, userId: {userId}, address: {address}",
                 eventData.Message.UserId, address);
             if (address.IsNullOrEmpty()) return;
-            var connectionId = _hubConnectionProvider.GetUserConnection(address);
+            var connectionId = await _hubConnectionProvider.GetUserConnection(address);
             _logger.LogInformation("OrderChangeHandler, connectionId: {connectionId}", connectionId);
             if (connectionId.IsNullOrEmpty()) return;
             var orderChangeGrain = _clusterClient.GetGrain<IUserOrderChangeGrain>(address);

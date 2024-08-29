@@ -59,6 +59,8 @@ public class ETransferServerHttpApiModule : AbpModule
                 });
             });
         });
+        context.Services.AddSignalR().AddStackExchangeRedis(configuration["Redis:Configuration"],
+            options => { options.Configuration.ChannelPrefix = "ETransferServer"; });
     }
 
     private void ConfigureLocalization()

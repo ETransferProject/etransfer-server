@@ -1,5 +1,4 @@
 using System.Threading;
-using CAServer;
 
 namespace ETransferServer.Common;
 
