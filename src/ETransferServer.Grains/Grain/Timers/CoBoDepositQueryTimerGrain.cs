@@ -188,6 +188,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
             if (await coBoDepositGrain.NotUpdated())
             {
                 await AddCheckDepositOrder(GuidHelper.GenerateCombinedId(coBoTransaction.Id, GetAlarmTemplate(e)));
+                await Remove(coBoTransaction.Id);
             }
 
             _logger.LogError(e,
@@ -233,14 +234,15 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         var user = await _userAppService.GetUserByIdAsync(userAddress.UserId);
         AssertHelper.NotNull(user, "user empty");
 
-        var addressInfo = user.AddressInfos.First(t => t.ChainId == userAddress.ChainId);
+        var addressInfo = user.AddressInfos.FirstOrDefault(t => t.ChainId == userAddress.ChainId);
+        if (addressInfo == null) addressInfo = user.AddressInfos.FirstOrDefault();
         AssertHelper.NotNull(addressInfo, "addressInfo empty");
 
         var paymentAddressExists =
-            _depositOption.Value.PaymentAddresses?.ContainsKey(addressInfo.ChainId) ?? false;
-        AssertHelper.IsTrue(paymentAddressExists, "Payment address missing, ChainId={ChainId}", addressInfo.ChainId);
-        var paymentAddressDic = _depositOption.Value.PaymentAddresses.GetValueOrDefault(addressInfo.ChainId);
-        AssertHelper.NotEmpty(paymentAddressDic, "Payment address empty, ChainId={ChainId}", addressInfo.ChainId);
+            _depositOption.Value.PaymentAddresses?.ContainsKey(userAddress.ChainId) ?? false;
+        AssertHelper.IsTrue(paymentAddressExists, "Payment address missing, ChainId={ChainId}", userAddress.ChainId);
+        var paymentAddressDic = _depositOption.Value.PaymentAddresses.GetValueOrDefault(userAddress.ChainId);
+        AssertHelper.NotEmpty(paymentAddressDic, "Payment address empty, ChainId={ChainId}", userAddress.ChainId);
         
         var depositOrderDto = new DepositOrderDto
         {
@@ -267,7 +269,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
                 FromAddress = GetPaymentAddress(paymentAddressDic, coinInfo.Symbol),
                 ToAddress = addressInfo.Address,
                 Network = CommonConstant.Network.AElf,
-                ChainId = addressInfo.ChainId,
+                ChainId = userAddress.ChainId,
                 Symbol = coinInfo.Symbol,
                 Amount = coBoTransaction.AbsAmount.SafeToDecimal(),
                 Status = OrderTransferStatusEnum.Created.ToString(),
