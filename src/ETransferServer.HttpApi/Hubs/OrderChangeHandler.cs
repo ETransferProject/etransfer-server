@@ -48,18 +48,23 @@ namespace ETransferServer.Hubs
             if (address.IsNullOrEmpty()) return;
             var connectionIds = await _hubConnectionProvider.GetUserConnections(address);
             if (connectionIds.IsNullOrEmpty()) return;
-            _logger.LogInformation("OrderChangeHandler, connectionIds: {connectionIds}", string.Join(CommonConstant.Comma, connectionIds));
+            _logger.LogInformation("OrderChangeHandler, connectionIds: {connectionIds}",
+                string.Join(CommonConstant.Comma, connectionIds));
             var orderChangeGrain = _clusterClient.GetGrain<IUserOrderChangeGrain>(address);
             var time = await orderChangeGrain.Get();
-            _logger.LogInformation("OrderChangeHandler, address: {address}, time: {time}", address, time);
+            var result = await _orderAppService.GetUserOrderRecordListAsync(new GetUserOrderRecordRequestDto
+            {
+                Address = address,
+                Time = time
+            });
+            _logger.LogInformation(
+                "OrderChangeHandler, address: {address}, time: {time}, pending: {depositCount1},{withdrawCount1}, success: {depositCount2},{withdrawCount2}, fail: {depositCount3},{withdrawCount3}",
+                address, time, result?.Processing.DepositCount, result?.Processing.WithdrawCount,
+                result?.Succeed.DepositCount, result?.Succeed.WithdrawCount, result?.Failed.DepositCount,
+                result.Failed.WithdrawCount);
             foreach (var connectionId in connectionIds)
             {
-                await _hubContext.Clients.Client(connectionId).SendAsync("ReceiveUserOrderRecords",
-                    await _orderAppService.GetUserOrderRecordListAsync(new GetUserOrderRecordRequestDto
-                    {
-                        Address = address,
-                        Time = time
-                    }));
+                await _hubContext.Clients.Client(connectionId).SendAsync("ReceiveUserOrderRecords", result);
             }
         }
     }
