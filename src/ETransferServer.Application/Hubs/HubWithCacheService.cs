@@ -33,7 +33,7 @@ public class HubWithCacheService : IHubWithCacheService, ISingletonDependency
             hubDto.ConnectionIds.Add(connectionId);
         if (hubDto.ConnectionIds.Count > _options.HubLimit)
             hubDto.ConnectionIds.RemoveAt(0);
-        hubDto.ExpireTime = DateTimeOffset.UtcNow.AddDays(_options.ExpireDays).ToUnixTimeMilliseconds();
+        hubDto.ExpireTime = DateTimeOffset.UtcNow.AddDays(_options.ExpireDays).ToUnixTimeSeconds();
         await _cacheProvider.Set(GetKey(clientId), Serialize(hubDto), TimeSpan.FromDays(_options.ExpireDays));
     }
 
@@ -53,7 +53,7 @@ public class HubWithCacheService : IHubWithCacheService, ISingletonDependency
         if (hubDto == null) return;
         hubDto.ConnectionIds.Remove(connectionId);
         if (hubDto.ConnectionIds.Count > 0)
-            await _cacheProvider.Set(GetKey(clientId), Serialize(hubDto), TimeSpan.FromMilliseconds(hubDto.ExpireTime));
+            await _cacheProvider.Set(GetKey(clientId), Serialize(hubDto), TimeSpan.FromSeconds(hubDto.ExpireTime - DateTimeOffset.UtcNow.ToUnixTimeSeconds()));
         else await _cacheProvider.Delete(GetKey(clientId));
     }
 
