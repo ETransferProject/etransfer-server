@@ -41,13 +41,15 @@ namespace ETransferServer.Hubs
 
         public async Task UnsubscribeUserOrderRecord(GetUserOrderRecordRequestDto input)
         {
+            _logger.LogInformation("UnsubscribeUserOrderRecord address: {address}, connectionId: {connectionId}",
+                input.Address, Context.ConnectionId);
             await _hubConnectionProvider.ClearUserConnection(input.Address, Context.ConnectionId);
         }
 
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
-            await _hubConnectionProvider.ClearUserConnection(Context.ConnectionId);
             _logger.LogInformation("OnDisconnectedAsync connectionId: {connectionId}", Context.ConnectionId);
+            await _hubConnectionProvider.ClearUserConnection(Context.ConnectionId);
             await base.OnDisconnectedAsync(exception);
         }
     }

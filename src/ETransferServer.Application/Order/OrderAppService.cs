@@ -463,7 +463,8 @@ public class OrderAppService : ApplicationService, IOrderAppService
             {
                 detailDto.Step.CurrentStep = 1;
             }
-            else if (detailDto.ToTransfer.Status == OrderStatusResponseEnum.Processing.ToString())
+            else if (detailDto.ToTransfer.Status.IsNullOrEmpty() ||
+                     detailDto.ToTransfer.Status == OrderStatusResponseEnum.Processing.ToString())
             {
                 detailDto.Step.CurrentStep = 2;
             }

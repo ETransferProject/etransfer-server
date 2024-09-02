@@ -83,6 +83,7 @@ namespace ETransferServer
             ConfigureSwaggerServices(context, configuration);
             ConfigureTokenCleanupService();
             ConfigureOrleans(context, configuration);
+            ConfigureHub(context, configuration);
             ConfigureGraphQl(context, configuration);
             context.Services.AddAutoResponseWrapper();
             ConfigureAuthentication(context, configuration);
@@ -253,6 +254,13 @@ namespace ETransferServer
                     .ConfigureLogging(builder => builder.AddProvider(o.GetService<ILoggerProvider>()))
                     .Build();
             });
+        }
+        
+        private void ConfigureHub(ServiceConfigurationContext context,
+            IConfiguration configuration)
+        {
+            var multiplexer = ConnectionMultiplexer.Connect(configuration["Redis:Configuration"]);
+            context.Services.AddSingleton<IConnectionMultiplexer>(multiplexer);
         }
 
         private void ConfigureGraphQl(ServiceConfigurationContext context,
