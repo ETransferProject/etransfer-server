@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Volo.Abp.DependencyInjection;
 
@@ -6,7 +7,7 @@ namespace ETransferServer.Hubs
     public interface IHubConnectionProvider
     {
         Task AddUserConnection(string address, string connectionId);
-        Task<string> GetUserConnection(string address);
+        Task<List<string>> GetUserConnections(string address);
         Task ClearUserConnection(string address, string connectionId);
         Task ClearUserConnection(string connectionId);
     }
@@ -25,9 +26,9 @@ namespace ETransferServer.Hubs
             await _hubAppService.RegisterClientAsync(address, connectionId);
         }
 
-        public async Task<string> GetUserConnection(string address)
+        public async Task<List<string>> GetUserConnections(string address)
         {
-            return await _hubAppService.GetConnectionIdAsync(address);
+            return await _hubAppService.GetConnectionIdsAsync(address);
         }
 
         public async Task ClearUserConnection(string address, string connectionId)

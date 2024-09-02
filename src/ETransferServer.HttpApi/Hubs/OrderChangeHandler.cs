@@ -1,5 +1,6 @@
 using System.Linq;
 using System.Threading.Tasks;
+using ETransferServer.Common;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Etos.Order;
 using ETransferServer.Grains.Grain.Users;
@@ -45,18 +46,21 @@ namespace ETransferServer.Hubs
             _logger.LogInformation("OrderChangeHandler, userId: {userId}, address: {address}",
                 eventData.Message.UserId, address);
             if (address.IsNullOrEmpty()) return;
-            var connectionId = await _hubConnectionProvider.GetUserConnection(address);
-            _logger.LogInformation("OrderChangeHandler, connectionId: {connectionId}", connectionId);
-            if (connectionId.IsNullOrEmpty()) return;
+            var connectionIds = await _hubConnectionProvider.GetUserConnections(address);
+            if (connectionIds.IsNullOrEmpty()) return;
+            _logger.LogInformation("OrderChangeHandler, connectionIds: {connectionIds}", string.Join(CommonConstant.Comma, connectionIds));
             var orderChangeGrain = _clusterClient.GetGrain<IUserOrderChangeGrain>(address);
             var time = await orderChangeGrain.Get();
             _logger.LogInformation("OrderChangeHandler, address: {address}, time: {time}", address, time);
-            await _hubContext.Clients.Client(connectionId).SendAsync("ReceiveUserOrderRecords",
-                await _orderAppService.GetUserOrderRecordListAsync(new GetUserOrderRecordRequestDto
-                {
-                    Address = address,
-                    Time = time
-                }));
+            foreach (var connectionId in connectionIds)
+            {
+                await _hubContext.Clients.Client(connectionId).SendAsync("ReceiveUserOrderRecords",
+                    await _orderAppService.GetUserOrderRecordListAsync(new GetUserOrderRecordRequestDto
+                    {
+                        Address = address,
+                        Time = time
+                    }));
+            }
         }
     }
 }

@@ -345,6 +345,12 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         _logger.LogInformation("save deposit record, recordInfo:{recordInfo}",
             JsonConvert.SerializeObject(coBoTransaction));
         var coBoDepositGrain = GrainFactory.GetGrain<ICoBoDepositGrain>(coBoTransaction.Id);
+        var coBoDto = await coBoDepositGrain.Get();
+        if (coBoDto != null && coBoDto.Status == CommonConstant.SuccessStatus)
+        {
+            _logger.LogInformation("order already success: {id}", coBoTransaction.Id);
+            return;
+        }
         await coBoDepositGrain.AddOrUpdate(coBoTransaction);
         
         if (_depositAddressOption.Value.AddressWhiteLists.Contains(coBoTransaction.Address))

@@ -309,12 +309,22 @@ public class OrderAppService : ApplicationService, IOrderAppService
                 item.ArrivalTime = item.LastModifyTime;
                 break;
             case OrderStatusEnum.FromTransferFailed:
+                item.Status = OrderStatusResponseEnum.Failed.ToString();
+                item.FromTransfer.Status = OrderStatusResponseEnum.Failed.ToString();
+                item.ToTransfer.Status = string.Empty;
+                item.ArrivalTime = 0;
+                break;
             case OrderStatusEnum.ToTransferFailed:
+                item.Status = OrderStatusResponseEnum.Failed.ToString();
+                item.FromTransfer.Status = OrderStatusResponseEnum.Succeed.ToString();
+                item.ToTransfer.Status = OrderStatusResponseEnum.Failed.ToString();
+                item.ArrivalTime = 0;
+                break;
             case OrderStatusEnum.Expired:
             case OrderStatusEnum.Failed:
                 item.Status = OrderStatusResponseEnum.Failed.ToString();
-                item.FromTransfer.Status = GetTransferStatus(item.FromTransfer.Status);
-                item.ToTransfer.Status = GetTransferStatus(item.ToTransfer.Status);
+                item.FromTransfer.Status = GetTransferStatus(item.FromTransfer.Status, status.ToString());
+                item.ToTransfer.Status = GetTransferStatus(item.ToTransfer.Status, status.ToString());
                 item.ArrivalTime = 0;
                 break;
             default:
@@ -359,10 +369,9 @@ public class OrderAppService : ApplicationService, IOrderAppService
         return avgExchange;
     }
 
-    private string GetTransferStatus(string transferStatus)
+    private string GetTransferStatus(string transferStatus, string orderStatus = null)
     {
         if(transferStatus == CommonConstant.SuccessStatus) return OrderStatusResponseEnum.Succeed.ToString();
-        if(transferStatus.IsNullOrEmpty()) return OrderStatusResponseEnum.Processing.ToString();
         try
         {
             var status = Enum.Parse<OrderTransferStatusEnum>(transferStatus);
@@ -374,12 +383,18 @@ public class OrderAppService : ApplicationService, IOrderAppService
                 case OrderTransferStatusEnum.Failed:
                     return OrderStatusResponseEnum.Failed.ToString();
                 default:
+                    if (orderStatus == OrderStatusEnum.Expired.ToString() 
+                        || orderStatus == OrderStatusEnum.Failed.ToString())
+                        return OrderStatusResponseEnum.Failed.ToString();
                     return OrderStatusResponseEnum.Processing.ToString();
             }
         }
         catch (Exception e)
         {
             _logger.LogError(e, "OrderTransferStatusEnum parse error, status={status}", transferStatus);
+            if (orderStatus == OrderStatusEnum.Expired.ToString() || orderStatus == OrderStatusEnum.Failed.ToString())
+                return OrderStatusResponseEnum.Failed.ToString();
+            if (transferStatus.IsNullOrEmpty()) return string.Empty;
             return OrderStatusResponseEnum.Processing.ToString();
         }
     }

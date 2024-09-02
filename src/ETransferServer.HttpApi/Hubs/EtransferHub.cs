@@ -47,6 +47,7 @@ namespace ETransferServer.Hubs
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
             await _hubConnectionProvider.ClearUserConnection(Context.ConnectionId);
+            _logger.LogInformation("OnDisconnectedAsync connectionId: {connectionId}", Context.ConnectionId);
             await base.OnDisconnectedAsync(exception);
         }
     }
