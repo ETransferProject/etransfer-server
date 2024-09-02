@@ -52,6 +52,7 @@ namespace ETransferServer.Hubs
                 string.Join(CommonConstant.Comma, connectionIds));
             var orderChangeGrain = _clusterClient.GetGrain<IUserOrderChangeGrain>(address);
             var time = await orderChangeGrain.Get();
+            await Task.Delay(2000);
             var result = await _orderAppService.GetUserOrderRecordListAsync(new GetUserOrderRecordRequestDto
             {
                 Address = address,
@@ -61,7 +62,7 @@ namespace ETransferServer.Hubs
                 "OrderChangeHandler, address: {address}, time: {time}, pending: {depositCount1},{withdrawCount1}, success: {depositCount2},{withdrawCount2}, fail: {depositCount3},{withdrawCount3}",
                 address, time, result?.Processing.DepositCount, result?.Processing.WithdrawCount,
                 result?.Succeed.DepositCount, result?.Succeed.WithdrawCount, result?.Failed.DepositCount,
-                result.Failed.WithdrawCount);
+                result?.Failed.WithdrawCount);
             foreach (var connectionId in connectionIds)
             {
                 await _hubContext.Clients.Client(connectionId).SendAsync("ReceiveUserOrderRecords", result);
