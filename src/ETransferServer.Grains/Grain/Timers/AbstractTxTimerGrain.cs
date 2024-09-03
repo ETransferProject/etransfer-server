@@ -207,6 +207,10 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
                         var txBlockHeight = info.Items.FirstOrDefault().BlockHeight;
                         order.ExtensionInfo.AddOrReplace(ExtensionKey.FromConfirmedNum,
                             (chainStatusDict[pendingTx.ChainId].BestChainHeight - txBlockHeight).ToString());
+                        _logger.LogDebug(
+                            "TxTimer from confirmedNum, orderId={orderId}, bestHeight={bestHeight}, txBlockHeight={txBlockHeight}, confirmedNum={confirmedNum}",
+                            orderId, chainStatusDict[pendingTx.ChainId].BestChainHeight, txBlockHeight,
+                            order.ExtensionInfo[ExtensionKey.FromConfirmedNum]);
                         await SaveOrder(order);
                     }
                 }
@@ -230,6 +234,10 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
                 order.Status = OrderStatusEnum.FromTransferConfirmed.ToString();
                 order.ExtensionInfo.AddOrReplace(ExtensionKey.FromConfirmedNum,
                     (chainStatusDict[pendingTx.ChainId].BestChainHeight - transfer.BlockHeight).ToString());
+                _logger.LogDebug(
+                    "TxTimer from confirmedNum, orderId={orderId}, bestHeight={bestHeight}, blockHeight={blockHeight}, confirmedNum={confirmedNum}",
+                    orderId, chainStatusDict[pendingTx.ChainId].BestChainHeight, transfer.BlockHeight,
+                    order.ExtensionInfo[ExtensionKey.FromConfirmedNum]);
             }
             await SaveOrder(order, ExtensionBuilder.New()
                 .Add(ExtensionKey.IsForward, pendingTx.IsForward)
@@ -289,8 +297,9 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
             var txStatus =
                 await _contractProvider.QueryTransactionResultAsync(transferInfo.ChainId, transferInfo.TxId);
             _logger.LogInformation(
-                "TxOrderTimer order={OrderId}, txId={TxId}, status={Status}, txHeight={Height}, LIB={Lib}", order.Id,
-                timerTx.TxId, txStatus.Status, txStatus.BlockNumber, chainStatus.LastIrreversibleBlockHeight);
+                "TxOrderTimer order={OrderId}, txId={TxId}, status={Status}, bestHeight={BestHeight}, txHeight={Height}, LIB={Lib}", 
+                order.Id, timerTx.TxId, txStatus.Status, chainStatus.BestChainHeight, txStatus.BlockNumber, 
+                chainStatus.LastIrreversibleBlockHeight);
 
             if (!isToTransfer)
             {

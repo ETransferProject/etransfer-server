@@ -179,8 +179,8 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
             var (withdrawAmount, realFee, isGo) = await RetryCalculateFeeAsync(transferRecord.ToChainId,
                 transferRecord.Symbol, amountDecimal, maxEstimateFee);
             AssertHelper.IsTrue(isGo,
-                "Invalid amount/fee, amount:{amount}, maxEstimateFee:{maxEstimateFee}, realFee:{realFee}", 
-                amountDecimal, maxEstimateFee, realFee);
+                "Invalid amount/fee, amount:{amount}, maxEstimateFee:{maxEstimateFee}, realFee:{realFee}, minWithdraw:{minWithdraw}", 
+                amountDecimal, maxEstimateFee, realFee, _withdrawOption.Value.MinWithdraw);
             AssertHelper.IsTrue(VerifyByWhiteList(transferRecord.From, transferRecord.ToChainId), "The whitelist is not allowed");
 
             var withdrawOrderDto = new WithdrawOrderDto

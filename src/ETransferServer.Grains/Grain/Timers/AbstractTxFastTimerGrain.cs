@@ -284,8 +284,9 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> 
             var txStatus =
                 await _contractProvider.QueryTransactionResultAsync(transferInfo.ChainId, transferInfo.TxId);
             _logger.LogInformation(
-                "TxFastOrderTimer order={OrderId}, txId={TxId}, status={Status}, txHeight={Height}, LIB={Lib}", order.Id,
-                timerTx.TxId, txStatus.Status, txStatus.BlockNumber, chainStatus.LastIrreversibleBlockHeight);
+                "TxFastOrderTimer order={OrderId}, txId={TxId}, status={Status}, bestHeight={BestHeight}, txHeight={Height}, LIB={Lib}", 
+                order.Id, timerTx.TxId, txStatus.Status, chainStatus.BestChainHeight, txStatus.BlockNumber, 
+                chainStatus.LastIrreversibleBlockHeight);
 
             if (!isToTransfer)
             {
