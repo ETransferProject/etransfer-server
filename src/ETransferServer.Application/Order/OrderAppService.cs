@@ -6,6 +6,7 @@ using AElf.Indexing.Elasticsearch;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Entities;
+using ETransferServer.Etos.Order;
 using ETransferServer.Grains.Grain.Token;
 using ETransferServer.Grains.Grain.Users;
 using ETransferServer.Network;
@@ -163,7 +164,7 @@ public class OrderAppService : ApplicationService, IOrderAppService
         }
     }
 
-    public async Task<UserOrderDto> GetUserOrderRecordListAsync(GetUserOrderRecordRequestDto request)
+    public async Task<UserOrderDto> GetUserOrderRecordListAsync(GetUserOrderRecordRequestDto request, OrderChangeEto orderEto = null)
     {
         var userOrderDto = new UserOrderDto
         {
@@ -203,6 +204,16 @@ public class OrderAppService : ApplicationService, IOrderAppService
 
             var (count, list) = await _orderIndexRepository.GetSortListAsync(Filter,
                 sortFunc: s => s.Descending(t => t.CreateTime));
+
+            if (orderEto != null)
+            {
+                var orderFirst = list.FirstOrDefault(item => item.Id == orderEto.Id);
+                if (orderFirst != null)
+                {
+                    list.Remove(orderFirst);
+                }
+                list.Add(_objectMapper.Map<OrderChangeEto, OrderIndex>(orderEto));
+            }
 
             return await LoopCollectionRecordsAsync(list, userOrderDto);
 
