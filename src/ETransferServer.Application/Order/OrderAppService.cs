@@ -444,7 +444,7 @@ public class OrderAppService : ApplicationService, IOrderAppService
                 || orderIndex.FromTransfer.Status == OrderTransferStatusEnum.Transferred.ToString())
             {
                 var coBoCoinGrain =
-                    _clusterClient.GetGrain<ICoBoCoinGrain>(ICoBoCoinGrain.Id(orderIndex.FromTransfer.Network,
+                    _clusterClient.GetGrain<ICoBoCoinGrain>(ICoBoCoinGrain.Id(orderIndex.ToTransfer.Network,
                         orderIndex.FromTransfer.Symbol));
                 detailDto.Step.FromTransfer.ConfirmingThreshold =
                     await coBoCoinGrain.GetHomogeneousConfirmingThreshold(orderIndex.FromTransfer.Amount);

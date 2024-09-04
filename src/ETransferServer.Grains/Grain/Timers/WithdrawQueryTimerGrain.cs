@@ -16,6 +16,7 @@ using ETransferServer.Grains.State.Order;
 using ETransferServer.User;
 using MassTransit;
 using Microsoft.IdentityModel.Tokens;
+using NBitcoin;
 using Volo.Abp.Application.Dtos;
 using Volo.Abp.ObjectMapping;
 
@@ -179,9 +180,10 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
             var (withdrawAmount, realFee, isGo) = await RetryCalculateFeeAsync(transferRecord.ToChainId,
                 transferRecord.Symbol, amountDecimal, maxEstimateFee);
             AssertHelper.IsTrue(isGo,
-                "Invalid amount/fee, amount:{amount}, maxEstimateFee:{maxEstimateFee}, realFee:{realFee}, minWithdraw:{minWithdraw}", 
+                "Invalid amount/fee, amount:{amount}, maxEstimateFee:{maxEstimateFee}, realFee:{realFee}, minWithdraw:{minWithdraw}",
                 amountDecimal, maxEstimateFee, realFee, _withdrawOption.Value.MinWithdraw);
-            AssertHelper.IsTrue(VerifyByWhiteList(transferRecord.From, transferRecord.ToChainId), "The whitelist is not allowed");
+            AssertHelper.IsTrue(VerifyByWhiteList(transferRecord.From, transferRecord.ToChainId),
+                "The whitelist is not allowed");
 
             var withdrawOrderDto = new WithdrawOrderDto
             {
@@ -218,11 +220,17 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
                     }
                 }
             };
+            withdrawOrderDto.ExtensionInfo ??= new Dictionary<string, string>();
+            var coBoCoinGrain =
+                GrainFactory.GetGrain<ICoBoCoinGrain>(ICoBoCoinGrain.Id(withdrawOrderDto.ToTransfer.Network,
+                    transferRecord.Symbol));
+            withdrawOrderDto.ExtensionInfo.AddOrReplace(ExtensionKey.FromConfirmingThreshold,
+                (await coBoCoinGrain.GetHomogeneousConfirmingThreshold(amountDecimal)).ToString());
             if (!string.IsNullOrWhiteSpace(transferRecord.Memo))
             {
-                withdrawOrderDto.ExtensionInfo = new Dictionary<string, string>();
-                withdrawOrderDto.ExtensionInfo.Add(ExtensionKey.Memo, transferRecord.Memo);
+                withdrawOrderDto.ExtensionInfo.AddOrReplace(ExtensionKey.Memo, transferRecord.Memo);
             }
+
             return withdrawOrderDto;
         }
         catch (Exception e)
