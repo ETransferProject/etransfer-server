@@ -14,6 +14,7 @@ using ETransferServer.MongoDB;
 using ETransferServer.Options;
 using ETransferServer.ThirdPart.Exchange;
 using ETransferServer.User;
+using MassTransit;
 using Volo.Abp.AspNetCore.Serilog;
 using Volo.Abp.Autofac;
 using Volo.Abp.Modularity;
@@ -66,6 +67,19 @@ public class ETransferServerOrleansSiloModule : AbpModule
         context.Services.AddTransient<IExchangeProvider, UniswapV3Provider>();
 
         ConfigureGraphQl(context, configuration);
+        
+        context.Services.AddMassTransit(x =>
+        {
+            x.UsingRabbitMq((ctx, cfg) =>
+            {
+                var rabbitMqConfig = configuration.GetSection("MassTransit:RabbitMQ").Get<Grains.Options.MassRabbitMqOptions>();
+                cfg.Host(rabbitMqConfig.Host, rabbitMqConfig.Port, "/", h =>
+                {
+                    h.Username(rabbitMqConfig.UserName);
+                    h.Password(rabbitMqConfig.Password);
+                });
+            });
+        });
     } 
 
     

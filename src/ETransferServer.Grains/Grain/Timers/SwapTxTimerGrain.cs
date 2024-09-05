@@ -135,6 +135,8 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
             {
                 var txIds = subList.Select(t => t.Value.TxId).Distinct().ToList();
                 var pager = await _transferProvider.GetSwapTokenInfoByTxIdsAsync(txIds, libHeight);
+                _logger.LogDebug("SwapTxTimer gql txIds={txIds}, libHeight={Height}, count={count}", 
+                    string.Join(CommonConstant.Comma, txIds), libHeight, pager.TotalCount);
                 var indexerTxDict = pager.Items.ToDictionary(t => t.TransactionId, t => t);
                 var handleResult = await HandlePage(subList, chainStatus, indexerLatestHeight, indexerTxDict);
                 _logger.LogInformation("handleResult {handleResult}", JsonConvert.SerializeObject(handleResult));

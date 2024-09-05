@@ -8,7 +8,6 @@ using AElf;
 using AElf.Contracts.MultiToken;
 using AElf.Indexing.Elasticsearch;
 using AElf.Types;
-using CAServer.Commons;
 using ETransfer.Contracts.TokenPool;
 using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;

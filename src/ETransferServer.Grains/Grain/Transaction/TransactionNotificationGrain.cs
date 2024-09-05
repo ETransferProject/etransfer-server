@@ -1,5 +1,4 @@
 using ETransferServer.Common;
-using ETransferServer.Grains.Common;
 using ETransferServer.Grains.Grain.Order.Deposit;
 using ETransferServer.Grains.Grain.Timers;
 using ETransferServer.Grains.Options;
@@ -81,25 +80,22 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
 
     private async Task<bool> HandleDeposit(CoBoTransactionDto coBoTransaction)
     {
-        var coinInfo = await GetCoinNetwork(coBoTransaction);
-        var recordGrainId = OrderIdHelper.DepositOrderId(coinInfo.Network, coinInfo.Symbol, coBoTransaction.TxId);
-        var userDepositRecordGrain = GrainFactory.GetGrain<IUserDepositRecordGrain>(recordGrainId);
-
-        var orderDto = await userDepositRecordGrain.GetAsync();
-        if (orderDto.Value != null)
-        {
-            // order already exist.
-            _logger.LogWarning("order already exist, orderId: {orderId}", orderDto.Value.Id);
-            return true;
-        }
-
-        var verifyResult = await VerifyTransaction(coBoTransaction);
-        AssertHelper.IsTrue(verifyResult, "transaction verify fail.");
-
+        await GetCoinNetwork(coBoTransaction);
         var coBoDepositQueryTimerGrain = GrainFactory.GetGrain<ICoBoDepositQueryTimerGrain>(
             GuidHelper.UniqGuid(nameof(ICoBoDepositQueryTimerGrain)));
-        // create order
-        await coBoDepositQueryTimerGrain.CreateDepositRecord(coBoTransaction);
+        if (coBoTransaction.Status == CommonConstant.PendingStatus)
+        {
+            await coBoDepositQueryTimerGrain.SaveDepositRecord(coBoTransaction);
+        }
+
+        if (coBoTransaction.Status == CommonConstant.SuccessStatus)
+        {
+            var verifyResult = await VerifyTransaction(coBoTransaction);
+            AssertHelper.IsTrue(verifyResult, "transaction verify fail.");
+
+            // create order
+            await coBoDepositQueryTimerGrain.CreateDepositRecord(coBoTransaction);
+        }
         return true;
     }
 
@@ -123,13 +119,16 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
                 throw;
             }
             var coBoDepositGrain = GrainFactory.GetGrain<ICoBoDepositGrain>(coBoTransaction.Id);
-            if (await coBoDepositGrain.NotExist())
+            if (await coBoDepositGrain.NeedUpdate())
             {
-                _logger.LogInformation("coBoDepositGrain not exist, Id: {id}, CombinedId: {combineId}", coBoTransaction.Id, GuidHelper.GenerateCombinedId(coBoTransaction.Id,
+                _logger.LogInformation("coBoDepositGrain update, Id: {id}, CombinedId: {combineId}", coBoTransaction.Id, GuidHelper.GenerateCombinedId(coBoTransaction.Id,
                     CommonConstant.DepositOrderCoinNotSupportAlarm));
                 await coBoDepositGrain.AddOrUpdate(coBoTransaction);
-                await _depositOrderStatusReminderGrain.AddReminder(GuidHelper.GenerateCombinedId(coBoTransaction.Id,
-                    CommonConstant.DepositOrderCoinNotSupportAlarm));
+                if (await coBoDepositGrain.NotUpdated())
+                {
+                    await _depositOrderStatusReminderGrain.AddReminder(GuidHelper.GenerateCombinedId(coBoTransaction.Id,
+                        CommonConstant.DepositOrderCoinNotSupportAlarm));
+                }
             }
 
             throw;

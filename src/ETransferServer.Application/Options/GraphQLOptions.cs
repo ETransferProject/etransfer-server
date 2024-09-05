@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace ETransferServer.Options;
 
 public class GraphQLOptions

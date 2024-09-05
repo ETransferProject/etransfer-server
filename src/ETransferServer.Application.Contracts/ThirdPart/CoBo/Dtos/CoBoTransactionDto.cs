@@ -37,6 +37,7 @@ public class TransactionDetailDto
 {
     public string TxId { get; set; }
     public int BlockNum { get; set; }
+    [JsonProperty("confirming_threshold")] public int ConfirmingThreshold { get; set; }
     public string BlockHash { get; set; }
     public string HexStr { get; set; }
 }

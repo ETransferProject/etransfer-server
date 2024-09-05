@@ -4,6 +4,7 @@ using ETransferServer.Dtos.Info;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Dtos.User;
 using ETransferServer.Entities;
+using ETransferServer.Etos.Order;
 using ETransferServer.Orders;
 using ETransferServer.User.Dtos;
 using ETransferServer.Network.Dtos;
@@ -27,6 +28,7 @@ public class ETransferServerApplicationAutoMapperProfile : Profile
         CreateMap<DepositOrderDto, OrderIndex>().ReverseMap();
         CreateMap<WithdrawOrderDto, OrderIndex>().ReverseMap();
         CreateMap<OrderIndex, OrderIndexDto>().ReverseMap();
+        CreateMap<OrderIndexDto, OrderDetailDto>().ReverseMap();
         CreateMap<Transfer, TransferInfoDto>().ReverseMap();
         CreateMap<TokenConfig, TokenConfigDto>().ReverseMap();
         CreateMap<TokenConfig, TokenConfigOptionDto>().ReverseMap();
@@ -38,5 +40,6 @@ public class ETransferServerApplicationAutoMapperProfile : Profile
             .ReverseMap();
         CreateMap<NetworkInfo, NetworkOptionDto>().ReverseMap();
         CreateMap<OrderStatusFlowDto, OrderStatusFlow>().ReverseMap();
+        CreateMap<OrderChangeEto, OrderIndex>().ReverseMap();
     }
 }

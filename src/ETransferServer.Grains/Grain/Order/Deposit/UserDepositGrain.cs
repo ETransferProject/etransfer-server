@@ -10,6 +10,8 @@ using ETransferServer.Grains.Grain.Timers;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.Provider;
 using ETransferServer.Options;
+using MassTransit;
+using Volo.Abp.ObjectMapping;
 
 namespace ETransferServer.Grains.Grain.Order.Deposit;
 
@@ -42,6 +44,8 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
     private IDepositOrderRetryTimerGrain _depositOrderRetryTimerGrain;
     private IOrderStatusReminderGrain _orderStatusReminderGrain;
     private ICoBoDepositQueryTimerGrain _depositQueryTimerGrain;
+    private readonly IObjectMapper _objectMapper;
+    private readonly IBus _bus;
 
     internal JsonSerializerSettings JsonSettings = JsonSettingsBuilder.New()
         .WithAElfTypesConverters()
@@ -51,7 +55,9 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
     public UserDepositGrain(IUserDepositProvider userDepositProvider,
         ILogger<UserDepositGrain> logger, IContractProvider contractProvider,
         IOptionsSnapshot<ChainOptions> chainOptions, IOptionsSnapshot<DepositOptions> depositOptions,
-        IOrderStatusFlowProvider orderStatusFlowProvider)
+        IOrderStatusFlowProvider orderStatusFlowProvider,
+        IObjectMapper objectMapper, 
+        IBus bus)
     {
         _userDepositProvider = userDepositProvider;
         _logger = logger;
@@ -59,6 +65,8 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
         _depositOptions = depositOptions;
         _orderStatusFlowProvider = orderStatusFlowProvider;
         _contractProvider = contractProvider;
+        _objectMapper = objectMapper;
+        _bus = bus;
     }
 
     public override async Task OnActivateAsync()

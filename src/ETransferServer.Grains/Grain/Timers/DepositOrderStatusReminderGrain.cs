@@ -187,7 +187,7 @@ public class DepositOrderStatusReminderGrain : Orleans.Grain, IDepositOrderStatu
                 [Keys.OrderId] = order.Id.ToString(),
                 [Keys.CreateTime] = TimeHelper.GetDateTimeFromTimeStamp(createTime).ToUtc8String(),
                 [Keys.TxId] = toTransfer?.TxId,
-                [Keys.Reason] = order.ExtensionInfo.IsNullOrEmpty() ? "" : order.ExtensionInfo.First().Value,
+                [Keys.Reason] = "",
 
                 [Keys.AmountFrom] = GetAmount(fromTransfer),
                 [Keys.AmountTo] = GetAmount(toTransfer),

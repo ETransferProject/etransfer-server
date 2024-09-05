@@ -4,6 +4,7 @@ using ETransferServer.Dtos.GraphQL;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Dtos.Token;
 using ETransferServer.Dtos.User;
+using ETransferServer.Etos.Order;
 using ETransferServer.Grains.Grain.Users;
 using ETransferServer.Grains.State;
 using ETransferServer.Grains.State.Order;
@@ -25,8 +26,10 @@ public class ETransferServerGrainsAutoMapperProfile : Profile
 
 
         CreateMap<DepositOrderDto, DepositOrderState>().ReverseMap();
+        CreateMap<DepositOrderDto, OrderChangeEto>().ReverseMap();
         CreateMap<OrderStatusFlowState, OrderStatusFlowDto>().ReverseMap();
         CreateMap<WithdrawOrderState, WithdrawOrderDto>().ReverseMap();
+        CreateMap<WithdrawOrderDto, OrderChangeEto>().ReverseMap();
 
         CreateMap<TokenState, TokenDto>().ReverseMap();
         CreateMap<TokenState, TokenInfo>().ReverseMap();

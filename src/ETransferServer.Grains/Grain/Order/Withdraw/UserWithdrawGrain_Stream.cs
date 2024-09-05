@@ -3,6 +3,7 @@ using Orleans;
 using Orleans.Streams;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Order;
+using ETransferServer.Etos.Order;
 using ETransferServer.Grains.Grain.TokenLimit;
 using ETransferServer.Grains.State.Order;
 
@@ -30,6 +31,7 @@ public partial class UserWithdrawGrain
             case OrderStatusEnum.Pending:
                 orderDto.Status = OrderStatusEnum.FromStartTransfer.ToString();
                 await AddOrUpdateOrder(orderDto);
+                await _bus.Publish(_objectMapper.Map<WithdrawOrderDto, OrderChangeEto>(orderDto));
                 break;
             case OrderStatusEnum.FromStartTransfer:
                 await TransferForward(orderDto);
@@ -83,6 +85,7 @@ public partial class UserWithdrawGrain
                 _logger.LogInformation("Order {Id} stream end, current status={Status}", this.GetPrimaryKey(),
                     status.ToString());
                 await HandleWithdrawQueryGrain(orderDto.FromTransfer.TxId);
+                await _bus.Publish(_objectMapper.Map<WithdrawOrderDto, OrderChangeEto>(orderDto));
                 break;
             case OrderStatusEnum.Expired:
             case OrderStatusEnum.Failed:
@@ -90,6 +93,7 @@ public partial class UserWithdrawGrain
                     status.ToString());
                 await ReverseTokenLimitAsync(orderDto.Id, orderDto.ToTransfer.Symbol, orderDto.AmountUsd);
                 await HandleWithdrawQueryGrain(orderDto.FromTransfer.TxId);
+                await _bus.Publish(_objectMapper.Map<WithdrawOrderDto, OrderChangeEto>(orderDto));
                 break;
 
             // Invalid status

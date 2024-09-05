@@ -5,6 +5,7 @@ using Orleans;
 using ETransferServer.Common;
 using ETransferServer.Dtos.GraphQL;
 using ETransferServer.Dtos.Order;
+using ETransferServer.Etos.Order;
 using ETransferServer.Grains.Common;
 using ETransferServer.Grains.Grain.Order.Withdraw;
 using ETransferServer.Grains.Grain.Token;
@@ -13,8 +14,11 @@ using ETransferServer.Grains.GraphQL;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.State.Order;
 using ETransferServer.User;
+using MassTransit;
 using Microsoft.IdentityModel.Tokens;
+using NBitcoin;
 using Volo.Abp.Application.Dtos;
+using Volo.Abp.ObjectMapping;
 
 namespace ETransferServer.Grains.Grain.Timers;
 
@@ -36,18 +40,24 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
     private readonly IUserAppService _userAppService;
 
     private readonly ITokenTransferProvider _tokenTransferProvider;
+    private readonly IObjectMapper _objectMapper;
+    private readonly IBus _bus;
 
     public WithdrawQueryTimerGrain(ILogger<WithdrawQueryTimerGrain> logger,
         IOptionsSnapshot<TimerOptions> timerOptions,
         IOptionsSnapshot<WithdrawOptions> withdrawOption,
         IUserAppService userAppService,
-        ITokenTransferProvider tokenTransferProvider)
+        ITokenTransferProvider tokenTransferProvider,
+        IObjectMapper objectMapper, 
+        IBus bus)
     {
         _logger = logger;
         _timerOptions = timerOptions;
         _withdrawOption = withdrawOption;
         _userAppService = userAppService;
         _tokenTransferProvider = tokenTransferProvider;
+        _objectMapper = objectMapper;
+        _bus = bus;
     }
 
     public override async Task OnActivateAsync()
@@ -128,8 +138,12 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
             var userWithdrawRecordGrain = GrainFactory.GetGrain<IUserWithdrawRecordGrain>(orderDto.Id);
             var orderExists = await userWithdrawRecordGrain.Get();
             AssertHelper.IsTrue(orderExists.Success, "Query withdraw exists order failed {Msg}", orderExists.Message);
-            AssertHelper.IsNull(orderExists.Data, "Withdraw order {OrderId} exists", orderDto.Id);
-
+            AssertHelper.IsNull(orderExists.Value, "Withdraw order {OrderId} exists", orderDto.Id);
+            if (orderExists.Value == null)
+            {
+                await _bus.Publish(_objectMapper.Map<WithdrawOrderDto, OrderChangeEto>(orderDto));
+            }
+            
             // Save the order, UserWithdrawGrain will process the database multi-write and put the order into the stream for processing.
             var userWithdrawGrain = GrainFactory.GetGrain<IUserWithdrawGrain>(orderDto.Id);
             await userWithdrawGrain.AddOrUpdateOrder(orderDto);
@@ -166,9 +180,10 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
             var (withdrawAmount, realFee, isGo) = await RetryCalculateFeeAsync(transferRecord.ToChainId,
                 transferRecord.Symbol, amountDecimal, maxEstimateFee);
             AssertHelper.IsTrue(isGo,
-                "Invalid amount/fee, amount:{amount}, maxEstimateFee:{maxEstimateFee}, realFee:{realFee}", 
-                amountDecimal, maxEstimateFee, realFee);
-            AssertHelper.IsTrue(VerifyByWhiteList(transferRecord.From, transferRecord.ToChainId), "The whitelist is not allowed");
+                "Invalid amount/fee, amount:{amount}, maxEstimateFee:{maxEstimateFee}, realFee:{realFee}, minWithdraw:{minWithdraw}",
+                amountDecimal, maxEstimateFee, realFee, _withdrawOption.Value.MinWithdraw);
+            AssertHelper.IsTrue(VerifyByWhiteList(transferRecord.From, transferRecord.ToChainId),
+                "The whitelist is not allowed");
 
             var withdrawOrderDto = new WithdrawOrderDto
             {
@@ -205,11 +220,17 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
                     }
                 }
             };
+            withdrawOrderDto.ExtensionInfo ??= new Dictionary<string, string>();
+            var coBoCoinGrain =
+                GrainFactory.GetGrain<ICoBoCoinGrain>(ICoBoCoinGrain.Id(withdrawOrderDto.ToTransfer.Network,
+                    transferRecord.Symbol));
+            withdrawOrderDto.ExtensionInfo.AddOrReplace(ExtensionKey.FromConfirmingThreshold,
+                (await coBoCoinGrain.GetHomogeneousConfirmingThreshold(amountDecimal)).ToString());
             if (!string.IsNullOrWhiteSpace(transferRecord.Memo))
             {
-                withdrawOrderDto.ExtensionInfo = new Dictionary<string, string>();
-                withdrawOrderDto.ExtensionInfo.Add(ExtensionKey.Memo, transferRecord.Memo);
+                withdrawOrderDto.ExtensionInfo.AddOrReplace(ExtensionKey.Memo, transferRecord.Memo);
             }
+
             return withdrawOrderDto;
         }
         catch (Exception e)

@@ -20,6 +20,7 @@ public class TransferInfoDto
     public string Network { get; set; }
     public string ChainId { get; set; }
     public string Symbol { get; set; }
+    public string Icon { get; set; }
     public string TxId { get; set; }
     public string Amount { get; set; }
     public string AmountUsd { get; set; }
