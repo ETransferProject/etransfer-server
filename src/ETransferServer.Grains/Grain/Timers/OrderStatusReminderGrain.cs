@@ -120,7 +120,10 @@ public class OrderStatusReminderGrain : Orleans.Grain, IOrderStatusReminderGrain
                 [Keys.TxId] = OrderTypeEnum.Withdraw.ToString().Equals(order.OrderType)
                     ? fromTransfer?.TxId
                     : toTransfer?.TxId,
-                [Keys.Reason] = order.ExtensionInfo.IsNullOrEmpty() ? "" : order.ExtensionInfo.First().Value,
+                [Keys.Reason] = order.ExtensionInfo.IsNullOrEmpty() ? "" : 
+                    order.ExtensionInfo.ContainsKey($"{CommonConstant.WithdrawRequestErrorKey}_0")
+                    ? order.ExtensionInfo[$"{CommonConstant.WithdrawRequestErrorKey}_0"]
+                    : "",
 
                 [Keys.AmountFrom] = GetAmount(fromTransfer),
                 [Keys.AmountTo] = GetAmount(toTransfer),

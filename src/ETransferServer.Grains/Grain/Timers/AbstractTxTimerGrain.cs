@@ -7,11 +7,13 @@ using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
 using ETransferServer.Dtos.GraphQL;
 using ETransferServer.Dtos.Order;
+using ETransferServer.Grains.Grain.Order.Withdraw;
 using ETransferServer.Grains.GraphQL;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.State.Order;
 using ETransferServer.Options;
 using Google.Protobuf;
+using NBitcoin;
 using Volo.Abp;
 
 namespace ETransferServer.Grains.Grain.Timers;
@@ -30,19 +32,21 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
     private readonly ILogger<AbstractTxTimerGrain<TOrder>> _logger;
     private readonly IContractProvider _contractProvider;
     private readonly ITokenTransferProvider _transferProvider;
+    private readonly IUserWithdrawProvider _userWithdrawProvider;
 
     private readonly IOptionsSnapshot<ChainOptions> _chainOptions;
     private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
 
     protected AbstractTxTimerGrain(ILogger<AbstractTxTimerGrain<TOrder>> logger, IContractProvider contractProvider,
         IOptionsSnapshot<ChainOptions> chainOptions, IOptionsSnapshot<TimerOptions> timerOptions,
-        ITokenTransferProvider transferProvider)
+        ITokenTransferProvider transferProvider, IUserWithdrawProvider userWithdrawProvider)
     {
         _logger = logger;
         _contractProvider = contractProvider;
         _chainOptions = chainOptions;
         _timerOptions = timerOptions;
         _transferProvider = transferProvider;
+        _userWithdrawProvider = userWithdrawProvider;
     }
 
 
@@ -118,6 +122,8 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
             {
                 var txIds = subList.Select(t => t.Value.TxId).Distinct().ToList();
                 var pager = await _transferProvider.GetTokenTransferInfoByTxIdsAsync(txIds, libHeight);
+                _logger.LogDebug("TxTimer gql txIds={txIds}, libHeight={Height}, count={count}", 
+                    string.Join(CommonConstant.Comma, txIds), libHeight, pager.TotalCount);
                 var indexerTxDict = pager.Items.ToDictionary(t => t.TransactionId, t => t);
                 var handleResult = await HandlePage(subList, chainStatus, indexerLatestHeight, indexerTxDict);
                 foreach (var (orderId, remove) in handleResult)
@@ -143,11 +149,11 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
         }
     }
 
+    internal abstract Task SaveOrder(TOrder order);
 
     internal abstract Task SaveOrder(TOrder order, Dictionary<string, string> externalInfo);
 
     internal abstract Task<TOrder> GetOrder(Guid orderId);
-
 
     private async Task<Dictionary<Guid, bool>> HandlePage(
         List<KeyValuePair<Guid, TimerTransaction>> pendingList, Dictionary<string, ChainStatusDto> chainStatusDict,
@@ -193,6 +199,21 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
             if (!indexerTx.ContainsKey(pendingTx.TxId))
             {
                 result[orderId] = false;
+                if (!isToTransfer)
+                {
+                    var info = await _transferProvider.GetTokenTransferInfoByTxIdsAsync(new List<string> { pendingTx.TxId }, 0);
+                    if (info.TotalCount > 0)
+                    {
+                        var txBlockHeight = info.Items.FirstOrDefault().BlockHeight;
+                        order.ExtensionInfo.AddOrReplace(ExtensionKey.FromConfirmedNum,
+                            (chainStatusDict[pendingTx.ChainId].BestChainHeight - txBlockHeight).ToString());
+                        _logger.LogDebug(
+                            "TxTimer from confirmedNum, orderId={orderId}, bestHeight={bestHeight}, txBlockHeight={txBlockHeight}, confirmedNum={confirmedNum}",
+                            orderId, chainStatusDict[pendingTx.ChainId].BestChainHeight, txBlockHeight,
+                            order.ExtensionInfo[ExtensionKey.FromConfirmedNum]);
+                        await SaveOrder(order);
+                    }
+                }
                 continue;
             }
 
@@ -211,6 +232,12 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
                 order.FromTransfer.ToAddress = transfer.ToAddress;
                 order.FromTransfer.Status = OrderTransferStatusEnum.Confirmed.ToString();
                 order.Status = OrderStatusEnum.FromTransferConfirmed.ToString();
+                order.ExtensionInfo.AddOrReplace(ExtensionKey.FromConfirmedNum,
+                    (chainStatusDict[pendingTx.ChainId].BestChainHeight - transfer.BlockHeight).ToString());
+                _logger.LogDebug(
+                    "TxTimer from confirmedNum, orderId={orderId}, bestHeight={bestHeight}, blockHeight={blockHeight}, confirmedNum={confirmedNum}",
+                    orderId, chainStatusDict[pendingTx.ChainId].BestChainHeight, transfer.BlockHeight,
+                    order.ExtensionInfo[ExtensionKey.FromConfirmedNum]);
             }
             await SaveOrder(order, ExtensionBuilder.New()
                 .Add(ExtensionKey.IsForward, pendingTx.IsForward)
@@ -270,9 +297,15 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
             var txStatus =
                 await _contractProvider.QueryTransactionResultAsync(transferInfo.ChainId, transferInfo.TxId);
             _logger.LogInformation(
-                "TxOrderTimer order={OrderId}, txId={TxId}, status={Status}, txHeight={Height}, LIB={Lib}", order.Id,
-                timerTx.TxId, txStatus.Status, txStatus.BlockNumber, chainStatus.LastIrreversibleBlockHeight);
+                "TxOrderTimer order={OrderId}, txId={TxId}, status={Status}, bestHeight={BestHeight}, txHeight={Height}, LIB={Lib}", 
+                order.Id, timerTx.TxId, txStatus.Status, chainStatus.BestChainHeight, txStatus.BlockNumber, 
+                chainStatus.LastIrreversibleBlockHeight);
 
+            if (!isToTransfer)
+            {
+                order.ExtensionInfo.AddOrReplace(ExtensionKey.FromConfirmedNum, (chainStatus.BestChainHeight - txStatus.BlockNumber).ToString());
+            }
+            
             // pending status, continue waiting
             if (txStatus.Status == CommonConstant.TransactionState.Pending) return false;
 

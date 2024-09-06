@@ -1,3 +1,4 @@
+using ETransferServer.Common;
 using ETransferServer.Grains.State.Order;
 using ETransferServer.ThirdPart.CoBo.Dtos;
 using Orleans;
@@ -10,7 +11,7 @@ public interface ICoBoDepositGrain : IGrainWithStringKey
     Task AddOrUpdate(CoBoTransactionDto dto);
     Task<CoBoTransactionDto> Get();
 
-    Task<bool> NotExist();
+    Task<bool> NeedUpdate();
 
     Task<bool> NotUpdated();
 }
@@ -49,9 +50,9 @@ public class CoBoDepositGrain : Grain<CoBoTransactionState>, ICoBoDepositGrain
         return _objectMapper.Map<CoBoTransactionState, CoBoTransactionDto>(State);
     }
 
-    public async Task<bool> NotExist()
+    public async Task<bool> NeedUpdate()
     {
-        return State == null || State?.Id == null;
+        return State == null || State?.Id == null || State.Status != CommonConstant.SuccessStatus;
     }
     
     public async Task<bool> NotUpdated()

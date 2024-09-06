@@ -19,14 +19,17 @@ public class UserWithdrawTxTimerGrain : AbstractTxTimerGrain<WithdrawOrderDto>, 
 {
     private readonly ILogger<UserWithdrawTxTimerGrain> _logger;
     private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
+    private readonly IUserWithdrawProvider _userWithdrawProvider;
 
     public UserWithdrawTxTimerGrain(ILogger<UserWithdrawTxTimerGrain> logger,
         IContractProvider contractProvider, IOptionsSnapshot<ChainOptions> chainOptions,
-        IOptionsSnapshot<TimerOptions> timerOptions, ITokenTransferProvider transferProvider) : base(logger,
-        contractProvider, chainOptions, timerOptions, transferProvider)
+        IOptionsSnapshot<TimerOptions> timerOptions, ITokenTransferProvider transferProvider,
+        IUserWithdrawProvider userWithdrawProvider) : base(logger,
+        contractProvider, chainOptions, timerOptions, transferProvider, userWithdrawProvider)
     {
         _logger = logger;
         _timerOptions = timerOptions;
+        _userWithdrawProvider = userWithdrawProvider;
     }
 
     public override async Task OnActivateAsync()
@@ -38,6 +41,13 @@ public class UserWithdrawTxTimerGrain : AbstractTxTimerGrain<WithdrawOrderDto>, 
         RegisterTimer(TimerCallback, State,
             TimeSpan.FromSeconds(_timerOptions.Value.WithdrawFromTimer.DelaySeconds),
             TimeSpan.FromSeconds(_timerOptions.Value.WithdrawFromTimer.PeriodSeconds));
+    }
+    
+    internal override async Task SaveOrder(WithdrawOrderDto order)
+    {
+        var recordGrain = GrainFactory.GetGrain<IUserWithdrawRecordGrain>(order.Id);
+        var res = await recordGrain.AddOrUpdate(order);
+        await _userWithdrawProvider.AddOrUpdateSync(res.Value);
     }
 
     internal override async Task SaveOrder(WithdrawOrderDto order, Dictionary<string, string> externalInfo)

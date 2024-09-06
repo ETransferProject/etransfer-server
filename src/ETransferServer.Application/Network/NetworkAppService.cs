@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
-using CAServer.Commons;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Token;
 using ETransferServer.Grains.Grain.Token;
@@ -221,6 +220,18 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
                 : null)
             ?.FirstOrDefault(t => t.Symbol == symbol)
             ?.Decimals ?? DecimalHelper.GetDecimals(symbol));
+    }
+    
+    public Task<string> GetIconAsync(string orderType, string chainId, string symbol)
+    {
+        var tokenDic = orderType == OrderTypeEnum.Withdraw.ToString()
+            ? _tokenOptions.Value.Withdraw
+            : _tokenOptions.Value.Deposit;
+        return Task.FromResult((tokenDic.ContainsKey(chainId)
+                ? tokenDic[chainId]
+                : null)
+            ?.FirstOrDefault(t => t.Symbol == symbol)
+            ?.Icon);
     }
 
     public async Task<ListResultDto<TokenPriceDataDto>> GetTokenPriceListAsync(GetTokenPriceListRequestDto request)

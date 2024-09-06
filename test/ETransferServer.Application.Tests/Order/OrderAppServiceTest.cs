@@ -1,8 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using AElf.Indexing.Elasticsearch;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Order;
+using ETransferServer.Entities;
+using ETransferServer.Etos.Order;
+using ETransferServer.Grains.Grain.Token;
 using ETransferServer.Options;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -22,17 +26,20 @@ public class OrderAppServiceTest : ETransferServerApplicationTestBase
     private readonly IOrderAppService _orderAppService;
     private readonly IOrderDepositAppService _orderDepositAppService;
     private readonly IOrderWithdrawAppService _orderWithdrawAppService;
+    private readonly INESTRepository<UserIndex, Guid> _userIndexRepository;
 
     public OrderAppServiceTest(ITestOutputHelper output) : base(output)
     {
         _orderAppService = GetRequiredService<IOrderAppService>();
         _orderDepositAppService = GetRequiredService<IOrderDepositAppService>();
         _orderWithdrawAppService = GetRequiredService<IOrderWithdrawAppService>();
+        _userIndexRepository = GetRequiredService<INESTRepository<UserIndex, Guid>>();
     }
 
     protected override void AfterAddApplication(IServiceCollection services)
     {
         services.AddSingleton(MockTokenOptions());
+        services.AddSingleton(MockCoBoCoinGrain());
         base.AfterAddApplication(services);
         _currentUser = Substitute.For<ICurrentUser>();
         services.AddSingleton(_currentUser);
@@ -168,7 +175,215 @@ public class OrderAppServiceTest : ETransferServerApplicationTestBase
         result = await _orderAppService.GetOrderRecordListAsync(input);
         result.TotalCount.ShouldBeGreaterThan(0);
     }
-    
+
+    [Fact]
+    public async Task GetOrderRecordDetailAsyncTest()
+    {
+        var input = new DepositOrderDto
+        {
+            Id = Guid.Parse("3a946083-ac0e-4e24-b913-3c9fc57ab03b"),
+            UserId = Guid.Parse("3a946083-ac0e-4e24-b913-3c9fc57ab03b"),
+            OrderType = "Deposit",
+            FromTransfer = new TransferInfo
+            {
+                Network = "ETH",
+                Symbol = "USDT",
+                ToAddress = "AA",
+                Amount = 10,
+                Status = "Confirmed"
+            },
+            ToTransfer = new TransferInfo
+            {
+                Network = "ETH",
+                ChainId = "AELF",
+                Symbol = "USDT",
+                ToAddress = "BB",
+                Amount = 9,
+                Status = "success"
+            },
+            Status = "Finish",
+            CreateTime = DateTime.UtcNow.AddHours(-2).ToUtcMilliSeconds(),
+            LastModifyTime = DateTime.UtcNow.AddHours(-1).ToUtcMilliSeconds(),
+            ArrivalTime = DateTime.UtcNow.AddHours(-1).ToUtcMilliSeconds(),
+            ExtensionInfo = new Dictionary<string, string>()
+            {
+                [ExtensionKey.FromConfirmingThreshold] = "25",
+                [ExtensionKey.FromConfirmedNum] = "30"
+            }
+        };
+        await _orderDepositAppService.AddOrUpdateAsync(input);
+        Login(Guid.Parse("3a946083-ac0e-4e24-b913-3c9fc57ab03b"));
+        var result = await _orderAppService.GetOrderRecordDetailAsync("3a946083-ac0e-4e24-b913-3c9fc57ab03b");
+        result.ShouldNotBeNull();
+        
+        input.ExtensionInfo = new Dictionary<string, string>()
+        {
+            [ExtensionKey.FromConfirmingThreshold] = "0",
+            [ExtensionKey.FromConfirmedNum] = "0"
+        };
+        await _orderDepositAppService.AddOrUpdateAsync(input);
+        result = await _orderAppService.GetOrderRecordDetailAsync("3a946083-ac0e-4e24-b913-3c9fc57ab03b");
+        result.ShouldNotBeNull();
+
+        input.OrderType = "Withdraw";
+        input.ExtensionInfo = new Dictionary<string, string>()
+        {
+            [ExtensionKey.FromConfirmingThreshold] = "0",
+            [ExtensionKey.FromConfirmedNum] = "0"
+        };
+        await _orderDepositAppService.AddOrUpdateAsync(input);
+        result = await _orderAppService.GetOrderRecordDetailAsync("3a946083-ac0e-4e24-b913-3c9fc57ab03b");
+        result.ShouldNotBeNull();
+
+        input.OrderType = "Deposit";
+        input.ExtensionInfo = new Dictionary<string, string>()
+        {
+            [ExtensionKey.FromConfirmingThreshold] = "30",
+            [ExtensionKey.FromConfirmedNum] = "25"
+        };
+        await _orderDepositAppService.AddOrUpdateAsync(input);
+        result = await _orderAppService.GetOrderRecordDetailAsync("3a946083-ac0e-4e24-b913-3c9fc57ab03b");
+        result.ShouldNotBeNull();
+
+        input.Status = "FromTransferFailed";
+        input.FromTransfer.Status = "Transferring";
+        input.ToTransfer.Status = string.Empty;
+        await _orderDepositAppService.AddOrUpdateAsync(input);
+        result = await _orderAppService.GetOrderRecordDetailAsync("3a946083-ac0e-4e24-b913-3c9fc57ab03b");
+        result.ShouldNotBeNull();
+        
+        input.Status = "ToTransferFailed";
+        input.FromTransfer.Status = "Confirmed";
+        input.ToTransfer.Status = "Transferring";
+        await _orderDepositAppService.AddOrUpdateAsync(input);
+        result = await _orderAppService.GetOrderRecordDetailAsync("3a946083-ac0e-4e24-b913-3c9fc57ab03b");
+        result.ShouldNotBeNull();
+        
+        input.Status = "Failed";
+        input.FromTransfer.Status = "Transferring";
+        input.ToTransfer.Status = string.Empty;
+        await _orderDepositAppService.AddOrUpdateAsync(input);
+        result = await _orderAppService.GetOrderRecordDetailAsync("3a946083-ac0e-4e24-b913-3c9fc57ab03b");
+        result.ShouldNotBeNull();
+        
+        input.Status = "Failed";
+        input.FromTransfer.Status = "Failed";
+        input.ToTransfer.Status = string.Empty;
+        await _orderDepositAppService.AddOrUpdateAsync(input);
+        result = await _orderAppService.GetOrderRecordDetailAsync("3a946083-ac0e-4e24-b913-3c9fc57ab03b");
+        result.ShouldNotBeNull();
+        
+        input.Status = "FromTransferred";
+        input.FromTransfer.Status = "Transferred";
+        input.ToTransfer.Status = string.Empty;
+        await _orderDepositAppService.AddOrUpdateAsync(input);
+        result = await _orderAppService.GetOrderRecordDetailAsync("3a946083-ac0e-4e24-b913-3c9fc57ab03b");
+        result.ShouldNotBeNull();
+        
+        input.Status = "FromTransferred";
+        input.FromTransfer.Status = "StartTransfer";
+        await _orderDepositAppService.AddOrUpdateAsync(input);
+        result = await _orderAppService.GetOrderRecordDetailAsync("3a946083-ac0e-4e24-b913-3c9fc57ab03b");
+        result.ShouldNotBeNull();
+        
+        input.Status = "ToTransferred";
+        input.FromTransfer.Status = "Confirmed";
+        input.ToTransfer.Status = "Transferring";
+        await _orderDepositAppService.AddOrUpdateAsync(input);
+        result = await _orderAppService.GetOrderRecordDetailAsync("3a946083-ac0e-4e24-b913-3c9fc57ab03b");
+        result.ShouldNotBeNull();
+    }
+
+    [Fact]
+    public async Task GetUserOrderRecordListAsyncTest()
+    {
+        await _userIndexRepository.AddOrUpdateAsync(new UserIndex
+        {
+            Id = Guid.NewGuid(),
+            UserId = Guid.Parse("3a946083-ac0e-4e24-b913-3c9fc57ab03b"),
+            AddressInfos = new List<UserAddressInfo>()
+            {
+                new UserAddressInfo()
+                {
+                    Address = "AA"
+                }
+            }
+        });
+        await _orderDepositAppService.AddOrUpdateAsync(new DepositOrderDto()
+        {
+            Id = Guid.Parse("3a946083-ac0e-4e24-b913-3c9fc57ab03b"),
+            UserId = Guid.Parse("3a946083-ac0e-4e24-b913-3c9fc57ab03b"),
+            OrderType = "Deposit",
+            FromTransfer = new TransferInfo
+            {
+                Network = "ETH",
+                Symbol = "USDT",
+                ToAddress = "AA",
+                Amount = 10,
+                Status = "Confirmed"
+            },
+            ToTransfer = new TransferInfo
+            {
+                Network = "ETH",
+                ChainId = "AELF",
+                Symbol = "USDT",
+                ToAddress = "BB",
+                Amount = 9,
+                Status = "success"
+            },
+            Status = "Finish",
+            CreateTime = DateTime.UtcNow.AddHours(-2).ToUtcMilliSeconds(),
+            LastModifyTime = DateTime.UtcNow.AddHours(-1).ToUtcMilliSeconds(),
+            ArrivalTime = DateTime.UtcNow.AddHours(-1).ToUtcMilliSeconds()
+        });
+
+        var input = new GetUserOrderRecordRequestDto()
+        {
+            Address = "AA"
+        };
+        var result = await _orderAppService.GetUserOrderRecordListAsync(input);
+        result.ShouldNotBeNull();
+
+        var eto = new OrderChangeEto()
+        {
+            Id = Guid.Parse("3a946083-ac0e-4e24-b913-3c9fc57ab03b"),
+            UserId = Guid.Parse("3a946083-ac0e-4e24-b913-3c9fc57ab03b"),
+            OrderType = "Deposit",
+            FromTransfer = new TransferInfo
+            {
+                Network = "ETH",
+                Symbol = "USDT",
+                ToAddress = "AA",
+                Amount = 10,
+                Status = "Transferring"
+            },
+            ToTransfer = new TransferInfo
+            {
+                Network = "ETH",
+                ChainId = "AELF",
+                Symbol = "USDT",
+                ToAddress = "BB",
+                Amount = 9,
+                Status = ""
+            },
+            Status = "FromTransferFailed",
+        };
+        result = await _orderAppService.GetUserOrderRecordListAsync(input, eto);
+        result.ShouldNotBeNull();
+
+        eto.OrderType = "Withdraw";
+        result = await _orderAppService.GetUserOrderRecordListAsync(input, eto);
+        result.ShouldNotBeNull();
+
+        input.Time = 48;
+        result = await _orderAppService.GetUserOrderRecordListAsync(input);
+        result.ShouldNotBeNull();
+
+        input.Address = "BB";
+        result = await _orderAppService.GetUserOrderRecordListAsync(input);
+        result.ShouldNotBeNull();
+    }
+
     private IOptionsSnapshot<TokenOptions> MockTokenOptions()
     {
         var mockOptionsSnapshot = new Mock<IOptionsSnapshot<TokenOptions>>();
@@ -183,7 +398,21 @@ public class OrderAppServiceTest : ETransferServerApplicationTestBase
                         {
                             Symbol = "USDT",
                             Name = "USDT",
-                            Decimals = 6
+                            Decimals = 6,
+                            Icon = "icon1"
+                        }
+                    }
+                },
+                Deposit = new Dictionary<string, List<TokenConfig>>()
+                {
+                    ["AELF"] = new List<TokenConfig>()
+                    {
+                        new TokenConfig()
+                        {
+                            Symbol = "USDT",
+                            Name = "USDT",
+                            Decimals = 6,
+                            Icon = "icon2"
                         }
                     }
                 },
@@ -207,5 +436,19 @@ public class OrderAppServiceTest : ETransferServerApplicationTestBase
                 }
             });
         return mockOptionsSnapshot.Object;
+    }
+    
+    private ICoBoCoinGrain MockCoBoCoinGrain()
+    {
+        var coboCoinGrain = new Mock<ICoBoCoinGrain>();
+
+        coboCoinGrain
+            .Setup(x => x.GetConfirmingThreshold())
+            .ReturnsAsync(50);
+        coboCoinGrain
+            .Setup(x => x.GetHomogeneousConfirmingThreshold(It.IsAny<decimal>()))
+            .ReturnsAsync(30);
+
+        return coboCoinGrain.Object;
     }
 }

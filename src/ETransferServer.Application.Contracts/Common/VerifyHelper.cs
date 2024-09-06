@@ -4,10 +4,9 @@ using System.Text.RegularExpressions;
 using AElf;
 using AElf.Cryptography;
 using AElf.Types;
-using ETransferServer.Common;
 using Google.Protobuf;
 
-namespace CAServer.Commons;
+namespace ETransferServer.Common;
 
 public static class VerifyHelper
 {

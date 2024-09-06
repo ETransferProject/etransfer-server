@@ -1,4 +1,4 @@
-namespace CAServer;
+namespace ETransferServer;
 
 public enum DeviceType
 {
