@@ -134,6 +134,11 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
             maxTime = list.Max(t => t.CreatedTime);
             foreach (var coBoTransaction in list)
             {
+                if (coBoTransaction.AbsAmount.SafeToDecimal() <= 0M)
+                {
+                    _logger.LogInformation("transaction amount invalid");
+                    continue;
+                }
                 if (State.ExistOrders.Contains(coBoTransaction.Id))
                 {
                     _logger.LogInformation("order already handle: {orderId}",
