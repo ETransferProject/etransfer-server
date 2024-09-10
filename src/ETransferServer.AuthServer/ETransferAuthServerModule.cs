@@ -78,7 +78,11 @@ public class ETransferAuthServerModule : AbpModule
 
         PreConfigure<OpenIddictServerBuilder>(builder =>
         {
-            builder.Configure(openIddictServerOptions => { openIddictServerOptions.GrantTypes.Add("signature"); });
+            builder.Configure(openIddictServerOptions =>
+            {
+                openIddictServerOptions.GrantTypes.Add("signature");
+                openIddictServerOptions.GrantTypes.Add(AuthConstant.GrantType);
+            });
         });
     }
 
@@ -104,6 +108,7 @@ public class ETransferAuthServerModule : AbpModule
         Configure<AbpOpenIddictExtensionGrantsOptions>(options =>
         {
             options.Grants.Add("signature", new SignatureGrantHandler());
+            options.Grants.Add(AuthConstant.GrantType, new LoginTokenExtensionGrant());
         });
 
         Configure<AbpLocalizationOptions>(options =>
