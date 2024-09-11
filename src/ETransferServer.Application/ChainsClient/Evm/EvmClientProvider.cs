@@ -1,6 +1,5 @@
 using System;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using ETransferServer.Common;
 using ETransferServer.Common.ChainsClient;
@@ -30,26 +29,27 @@ public class EvmClientProvider : IBlockchainClientProvider
     public async Task<BlockDtos> GetBlockTimeAsync(string chainId, string blockHash,string txId = null)
     {
         var client = BlockchainClientFactory.GetClient(chainId);
-        using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(_blockChainInfoOptions.TimeOut)))
+        var timeout = TimeSpan.FromSeconds(_blockChainInfoOptions.TimeOut);
+        var timeoutTask = Task.Delay(timeout);
+
+        _logger.LogInformation("Evm start, timeOut:{timeOut}", _blockChainInfoOptions.TimeOut);
+        var blockTask = client.Eth.Blocks.GetBlockWithTransactionsByHash.SendRequestAsync(blockHash);
+        
+        var completedTask = await Task.WhenAny(blockTask, timeoutTask);
+        if (completedTask == timeoutTask)
         {
-            try
-            {
-                _logger.LogInformation("Evm start, timeOut:{timeOut}", _blockChainInfoOptions.TimeOut);
-                var block = await client.Eth.Blocks.GetBlockWithTransactionsByHash.SendRequestAsync(blockHash, cts.Token);
-                _logger.LogInformation("Get time from block.{chainId},{blockHash},{time}",chainId,block.BlockHash,block.Timestamp.Value);
-                return new BlockDtos
-                {
-                    BlockHash = block.BlockHash,
-                    BlockTimeStamp = block.Timestamp.Value,
-                    BlockHeight = block.Number.Value,
-                    TransactionIdList = block.Transactions.ToList().Select(t => t.TransactionHash).ToList()
-                };
-            }
-            catch (TaskCanceledException)
-            {
-                _logger.LogInformation("Evm cancel");
-            }
+            _logger.LogInformation("Evm cancel");
+            return new BlockDtos();
         }
-        return new BlockDtos();
+        
+        var block = await blockTask;
+        _logger.LogInformation("Get time from block.{chainId},{blockHash},{time}",chainId,block.BlockHash,block.Timestamp.Value);
+        return new BlockDtos
+        {
+            BlockHash = block.BlockHash,
+            BlockTimeStamp = block.Timestamp.Value,
+            BlockHeight = block.Number.Value,
+            TransactionIdList = block.Transactions.ToList().Select(t => t.TransactionHash).ToList()
+        };
     }
 }
