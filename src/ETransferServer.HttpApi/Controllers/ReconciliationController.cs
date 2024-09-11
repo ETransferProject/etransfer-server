@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ETransferServer.Dtos.Info;
 using ETransferServer.Dtos.Order;
+using ETransferServer.Dtos.Reconciliation;
 using ETransferServer.Reconciliation;
 using Volo.Abp;
 
@@ -26,6 +27,13 @@ public class ReconciliationController : ETransferController
     public async Task<GetTokenOptionResultDto> GetNetworkOptionAsync()
     {
         return await _reconciliationAppService.GetNetworkOptionAsync();
+    }
+    
+    [Authorize]
+    [HttpPost("change-password")]
+    public virtual async Task<bool> ChangePasswordAsync(ChangePasswordRequestDto request)
+    {
+        return await _reconciliationAppService.ChangePasswordAsync(request);
     }
     
     [Authorize]
