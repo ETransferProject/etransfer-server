@@ -139,7 +139,7 @@ public class OrderAppService : ApplicationService, IOrderAppService
         }
     }
 
-    public async Task<OrderDetailDto> GetOrderRecordDetailAsync(string id)
+    public async Task<OrderDetailDto> GetOrderRecordDetailAsync(string id, bool includeAll = false)
     {
         try
         {
@@ -147,8 +147,11 @@ public class OrderAppService : ApplicationService, IOrderAppService
             if (id.IsNullOrWhiteSpace() || !userId.HasValue || userId == Guid.Empty) return new OrderDetailDto();
             
             var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
-            mustQuery.Add(q => q.Term(i =>
-                i.Field(f => f.UserId).Value(userId.ToString())));
+            if (!includeAll)
+            {
+                mustQuery.Add(q => q.Term(i =>
+                    i.Field(f => f.UserId).Value(userId.ToString())));
+            }
             mustQuery.Add(q => q.Term(i =>
                 i.Field(f => f.Id).Value(id)));
             

@@ -24,10 +24,16 @@ public class LoginTokenExtensionGrant : ITokenExtensionGrant
         var scopeManager = context.HttpContext.RequestServices.GetRequiredService<IOpenIddictScopeManager>();
         var signInManager = context.HttpContext.RequestServices.GetRequiredService<SignInManager<IdentityUser>>();
         var userManager = context.HttpContext.RequestServices.GetRequiredService<IdentityUserManager>();
-        var _logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<SignatureGrantHandler>>();
+        var _logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<LoginTokenExtensionGrant>>();
+        var source = context.Request.GetParameter("source").ToString();
         var name = context.Request.GetParameter("user_name")?.ToString();
         var password = context.Request.GetParameter("password").ToString();
-        _logger.LogInformation("Reconciliation name:{name}", name);
+        _logger.LogInformation("Reconciliation name:{name}, {source}", name, source);
+        if (source != AuthConstant.ReconciliationSource)
+        {
+            return GetForbidResult(OpenIddictConstants.Errors.InvalidRequest, "invalid source");
+        }
+
         if (name.IsNullOrEmpty() || password.IsNullOrEmpty())
         {
             return GetForbidResult(OpenIddictConstants.Errors.InvalidRequest, "invalid name or password");
