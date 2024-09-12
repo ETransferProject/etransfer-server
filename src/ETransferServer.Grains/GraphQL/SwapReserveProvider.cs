@@ -1,7 +1,11 @@
 using ETransferServer.Common.GraphQL;
+using ETransferServer.Common.HttpClient;
 using ETransferServer.Dtos.GraphQL;
+using ETransferServer.Options;
+using ETransferServer.Samples.HttpClient;
 using GraphQL;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Volo.Abp.Application.Dtos;
 using Volo.Abp.DependencyInjection;
 
@@ -17,13 +21,22 @@ public interface ISwapReserveProvider
 
 public class SwapReserveProvider : ISwapReserveProvider, ISingletonDependency
 {
+    private ApiInfo _swapSyncStateUri => new (HttpMethod.Get, _syncStateServiceOption.Value.SwapSyncStateUri);
+    
     private readonly IGraphQLClientFactory _graphQlClientFactory;
+    private readonly HttpProvider _httpProvider;
+    private readonly IOptionsSnapshot<SyncStateServiceOption> _syncStateServiceOption;
     private readonly ILogger<SwapReserveProvider> _logger;
 
-    public SwapReserveProvider(ILogger<SwapReserveProvider> logger, IGraphQLClientFactory graphQlClientFactory)
+    public SwapReserveProvider(IGraphQLClientFactory graphQlClientFactory,
+        HttpProvider httpProvider,
+        IOptionsSnapshot<SyncStateServiceOption> syncStateServiceOption,
+        ILogger<SwapReserveProvider> logger)
     {
-        _logger = logger;
         _graphQlClientFactory = graphQlClientFactory;
+        _httpProvider = httpProvider;
+        _syncStateServiceOption = syncStateServiceOption;
+        _logger = logger;
     }
 
     public async Task<PagedResultDto<ReserveDto>> GetReserveAsync(string chainId, string pairAddress, long timestamp,
@@ -40,7 +53,7 @@ public class SwapReserveProvider : ISwapReserveProvider, ISingletonDependency
 			    query(
                     $chainId:String,
                     $pairAddress:String,
-                    $timestampMax:Long!
+                    $timestampMax:Long
                     $skipCount:Int!,
                     $maxResultCount:Int!
                 ) {
@@ -79,22 +92,16 @@ public class SwapReserveProvider : ISwapReserveProvider, ISingletonDependency
 
     public async Task<long> GetConfirmedHeightAsync(string chainId)
     {
-        var res = await _graphQlClientFactory.GetClient(GraphQLClientEnum.SwapClient)
-            .SendQueryAsync<ConfirmedBlockHeight>(new GraphQLRequest
+        try
         {
-            Query = @"
-			    query($chainId:String,$filterType:BlockFilterType!) {
-                    syncState(dto: {chainId:$chainId,filterType:$filterType}){
-                        confirmedBlockHeight}
-                    }",
-            Variables = new
-            {
-                chainId,
-                filterType = BlockFilterType.LOG_EVENT
-            }
-        });
-
-        return res.Data.SyncState.ConfirmedBlockHeight;
+            var res = await _httpProvider.InvokeAsync<SyncStateResponse>(_syncStateServiceOption.Value.BaseUrl, _swapSyncStateUri);
+            return res.CurrentVersion.Items.FirstOrDefault(i => i.ChainId == chainId)?.LastIrreversibleBlockHeight ?? 0;
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Query swap syncState error");
+            return 0;
+        }
     }
 }
 
