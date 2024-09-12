@@ -1,5 +1,6 @@
 name: build and package
 on:
+  workflow_dispatch:
   push:
     branches:
       - 'release/*'
