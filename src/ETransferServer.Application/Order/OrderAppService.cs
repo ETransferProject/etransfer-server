@@ -139,32 +139,36 @@ public class OrderAppService : ApplicationService, IOrderAppService
         }
     }
 
-    public async Task<OrderDetailDto> GetOrderRecordDetailAsync(string id, bool includeAll = false)
+    public async Task<OrderDetailDto> GetOrderRecordDetailAsync(string id)
     {
         try
         {
             var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
             if (id.IsNullOrWhiteSpace() || !userId.HasValue || userId == Guid.Empty) return new OrderDetailDto();
-            
-            var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
-            if (!includeAll)
-            {
-                mustQuery.Add(q => q.Term(i =>
-                    i.Field(f => f.UserId).Value(userId.ToString())));
-            }
-            mustQuery.Add(q => q.Term(i =>
-                i.Field(f => f.Id).Value(id)));
-            
-            QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery));
-
-            var orderIndex = await _orderIndexRepository.GetAsync(Filter);
-            return await GetOrderDetailDtoAsync(orderIndex);
+            return (await GetOrderDetailAsync(id, userId, false)).Item1;
         }
         catch (Exception e)
         {
             _logger.LogError(e, "Get order record detail failed, orderId={id}", id);
             return new OrderDetailDto();
         }
+    }
+
+    public async Task<Tuple<OrderDetailDto, OrderIndex>> GetOrderDetailAsync(string id, Guid? userId, bool includeAll = false)
+    {
+        var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+        if (!includeAll)
+        {
+            mustQuery.Add(q => q.Term(i =>
+                i.Field(f => f.UserId).Value(userId.ToString())));
+        }
+        mustQuery.Add(q => q.Term(i =>
+            i.Field(f => f.Id).Value(id)));
+            
+        QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery));
+
+        var orderIndex = await _orderIndexRepository.GetAsync(Filter);
+        return Tuple.Create(await GetOrderDetailDtoAsync(orderIndex), orderIndex);
     }
 
     public async Task<UserOrderDto> GetUserOrderRecordListAsync(GetUserOrderRecordRequestDto request, OrderChangeEto orderEto = null)

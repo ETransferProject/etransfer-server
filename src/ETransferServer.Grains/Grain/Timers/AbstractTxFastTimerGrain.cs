@@ -195,6 +195,7 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> 
             {
                 order.ToTransfer.Status = OrderTransferStatusEnum.Transferred.ToString();
                 order.Status = OrderStatusEnum.ToTransferConfirmed.ToString();
+                await ChangeOperationStatus(order);
             }
             else
             {
@@ -310,6 +311,11 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> 
                         transferInfo.ToAddress = to;
                     }
                 }
+                else
+                {
+                    await ChangeOperationStatus(order);
+                }
+
                 transferInfo.Status = OrderTransferStatusEnum.Transferred.ToString();
                 order.Status = isToTransfer
                     ? OrderStatusEnum.ToTransferConfirmed.ToString()
@@ -330,6 +336,7 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> 
                 order.Status = isToTransfer
                     ? OrderStatusEnum.ToTransferFailed.ToString()
                     : OrderStatusEnum.FromTransferFailed.ToString();
+                if (isToTransfer) await ChangeOperationStatus(order, false);
                 await SaveOrder(order, ExtensionBuilder.New()
                     .Add(ExtensionKey.TransactionStatus, txStatus.Status)
                     .Add(ExtensionKey.TransactionError, txStatus.Error)
@@ -395,6 +402,25 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> 
         {
             _logger.LogWarning("TxFastTimer order timer error, OrderId={OrderId} Message={Msg}", orderId, e.Message);
             return null;
+        }
+    }
+    
+    private async Task ChangeOperationStatus(TOrder order, bool success = true)
+    {
+        if (!order.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)) return;
+
+        order.ExtensionInfo ??= new Dictionary<string, string>();
+        if (order.ExtensionInfo[ExtensionKey.SubStatus] == OrderOperationStatusEnum.ReleaseConfirming.ToString())
+        {
+            order.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus, success
+                ? OrderOperationStatusEnum.ReleaseConfirmed.ToString()
+                : OrderOperationStatusEnum.ReleaseFailed.ToString());
+        }
+        else if (order.ExtensionInfo[ExtensionKey.SubStatus] == OrderOperationStatusEnum.RefundConfirming.ToString())
+        {
+            order.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus, success
+                ? OrderOperationStatusEnum.RefundConfirmed.ToString()
+                : OrderOperationStatusEnum.RefundFailed.ToString());
         }
     }
 

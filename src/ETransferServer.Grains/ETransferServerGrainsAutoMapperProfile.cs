@@ -11,6 +11,7 @@ using ETransferServer.Grains.State.Order;
 using ETransferServer.Grains.State.Swap;
 using ETransferServer.Grains.State.Token;
 using ETransferServer.Grains.State.Users;
+using ETransferServer.Orders;
 using ETransferServer.ThirdPart.CoBo.Dtos;
 using ETransferServer.User.Dtos;
 using TokenDto = ETransferServer.Dtos.Token.TokenDto;
@@ -23,13 +24,14 @@ public class ETransferServerGrainsAutoMapperProfile : Profile
     {
         CreateMap<UserGrainDto, UserState>().ReverseMap();
         CreateMap<UserState, UserDto>().ReverseMap();
-
+        CreateMap<UserReconciliationState, UserReconciliationDto>().ReverseMap();
 
         CreateMap<DepositOrderDto, DepositOrderState>().ReverseMap();
         CreateMap<DepositOrderDto, OrderChangeEto>().ReverseMap();
         CreateMap<OrderStatusFlowState, OrderStatusFlowDto>().ReverseMap();
         CreateMap<WithdrawOrderState, WithdrawOrderDto>().ReverseMap();
         CreateMap<WithdrawOrderDto, OrderChangeEto>().ReverseMap();
+        CreateMap<Transfer, TransferInfo>().ReverseMap();
 
         CreateMap<TokenState, TokenDto>().ReverseMap();
         CreateMap<TokenState, TokenInfo>().ReverseMap();

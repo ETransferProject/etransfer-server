@@ -7,9 +7,6 @@ namespace ETransferServer.Common;
 
 public static class EncryptionHelper
 {
-    private const int Iterations = 1000;
-
-
     public static string MD5Encrypt32(string input)
     {
         using (MD5 md5 = MD5.Create())
@@ -27,66 +24,56 @@ public static class EncryptionHelper
         }
     }
     
-    public static string Encrypt(string plainText, string password)
+    public static string Encrypt(string plainText, string key)
     {
-        var aes = Aes.Create();
-        aes.KeySize = 256; 
-        aes.BlockSize = 128; 
-        aes.Mode = CipherMode.CBC; 
+        byte[] iv = new byte[16];
+        byte[] array;
 
-        var salt = new byte[16];
-        using (var rng = RandomNumberGenerator.Create())
+        using (Aes aes = Aes.Create())
         {
-            rng.GetBytes(salt);
-        }
+            aes.Key = Encoding.UTF8.GetBytes(key);
+            aes.IV = iv;
 
-        var key = new Rfc2898DeriveBytes(password, salt, Iterations, HashAlgorithmName.SHA256);
+            ICryptoTransform encryptor = aes.CreateEncryptor(aes.Key, aes.IV);
 
-        using (var encryptor = aes.CreateEncryptor(key.GetBytes(aes.KeySize / 8), aes.IV))
-        using (var memoryStream = new MemoryStream())
-        {
-            memoryStream.Write(salt, 0, salt.Length); 
-            memoryStream.Write(aes.IV, 0, aes.IV.Length);
-            using (var cryptoStream = new CryptoStream(memoryStream, encryptor, CryptoStreamMode.Write))
+            using (MemoryStream memoryStream = new MemoryStream())
             {
-                using (var streamWriter = new StreamWriter(cryptoStream))
+                using (CryptoStream cryptoStream = new CryptoStream((Stream)memoryStream, encryptor, CryptoStreamMode.Write))
                 {
-                    streamWriter.Write(plainText);
+                    using (StreamWriter streamWriter = new StreamWriter((Stream)cryptoStream))
+                    {
+                        streamWriter.Write(plainText);
+                    }
+                    array = memoryStream.ToArray();
                 }
             }
-
-            return Convert.ToBase64String(memoryStream.ToArray());
         }
+
+        return Convert.ToBase64String(array);
     }
 
-    public static string Decrypt(string cipherText, string password)
+    public static string Decrypt(string cipherText, string key)
     {
-        var bytes = Convert.FromBase64String(cipherText);
-        using (var memoryStream = new MemoryStream(bytes))
+        byte[] iv = new byte[16];
+        byte[] buffer = Convert.FromBase64String(cipherText);
+
+        using (Aes aes = Aes.Create())
         {
-            var salt = new byte[16];
-            var _ = memoryStream.Read(salt, 0, salt.Length);
+            aes.Key = Encoding.UTF8.GetBytes(key);
+            aes.IV = iv;
 
-            var iv = new byte[16];
-            var __= memoryStream.Read(iv, 0, iv.Length);
+            ICryptoTransform decryptor = aes.CreateDecryptor(aes.Key, aes.IV);
 
-            var key = new Rfc2898DeriveBytes(password, salt, Iterations, HashAlgorithmName.SHA256);
-
-            using (var aes = Aes.Create())
+            using (MemoryStream memoryStream = new MemoryStream(buffer))
             {
-                aes.KeySize = 256;
-                aes.BlockSize = 128;
-                aes.Mode = CipherMode.CBC;
-                aes.IV = iv;
-
-                using (var decryptor = aes.CreateDecryptor(key.GetBytes(aes.KeySize / 8), aes.IV))
-                using (var cryptoStream = new CryptoStream(memoryStream, decryptor, CryptoStreamMode.Read))
-                using (var streamReader = new StreamReader(cryptoStream))
+                using (CryptoStream cryptoStream = new CryptoStream((Stream)memoryStream, decryptor, CryptoStreamMode.Read))
                 {
-                    return streamReader.ReadToEnd();
+                    using (StreamReader streamReader = new StreamReader((Stream)cryptoStream))
+                    {
+                        return streamReader.ReadToEnd();
+                    }
                 }
             }
         }
     }
-
 }

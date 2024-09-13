@@ -31,7 +31,15 @@ public static class ExtensionKey
     public const string Memo = "Memo";
     public const string FromConfirmedNum = "FromConfirmedNum";
     public const string FromConfirmingThreshold = "FromConfirmingThreshold";
-
+    public const string RelatedOrderId = "RelatedOrderId";
+    public const string RequestUser = "RequestUser";
+    public const string RequestTime = "RequestTime";
+    public const string ReleaseUser = "ReleaseUser";
+    public const string ReleaseTime = "ReleaseTime";
+    public const string RefundUser = "RefundUser";
+    public const string RefundTime = "RefundTime";
+    public const string SubStatus = "SubStatus";
+    
     public const string IsSwap = "IsSwap";
     public const string NeedSwap = "NeedSwap";
     public const string SwapStage = "SwapStage";

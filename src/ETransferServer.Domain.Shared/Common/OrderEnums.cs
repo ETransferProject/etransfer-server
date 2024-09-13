@@ -56,3 +56,18 @@ public enum OrderStatusResponseEnum
     Succeed,
     Failed
 }
+
+public enum OrderOperationStatusEnum
+{
+    ReleaseRequested,
+    ReleaseConfirming,
+    ReleaseConfirmed,
+    ReleaseFailed,
+    ReleaseRejected,
+    RefundRequested,
+    RefundConfirming,
+    RefundConfirmed,
+    RefundFailed,
+    RefundRejected
+
+}

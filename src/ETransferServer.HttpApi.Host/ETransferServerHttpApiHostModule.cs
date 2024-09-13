@@ -84,6 +84,7 @@ namespace ETransferServer
             Configure<CoBoOptions>(configuration.GetSection("CoBo"));
             Configure<HubOptions>(configuration.GetSection("Hub"));
             Configure<SwapInfosOptions>(configuration.GetSection("SwapInfos"));
+            Configure<StringEncryptionOptions>(configuration.GetSection("StringEncryption"));
 
             ConfigureConventionalControllers();
             // ConfigureAuthentication(context, configuration);
