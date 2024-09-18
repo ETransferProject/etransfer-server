@@ -52,8 +52,8 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
         IObjectMapper objectMapper,
         ILogger<OrderAppService> logger,
         IInfoAppService infoService,
-        IOrderAppService orderService, 
-        INetworkAppService networkAppService, 
+        IOrderAppService orderService,
+        INetworkAppService networkAppService,
         IdentityUserManager userManager,
         IOptionsSnapshot<StringEncryptionOptions> stringEncryptionOptions)
     {
@@ -94,7 +94,7 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
             {
                 throw new UserFriendlyException("Invalid password.");
             }
-            
+
             var token = await _userManager.GeneratePasswordResetTokenAsync(identityUser);
             var result = await _userManager.ResetPasswordAsync(identityUser, token, password);
             if (!result.Succeeded)
@@ -141,7 +141,8 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
 
             var (orderDetailDto, orderIndex) = await _orderService.GetOrderDetailAsync(id, userId, true);
             var result = _objectMapper.Map<OrderDetailDto, OrderMoreDetailDto>(orderDetailDto);
-            result.RelatedOrderId = orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.RelatedOrderId)
+            result.RelatedOrderId = !orderIndex.ExtensionInfo.IsNullOrEmpty() &&
+                                    orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.RelatedOrderId)
                 ? orderIndex.ExtensionInfo[ExtensionKey.RelatedOrderId]
                 : null;
             result.ThirdPartFee = !orderIndex.ThirdPartFee.IsNullOrEmpty() &&
@@ -153,6 +154,11 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
                               (decimal)Math.Pow(10, orderIndex.ThirdPartFee[0].Decimals.SafeToInt())).ToString()
                 }
                 : new FeeInfo();
+            result.OperationStatus = !orderIndex.ExtensionInfo.IsNullOrEmpty() &&
+                                     orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)
+                ? orderIndex.ExtensionInfo[ExtensionKey.SubStatus]
+                : null;
+            result.RoleType = await GetRoleTypeAsync();
             return result;
         }
         catch (Exception e)
@@ -168,7 +174,7 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
         {
             var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
             if (!userId.HasValue || userId == Guid.Empty) return new OrderPagedResultDto<OrderRecordDto>();
-            
+
             var (count, list) = await GetOrderRecordListAsync(request, OrderTypeEnum.Deposit.ToString());
 
             return new OrderPagedResultDto<OrderRecordDto>
@@ -192,7 +198,7 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
         {
             var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
             if (!userId.HasValue || userId == Guid.Empty) return new OrderPagedResultDto<OrderRecordDto>();
-                
+
             var (count, list) = await GetOrderRecordListAsync(request, OrderTypeEnum.Withdraw.ToString());
 
             return new OrderPagedResultDto<OrderRecordDto>
@@ -216,13 +222,14 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
         {
             var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
             if (!userId.HasValue || userId == Guid.Empty) return new PagedResultDto<OrderRecordDto>();
-                
+
             var (count, list) = await GetOrderRecordListAsync(request, OrderStatusResponseEnum.Failed.ToString());
 
             return new PagedResultDto<OrderRecordDto>
             {
                 Items = await LoopCollectionItemsAsync(
-                    _objectMapper.Map<List<OrderIndex>, List<OrderRecordDto>>(list)),
+                    _objectMapper.Map<List<OrderIndex>, List<OrderRecordDto>>(list), list,
+                    OrderStatusResponseEnum.Failed.ToString()),
                 TotalCount = count
             };
         }
@@ -287,10 +294,10 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
                 throw new UserFriendlyException("Invalid user.");
 
             var orderIndex = await GetOrderIndexAsync(request.OrderId);
-            if (orderIndex == null || (!orderIndex.ExtensionInfo.IsNullOrEmpty() &&
-                                       orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus) &&
-                                       orderIndex.ExtensionInfo[ExtensionKey.SubStatus] ==
-                                       OrderOperationStatusEnum.ReleaseRequested.ToString()))
+            if (orderIndex == null || orderIndex.ExtensionInfo.IsNullOrEmpty()
+                                   || !orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)
+                                   || orderIndex.ExtensionInfo[ExtensionKey.SubStatus] !=
+                                   OrderOperationStatusEnum.ReleaseRequested.ToString())
             {
                 throw new UserFriendlyException("Invalid order.");
             }
@@ -322,7 +329,7 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
             var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
             if (!userId.HasValue || userId == Guid.Empty)
                 throw new UserFriendlyException("Invalid user.");
-            
+
             await VerifyCode(request.Code);
 
             var orderIndex = await GetOrderIndexAsync(request.OrderId);
@@ -356,7 +363,7 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
             orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus,
                 OrderOperationStatusEnum.ReleaseConfirming.ToString());
             await _orderIndexRepository.AddOrUpdateAsync(orderIndex);
-            
+
             var userDepositGrain = _clusterClient.GetGrain<IUserDepositGrain>(orderIndex.Id);
             await userDepositGrain.AddOrUpdateOrder(_objectMapper.Map<OrderIndex, DepositOrderDto>(orderIndex));
             var depositOrderStatusReminderGrain =
@@ -390,7 +397,8 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
                                    || orderIndex.Status == OrderStatusEnum.Finish.ToString()
                                    || orderIndex.Status == OrderStatusEnum.ToTransferConfirmed.ToString()
                                    || (orderIndex.FromTransfer.Status != OrderTransferStatusEnum.Confirmed.ToString()
-                                   && orderIndex.FromTransfer.Status != OrderTransferStatusEnum.Transferred.ToString()))
+                                       && orderIndex.FromTransfer.Status !=
+                                       OrderTransferStatusEnum.Transferred.ToString()))
             {
                 throw new UserFriendlyException("Invalid order.");
             }
@@ -432,10 +440,10 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
                 throw new UserFriendlyException("Invalid user.");
 
             var orderIndex = await GetOrderIndexAsync(request.OrderId);
-            if (orderIndex == null || (!orderIndex.ExtensionInfo.IsNullOrEmpty() &&
-                                       orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus) &&
-                                       orderIndex.ExtensionInfo[ExtensionKey.SubStatus] ==
-                                       OrderOperationStatusEnum.RefundRequested.ToString()))
+            if (orderIndex == null || orderIndex.ExtensionInfo.IsNullOrEmpty()
+                                   || !orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)
+                                   || orderIndex.ExtensionInfo[ExtensionKey.SubStatus] !=
+                                   OrderOperationStatusEnum.RefundRequested.ToString())
             {
                 throw new UserFriendlyException("Invalid order.");
             }
@@ -475,7 +483,8 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
                                    || orderIndex.Status == OrderStatusEnum.Finish.ToString()
                                    || orderIndex.Status == OrderStatusEnum.ToTransferConfirmed.ToString()
                                    || (orderIndex.FromTransfer.Status != OrderTransferStatusEnum.Confirmed.ToString()
-                                       && orderIndex.FromTransfer.Status != OrderTransferStatusEnum.Transferred.ToString()))
+                                       && orderIndex.FromTransfer.Status !=
+                                       OrderTransferStatusEnum.Transferred.ToString()))
             {
                 throw new UserFriendlyException("Invalid order.");
             }
@@ -540,7 +549,7 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
         var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
         mustQuery.Add(q => q.Term(i =>
             i.Field(f => f.Id).Value(orderId)));
-        
+
         QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery));
         return await _orderIndexRepository.GetAsync(Filter);
     }
@@ -563,7 +572,7 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
                 )
             )
         );
-        
+
         var searchResponse = await _orderIndexRepository.SearchAsync(s, 0, 0);
         if (!searchResponse.IsValid)
         {
@@ -592,7 +601,7 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
 
         return await _orderIndexRepository.GetSortListAsync(Filter,
             sortFunc: string.IsNullOrWhiteSpace(request.Sorting)
-                ? s => s.Descending(t => t.ArrivalTime)
+                ? s => s.Descending(t => t.CreateTime)
                 : GetSorting(request.Sorting),
             limit: request.MaxResultCount == 0 ? OrderOptions.DefaultResultCount :
             request.MaxResultCount > OrderOptions.MaxResultCount ? OrderOptions.MaxResultCount :
@@ -611,7 +620,7 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
                     w.Field(f => f.Status).Terms(OrderStatusHelper.GetFailedList())),
                 p => p.Bool(j => j.Must(
                     s => s.Range(k =>
-                        k.Field(f => f.CreateTime).GreaterThan(DateTime.UtcNow
+                        k.Field(f => f.CreateTime).LessThan(DateTime.UtcNow
                             .AddDays(OrderOptions.ValidOrderMessageThreshold).ToUtcMilliSeconds())),
                     s => s.Terms(i =>
                         i.Field(f => f.Status).Terms(OrderStatusHelper.GetProcessingList())))))));
@@ -638,8 +647,8 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
                 s => s.Term(w =>
                     w.Field(f => f.ToTransfer.TxId).Value(request.Address.Trim()).CaseInsensitive()))));
         }
-        
-         if (request.Token > 0 || request.FromChainId > 0 || request.ToChainId > 0)
+
+        if (request.Token > 0 || request.FromChainId > 0 || request.ToChainId > 0)
         {
             var options = await GetNetworkOptionAsync();
             if (request.Token > 0)
@@ -701,7 +710,8 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
         return mustQuery;
     }
 
-    private async Task<List<OrderRecordDto>> LoopCollectionItemsAsync(List<OrderRecordDto> itemList)
+    private async Task<List<OrderRecordDto>> LoopCollectionItemsAsync(List<OrderRecordDto> itemList,
+        List<OrderIndex> orderList = null, string type = null)
     {
         var fromSymbolList = itemList.Select(i => i.FromTransfer.Symbol).Distinct().ToList();
         var toSymbolList = itemList.Select(i => i.ToTransfer.Symbol).Distinct().ToList();
@@ -737,9 +747,35 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
             item.FromTransfer.Icon =
                 await _networkAppService.GetIconAsync(item.OrderType, ChainId.AELF, item.FromTransfer.Symbol);
             item.ToTransfer.Icon =
-                await _networkAppService.GetIconAsync(item.OrderType, ChainId.AELF, item.ToTransfer.Symbol);
+                await _networkAppService.GetIconAsync(item.OrderType, ChainId.AELF, item.FromTransfer.Symbol,
+                    item.ToTransfer.Symbol);
+            if (!type.IsNullOrEmpty())
+            {
+                var extensionInfo = orderList.FirstOrDefault(i => i.Id == item.Id)?.ExtensionInfo;
+                if (!extensionInfo.IsNullOrEmpty() && extensionInfo.ContainsKey(ExtensionKey.SubStatus))
+                {
+                    item.OperationStatus = extensionInfo[ExtensionKey.SubStatus];
+                }
+                item.RoleType = await GetRoleTypeAsync();
+            }
         }
+
         return itemList;
+    }
+
+    private async Task<int> GetRoleTypeAsync()
+    {
+        var roles = CurrentUser?.Roles;
+        if (!roles.IsNullOrEmpty())
+        {
+            var role = char.ToUpper(roles[0][0]) + roles[0].Substring(1);
+            if (Enum.TryParse(role, out RoleEnum result))
+            {
+                return (int)result;
+            }
+        }
+
+        return -1;
     }
 
     private async Task HandleItemAsync(OrderRecordDto item)

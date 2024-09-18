@@ -9,13 +9,13 @@ public static class EncryptionHelper
 {
     public static string MD5Encrypt32(string input)
     {
-        using (MD5 md5 = MD5.Create())
+        using (var md5 = MD5.Create())
         {
-            byte[] inputBytes = Encoding.UTF8.GetBytes(input);
-            byte[] hashBytes = md5.ComputeHash(inputBytes);
+            var inputBytes = Encoding.UTF8.GetBytes(input);
+            var hashBytes = md5.ComputeHash(inputBytes);
 
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < hashBytes.Length; i++)
+            var sb = new StringBuilder();
+            for (var i = 0; i < hashBytes.Length; i++)
             {
                 sb.Append(hashBytes[i].ToString("x2"));
             }
@@ -26,21 +26,21 @@ public static class EncryptionHelper
     
     public static string Encrypt(string plainText, string key)
     {
-        byte[] iv = new byte[16];
+        var iv = new byte[16];
         byte[] array;
 
-        using (Aes aes = Aes.Create())
+        using (var aes = Aes.Create())
         {
             aes.Key = Encoding.UTF8.GetBytes(key);
             aes.IV = iv;
 
-            ICryptoTransform encryptor = aes.CreateEncryptor(aes.Key, aes.IV);
+            var encryptor = aes.CreateEncryptor(aes.Key, aes.IV);
 
-            using (MemoryStream memoryStream = new MemoryStream())
+            using (var memoryStream = new MemoryStream())
             {
-                using (CryptoStream cryptoStream = new CryptoStream((Stream)memoryStream, encryptor, CryptoStreamMode.Write))
+                using (var cryptoStream = new CryptoStream((Stream)memoryStream, encryptor, CryptoStreamMode.Write))
                 {
-                    using (StreamWriter streamWriter = new StreamWriter((Stream)cryptoStream))
+                    using (var streamWriter = new StreamWriter((Stream)cryptoStream))
                     {
                         streamWriter.Write(plainText);
                     }
@@ -54,21 +54,21 @@ public static class EncryptionHelper
 
     public static string Decrypt(string cipherText, string key)
     {
-        byte[] iv = new byte[16];
-        byte[] buffer = Convert.FromBase64String(cipherText);
+        var iv = new byte[16];
+        var buffer = Convert.FromBase64String(cipherText);
 
-        using (Aes aes = Aes.Create())
+        using (var aes = Aes.Create())
         {
             aes.Key = Encoding.UTF8.GetBytes(key);
             aes.IV = iv;
 
-            ICryptoTransform decryptor = aes.CreateDecryptor(aes.Key, aes.IV);
+            var decryptor = aes.CreateDecryptor(aes.Key, aes.IV);
 
-            using (MemoryStream memoryStream = new MemoryStream(buffer))
+            using (var memoryStream = new MemoryStream(buffer))
             {
-                using (CryptoStream cryptoStream = new CryptoStream((Stream)memoryStream, decryptor, CryptoStreamMode.Read))
+                using (var cryptoStream = new CryptoStream((Stream)memoryStream, decryptor, CryptoStreamMode.Read))
                 {
-                    using (StreamReader streamReader = new StreamReader((Stream)cryptoStream))
+                    using (var streamReader = new StreamReader((Stream)cryptoStream))
                     {
                         return streamReader.ReadToEnd();
                     }

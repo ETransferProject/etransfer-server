@@ -5,7 +5,7 @@ namespace ETransferServer.Dtos.Reconciliation;
 
 public class GetOrderRequestDto : PagedAndSortedResultRequestDto
 {
-    public string Address { get; set; }
+    public string? Address { get; set; }
     [Range(0, int.MaxValue)]
     public int Token { get; set; }
     [Range(0, int.MaxValue)]

@@ -6,7 +6,7 @@ namespace ETransferServer.Dtos.Reconciliation;
 
 public class OrderRecordDto : OrderIndexDto
 {
-    public int RoleType { get; set; }
+    public int RoleType { get; set; } = -1;
     public string OperationStatus { get; set; }
 }
 

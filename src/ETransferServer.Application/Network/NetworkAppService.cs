@@ -221,17 +221,16 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
             ?.FirstOrDefault(t => t.Symbol == symbol)
             ?.Decimals ?? DecimalHelper.GetDecimals(symbol));
     }
-    
-    public Task<string> GetIconAsync(string orderType, string chainId, string symbol)
+
+    public Task<string> GetIconAsync(string orderType, string chainId, string fromSymbol, string toSymbol = null)
     {
         var tokenDic = orderType == OrderTypeEnum.Withdraw.ToString()
             ? _tokenOptions.Value.Withdraw
             : _tokenOptions.Value.Deposit;
-        return Task.FromResult((tokenDic.ContainsKey(chainId)
-                ? tokenDic[chainId]
-                : null)
-            ?.FirstOrDefault(t => t.Symbol == symbol)
-            ?.Icon);
+        return Task.FromResult(tokenDic.ContainsKey(chainId) && (toSymbol.IsNullOrEmpty() || fromSymbol == toSymbol)
+            ? tokenDic[chainId]?.FirstOrDefault(t => t.Symbol == fromSymbol)?.Icon
+            : _tokenOptions.Value.DepositSwap.FirstOrDefault(config => config.Symbol == fromSymbol)?.ToTokenList?
+                .FirstOrDefault(token => token.Symbol == toSymbol)?.Icon);
     }
 
     public async Task<ListResultDto<TokenPriceDataDto>> GetTokenPriceListAsync(GetTokenPriceListRequestDto request)

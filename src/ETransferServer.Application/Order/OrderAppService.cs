@@ -367,7 +367,7 @@ public class OrderAppService : ApplicationService, IOrderAppService
         item.FromTransfer.Icon =
             await _networkAppService.GetIconAsync(item.OrderType, ChainId.AELF, item.FromTransfer.Symbol);
         item.ToTransfer.Icon =
-            await _networkAppService.GetIconAsync(item.OrderType, ChainId.AELF, item.ToTransfer.Symbol);
+            await _networkAppService.GetIconAsync(item.OrderType, ChainId.AELF, item.FromTransfer.Symbol, item.ToTransfer.Symbol);
         return item;
     }
 
