@@ -343,8 +343,10 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
 
             if (orderIndex.ExtensionInfo.IsNullOrEmpty()
                 || !orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)
-                || orderIndex.ExtensionInfo[ExtensionKey.SubStatus] !=
-                OrderOperationStatusEnum.ReleaseRequested.ToString())
+                || (orderIndex.ExtensionInfo[ExtensionKey.SubStatus] !=
+                    OrderOperationStatusEnum.ReleaseRequested.ToString()
+                    && orderIndex.ExtensionInfo[ExtensionKey.SubStatus] !=
+                    OrderOperationStatusEnum.ReleaseFailed.ToString()))
             {
                 throw new UserFriendlyException("Invalid release status.");
             }
@@ -491,8 +493,10 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
 
             if (orderIndex.ExtensionInfo.IsNullOrEmpty()
                 || !orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)
-                || orderIndex.ExtensionInfo[ExtensionKey.SubStatus] !=
-                OrderOperationStatusEnum.RefundRequested.ToString())
+                || (orderIndex.ExtensionInfo[ExtensionKey.SubStatus] !=
+                    OrderOperationStatusEnum.RefundRequested.ToString()
+                    && orderIndex.ExtensionInfo[ExtensionKey.SubStatus] !=
+                    OrderOperationStatusEnum.RefundFailed.ToString()))
             {
                 throw new UserFriendlyException("Invalid refund status.");
             }
@@ -507,9 +511,8 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
                 newOrderId.ToString());
             await _orderIndexRepository.AddOrUpdateAsync(orderIndex);
 
-            orderIndex.ToTransfer.ToAddress = address;
             var userWithdrawGrain = _clusterClient.GetGrain<IUserWithdrawGrain>(newOrderId);
-            await userWithdrawGrain.CreateRefundOrder(orderIndex);
+            await userWithdrawGrain.CreateRefundOrder(orderIndex, address);
 
             return new OrderOperationStatusDto
             {

@@ -30,7 +30,7 @@ public interface IUserWithdrawGrain : IGrainWithGuidKey
     /// <returns></returns>
     Task<WithdrawOrderDto> CreateOrder(WithdrawOrderDto withdrawOrderDto);
     
-    Task<WithdrawOrderDto> CreateRefundOrder(OrderIndex orderIndex);
+    Task<WithdrawOrderDto> CreateRefundOrder(OrderIndex orderIndex, string address);
 
     /// <summary>
     ///     Forward transaction information from the front end
@@ -165,7 +165,7 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         return await AddOrUpdateOrder(withdrawOrderDto);
     }
 
-    public async Task<WithdrawOrderDto> CreateRefundOrder(OrderIndex orderIndex)
+    public async Task<WithdrawOrderDto> CreateRefundOrder(OrderIndex orderIndex, string address)
     {
         // amount limit
         var amountUsd = await _withdrawQueryTimerGrain.GetAvgExchangeAsync(orderIndex.FromTransfer.Symbol, CommonConstant.Symbol.USD);
@@ -180,7 +180,7 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
             {
                 Id = this.GetPrimaryKey(),
                 Status = OrderStatusEnum.FromTransferConfirmed.ToString(),
-                UserId = await _withdrawQueryTimerGrain.GetUserIdAsync(orderIndex.ToTransfer.ToAddress),
+                UserId = await _withdrawQueryTimerGrain.GetUserIdAsync(address),
                 OrderType = OrderTypeEnum.Withdraw.ToString(),
                 AmountUsd = amountUsd,
                 FromTransfer = _objectMapper.Map<Transfer, TransferInfo>(orderIndex.FromTransfer),
