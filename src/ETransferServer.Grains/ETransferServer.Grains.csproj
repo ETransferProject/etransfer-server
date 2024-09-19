@@ -39,11 +39,5 @@
     <ItemGroup>
       <ProjectReference Include="..\ETransferServer.Application.Contracts\ETransferServer.Application.Contracts.csproj" />
     </ItemGroup>
-
-    <ItemGroup>
-      <Orleans_CodeGenInputs Remove="Common\AElfSdk\ContractProvider.cs" />
-      <Orleans_CodeGenInputs Remove="Common\AElfSdk\Dtos\SenderAccount.cs" />
-      <Orleans_CodeGenInputs Remove="Common\AElfSdk\Dtos\SystemContractName.cs" />
-      <Orleans_CodeGenInputs Remove="Common\AElfSdk\SignatureProvider.cs" />
-    </ItemGroup>
+    
 </Project>
