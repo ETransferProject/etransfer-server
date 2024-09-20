@@ -17,10 +17,6 @@ jobs:
         displayName: 'Install .NET Core SDK'
         inputs:
           version: 7.0.x
-      - script: bash scripts/download_binary.sh
-        displayName: 'Download AElf build tools'
-      - script: bash scripts/install_protobuf.sh
-        displayName: 'Install protobuf'
       - script: cd scripts && bash elasticsearch-macOS.sh
         displayName: 'Start an elasticsearch'
       - script: bash build.sh --target=Test-with-Codecov

@@ -42,30 +42,4 @@
     <PackageReference Include="NBitcoin" Version="7.0.31" />
   </ItemGroup>
 
-  <ItemGroup>
-    <ContractReference Include="..\..\protobuf\acs12.proto">
-      <Link>Protobuf\Proto\acs12.proto</Link>
-    </ContractReference>
-    <ContractReference Include="..\..\protobuf\authority_info.proto">
-      <Link>Protobuf\Proto\authority_info.proto</Link>
-    </ContractReference>
-    <ContractReference Include="..\..\protobuf\token_pool_contract.proto">
-      <Link>Protobuf\Proto\token_pool_contract.proto</Link>
-    </ContractReference>
-    <ContractReference Include="..\..\protobuf\token_contract.proto">
-      <Link>Protobuf\Proto\token_contract.proto</Link>
-    </ContractReference>
-    <ContractReference Include="..\..\protobuf\ca_contract.proto">
-      <Link>Protobuf\Proto\ca_contract.proto</Link>
-    </ContractReference>
-  </ItemGroup>
-  <ItemGroup>
-    <None Remove="contract_csharp_plugin-v1.0.3-osx.zip" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Remove="Protobuf\Generated\TokenContract.c.cs" />
-    <Compile Remove="Protobuf\Generated\AuthorityInfo.g.cs" />
-  </ItemGroup>
-
 </Project>

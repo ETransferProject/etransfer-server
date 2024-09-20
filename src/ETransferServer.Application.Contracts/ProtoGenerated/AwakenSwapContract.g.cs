@@ -3832,7 +3832,7 @@ namespace Awaken.Contracts.Swap {
 
   }
 
-  internal sealed partial class GetPairAddressInput : pb::IMessage<GetPairAddressInput>
+  public sealed partial class GetPairAddressInput : pb::IMessage<GetPairAddressInput>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
@@ -4974,7 +4974,7 @@ namespace Awaken.Contracts.Swap {
 
   }
 
-  internal sealed partial class GetAmountsOutInput : pb::IMessage<GetAmountsOutInput>
+  public sealed partial class GetAmountsOutInput : pb::IMessage<GetAmountsOutInput>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
@@ -6224,7 +6224,7 @@ namespace Awaken.Contracts.Swap {
 
   }
 
-  internal sealed partial class GetAmountsOutOutput : pb::IMessage<GetAmountsOutOutput>
+  public sealed partial class GetAmountsOutOutput : pb::IMessage<GetAmountsOutOutput>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif

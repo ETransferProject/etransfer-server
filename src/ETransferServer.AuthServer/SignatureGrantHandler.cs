@@ -73,7 +73,7 @@ public class SignatureGrantHandler : ITokenExtensionGrant
 
         var rawText = Encoding.UTF8.GetString(ByteArrayHelper.HexStringToByteArray(plainText));
         _logger.LogInformation("rawText:{rawText}", rawText);
-        var nonce = rawText.TrimEnd().Substring(plainText.IndexOf("Nonce:") + 7);
+        var nonce = rawText.TrimEnd().Substring(rawText.LastIndexOf("Nonce:") + 6);
         _logger.LogInformation("nonce:{nonce}", nonce);
         var publicKey = ByteArrayHelper.HexStringToByteArray(publicKeyVal);
         _logger.LogInformation("publicKey:{publicKey}", publicKey);

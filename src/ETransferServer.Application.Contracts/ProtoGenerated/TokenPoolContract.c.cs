@@ -11,7 +11,8 @@ using aelf = global::AElf.CSharp.Core;
 namespace ETransfer.Contracts.TokenPool {
 
   #region Events
-  internal partial class TokenPoolTransferred : aelf::IEvent<TokenPoolTransferred>
+
+  public partial class TokenPoolTransferred : aelf::IEvent<TokenPoolTransferred>
   {
     public global::System.Collections.Generic.IEnumerable<TokenPoolTransferred> GetIndexed()
     {
@@ -94,7 +95,7 @@ namespace ETransfer.Contracts.TokenPool {
     }
   }
 
-  internal partial class TokenSwapped : aelf::IEvent<TokenSwapped>
+  public partial class TokenSwapped : aelf::IEvent<TokenSwapped>
   {
     public global::System.Collections.Generic.IEnumerable<TokenSwapped> GetIndexed()
     {
