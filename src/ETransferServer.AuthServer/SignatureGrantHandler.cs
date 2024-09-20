@@ -67,14 +67,13 @@ public class SignatureGrantHandler : ITokenExtensionGrant
             return invalidParamResult;
         }
 
-        _logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<SignatureGrantHandler>>();
         _logger.LogInformation(
             "publicKeyVal:{publicKeyVal}, signatureVal:{signatureVal}, plainText:{plainText}, caHash:{caHash}, chainId:{chainId}, version:{version}, source:{source}",
             publicKeyVal, signatureVal, plainText, caHash, chainId, version, source);
 
         var rawText = Encoding.UTF8.GetString(ByteArrayHelper.HexStringToByteArray(plainText));
         _logger.LogInformation("rawText:{rawText}", rawText);
-        var nonce = rawText.TrimEnd().Substring(plainText.IndexOf("Nonce:") + 7);
+        var nonce = rawText.TrimEnd().Substring(rawText.LastIndexOf("Nonce:") + 6);
         _logger.LogInformation("nonce:{nonce}", nonce);
         var publicKey = ByteArrayHelper.HexStringToByteArray(publicKeyVal);
         _logger.LogInformation("publicKey:{publicKey}", publicKey);

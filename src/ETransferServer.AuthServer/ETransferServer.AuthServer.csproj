@@ -59,14 +59,5 @@
         </ProjectReference>
 <!--        <ProjectReference Include="..\ETransferServer.Signature\ETransferServer.Signature.csproj" />-->
     </ItemGroup>
-    
-    <ItemGroup>
-        <ContractReference Include="..\..\protobuf\acs12.proto">
-            <Link>Protobuf\Proto\acs12.proto</Link>
-        </ContractReference>
-        <ContractReference Include="..\..\protobuf\ca_contract.proto">
-            <Link>Protobuf\Proto\ca_contract.proto</Link>
-        </ContractReference>
-    </ItemGroup>
 
 </Project>

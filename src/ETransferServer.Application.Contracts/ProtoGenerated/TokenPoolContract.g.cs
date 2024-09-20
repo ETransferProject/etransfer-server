@@ -382,7 +382,7 @@ namespace ETransfer.Contracts.TokenPool {
 
   }
 
-  internal sealed partial class TransferTokenInput : pb::IMessage<TransferTokenInput>
+  public sealed partial class TransferTokenInput : pb::IMessage<TransferTokenInput>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
@@ -756,7 +756,7 @@ namespace ETransfer.Contracts.TokenPool {
 
   }
 
-  internal sealed partial class ReleaseTokenInput : pb::IMessage<ReleaseTokenInput>
+  public sealed partial class ReleaseTokenInput : pb::IMessage<ReleaseTokenInput>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
@@ -2980,7 +2980,7 @@ namespace ETransfer.Contracts.TokenPool {
 
   }
 
-  internal sealed partial class SwapTokenInput : pb::IMessage<SwapTokenInput>
+  public sealed partial class SwapTokenInput : pb::IMessage<SwapTokenInput>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
@@ -4273,7 +4273,7 @@ namespace ETransfer.Contracts.TokenPool {
   /// <summary>
   /// event log
   /// </summary>
-  internal sealed partial class TokenPoolTransferred : pb::IMessage<TokenPoolTransferred>
+  public sealed partial class TokenPoolTransferred : pb::IMessage<TokenPoolTransferred>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
@@ -5490,7 +5490,7 @@ namespace ETransfer.Contracts.TokenPool {
 
   }
 
-  internal sealed partial class TokenSwapped : pb::IMessage<TokenSwapped>
+  public sealed partial class TokenSwapped : pb::IMessage<TokenSwapped>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
@@ -6011,7 +6011,7 @@ namespace ETransfer.Contracts.TokenPool {
 
   }
 
-  internal sealed partial class SwapPath : pb::IMessage<SwapPath>
+  public sealed partial class SwapPath : pb::IMessage<SwapPath>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
@@ -6189,7 +6189,7 @@ namespace ETransfer.Contracts.TokenPool {
 
   }
 
-  internal sealed partial class AmountsOut : pb::IMessage<AmountsOut>
+  public sealed partial class AmountsOut : pb::IMessage<AmountsOut>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif

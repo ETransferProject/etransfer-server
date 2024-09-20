@@ -11,6 +11,7 @@ using ETransferServer.Grains.Grain.Order.Deposit;
 using ETransferServer.Grains.Grain.Users;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.State.Order;
+using ETransferServer.Options;
 using ETransferServer.ThirdPart.CoBo;
 using ETransferServer.ThirdPart.CoBo.Dtos;
 using ETransferServer.User;
@@ -39,6 +40,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
     private readonly IOptionsSnapshot<DepositOptions> _depositOption;
     private readonly IOptionsSnapshot<DepositAddressOptions> _depositAddressOption;
     private readonly IOptionsSnapshot<NetworkOptions> _networkOption;
+    private readonly IOptionsSnapshot<CoBoOptions> _coBoOptions;
     private readonly IUserAppService _userAppService;
     private readonly IUserAddressService _userAddressService;
 
@@ -55,6 +57,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         IOptionsSnapshot<DepositOptions> depositOption, 
         IOptionsSnapshot<DepositAddressOptions> depositAddressOption, 
         IOptionsSnapshot<NetworkOptions> networkOption,
+        IOptionsSnapshot<CoBoOptions> coBoOptions,
         IUserAppService userAppService, 
         IUserAddressService userAddressService,
         IObjectMapper objectMapper, 
@@ -67,6 +70,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         _depositOption = depositOption;
         _depositAddressOption = depositAddressOption;
         _networkOption = networkOption;
+        _coBoOptions = coBoOptions;
         _userAppService = userAppService;
         _userAddressService = userAddressService;
         _objectMapper = objectMapper;
@@ -265,7 +269,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
                 Status = OrderTransferStatusEnum.Confirmed.ToString(),
                 TxId = coBoTransaction.TxId,
                 Amount = Convert.ToDecimal(coBoTransaction.AbsAmount),
-                FromAddress = coBoTransaction.SourceAddress,
+                FromAddress = KeyMapping(coBoTransaction.SourceAddress),
                 ToAddress = coBoTransaction.Address,
                 BlockHash = coBoTransaction.TxDetail.BlockHash
             },
@@ -333,6 +337,11 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
 
         var coBoDepositGrain = GrainFactory.GetGrain<ICoBoDepositGrain>(depositOrder.Id);
         await coBoDepositGrain.AddOrUpdate(depositOrder);
+    }
+    
+    private string KeyMapping(string key)
+    {
+        return _coBoOptions.Value.KeyMapping.GetValueOrDefault(key, key);
     }
 
     public async Task AddCheckDepositOrder(string id)

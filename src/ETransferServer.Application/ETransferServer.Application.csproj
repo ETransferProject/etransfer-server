@@ -39,30 +39,4 @@
     <PackageReference Include="Nethereum.Util" Version="4.20.0" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Protobuf\" />
-  </ItemGroup>
-  
-  <ItemGroup>
-    <ContractReference Include="..\..\protobuf\acs12.proto">
-      <Link>Protobuf\Proto\acs12.proto</Link>
-    </ContractReference>
-    <ContractReference Include="..\..\protobuf\authority_info.proto">
-      <Link>Protobuf\Proto\authority_info.proto</Link>
-    </ContractReference>
-    <ContractReference Include="..\..\protobuf\token_pool_contract.proto">
-      <Link>Protobuf\Proto\token_pool_contract.proto</Link>
-    </ContractReference>
-    <ContractReference Include="..\..\protobuf\token_contract.proto">
-      <Link>Protobuf\Proto\token_contract.proto</Link>
-    </ContractReference>
-    <ContractReference Include="..\..\protobuf\ca_contract.proto">
-      <Link>Protobuf\Proto\ca_contract.proto</Link>
-    </ContractReference>
-    <ContractReference Include="..\..\protobuf\awaken_swap_contract.proto">
-      <Link>Protobuf\Proto\awaken_swap_contract.proto</Link>
-    </ContractReference>
-  </ItemGroup>
-
-
 </Project>

@@ -7,6 +7,7 @@ using ETransferServer.Dtos.Order;
 using ETransferServer.Grains.Grain.Order.Withdraw;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.State.Order;
+using ETransferServer.Options;
 using ETransferServer.ThirdPart.CoBo;
 using ETransferServer.ThirdPart.CoBo.Dtos;
 using Volo.Abp;
@@ -26,19 +27,24 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
     private readonly TimerOptions _timerOptions;
     private readonly ICoBoProvider _coBoProvider;
     private readonly IOptionsSnapshot<WithdrawNetworkOptions> _withdrawNetworkOptions;
+    private readonly IOptionsSnapshot<CoBoOptions> _coBoOptions;
 
     private const string SUCCESS = "success";
     private const string FAIL = "failed";
     private const string PENDING = "pending";
     private const int RETRYCOUNT = 4;
 
-    public WithdrawTimerGrain(ILogger<WithdrawTimerGrain> logger, IOptionsSnapshot<TimerOptions> timerOptions,
-        ICoBoProvider coBoProvider, IOptionsSnapshot<WithdrawNetworkOptions> withdrawNetworkOptions)
+    public WithdrawTimerGrain(ILogger<WithdrawTimerGrain> logger, 
+        IOptionsSnapshot<TimerOptions> timerOptions,
+        ICoBoProvider coBoProvider, 
+        IOptionsSnapshot<WithdrawNetworkOptions> withdrawNetworkOptions,
+        IOptionsSnapshot<CoBoOptions> coBoOptions)
     {
         _logger = logger;
         _coBoProvider = coBoProvider;
         _withdrawNetworkOptions = withdrawNetworkOptions;
         _timerOptions = timerOptions.Value;
+        _coBoOptions = coBoOptions;
     }
 
     public override async Task OnActivateAsync()
@@ -290,7 +296,7 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
 
         order.ToTransfer.TxTime = result.LastTime;
         order.ToTransfer.Status = result.Status;
-        order.ToTransfer.FromAddress = result.SourceAddress;
+        order.ToTransfer.FromAddress = KeyMapping(result.SourceAddress);
 
         var extensionInfo = ExtensionBuilder.New()
             .Add(ExtensionKey.RequestId, result.RequestId)
@@ -468,6 +474,11 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
 
     private string GetWithdrawErrorKey(int retryCount = 0) =>
         $"{CommonConstant.WithdrawRequestErrorKey}_{retryCount}";
+    
+    private string KeyMapping(string key)
+    {
+        return _coBoOptions.Value.KeyMapping.GetValueOrDefault(key, key);
+    }
 
     private void HandleWithdrawRequestException(string extensionKey,
         KeyValuePair<Guid, WithdrawRequestInfo> withdrawRequest,
