@@ -192,27 +192,27 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
         }
     }
 
-    public async Task<OrderPagedResultDto<OrderRecordDto>> GetWithdrawOrderRecordListAsync(GetOrderRequestDto request)
+    public async Task<OrderPagedResultDto<OrderMoreDetailDto>> GetWithdrawOrderRecordListAsync(GetOrderRequestDto request)
     {
         try
         {
             var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
-            if (!userId.HasValue || userId == Guid.Empty) return new OrderPagedResultDto<OrderRecordDto>();
+            if (!userId.HasValue || userId == Guid.Empty) return new OrderPagedResultDto<OrderMoreDetailDto>();
 
             var (count, list) = await GetOrderRecordListAsync(request, OrderTypeEnum.Withdraw.ToString());
 
-            return new OrderPagedResultDto<OrderRecordDto>
+            return new OrderPagedResultDto<OrderMoreDetailDto>
             {
                 TotalAmount = await QuerySumAggAsync(request, OrderTypeEnum.Withdraw.ToString()),
-                Items = await LoopCollectionItemsAsync(
-                    _objectMapper.Map<List<OrderIndex>, List<OrderRecordDto>>(list)),
+                Items = await LoopWithdrawItemsAsync(await LoopCollectionItemsAsync(
+                    _objectMapper.Map<List<OrderIndex>, List<OrderRecordDto>>(list)), list),
                 TotalCount = count
             };
         }
         catch (Exception e)
         {
             _logger.LogError(e, "Get rec withdraw order record list failed");
-            return new OrderPagedResultDto<OrderRecordDto>();
+            return new OrderPagedResultDto<OrderMoreDetailDto>();
         }
     }
 
@@ -764,6 +764,28 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
         }
 
         return itemList;
+    }
+    
+    private async Task<List<OrderMoreDetailDto>> LoopWithdrawItemsAsync(List<OrderRecordDto> itemList,
+        List<OrderIndex> orderList = null)
+    {
+        var withdrawList = _objectMapper.Map<List<OrderRecordDto>, List<OrderMoreDetailDto>>(itemList);
+        foreach (var item in withdrawList)
+        {
+            var itemIndex = orderList.FirstOrDefault(i => i.Id == item.Id);
+            if (itemIndex == null) continue;
+            item.ThirdPartFee = !itemIndex.ThirdPartFee.IsNullOrEmpty() &&
+                                itemIndex.ThirdPartFee[0].Decimals.SafeToInt() > 0
+                ? new FeeInfo
+                {
+                    Symbol = itemIndex.ThirdPartFee[0].Symbol.Split(CommonConstant.Underline).LastOrDefault(),
+                    Amount = (itemIndex.ThirdPartFee[0].Amount.SafeToDecimal() /
+                              (decimal)Math.Pow(10, itemIndex.ThirdPartFee[0].Decimals.SafeToInt())).ToString()
+                }
+                : new FeeInfo();
+        }
+
+        return withdrawList;
     }
 
     private async Task<int> GetRoleTypeAsync()

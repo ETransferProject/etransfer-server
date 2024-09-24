@@ -59,7 +59,7 @@ public class ReconciliationController : ETransferController
     
     [Authorize]
     [HttpGet("withdraw-order")]
-    public async Task<OrderPagedResultDto<OrderRecordDto>> GetWithdrawOrderRecordListAsync(GetOrderRequestDto request)
+    public async Task<OrderPagedResultDto<OrderMoreDetailDto>> GetWithdrawOrderRecordListAsync(GetOrderRequestDto request)
     {
         return await _reconciliationAppService.GetWithdrawOrderRecordListAsync(request);
     }

@@ -14,7 +14,7 @@ public interface IReconciliationAppService : IApplicationService
     Task<bool> InitUserAsync(GetUserDto request);
     Task<OrderMoreDetailDto> GetOrderRecordDetailAsync(string id);
     Task<OrderPagedResultDto<OrderRecordDto>> GetDepositOrderRecordListAsync(GetOrderRequestDto request);
-    Task<OrderPagedResultDto<OrderRecordDto>> GetWithdrawOrderRecordListAsync(GetOrderRequestDto request);
+    Task<OrderPagedResultDto<OrderMoreDetailDto>> GetWithdrawOrderRecordListAsync(GetOrderRequestDto request);
     Task<PagedResultDto<OrderRecordDto>> GetFailOrderRecordListAsync(GetOrderRequestDto request);
     Task<OrderOperationStatusDto> RequestReleaseTokenAsync(GetRequestReleaseDto request);
     Task<OrderOperationStatusDto> RejectReleaseTokenAsync(GetOrderOperationDto request);
