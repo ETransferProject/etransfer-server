@@ -257,7 +257,7 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
                 throw new UserFriendlyException("Invalid order.");
             }
 
-            if (orderIndex.FromTransfer.ToAddress != request.ToAddress
+            if (orderIndex.ToTransfer.ToAddress != request.ToAddress
                 || orderIndex.FromTransfer.Amount.ToString() != request.Amount
                 || orderIndex.FromTransfer.Symbol != request.Symbol
                 || orderIndex.ToTransfer.ChainId != request.ChainId)
@@ -618,6 +618,8 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
         var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
         if (type == OrderStatusResponseEnum.Failed.ToString())
         {
+            mustQuery.Add(q => q.Term(i =>
+                i.Field(f => f.FromTransfer.Status).Value(OrderTransferStatusEnum.Confirmed.ToString())));
             mustQuery.Add(q => q.Bool(i => i.Should(
                 s => s.Terms(w =>
                     w.Field(f => f.Status).Terms(OrderStatusHelper.GetFailedList())),
