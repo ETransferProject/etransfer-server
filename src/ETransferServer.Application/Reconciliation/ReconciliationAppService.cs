@@ -258,7 +258,7 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
             }
 
             if (orderIndex.ToTransfer.ToAddress != request.ToAddress
-                || orderIndex.FromTransfer.Amount.ToString() != request.Amount
+                || orderIndex.FromTransfer.Amount != request.Amount.SafeToDecimal()
                 || orderIndex.FromTransfer.Symbol != request.Symbol
                 || orderIndex.ToTransfer.ChainId != request.ChainId)
             {
@@ -406,7 +406,7 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
             }
 
             if (orderIndex.FromTransfer.FromAddress != request.FromAddress
-                || orderIndex.FromTransfer.Amount.ToString() != request.Amount
+                || orderIndex.FromTransfer.Amount != request.Amount.SafeToDecimal()
                 || orderIndex.FromTransfer.Symbol != request.Symbol
                 || orderIndex.FromTransfer.ChainId != request.ChainId)
             {
