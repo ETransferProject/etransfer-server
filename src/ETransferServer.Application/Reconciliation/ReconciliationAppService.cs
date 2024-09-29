@@ -154,6 +154,7 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
                               (decimal)Math.Pow(10, orderIndex.ThirdPartFee[0].Decimals.SafeToInt())).ToString()
                 }
                 : new FeeInfo();
+            result.RoleType = await GetRoleTypeAsync();
             result.OperationStatus = !orderIndex.ExtensionInfo.IsNullOrEmpty() &&
                                      orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)
                 ? orderIndex.ExtensionInfo[ExtensionKey.SubStatus]
