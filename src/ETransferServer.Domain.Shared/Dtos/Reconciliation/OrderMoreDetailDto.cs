@@ -8,4 +8,5 @@ public class OrderMoreDetailDto : OrderDetailDto
     public FeeInfo ThirdPartFee { get; set; }
     public int RoleType { get; set; } = -1;
     public string OperationStatus { get; set; }
+    public string Applicant { get; set; }
 }

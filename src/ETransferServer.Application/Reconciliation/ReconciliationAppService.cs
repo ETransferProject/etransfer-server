@@ -158,7 +158,10 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
                                      orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)
                 ? orderIndex.ExtensionInfo[ExtensionKey.SubStatus]
                 : null;
-            result.RoleType = await GetRoleTypeAsync();
+            result.Applicant = !orderIndex.ExtensionInfo.IsNullOrEmpty() && 
+                               orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.RequestUser)
+                ? orderIndex.ExtensionInfo[ExtensionKey.RequestUser]
+                : null;
             return result;
         }
         catch (Exception e)
@@ -263,6 +266,14 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
                 || orderIndex.ToTransfer.ChainId != request.ChainId)
             {
                 throw new UserFriendlyException("Invalid param.");
+            }
+
+            if (!orderIndex.ExtensionInfo.IsNullOrEmpty() &&
+                orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus) &&
+                orderIndex.ExtensionInfo[ExtensionKey.SubStatus] ==
+                OrderOperationStatusEnum.ReleaseRequested.ToString())
+            {
+                throw new UserFriendlyException("Invalid request.");
             }
 
             orderIndex.ExtensionInfo ??= new Dictionary<string, string>();
@@ -411,6 +422,14 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
                 || orderIndex.FromTransfer.ChainId != request.ChainId)
             {
                 throw new UserFriendlyException("Invalid param.");
+            }
+            
+            if (!orderIndex.ExtensionInfo.IsNullOrEmpty() &&
+                orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus) &&
+                orderIndex.ExtensionInfo[ExtensionKey.SubStatus] ==
+                OrderOperationStatusEnum.RefundRequested.ToString())
+            {
+                throw new UserFriendlyException("Invalid request.");
             }
 
             orderIndex.ExtensionInfo ??= new Dictionary<string, string>();
