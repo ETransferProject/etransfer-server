@@ -600,7 +600,12 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
     {
         var mustQuery = await GetMustQueryAsync(request, type);
         if (mustQuery == null) return Tuple.Create(0L, new List<OrderIndex>());
-        QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery));
+        var mustNotQuery = await GetMustNotQueryAsync();
+
+        QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) =>
+            type == OrderStatusResponseEnum.Failed.ToString()
+                ? f.Bool(b => b.Must(mustQuery).MustNot(mustNotQuery))
+                : f.Bool(b => b.Must(mustQuery));
 
         return await _orderIndexRepository.GetSortListAsync(Filter,
             sortFunc: string.IsNullOrWhiteSpace(request.Sorting)
@@ -715,6 +720,14 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
         }
 
         return mustQuery;
+    }
+
+    private async Task<List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>> GetMustNotQueryAsync()
+    {
+        var mustNotQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+        mustNotQuery.Add(q => q.Match(i =>
+            i.Field("extensionInfo.RefundTx").Query(ExtensionKey.RefundTx)));
+        return mustNotQuery;
     }
 
     private async Task<List<OrderRecordDto>> LoopCollectionItemsAsync(List<OrderRecordDto> itemList,
