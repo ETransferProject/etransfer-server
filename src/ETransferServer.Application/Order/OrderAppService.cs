@@ -103,8 +103,13 @@ public class OrderAppService : ApplicationService, IOrderAppService
                     i.Field(f => f.ArrivalTime)
                         .LessThanOrEquals(request.EndTimestamp.Value)));
             }
+            
+            var mustNotQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+            mustNotQuery.Add(q => q.Match(i =>
+                i.Field("extensionInfo.RefundTx").Query(ExtensionKey.RefundTx)));
 
-            QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery));
+            QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery)
+                .MustNot(mustNotQuery));
 
             var (count, list) = await _orderIndexRepository.GetSortListAsync(Filter,
                 sortFunc: string.IsNullOrWhiteSpace(request.Sorting)

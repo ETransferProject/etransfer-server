@@ -210,18 +210,27 @@ public partial class UserWithdrawGrain
         }
         return (res.Data as WithdrawOrderDto)?.CreateTime ?? 0;
     }
-    
+
     private async Task ChangeOperationStatus(WithdrawOrderDto order)
     {
         order.ExtensionInfo ??= new Dictionary<string, string>();
-        if (!order.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)) return;
+        if (!order.ExtensionInfo.ContainsKey(ExtensionKey.RelatedOrderId)) return;
 
-        if (order.ExtensionInfo[ExtensionKey.SubStatus] == OrderOperationStatusEnum.RefundConfirming.ToString())
+        var recordGrain = GrainFactory.GetGrain<IUserWithdrawRecordGrain>(Guid.Parse(order.ExtensionInfo[ExtensionKey.RelatedOrderId]));
+        var res = await recordGrain.Get();
+        if (res.Success)
         {
-            order.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus, OrderOperationStatusEnum.RefundFailed.ToString());
+            var orderRelated = res.Value;
+            if (orderRelated.ExtensionInfo.IsNullOrEmpty() || !orderRelated.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)) return;
+
+            if (orderRelated.ExtensionInfo[ExtensionKey.SubStatus] == OrderOperationStatusEnum.RefundConfirming.ToString())
+            {
+                orderRelated.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus, OrderOperationStatusEnum.RefundFailed.ToString());
+                await _userWithdrawProvider.AddOrUpdateSync(orderRelated);
+            }
         }
     }
-    
+
     private async Task HandleWithdrawQueryGrain(string transactionId)
     {
         await _withdrawQueryTimerGrain.Remove(transactionId);

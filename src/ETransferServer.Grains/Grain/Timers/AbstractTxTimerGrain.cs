@@ -404,19 +404,35 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
     private async Task ChangeOperationStatus(TOrder order, bool success = true)
     {
         order.ExtensionInfo ??= new Dictionary<string, string>();
-        if (!order.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)) return;
-
-        if (order.ExtensionInfo[ExtensionKey.SubStatus] == OrderOperationStatusEnum.ReleaseConfirming.ToString())
+        if (order.OrderType == OrderTypeEnum.Deposit.ToString())
         {
-            order.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus, success
-                ? OrderOperationStatusEnum.ReleaseConfirmed.ToString()
-                : OrderOperationStatusEnum.ReleaseFailed.ToString());
+            if (!order.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)) return;
+            
+            if (order.ExtensionInfo[ExtensionKey.SubStatus] == OrderOperationStatusEnum.ReleaseConfirming.ToString())
+            {
+                order.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus, success
+                    ? OrderOperationStatusEnum.ReleaseConfirmed.ToString()
+                    : OrderOperationStatusEnum.ReleaseFailed.ToString());
+            }
         }
-        else if (order.ExtensionInfo[ExtensionKey.SubStatus] == OrderOperationStatusEnum.RefundConfirming.ToString())
+        if (order.OrderType == OrderTypeEnum.Withdraw.ToString())
         {
-            order.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus, success
-                ? OrderOperationStatusEnum.RefundConfirmed.ToString()
-                : OrderOperationStatusEnum.RefundFailed.ToString());
+            if (!order.ExtensionInfo.ContainsKey(ExtensionKey.RelatedOrderId)) return;
+            var recordGrain = GrainFactory.GetGrain<IUserWithdrawRecordGrain>(Guid.Parse(order.ExtensionInfo[ExtensionKey.RelatedOrderId]));
+            var res = await recordGrain.Get();
+            if (res.Success)
+            {
+                var orderRelated = res.Value;
+                if (orderRelated.ExtensionInfo.IsNullOrEmpty() || !orderRelated.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)) return;
+
+                if (orderRelated.ExtensionInfo[ExtensionKey.SubStatus] == OrderOperationStatusEnum.RefundConfirming.ToString())
+                {
+                    orderRelated.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus, success
+                        ? OrderOperationStatusEnum.RefundConfirmed.ToString()
+                        : OrderOperationStatusEnum.RefundFailed.ToString());
+                    await _userWithdrawProvider.AddOrUpdateSync(orderRelated);
+                }
+            }
         }
     }
 
