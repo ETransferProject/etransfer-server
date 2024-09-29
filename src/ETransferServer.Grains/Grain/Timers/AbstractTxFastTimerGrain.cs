@@ -407,9 +407,9 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> 
     
     private async Task ChangeOperationStatus(TOrder order, bool success = true)
     {
-        if (!order.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)) return;
-
         order.ExtensionInfo ??= new Dictionary<string, string>();
+        if (!order.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)) return;
+        
         if (order.ExtensionInfo[ExtensionKey.SubStatus] == OrderOperationStatusEnum.ReleaseConfirming.ToString())
         {
             order.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus, success

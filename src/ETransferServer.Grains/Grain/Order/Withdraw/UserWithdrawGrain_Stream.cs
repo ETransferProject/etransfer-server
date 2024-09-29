@@ -6,6 +6,7 @@ using ETransferServer.Dtos.Order;
 using ETransferServer.Etos.Order;
 using ETransferServer.Grains.Grain.TokenLimit;
 using ETransferServer.Grains.State.Order;
+using NBitcoin;
 
 namespace ETransferServer.Grains.Grain.Order.Withdraw;
 
@@ -77,6 +78,7 @@ public partial class UserWithdrawGrain
             case OrderStatusEnum.ToTransferFailed:
                 _logger.LogError("Order {Id} ToTransferFailed, invalid status, current status={Status}",
                     this.GetPrimaryKey(), status.ToString());
+                await ChangeOperationStatus(orderDto);
                 await AddToRetryTx(orderDto);
                 break;
             
@@ -207,6 +209,17 @@ public partial class UserWithdrawGrain
             return 0;
         }
         return (res.Data as WithdrawOrderDto)?.CreateTime ?? 0;
+    }
+    
+    private async Task ChangeOperationStatus(WithdrawOrderDto order)
+    {
+        order.ExtensionInfo ??= new Dictionary<string, string>();
+        if (!order.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)) return;
+
+        if (order.ExtensionInfo[ExtensionKey.SubStatus] == OrderOperationStatusEnum.RefundConfirming.ToString())
+        {
+            order.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus, OrderOperationStatusEnum.RefundFailed.ToString());
+        }
     }
     
     private async Task HandleWithdrawQueryGrain(string transactionId)

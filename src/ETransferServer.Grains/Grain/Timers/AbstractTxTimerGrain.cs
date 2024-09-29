@@ -403,9 +403,9 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
 
     private async Task ChangeOperationStatus(TOrder order, bool success = true)
     {
+        order.ExtensionInfo ??= new Dictionary<string, string>();
         if (!order.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)) return;
 
-        order.ExtensionInfo ??= new Dictionary<string, string>();
         if (order.ExtensionInfo[ExtensionKey.SubStatus] == OrderOperationStatusEnum.ReleaseConfirming.ToString())
         {
             order.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus, success

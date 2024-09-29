@@ -4,6 +4,7 @@ using Orleans.Streams;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Etos.Order;
+using NBitcoin;
 
 namespace ETransferServer.Grains.Grain.Order.Deposit;
 
@@ -67,6 +68,7 @@ public partial class UserDepositGrain
             // Retry with max count
             case OrderStatusEnum.ToTransferFailed:
             {
+                await ChangeOperationStatus(orderDto);
                 var statusFlow = await _orderStatusFlowGrain.GetAsync();
                 var querySuccess = statusFlow?.Data != null;
                 var retryFrom = OrderStatusEnum.ToStartTransfer.ToString();
@@ -123,6 +125,17 @@ public partial class UserDepositGrain
     {
         _logger.LogError(ex, "Order {Id} stream OnError", this.GetPrimaryKey());
         return Task.CompletedTask;
+    }
+    
+    private async Task ChangeOperationStatus(DepositOrderDto order)
+    {
+        order.ExtensionInfo ??= new Dictionary<string, string>();
+        if (!order.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)) return;
+
+        if (order.ExtensionInfo[ExtensionKey.SubStatus] == OrderOperationStatusEnum.ReleaseConfirming.ToString())
+        {
+            order.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus, OrderOperationStatusEnum.ReleaseFailed.ToString());
+        }
     }
 
     private async Task HandleDepositQueryGrain(string transactionId)
