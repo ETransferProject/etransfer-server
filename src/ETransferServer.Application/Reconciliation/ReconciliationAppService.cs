@@ -797,6 +797,9 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
                     item.OperationStatus = extensionInfo[ExtensionKey.SubStatus];
                 }
                 item.RoleType = await GetRoleTypeAsync();
+                item.Applicant = !extensionInfo.IsNullOrEmpty() && extensionInfo.ContainsKey(ExtensionKey.RequestUser)
+                    ? extensionInfo[ExtensionKey.RequestUser]
+                    : null;
             }
         }
 
