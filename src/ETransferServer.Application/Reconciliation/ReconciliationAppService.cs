@@ -620,6 +620,8 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
         {
             mustQuery.Add(q => q.Term(i =>
                 i.Field(f => f.FromTransfer.Status).Value(OrderTransferStatusEnum.Confirmed.ToString())));
+            mustQuery.Add(q => q.Range(i =>
+                i.Field(f => f.FromTransfer.Amount).GreaterThan(0)));
             mustQuery.Add(q => q.Bool(i => i.Should(
                 s => s.Terms(w =>
                     w.Field(f => f.Status).Terms(OrderStatusHelper.GetFailedList())),
