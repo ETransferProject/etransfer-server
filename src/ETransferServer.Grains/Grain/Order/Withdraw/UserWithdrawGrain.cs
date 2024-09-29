@@ -196,6 +196,7 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
             };
 
             withdrawOrderDto.ExtensionInfo ??= new Dictionary<string, string>();
+            withdrawOrderDto.ExtensionInfo.AddOrReplace(ExtensionKey.RefundTx, ExtensionKey.RefundTx);
             withdrawOrderDto.ExtensionInfo.AddOrReplace(ExtensionKey.RelatedOrderId, orderIndex.Id.ToString());
             if (!orderIndex.ExtensionInfo.IsNullOrEmpty() &&
                 orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.FromConfirmingThreshold))

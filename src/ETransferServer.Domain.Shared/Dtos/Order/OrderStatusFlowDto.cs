@@ -36,6 +36,7 @@ public static class ExtensionKey
     public const string RequestTime = "RequestTime";
     public const string ReleaseUser = "ReleaseUser";
     public const string ReleaseTime = "ReleaseTime";
+    public const string RefundTx = "RefundTx";
     public const string RefundUser = "RefundUser";
     public const string RefundTime = "RefundTime";
     public const string SubStatus = "SubStatus";
