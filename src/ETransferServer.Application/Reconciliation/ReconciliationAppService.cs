@@ -283,6 +283,10 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
                 DateTime.UtcNow.ToUtcMilliSeconds().ToString());
             orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus,
                 OrderOperationStatusEnum.ReleaseRequested.ToString());
+            var recordGrain = _clusterClient.GetGrain<IUserDepositRecordGrain>(orderIndex.Id);
+            var order = (await recordGrain.GetAsync()).Value;
+            order.ExtensionInfo = orderIndex.ExtensionInfo;
+            await recordGrain.CreateOrUpdateAsync(order);
             await _orderIndexRepository.AddOrUpdateAsync(orderIndex);
 
             return new OrderOperationStatusDto
@@ -320,6 +324,10 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
                 DateTime.UtcNow.ToUtcMilliSeconds().ToString());
             orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus,
                 OrderOperationStatusEnum.ReleaseRejected.ToString());
+            var recordGrain = _clusterClient.GetGrain<IUserDepositRecordGrain>(orderIndex.Id);
+            var order = (await recordGrain.GetAsync()).Value;
+            order.ExtensionInfo = orderIndex.ExtensionInfo;
+            await recordGrain.CreateOrUpdateAsync(order);
             await _orderIndexRepository.AddOrUpdateAsync(orderIndex);
 
             return new OrderOperationStatusDto
@@ -376,6 +384,10 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
                 DateTime.UtcNow.ToUtcMilliSeconds().ToString());
             orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus,
                 OrderOperationStatusEnum.ReleaseConfirming.ToString());
+            var recordGrain = _clusterClient.GetGrain<IUserDepositRecordGrain>(orderIndex.Id);
+            var order = (await recordGrain.GetAsync()).Value;
+            order.ExtensionInfo = orderIndex.ExtensionInfo;
+            await recordGrain.CreateOrUpdateAsync(order);
             await _orderIndexRepository.AddOrUpdateAsync(orderIndex);
 
             var userDepositGrain = _clusterClient.GetGrain<IUserDepositGrain>(orderIndex.Id);
@@ -439,6 +451,10 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
                 DateTime.UtcNow.ToUtcMilliSeconds().ToString());
             orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus,
                 OrderOperationStatusEnum.RefundRequested.ToString());
+            var recordGrain = _clusterClient.GetGrain<IUserWithdrawRecordGrain>(orderIndex.Id);
+            var order = (await recordGrain.Get()).Value;
+            order.ExtensionInfo = orderIndex.ExtensionInfo;
+            await recordGrain.AddOrUpdate(order);
             await _orderIndexRepository.AddOrUpdateAsync(orderIndex);
 
             return new OrderOperationStatusDto
@@ -476,6 +492,10 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
                 DateTime.UtcNow.ToUtcMilliSeconds().ToString());
             orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus,
                 OrderOperationStatusEnum.RefundRejected.ToString());
+            var recordGrain = _clusterClient.GetGrain<IUserWithdrawRecordGrain>(orderIndex.Id);
+            var order = (await recordGrain.Get()).Value;
+            order.ExtensionInfo = orderIndex.ExtensionInfo;
+            await recordGrain.AddOrUpdate(order);
             await _orderIndexRepository.AddOrUpdateAsync(orderIndex);
 
             return new OrderOperationStatusDto
@@ -529,6 +549,10 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
                 OrderOperationStatusEnum.RefundConfirming.ToString());
             orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.RelatedOrderId,
                 newOrderId.ToString());
+            var recordGrain = _clusterClient.GetGrain<IUserWithdrawRecordGrain>(orderIndex.Id);
+            var order = (await recordGrain.Get()).Value;
+            order.ExtensionInfo = orderIndex.ExtensionInfo;
+            await recordGrain.AddOrUpdate(order);
             await _orderIndexRepository.AddOrUpdateAsync(orderIndex);
 
             var userWithdrawGrain = _clusterClient.GetGrain<IUserWithdrawGrain>(newOrderId);

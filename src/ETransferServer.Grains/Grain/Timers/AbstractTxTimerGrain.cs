@@ -408,12 +408,10 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
         {
             if (!order.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)) return;
             
-            if (order.ExtensionInfo[ExtensionKey.SubStatus] == OrderOperationStatusEnum.ReleaseConfirming.ToString())
-            {
-                order.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus, success
-                    ? OrderOperationStatusEnum.ReleaseConfirmed.ToString()
-                    : OrderOperationStatusEnum.ReleaseFailed.ToString());
-            }
+            order.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus, success
+                ? OrderOperationStatusEnum.ReleaseConfirmed.ToString()
+                : OrderOperationStatusEnum.ReleaseFailed.ToString());
+            
         }
         if (order.OrderType == OrderTypeEnum.Withdraw.ToString())
         {
@@ -425,13 +423,9 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
                 var orderRelated = res.Value;
                 if (orderRelated.ExtensionInfo.IsNullOrEmpty() || !orderRelated.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)) return;
 
-                if (orderRelated.ExtensionInfo[ExtensionKey.SubStatus] == OrderOperationStatusEnum.RefundConfirming.ToString())
-                {
-                    orderRelated.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus, success
-                        ? OrderOperationStatusEnum.RefundConfirmed.ToString()
-                        : OrderOperationStatusEnum.RefundFailed.ToString());
-                    await _userWithdrawProvider.AddOrUpdateSync(orderRelated);
-                }
+                orderRelated.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus, success
+                    ? OrderOperationStatusEnum.RefundConfirmed.ToString()
+                    : OrderOperationStatusEnum.RefundFailed.ToString());
             }
         }
     }

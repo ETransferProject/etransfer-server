@@ -68,7 +68,6 @@ public partial class UserDepositGrain
             // Retry with max count
             case OrderStatusEnum.ToTransferFailed:
             {
-                await ChangeOperationStatus(orderDto);
                 var statusFlow = await _orderStatusFlowGrain.GetAsync();
                 var querySuccess = statusFlow?.Data != null;
                 var retryFrom = OrderStatusEnum.ToStartTransfer.ToString();
@@ -95,6 +94,7 @@ public partial class UserDepositGrain
                 _logger.LogInformation("Order {Id} stream end, current status={Status}", this.GetPrimaryKey(),
                     status.ToString());
                 await HandleDepositQueryGrain(orderDto.ThirdPartOrderId);
+                await ChangeOperationStatus(orderDto);
                 await _bus.Publish(_objectMapper.Map<DepositOrderDto, OrderChangeEto>(orderDto));
                 // await _orderChangeStream.OnCompletedAsync();
                 break;
@@ -132,9 +132,13 @@ public partial class UserDepositGrain
         order.ExtensionInfo ??= new Dictionary<string, string>();
         if (!order.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)) return;
 
-        if (order.ExtensionInfo[ExtensionKey.SubStatus] == OrderOperationStatusEnum.ReleaseConfirming.ToString())
+        order.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus, OrderOperationStatusEnum.ReleaseFailed.ToString());
+        var recordGrain = GrainFactory.GetGrain<IUserDepositRecordGrain>(order.Id);
+        var res = await recordGrain.GetAsync();
+        if (res.Success)
         {
-            order.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus, OrderOperationStatusEnum.ReleaseFailed.ToString());
+            await recordGrain.CreateOrUpdateAsync(order);
+            await _userDepositProvider.AddOrUpdateSync(order);
         }
     }
 

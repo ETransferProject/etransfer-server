@@ -221,8 +221,7 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
             order.ToTransfer.Status = OrderTransferStatusEnum.Confirmed.ToString();
             order.Status = OrderStatusEnum.ToTransferConfirmed.ToString();
             order.ExtensionInfo ??= new Dictionary<string, string>();
-            if (order.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus) && order.ExtensionInfo[ExtensionKey.SubStatus]
-                == OrderOperationStatusEnum.ReleaseConfirming.ToString())
+            if (order.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus))
             {
                 order.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus,
                     OrderOperationStatusEnum.ReleaseConfirmed.ToString());
@@ -336,9 +335,7 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
                     var swapGrain = GrainFactory.GetGrain<ISwapGrain>(order.Id);
                     transferInfo.Amount = await swapGrain.ParseReturnValue(txStatus.Logs);
                     order.ExtensionInfo ??= new Dictionary<string, string>();
-                    if (order.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus) &&
-                        order.ExtensionInfo[ExtensionKey.SubStatus] ==
-                        OrderOperationStatusEnum.ReleaseConfirming.ToString())
+                    if (order.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus))
                     {
                         order.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus,
                             OrderOperationStatusEnum.ReleaseConfirmed.ToString());

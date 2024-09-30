@@ -78,7 +78,6 @@ public partial class UserWithdrawGrain
             case OrderStatusEnum.ToTransferFailed:
                 _logger.LogError("Order {Id} ToTransferFailed, invalid status, current status={Status}",
                     this.GetPrimaryKey(), status.ToString());
-                await ChangeOperationStatus(orderDto);
                 await AddToRetryTx(orderDto);
                 break;
             
@@ -95,6 +94,7 @@ public partial class UserWithdrawGrain
                     status.ToString());
                 await ReverseTokenLimitAsync(orderDto.Id, orderDto.ToTransfer.Symbol, orderDto.AmountUsd);
                 await HandleWithdrawQueryGrain(orderDto.FromTransfer.TxId);
+                await ChangeOperationStatus(orderDto);
                 await _bus.Publish(_objectMapper.Map<WithdrawOrderDto, OrderChangeEto>(orderDto));
                 break;
 
@@ -223,11 +223,9 @@ public partial class UserWithdrawGrain
             var orderRelated = res.Value;
             if (orderRelated.ExtensionInfo.IsNullOrEmpty() || !orderRelated.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)) return;
 
-            if (orderRelated.ExtensionInfo[ExtensionKey.SubStatus] == OrderOperationStatusEnum.RefundConfirming.ToString())
-            {
-                orderRelated.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus, OrderOperationStatusEnum.RefundFailed.ToString());
-                await _userWithdrawProvider.AddOrUpdateSync(orderRelated);
-            }
+            orderRelated.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus, OrderOperationStatusEnum.RefundFailed.ToString());
+            await recordGrain.AddOrUpdate(orderRelated);
+            await _userWithdrawProvider.AddOrUpdateSync(orderRelated);
         }
     }
 
