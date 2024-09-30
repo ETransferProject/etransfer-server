@@ -70,4 +70,18 @@ public static class VerifyHelper
             return false;
         }
     }
+    
+    public static bool VerifyAelfAddress(string address)
+    {
+        if (address.IsNullOrEmpty()) return true;
+        try
+        {
+            var addr = Address.FromBase58(address);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            return false;
+        }
+    }
 }

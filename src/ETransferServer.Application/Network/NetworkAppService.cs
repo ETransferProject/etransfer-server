@@ -159,6 +159,10 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
             .Where(kv => request.Address.Match(kv.Key))
             .SelectMany(kv => kv.Value)
             .ToList();
+        if (!VerifyHelper.VerifyAelfAddress(request.Address))
+        {
+            networkByAddress.RemoveAll(a => a == ChainId.AELF || a == ChainId.tDVV || a == ChainId.tDVW);
+        }
         AssertHelper.NotEmpty(networkByAddress, ErrorResult.AddressFormatWrongCode);
 
         getNetworkListDto.NetworkList = getNetworkListDto.NetworkList

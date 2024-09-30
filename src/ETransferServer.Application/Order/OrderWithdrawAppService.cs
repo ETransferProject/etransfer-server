@@ -117,7 +117,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
                 AssertHelper.IsTrue(_withdrawInfoOptions.Value.CanCrossSameChain ||
                                     (!_withdrawInfoOptions.Value.CanCrossSameChain && request.ChainId != request.Network),
                     "Network is invalid. Please refresh and try again.");
-                AssertHelper.IsTrue(VerifyAelfAddress(request.Address), ErrorResult.AddressFormatWrongCode);
+                AssertHelper.IsTrue(VerifyHelper.VerifyAelfAddress(request.Address), ErrorResult.AddressFormatWrongCode);
             }
 
             var tokenInfoGrain =
@@ -473,7 +473,7 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
                 AssertHelper.IsTrue(_withdrawInfoOptions.Value.CanCrossSameChain ||
                                     (!_withdrawInfoOptions.Value.CanCrossSameChain && request.FromChainId != request.Network),
                     ErrorResult.NetworkInvalidCode);
-                AssertHelper.IsTrue(VerifyAelfAddress(request.ToAddress), ErrorResult.AddressFormatWrongCode);
+                AssertHelper.IsTrue(VerifyHelper.VerifyAelfAddress(request.ToAddress), ErrorResult.AddressFormatWrongCode);
             }
 
             var userGrain = _clusterClient.GetGrain<IUserGrain>(userId);
@@ -668,21 +668,6 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
     private bool VerifyAElfChain(string chainId)
     {
         return chainId == ChainId.AELF || chainId == ChainId.tDVV || chainId == ChainId.tDVW;
-    }
-
-    private bool VerifyAelfAddress(string address)
-    {
-        if (address.IsNullOrEmpty()) return true;
-        try
-        {
-            var addr = Address.FromBase58(address);
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Invalid base58 address: {address}", address);
-            return false;
-        }
     }
 
     private bool VerifyMemo(string memo)
