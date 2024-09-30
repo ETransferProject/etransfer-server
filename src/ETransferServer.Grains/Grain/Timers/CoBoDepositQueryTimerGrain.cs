@@ -268,7 +268,6 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
                 Symbol = coinInfo.Symbol,
                 Status = OrderTransferStatusEnum.Confirmed.ToString(),
                 TxId = coBoTransaction.TxId,
-                TxTime = coBoTransaction.CreatedTime > 0 ? coBoTransaction.CreatedTime : DateTime.UtcNow.ToUtcMilliSeconds(),
                 Amount = Convert.ToDecimal(coBoTransaction.AbsAmount),
                 FromAddress = KeyMapping(coBoTransaction.SourceAddress),
                 ToAddress = coBoTransaction.Address,
