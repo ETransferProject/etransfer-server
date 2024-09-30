@@ -9,6 +9,8 @@ public class AuthConstant
     public const string PortKeySource = "portkey";
     public const string NightElfAppId = "NightElf";
     public const string NightElfSource = "nightElf";
+    public const string ReconciliationSource = "reconciliation";
+    public const string GrantType = "login_credentials";
 }
 
 public static class ContractName

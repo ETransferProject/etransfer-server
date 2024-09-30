@@ -103,8 +103,13 @@ public class OrderAppService : ApplicationService, IOrderAppService
                     i.Field(f => f.ArrivalTime)
                         .LessThanOrEquals(request.EndTimestamp.Value)));
             }
+            
+            var mustNotQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+            mustNotQuery.Add(q => q.Match(i =>
+                i.Field("extensionInfo.RefundTx").Query(ExtensionKey.RefundTx)));
 
-            QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery));
+            QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery)
+                .MustNot(mustNotQuery));
 
             var (count, list) = await _orderIndexRepository.GetSortListAsync(Filter,
                 sortFunc: string.IsNullOrWhiteSpace(request.Sorting)
@@ -145,23 +150,30 @@ public class OrderAppService : ApplicationService, IOrderAppService
         {
             var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
             if (id.IsNullOrWhiteSpace() || !userId.HasValue || userId == Guid.Empty) return new OrderDetailDto();
-            
-            var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
-            mustQuery.Add(q => q.Term(i =>
-                i.Field(f => f.UserId).Value(userId.ToString())));
-            mustQuery.Add(q => q.Term(i =>
-                i.Field(f => f.Id).Value(id)));
-            
-            QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery));
-
-            var orderIndex = await _orderIndexRepository.GetAsync(Filter);
-            return await GetOrderDetailDtoAsync(orderIndex);
+            return (await GetOrderDetailAsync(id, userId, false)).Item1;
         }
         catch (Exception e)
         {
             _logger.LogError(e, "Get order record detail failed, orderId={id}", id);
             return new OrderDetailDto();
         }
+    }
+
+    public async Task<Tuple<OrderDetailDto, OrderIndex>> GetOrderDetailAsync(string id, Guid? userId, bool includeAll = false)
+    {
+        var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+        if (!includeAll)
+        {
+            mustQuery.Add(q => q.Term(i =>
+                i.Field(f => f.UserId).Value(userId.ToString())));
+        }
+        mustQuery.Add(q => q.Term(i =>
+            i.Field(f => f.Id).Value(id)));
+            
+        QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery));
+
+        var orderIndex = await _orderIndexRepository.GetAsync(Filter);
+        return Tuple.Create(await GetOrderDetailDtoAsync(orderIndex), orderIndex);
     }
 
     public async Task<UserOrderDto> GetUserOrderRecordListAsync(GetUserOrderRecordRequestDto request, OrderChangeEto orderEto = null)
@@ -360,7 +372,7 @@ public class OrderAppService : ApplicationService, IOrderAppService
         item.FromTransfer.Icon =
             await _networkAppService.GetIconAsync(item.OrderType, ChainId.AELF, item.FromTransfer.Symbol);
         item.ToTransfer.Icon =
-            await _networkAppService.GetIconAsync(item.OrderType, ChainId.AELF, item.ToTransfer.Symbol);
+            await _networkAppService.GetIconAsync(item.OrderType, ChainId.AELF, item.FromTransfer.Symbol, item.ToTransfer.Symbol);
         return item;
     }
 

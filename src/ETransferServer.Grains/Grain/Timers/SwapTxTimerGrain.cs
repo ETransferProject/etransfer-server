@@ -12,6 +12,7 @@ using ETransferServer.Grains.Options;
 using ETransferServer.Grains.State.Order;
 using ETransferServer.Options;
 using Microsoft.Extensions.Options;
+using NBitcoin;
 using Newtonsoft.Json;
 using Volo.Abp;
 
@@ -219,7 +220,13 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
             _logger.LogInformation("SwapTxTimer toTransfer amount: {Amount}", order.ToTransfer.Amount);
             order.ToTransfer.Status = OrderTransferStatusEnum.Confirmed.ToString();
             order.Status = OrderStatusEnum.ToTransferConfirmed.ToString();
-           
+            order.ExtensionInfo ??= new Dictionary<string, string>();
+            if (order.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus))
+            {
+                order.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus,
+                    OrderOperationStatusEnum.ReleaseConfirmed.ToString());
+            }
+
             await SaveOrder(order, ExtensionBuilder.New()
                 .Add(ExtensionKey.TransactionStatus, CommonConstant.TransactionState.Mined)
                 .Build());
@@ -326,9 +333,16 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
                     transferInfo.Status = OrderTransferStatusEnum.Confirmed.ToString();
                     order.Status = OrderStatusEnum.ToTransferConfirmed.ToString();
                     var swapGrain = GrainFactory.GetGrain<ISwapGrain>(order.Id);
-                    transferInfo.Amount =  await swapGrain.ParseReturnValue(txStatus.Logs);
+                    transferInfo.Amount = await swapGrain.ParseReturnValue(txStatus.Logs);
+                    order.ExtensionInfo ??= new Dictionary<string, string>();
+                    if (order.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus))
+                    {
+                        order.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus,
+                            OrderOperationStatusEnum.ReleaseConfirmed.ToString());
+                    }
+
                     _logger.LogInformation("After ParseReturnValueAsync: {Amount}", transferInfo.Amount);
-                    
+
                     await SaveOrder(order, ExtensionBuilder.New()
                         .Add(ExtensionKey.TransactionStatus, txStatus.Status)
                         .Add(ExtensionKey.TransactionError, txStatus.Error)

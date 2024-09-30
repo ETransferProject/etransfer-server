@@ -119,6 +119,7 @@ public class OpenIddictDataSeedContributor : IDataSeedContributor, ITransientDep
                     OpenIddictConstants.GrantTypes.ClientCredentials,
                     OpenIddictConstants.GrantTypes.RefreshToken,
                     GrantTypeConstants.SIGNATURE,
+                    GrantTypeConstants.LOGIN_CREDENTIALS
                 },
                 scopes: commonScopes,
                 redirectUri: consoleAndAngularClientRootUrl,
@@ -258,6 +259,11 @@ public class OpenIddictDataSeedContributor : IDataSeedContributor, ITransientDep
                 if (grantType == GrantTypeConstants.SIGNATURE)
                 {
                     application.Permissions.Add(GrantTypeConstants.PERMISSIONS_SIGNATURE);
+                }
+                
+                if (grantType == GrantTypeConstants.LOGIN_CREDENTIALS)
+                {
+                    application.Permissions.Add(GrantTypeConstants.PERMISSIONS_LOGIN_CREDENTIALS);
                 }
 
                 if (grantType == OpenIddictConstants.GrantTypes.DeviceCode)

@@ -6,13 +6,17 @@ using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Grains.Grain.Timers;
+using ETransferServer.Grains.Grain.TokenLimit;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.Provider;
 using ETransferServer.Options;
+using ETransferServer.Orders;
+using ETransferServer.WithdrawOrder.Dtos;
 using MassTransit;
 using NBitcoin;
 using Newtonsoft.Json;
 using Volo.Abp.ObjectMapping;
+using Volo.Abp.Users;
 
 namespace ETransferServer.Grains.Grain.Order.Withdraw;
 
@@ -25,6 +29,8 @@ public interface IUserWithdrawGrain : IGrainWithGuidKey
     /// <param name="withdrawOrderDto"></param>
     /// <returns></returns>
     Task<WithdrawOrderDto> CreateOrder(WithdrawOrderDto withdrawOrderDto);
+    
+    Task<WithdrawOrderDto> CreateRefundOrder(OrderIndex orderIndex, string address);
 
     /// <summary>
     ///     Forward transaction information from the front end
@@ -157,6 +163,58 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         withdrawOrderDto.ExtensionInfo ??= new Dictionary<string, string>();
         withdrawOrderDto.ExtensionInfo.AddOrReplace(ExtensionKey.FromConfirmingThreshold, GetFromConfirmingThreshold(withdrawOrderDto).ToString());
         return await AddOrUpdateOrder(withdrawOrderDto);
+    }
+
+    public async Task<WithdrawOrderDto> CreateRefundOrder(OrderIndex orderIndex, string address)
+    {
+        // amount limit
+        var amountUsd = await _withdrawQueryTimerGrain.GetAvgExchangeAsync(orderIndex.FromTransfer.Symbol, CommonConstant.Symbol.USD);
+        var tokenInfoGrain =
+            GrainFactory.GetGrain<ITokenWithdrawLimitGrain>(ITokenWithdrawLimitGrain.GenerateGrainId(orderIndex.FromTransfer.Symbol));
+        AssertHelper.IsTrue(await tokenInfoGrain.Acquire(amountUsd), ErrorResult.WithdrawLimitInsufficientCode, null,
+            (await tokenInfoGrain.GetLimit()).RemainingLimit, TimeHelper.GetHourDiff(DateTime.UtcNow,
+                DateTime.UtcNow.AddDays(1).Date));
+        try
+        {
+            var withdrawOrderDto = new WithdrawOrderDto
+            {
+                Id = this.GetPrimaryKey(),
+                Status = OrderStatusEnum.FromTransferConfirmed.ToString(),
+                UserId = await _withdrawQueryTimerGrain.GetUserIdAsync(address),
+                OrderType = OrderTypeEnum.Withdraw.ToString(),
+                AmountUsd = amountUsd,
+                FromTransfer = _objectMapper.Map<Transfer, TransferInfo>(orderIndex.FromTransfer),
+                ToTransfer = new TransferInfo
+                {
+                    Network = orderIndex.FromTransfer.Network,
+                    ChainId = orderIndex.FromTransfer.ChainId,
+                    FromAddress = orderIndex.FromTransfer.ToAddress,
+                    ToAddress = orderIndex.FromTransfer.FromAddress,
+                    Amount = orderIndex.FromTransfer.Amount,
+                    Symbol = orderIndex.FromTransfer.Symbol
+                }
+            };
+
+            withdrawOrderDto.ExtensionInfo ??= new Dictionary<string, string>();
+            withdrawOrderDto.ExtensionInfo.AddOrReplace(ExtensionKey.RefundTx, ExtensionKey.RefundTx);
+            withdrawOrderDto.ExtensionInfo.AddOrReplace(ExtensionKey.RelatedOrderId, orderIndex.Id.ToString());
+            if (!orderIndex.ExtensionInfo.IsNullOrEmpty() &&
+                orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.FromConfirmingThreshold))
+            {
+                withdrawOrderDto.ExtensionInfo.AddOrReplace(ExtensionKey.FromConfirmedNum,
+                    orderIndex.ExtensionInfo[ExtensionKey.FromConfirmingThreshold]);
+                withdrawOrderDto.ExtensionInfo.AddOrReplace(ExtensionKey.FromConfirmingThreshold,
+                    orderIndex.ExtensionInfo[ExtensionKey.FromConfirmingThreshold]);
+            }
+
+            return await AddOrUpdateOrder(withdrawOrderDto);
+        }
+        catch (Exception e)
+        {
+            await tokenInfoGrain.Reverse(amountUsd);
+            _logger.LogError(e, "Create refund withdraw order error, relatedOrderId:{OrderId}", orderIndex.Id);
+            throw;
+        }
     }
 
     private long GetFromConfirmingThreshold(WithdrawOrderDto withdrawOrderDto)

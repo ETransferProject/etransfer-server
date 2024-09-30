@@ -4,6 +4,7 @@ using Orleans.Streams;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Etos.Order;
+using NBitcoin;
 
 namespace ETransferServer.Grains.Grain.Order.Deposit;
 
@@ -93,6 +94,7 @@ public partial class UserDepositGrain
                 _logger.LogInformation("Order {Id} stream end, current status={Status}", this.GetPrimaryKey(),
                     status.ToString());
                 await HandleDepositQueryGrain(orderDto.ThirdPartOrderId);
+                await ChangeOperationStatus(orderDto);
                 await _bus.Publish(_objectMapper.Map<DepositOrderDto, OrderChangeEto>(orderDto));
                 // await _orderChangeStream.OnCompletedAsync();
                 break;
@@ -123,6 +125,23 @@ public partial class UserDepositGrain
     {
         _logger.LogError(ex, "Order {Id} stream OnError", this.GetPrimaryKey());
         return Task.CompletedTask;
+    }
+    
+    private async Task ChangeOperationStatus(DepositOrderDto order)
+    {
+        order.ExtensionInfo ??= new Dictionary<string, string>();
+        if (!order.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)) return;
+
+        order.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus, order.Status == OrderStatusEnum.Finish.ToString()
+            ? OrderOperationStatusEnum.ReleaseConfirmed.ToString()
+            : OrderOperationStatusEnum.ReleaseFailed.ToString());
+        var recordGrain = GrainFactory.GetGrain<IUserDepositRecordGrain>(order.Id);
+        var res = await recordGrain.GetAsync();
+        if (res.Success)
+        {
+            await recordGrain.CreateOrUpdateAsync(order);
+            await _userDepositProvider.AddOrUpdateSync(order);
+        }
     }
 
     private async Task HandleDepositQueryGrain(string transactionId)

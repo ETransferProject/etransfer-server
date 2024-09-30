@@ -25,6 +25,8 @@ namespace ETransferServer.Grains.Grain.Timers;
 public interface IWithdrawQueryTimerGrain : IGrainWithGuidKey
 {
     Task<DateTime> GetLastCallbackTime();
+    Task<decimal> GetAvgExchangeAsync(string fromSymbol, string toSymbol);
+    Task<Guid> GetUserIdAsync(string address);
     Task Remove(string transactionId);
 }
 
@@ -289,8 +291,9 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
         return avgExchange;
     }
 
-    private async Task<Guid> GetUserIdAsync(string address)
+    public async Task<Guid> GetUserIdAsync(string address)
     {
+        if (address.IsNullOrEmpty()) return Guid.Empty;
         var user = await _userAppService.GetUserByAddressAsync(address);
         return user?.Id ?? OrderIdHelper.WithdrawUserId(address);
     }

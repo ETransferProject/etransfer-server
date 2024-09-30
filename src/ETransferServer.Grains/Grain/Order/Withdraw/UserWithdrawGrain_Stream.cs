@@ -6,6 +6,7 @@ using ETransferServer.Dtos.Order;
 using ETransferServer.Etos.Order;
 using ETransferServer.Grains.Grain.TokenLimit;
 using ETransferServer.Grains.State.Order;
+using NBitcoin;
 
 namespace ETransferServer.Grains.Grain.Order.Withdraw;
 
@@ -85,6 +86,7 @@ public partial class UserWithdrawGrain
                 _logger.LogInformation("Order {Id} stream end, current status={Status}", this.GetPrimaryKey(),
                     status.ToString());
                 await HandleWithdrawQueryGrain(orderDto.FromTransfer.TxId);
+                await ChangeOperationStatus(orderDto);
                 await _bus.Publish(_objectMapper.Map<WithdrawOrderDto, OrderChangeEto>(orderDto));
                 break;
             case OrderStatusEnum.Expired:
@@ -93,6 +95,7 @@ public partial class UserWithdrawGrain
                     status.ToString());
                 await ReverseTokenLimitAsync(orderDto.Id, orderDto.ToTransfer.Symbol, orderDto.AmountUsd);
                 await HandleWithdrawQueryGrain(orderDto.FromTransfer.TxId);
+                await ChangeOperationStatus(orderDto, false);
                 await _bus.Publish(_objectMapper.Map<WithdrawOrderDto, OrderChangeEto>(orderDto));
                 break;
 
@@ -208,7 +211,27 @@ public partial class UserWithdrawGrain
         }
         return (res.Data as WithdrawOrderDto)?.CreateTime ?? 0;
     }
-    
+
+    private async Task ChangeOperationStatus(WithdrawOrderDto order, bool success = true)
+    {
+        order.ExtensionInfo ??= new Dictionary<string, string>();
+        if (!order.ExtensionInfo.ContainsKey(ExtensionKey.RelatedOrderId)) return;
+
+        var recordGrain = GrainFactory.GetGrain<IUserWithdrawRecordGrain>(Guid.Parse(order.ExtensionInfo[ExtensionKey.RelatedOrderId]));
+        var res = await recordGrain.Get();
+        if (res.Success)
+        {
+            var orderRelated = res.Value;
+            if (orderRelated.ExtensionInfo.IsNullOrEmpty() || !orderRelated.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)) return;
+
+            orderRelated.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus, success
+                ? OrderOperationStatusEnum.RefundConfirmed.ToString()
+                : OrderOperationStatusEnum.RefundFailed.ToString());
+            await recordGrain.AddOrUpdate(orderRelated);
+            await _userWithdrawProvider.AddOrUpdateSync(orderRelated);
+        }
+    }
+
     private async Task HandleWithdrawQueryGrain(string transactionId)
     {
         await _withdrawQueryTimerGrain.Remove(transactionId);

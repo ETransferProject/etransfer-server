@@ -23,6 +23,7 @@ using ETransferServer.Grains;
 using ETransferServer.Middleware;
 using ETransferServer.MongoDB;
 using ETransferServer.Options;
+using Microsoft.AspNetCore.Identity;
 using Volo.Abp;
 using Volo.Abp.AspNetCore.Mvc;
 using Volo.Abp.AspNetCore.Mvc.UI.MultiTenancy;
@@ -33,12 +34,14 @@ using Volo.Abp.BlobStoring.Aliyun;
 using Volo.Abp.Caching;
 using Volo.Abp.Caching.StackExchangeRedis;
 using Volo.Abp.EventBus.RabbitMq;
+using Volo.Abp.Identity;
 using Volo.Abp.Localization;
 using Volo.Abp.Modularity;
 using Volo.Abp.OpenIddict.Tokens;
 using Volo.Abp.Swashbuckle;
 using Volo.Abp.Threading;
 using Volo.Abp.VirtualFileSystem;
+using TokenOptions = ETransferServer.Options.TokenOptions;
 
 namespace ETransferServer
 {
@@ -52,10 +55,19 @@ namespace ETransferServer
         typeof(AbpAspNetCoreSerilogModule),
         typeof(AbpSwashbuckleModule),
         typeof(AbpEventBusRabbitMqModule),
-        typeof(AbpBlobStoringAliyunModule)
+        typeof(AbpBlobStoringAliyunModule),
+        typeof(AbpIdentityDomainModule)
     )]
     public class ETransferServerHttpApiHostModule : AbpModule
     {
+        public override void PreConfigureServices(ServiceConfigurationContext context)
+        {
+            PreConfigure<IdentityBuilder>(builder =>
+            {
+                builder.AddDefaultTokenProviders();
+            });
+        }
+        
         public override void ConfigureServices(ServiceConfigurationContext context)
         {
             Configure<AbpAutoMapperOptions>(options => { options.AddMaps<ETransferServerHttpApiHostModule>(); });
@@ -72,6 +84,7 @@ namespace ETransferServer
             Configure<CoBoOptions>(configuration.GetSection("CoBo"));
             Configure<HubOptions>(configuration.GetSection("Hub"));
             Configure<SwapInfosOptions>(configuration.GetSection("SwapInfos"));
+            Configure<StringEncryptionOptions>(configuration.GetSection("StringEncryption"));
 
             ConfigureConventionalControllers();
             // ConfigureAuthentication(context, configuration);
