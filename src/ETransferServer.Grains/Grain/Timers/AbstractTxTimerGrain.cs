@@ -426,6 +426,8 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
                 orderRelated.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus, success
                     ? OrderOperationStatusEnum.RefundConfirmed.ToString()
                     : OrderOperationStatusEnum.RefundFailed.ToString());
+                await recordGrain.AddOrUpdate(orderRelated);
+                await _userWithdrawProvider.AddOrUpdateSync(orderRelated);
             }
         }
     }

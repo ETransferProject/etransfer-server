@@ -132,7 +132,9 @@ public partial class UserDepositGrain
         order.ExtensionInfo ??= new Dictionary<string, string>();
         if (!order.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)) return;
 
-        order.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus, OrderOperationStatusEnum.ReleaseFailed.ToString());
+        order.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus, order.Status == OrderStatusEnum.Finish.ToString()
+            ? OrderOperationStatusEnum.ReleaseConfirmed.ToString()
+            : OrderOperationStatusEnum.ReleaseFailed.ToString());
         var recordGrain = GrainFactory.GetGrain<IUserDepositRecordGrain>(order.Id);
         var res = await recordGrain.GetAsync();
         if (res.Success)

@@ -429,6 +429,8 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> 
                 orderRelated.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus, success
                     ? OrderOperationStatusEnum.RefundConfirmed.ToString()
                     : OrderOperationStatusEnum.RefundFailed.ToString());
+                await recordGrain.AddOrUpdate(orderRelated);
+                await _userWithdrawProvider.AddOrUpdateSync(orderRelated);
             }
         }
     }
