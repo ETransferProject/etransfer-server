@@ -10,6 +10,7 @@ using ETransferServer.Grains.State.Order;
 using ETransferServer.Options;
 using ETransferServer.ThirdPart.CoBo;
 using ETransferServer.ThirdPart.CoBo.Dtos;
+using NBitcoin;
 using Volo.Abp;
 
 namespace ETransferServer.Grains.Grain.Timers;
@@ -314,6 +315,8 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
                     order.ThirdPartFee.Add(new FeeInfo(result.FeeCoin, result.FeeAmount, result.FeeDecimal,
                         FeeInfo.FeeName.CoBoFee));
                 }
+                order.ExtensionInfo ??= new Dictionary<string, string>();
+                order.ExtensionInfo.AddOrReplace(ExtensionKey.ToConfirmedNum, result.ConfirmedNum.ToString());
                 await userWithdrawGrain.AddOrUpdateOrder(order, extensionInfo);
                 break;
             case FAIL:
@@ -325,8 +328,14 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
                 await userWithdrawGrain.AddOrUpdateOrder(order, extensionInfo);
                 break;
             case PENDING:
+                order.ExtensionInfo ??= new Dictionary<string, string>();
+                order.ExtensionInfo.AddOrReplace(ExtensionKey.ToConfirmedNum, result.ConfirmedNum.ToString());
                 withdrawInfo.RequestTime =
                     DateTime.UtcNow.AddSeconds(CoBoConstant.WithdrawQueryInterval).ToUtcSeconds();
+                extensionInfo = ExtensionBuilder.New()
+                    .Add(ExtensionKey.IsForward, Boolean.FalseString)
+                    .Build();
+                await userWithdrawGrain.AddOrUpdateOrder(order, extensionInfo);
                 break;
             default:
                 break;

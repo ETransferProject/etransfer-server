@@ -31,6 +31,7 @@ public static class ExtensionKey
     public const string Memo = "Memo";
     public const string FromConfirmedNum = "FromConfirmedNum";
     public const string FromConfirmingThreshold = "FromConfirmingThreshold";
+    public const string ToConfirmedNum = "ToConfirmedNum";
     public const string RelatedOrderId = "RelatedOrderId";
     public const string RequestUser = "RequestUser";
     public const string RequestTime = "RequestTime";

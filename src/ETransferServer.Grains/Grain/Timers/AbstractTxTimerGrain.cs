@@ -199,21 +199,19 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
             if (!indexerTx.ContainsKey(pendingTx.TxId))
             {
                 result[orderId] = false;
-                if (!isToTransfer)
+                var info = await _transferProvider.GetTokenTransferInfoByTxIdsAsync(new List<string> { pendingTx.TxId }, 0);
+                if (info.TotalCount > 0)
                 {
-                    var info = await _transferProvider.GetTokenTransferInfoByTxIdsAsync(new List<string> { pendingTx.TxId }, 0);
-                    if (info.TotalCount > 0)
-                    {
-                        var txBlockHeight = info.Items.FirstOrDefault().BlockHeight;
-                        order.ExtensionInfo.AddOrReplace(ExtensionKey.FromConfirmedNum,
-                            (chainStatusDict[pendingTx.ChainId].BestChainHeight - txBlockHeight).ToString());
-                        _logger.LogDebug(
-                            "TxTimer from confirmedNum, orderId={orderId}, bestHeight={bestHeight}, txBlockHeight={txBlockHeight}, confirmedNum={confirmedNum}",
-                            orderId, chainStatusDict[pendingTx.ChainId].BestChainHeight, txBlockHeight,
-                            order.ExtensionInfo[ExtensionKey.FromConfirmedNum]);
-                        await SaveOrder(order);
-                    }
+                    var txBlockHeight = info.Items.FirstOrDefault().BlockHeight;
+                    order.ExtensionInfo.AddOrReplace(isToTransfer ? ExtensionKey.ToConfirmedNum : ExtensionKey.FromConfirmedNum,
+                        (chainStatusDict[pendingTx.ChainId].BestChainHeight - txBlockHeight).ToString());
+                    _logger.LogDebug(
+                        "TxTimer {transfer} confirmedNum, orderId={orderId}, bestHeight={bestHeight}, txBlockHeight={txBlockHeight}, confirmedNum={confirmedNum}",
+                        isToTransfer ? "to" : "from",orderId, chainStatusDict[pendingTx.ChainId].BestChainHeight, txBlockHeight,
+                        order.ExtensionInfo[isToTransfer ? ExtensionKey.ToConfirmedNum : ExtensionKey.FromConfirmedNum]);
+                    await SaveOrder(order);
                 }
+                
                 continue;
             }
 
@@ -226,6 +224,12 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
                 order.ToTransfer.Status = OrderTransferStatusEnum.Confirmed.ToString();
                 order.Status = OrderStatusEnum.ToTransferConfirmed.ToString();
                 await ChangeOperationStatus(order);
+                order.ExtensionInfo.AddOrReplace(ExtensionKey.ToConfirmedNum,
+                    (chainStatusDict[pendingTx.ChainId].BestChainHeight - transfer.BlockHeight).ToString());
+                _logger.LogDebug(
+                    "TxTimer to confirmedNum, orderId={orderId}, bestHeight={bestHeight}, blockHeight={blockHeight}, confirmedNum={confirmedNum}",
+                    orderId, chainStatusDict[pendingTx.ChainId].BestChainHeight, transfer.BlockHeight,
+                    order.ExtensionInfo[ExtensionKey.ToConfirmedNum]);
             }
             else
             {
@@ -302,11 +306,8 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
                 order.Id, timerTx.TxId, txStatus.Status, chainStatus.BestChainHeight, txStatus.BlockNumber, 
                 chainStatus.LastIrreversibleBlockHeight);
 
-            if (!isToTransfer)
-            {
-                order.ExtensionInfo.AddOrReplace(ExtensionKey.FromConfirmedNum, (chainStatus.BestChainHeight - txStatus.BlockNumber).ToString());
-            }
-            
+            order.ExtensionInfo.AddOrReplace(isToTransfer ? ExtensionKey.ToConfirmedNum : ExtensionKey.FromConfirmedNum, (chainStatus.BestChainHeight - txStatus.BlockNumber).ToString());
+
             // pending status, continue waiting
             if (txStatus.Status == CommonConstant.TransactionState.Pending) return false;
 
