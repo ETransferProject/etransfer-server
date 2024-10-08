@@ -2,9 +2,11 @@ using ETransferServer.Common;
 using ETransferServer.Dtos.Notify;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Grains.Common;
+using ETransferServer.Grains.Options;
 using ETransferServer.Grains.Provider.Notify;
 using ETransferServer.Grains.State.Order;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Orleans;
 using Volo.Abp;
@@ -14,19 +16,24 @@ namespace ETransferServer.Grains.Grain.Order.Withdraw;
 public interface IWithdrawOrderMonitorGrain : IGrainWithStringKey
 {
     Task DoMonitor(WithdrawOrderMonitorDto dto);
+    Task DoLargeAmountMonitor(WithdrawOrderDto dto);
 }
 
 public class WithdrawOrderMonitorGrain : Grain<WithdrawOrderMonitorState>, IWithdrawOrderMonitorGrain
 {
     private const string WithdrawOrderFailureAlarm = "WithdrawOrderFailureAlarm";
+    private const string WithdrawLargeAmountAlarm = "WithdrawLargeAmountAlarm";
 
     private readonly ILogger<WithdrawOrderMonitorGrain> _logger;
+    private readonly IOptionsSnapshot<WithdrawOptions> _withdrawOptions;
     private readonly Dictionary<string, INotifyProvider> _notifyProvider;
 
     public WithdrawOrderMonitorGrain(ILogger<WithdrawOrderMonitorGrain> logger, 
+        IOptionsSnapshot<WithdrawOptions> withdrawOptions,
         IEnumerable<INotifyProvider> notifyProvider)
     {
         _logger = logger;
+        _withdrawOptions = withdrawOptions;
         _notifyProvider = notifyProvider.ToDictionary(p => p.NotifyType().ToString());
     }
     
@@ -60,7 +67,32 @@ public class WithdrawOrderMonitorGrain : Grain<WithdrawOrderMonitorState>, IWith
             await WriteStateAsync();
         }
     }
-    
+
+    public async Task DoLargeAmountMonitor(WithdrawOrderDto dto)
+    {
+        try
+        {
+            var symbolExists = _withdrawOptions.Value.LargeAmount.TryGetValue(dto.FromTransfer.Symbol, out var amount);
+            AssertHelper.IsTrue(symbolExists, "Symbol not found: {Symbol}", dto.FromTransfer.Symbol);
+            if (dto.FromTransfer.Amount >= amount)
+            {
+                var sendSuccess = await SendNotifyAsync(dto);
+                AssertHelper.IsTrue(sendSuccess, "Send notify failed");
+            }
+        }
+        catch (UserFriendlyException e)
+        {
+            _logger.LogWarning(
+                "WithdrawOrderMonitor largeAmount failed , Message={Msg}, GrainId={GrainId}",
+                e.Message, this.GetPrimaryKeyString());
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "WithdrawOrderMonitor largeAmount failed GrainId={GrainId}",
+                this.GetPrimaryKeyString());
+        }
+    }
+
     private async Task<bool> ExistWithdrawOrderAsync(WithdrawOrderMonitorDto dto)
     {
         try
@@ -105,6 +137,31 @@ public class WithdrawOrderMonitorGrain : Grain<WithdrawOrderMonitorState>, IWith
         });
     }
 
+    private async Task<bool> SendNotifyAsync(WithdrawOrderDto dto)
+    {
+        var providerExists = _notifyProvider.TryGetValue(NotifyTypeEnum.FeiShuGroup.ToString(), out var provider);
+        AssertHelper.IsTrue(providerExists, "Provider not found");
+        return await provider.SendNotifyAsync(new NotifyRequest
+        {
+            Template = WithdrawLargeAmountAlarm,
+            Params = new Dictionary<string, string>
+            {
+                [LargeAmountKeys.OrderType] = OrderTypeEnum.Withdraw.ToString(),
+                [LargeAmountKeys.OrderId] = dto.Id.ToString(),
+                [LargeAmountKeys.CreateTime] = dto.CreateTime.HasValue && dto.CreateTime.Value > 0
+                    ? DateTimeHelper.FromUnixTimeMilliseconds(dto.CreateTime.Value).ToUtc8String()
+                    : DateTime.UtcNow.ToUtc8String(),
+                [LargeAmountKeys.Amount] = dto.FromTransfer.Amount.ToString(),
+                [LargeAmountKeys.Symbol] = dto.FromTransfer.Symbol,
+                [LargeAmountKeys.TxId] = dto.FromTransfer.TxId,
+                [LargeAmountKeys.ToAddress] = dto.ToTransfer.ToAddress,
+                [LargeAmountKeys.Network] = dto.ToTransfer.Network == CommonConstant.Network.AElf 
+                    ? dto.ToTransfer.ChainId
+                    : dto.ToTransfer.Network
+            }
+        });
+    }
+
     private static class Keys
     {
         public const string OrderType = "orderType";
@@ -122,5 +179,17 @@ public class WithdrawOrderMonitorGrain : Grain<WithdrawOrderMonitorState>, IWith
         public const string BlockHash = "blockHash";
         public const string BlockHeight = "blockHeight";
         public const string Reason = "reason";
+    }
+    
+    private static class LargeAmountKeys
+    {
+        public const string OrderType = "orderType";
+        public const string OrderId = "orderId";
+        public const string CreateTime = "createTime";
+        public const string Amount = "amount";
+        public const string Symbol = "symbol";
+        public const string TxId = "txId";
+        public const string ToAddress = "toAddress";
+        public const string Network = "network";
     }
 }
