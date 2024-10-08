@@ -7,18 +7,15 @@ namespace ETransferServer.Common;
 
 public static class EncryptionHelper
 {
-    private const int Iterations = 1000;
-
-
     public static string MD5Encrypt32(string input)
     {
-        using (MD5 md5 = MD5.Create())
+        using (var md5 = MD5.Create())
         {
-            byte[] inputBytes = Encoding.UTF8.GetBytes(input);
-            byte[] hashBytes = md5.ComputeHash(inputBytes);
+            var inputBytes = Encoding.UTF8.GetBytes(input);
+            var hashBytes = md5.ComputeHash(inputBytes);
 
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < hashBytes.Length; i++)
+            var sb = new StringBuilder();
+            for (var i = 0; i < hashBytes.Length; i++)
             {
                 sb.Append(hashBytes[i].ToString("x2"));
             }
@@ -27,66 +24,56 @@ public static class EncryptionHelper
         }
     }
     
-    public static string Encrypt(string plainText, string password)
+    public static string Encrypt(string plainText, string key)
     {
-        var aes = Aes.Create();
-        aes.KeySize = 256; 
-        aes.BlockSize = 128; 
-        aes.Mode = CipherMode.CBC; 
+        var iv = new byte[16];
+        byte[] array;
 
-        var salt = new byte[16];
-        using (var rng = RandomNumberGenerator.Create())
+        using (var aes = Aes.Create())
         {
-            rng.GetBytes(salt);
-        }
+            aes.Key = Encoding.UTF8.GetBytes(key);
+            aes.IV = iv;
 
-        var key = new Rfc2898DeriveBytes(password, salt, Iterations, HashAlgorithmName.SHA256);
+            var encryptor = aes.CreateEncryptor(aes.Key, aes.IV);
 
-        using (var encryptor = aes.CreateEncryptor(key.GetBytes(aes.KeySize / 8), aes.IV))
-        using (var memoryStream = new MemoryStream())
-        {
-            memoryStream.Write(salt, 0, salt.Length); 
-            memoryStream.Write(aes.IV, 0, aes.IV.Length);
-            using (var cryptoStream = new CryptoStream(memoryStream, encryptor, CryptoStreamMode.Write))
+            using (var memoryStream = new MemoryStream())
             {
-                using (var streamWriter = new StreamWriter(cryptoStream))
+                using (var cryptoStream = new CryptoStream((Stream)memoryStream, encryptor, CryptoStreamMode.Write))
                 {
-                    streamWriter.Write(plainText);
+                    using (var streamWriter = new StreamWriter((Stream)cryptoStream))
+                    {
+                        streamWriter.Write(plainText);
+                    }
+                    array = memoryStream.ToArray();
                 }
             }
-
-            return Convert.ToBase64String(memoryStream.ToArray());
         }
+
+        return Convert.ToBase64String(array);
     }
 
-    public static string Decrypt(string cipherText, string password)
+    public static string Decrypt(string cipherText, string key)
     {
-        var bytes = Convert.FromBase64String(cipherText);
-        using (var memoryStream = new MemoryStream(bytes))
+        var iv = new byte[16];
+        var buffer = Convert.FromBase64String(cipherText);
+
+        using (var aes = Aes.Create())
         {
-            var salt = new byte[16];
-            var _ = memoryStream.Read(salt, 0, salt.Length);
+            aes.Key = Encoding.UTF8.GetBytes(key);
+            aes.IV = iv;
 
-            var iv = new byte[16];
-            var __= memoryStream.Read(iv, 0, iv.Length);
+            var decryptor = aes.CreateDecryptor(aes.Key, aes.IV);
 
-            var key = new Rfc2898DeriveBytes(password, salt, Iterations, HashAlgorithmName.SHA256);
-
-            using (var aes = Aes.Create())
+            using (var memoryStream = new MemoryStream(buffer))
             {
-                aes.KeySize = 256;
-                aes.BlockSize = 128;
-                aes.Mode = CipherMode.CBC;
-                aes.IV = iv;
-
-                using (var decryptor = aes.CreateDecryptor(key.GetBytes(aes.KeySize / 8), aes.IV))
-                using (var cryptoStream = new CryptoStream(memoryStream, decryptor, CryptoStreamMode.Read))
-                using (var streamReader = new StreamReader(cryptoStream))
+                using (var cryptoStream = new CryptoStream((Stream)memoryStream, decryptor, CryptoStreamMode.Read))
                 {
-                    return streamReader.ReadToEnd();
+                    using (var streamReader = new StreamReader((Stream)cryptoStream))
+                    {
+                        return streamReader.ReadToEnd();
+                    }
                 }
             }
         }
     }
-
 }

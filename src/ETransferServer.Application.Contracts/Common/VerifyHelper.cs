@@ -26,6 +26,13 @@ public static class VerifyHelper
         var emailReg = new Regex(phoneRegex);
         return emailReg.IsMatch(phoneNumber.Trim());
     }
+    
+    public static bool VerifyPassword(string password)
+    {
+        var passwordRegex = @"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$";
+        var passwordReg = new Regex(passwordRegex);
+        return passwordReg.IsMatch(password);
+    }
 
     public static bool VerifySignature(Transaction transaction, string inputPublicKey)
     {
@@ -59,6 +66,20 @@ public static class VerifyHelper
                    >= new Version(anotherVersion);
         }
         catch (Exception e)
+        {
+            return false;
+        }
+    }
+    
+    public static bool VerifyAelfAddress(string address)
+    {
+        if (address.IsNullOrEmpty()) return true;
+        try
+        {
+            var addr = Address.FromBase58(address);
+            return true;
+        }
+        catch (Exception ex)
         {
             return false;
         }

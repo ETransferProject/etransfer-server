@@ -21,7 +21,6 @@
     <PackageReference Include="GraphQL.Client.Abstractions" Version="6.0.0" />
     <PackageReference Include="GraphQL.SystemTextJson" Version="7.4.1" />
     <PackageReference Include="Grpc.Core.Api" Version="2.46.1" />
-    <PackageReference Include="KafkaNetClient" Version="1.0.2" />
     <PackageReference Include="StackExchange.Redis" Version="2.2.4" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="6.25.1" />
     <PackageReference Include="Volo.Abp.Account.Application" Version="7.0.0" />
@@ -38,31 +37,5 @@
     <PackageReference Include="Nethereum.Web3" Version="4.20.0" />
     <PackageReference Include="Nethereum.Util" Version="4.20.0" />
   </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Protobuf\" />
-  </ItemGroup>
-  
-  <ItemGroup>
-    <ContractReference Include="..\..\protobuf\acs12.proto">
-      <Link>Protobuf\Proto\acs12.proto</Link>
-    </ContractReference>
-    <ContractReference Include="..\..\protobuf\authority_info.proto">
-      <Link>Protobuf\Proto\authority_info.proto</Link>
-    </ContractReference>
-    <ContractReference Include="..\..\protobuf\token_pool_contract.proto">
-      <Link>Protobuf\Proto\token_pool_contract.proto</Link>
-    </ContractReference>
-    <ContractReference Include="..\..\protobuf\token_contract.proto">
-      <Link>Protobuf\Proto\token_contract.proto</Link>
-    </ContractReference>
-    <ContractReference Include="..\..\protobuf\ca_contract.proto">
-      <Link>Protobuf\Proto\ca_contract.proto</Link>
-    </ContractReference>
-    <ContractReference Include="..\..\protobuf\awaken_swap_contract.proto">
-      <Link>Protobuf\Proto\awaken_swap_contract.proto</Link>
-    </ContractReference>
-  </ItemGroup>
-
 
 </Project>

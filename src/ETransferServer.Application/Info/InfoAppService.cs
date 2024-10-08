@@ -212,6 +212,26 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
             var networkInfos = _networkOptions.Value.NetworkMap[CommonConstant.Symbol.USDT].Select(config =>
                 config.NetworkInfo).ToList();
             var tokenConfigs = _tokenOptions.Value.Deposit[ChainId.AELF];
+            var toTokenConfigs = _tokenOptions.Value.DepositSwap.SelectMany(t => t.ToTokenList);
+            foreach (var item in toTokenConfigs)
+            {
+                if (!tokenConfigs.Exists(t => t.Symbol == item.Symbol))
+                {
+                    tokenConfigs.Add(_objectMapper.Map<ToTokenConfig, TokenConfig>(item));
+                }
+            }
+            foreach (var item in tokenConfigs)
+            {
+                if (!_networkOptions.Value.NetworkMap.ContainsKey(item.Symbol) 
+                    || item.Symbol == CommonConstant.Symbol.USDT) continue;
+                var networks = _networkOptions.Value.NetworkMap[item.Symbol].Select(config =>
+                    config.NetworkInfo).ToList();
+                foreach (var network in networks)
+                {
+                    if (networkInfos.Exists(t => t.Network == network.Network)) continue;
+                    networkInfos.Add(network);
+                }
+            }
             var result = new GetTokenOptionResultDto
             {
                 NetworkList = _objectMapper.Map<List<NetworkInfo>, List<NetworkOptionDto>>(networkInfos),
@@ -296,8 +316,13 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
                     }
                 }
             }
-
-            QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery));
+            
+            var mustNotQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+            mustNotQuery.Add(q => q.Match(i =>
+                i.Field("extensionInfo.RefundTx").Query(ExtensionKey.RefundTx)));
+            
+            QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery)
+                .MustNot(mustNotQuery));
 
             var (count, list) = await _orderIndexRepository.GetSortListAsync(Filter,
                 sortFunc: string.IsNullOrWhiteSpace(request.Sorting)

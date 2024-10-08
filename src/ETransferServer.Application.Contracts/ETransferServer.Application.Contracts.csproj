@@ -20,7 +20,9 @@
     <PackageReference Include="CodingSeb.ExpressionEvaluator" Version="1.4.40" />
     <PackageReference Include="GraphQL.Client" Version="5.1.0" />
     <PackageReference Include="GraphQL.Client.Serializer.Newtonsoft" Version="5.1.0" />
+    <PackageReference Include="KafkaNetClient" Version="1.0.2" />
     <PackageReference Include="Orleans.Providers.MongoDB" Version="3.8.0" />
+    <PackageReference Include="Otp.NET" Version="1.4.0" />
     <PackageReference Include="Volo.Abp.ObjectExtending" Version="7.0.0" />
     <PackageReference Include="Volo.Abp.Account.Application.Contracts" Version="7.0.0" />
     <PackageReference Include="Volo.Abp.Identity.Application.Contracts" Version="7.0.0" />
@@ -38,32 +40,6 @@
 
     <PackageReference Include="CoinGeckoAsyncApi" Version="1.6.0" />
     <PackageReference Include="NBitcoin" Version="7.0.31" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ContractReference Include="..\..\protobuf\acs12.proto">
-      <Link>Protobuf\Proto\acs12.proto</Link>
-    </ContractReference>
-    <ContractReference Include="..\..\protobuf\authority_info.proto">
-      <Link>Protobuf\Proto\authority_info.proto</Link>
-    </ContractReference>
-    <ContractReference Include="..\..\protobuf\token_pool_contract.proto">
-      <Link>Protobuf\Proto\token_pool_contract.proto</Link>
-    </ContractReference>
-    <ContractReference Include="..\..\protobuf\token_contract.proto">
-      <Link>Protobuf\Proto\token_contract.proto</Link>
-    </ContractReference>
-    <ContractReference Include="..\..\protobuf\ca_contract.proto">
-      <Link>Protobuf\Proto\ca_contract.proto</Link>
-    </ContractReference>
-  </ItemGroup>
-  <ItemGroup>
-    <None Remove="contract_csharp_plugin-v1.0.3-osx.zip" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Remove="Protobuf\Generated\TokenContract.c.cs" />
-    <Compile Remove="Protobuf\Generated\AuthorityInfo.g.cs" />
   </ItemGroup>
 
 </Project>

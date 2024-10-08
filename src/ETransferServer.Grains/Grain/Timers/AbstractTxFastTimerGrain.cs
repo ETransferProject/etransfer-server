@@ -195,6 +195,7 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> 
             {
                 order.ToTransfer.Status = OrderTransferStatusEnum.Transferred.ToString();
                 order.Status = OrderStatusEnum.ToTransferConfirmed.ToString();
+                await ChangeOperationStatus(order);
             }
             else
             {
@@ -310,6 +311,11 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> 
                         transferInfo.ToAddress = to;
                     }
                 }
+                else
+                {
+                    await ChangeOperationStatus(order);
+                }
+
                 transferInfo.Status = OrderTransferStatusEnum.Transferred.ToString();
                 order.Status = isToTransfer
                     ? OrderStatusEnum.ToTransferConfirmed.ToString()
@@ -330,6 +336,7 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> 
                 order.Status = isToTransfer
                     ? OrderStatusEnum.ToTransferFailed.ToString()
                     : OrderStatusEnum.FromTransferFailed.ToString();
+                if (isToTransfer) await ChangeOperationStatus(order, false);
                 await SaveOrder(order, ExtensionBuilder.New()
                     .Add(ExtensionKey.TransactionStatus, txStatus.Status)
                     .Add(ExtensionKey.TransactionError, txStatus.Error)
@@ -395,6 +402,36 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> 
         {
             _logger.LogWarning("TxFastTimer order timer error, OrderId={OrderId} Message={Msg}", orderId, e.Message);
             return null;
+        }
+    }
+    
+    private async Task ChangeOperationStatus(TOrder order, bool success = true)
+    {
+        order.ExtensionInfo ??= new Dictionary<string, string>();
+        if (order.OrderType == OrderTypeEnum.Deposit.ToString())
+        {
+            if (!order.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)) return;
+            
+            order.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus, success
+                ? OrderOperationStatusEnum.ReleaseConfirmed.ToString()
+                : OrderOperationStatusEnum.ReleaseFailed.ToString());
+        }
+        if (order.OrderType == OrderTypeEnum.Withdraw.ToString())
+        {
+            if (!order.ExtensionInfo.ContainsKey(ExtensionKey.RelatedOrderId)) return;
+            var recordGrain = GrainFactory.GetGrain<IUserWithdrawRecordGrain>(Guid.Parse(order.ExtensionInfo[ExtensionKey.RelatedOrderId]));
+            var res = await recordGrain.Get();
+            if (res.Success)
+            {
+                var orderRelated = res.Value;
+                if (orderRelated.ExtensionInfo.IsNullOrEmpty() || !orderRelated.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)) return;
+
+                orderRelated.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus, success
+                    ? OrderOperationStatusEnum.RefundConfirmed.ToString()
+                    : OrderOperationStatusEnum.RefundFailed.ToString());
+                await recordGrain.AddOrUpdate(orderRelated);
+                await _userWithdrawProvider.AddOrUpdateSync(orderRelated);
+            }
         }
     }
 

@@ -61,6 +61,11 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
         coBoTransaction.Coin = _coBoProvider.GetResponseCoin(coBoTransaction.Coin);
         AssertHelper.NotNull(coBoTransaction, "DeserializeObject to CoBoTransactionDto fail, invalid body: {body}",
             body);
+        if (coBoTransaction.AbsAmount.SafeToDecimal() <= 0M)
+        {
+            _logger.LogInformation("transaction callback amount invalid");
+            return true;
+        }
 
         var handleResult = false;
         switch (coBoTransaction.Side)

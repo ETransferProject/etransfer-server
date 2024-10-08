@@ -112,10 +112,12 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
                 AssertHelper.IsTrue(await VerifyByVersionAndWhiteList(networkConfig, userId, version), ErrorResult.VersionOrWhitelistVerifyFailCode);
             }
 
-            if (VerifyAElfChain(request.Network) && !_withdrawInfoOptions.Value.CanCrossSameChain)
+            if (VerifyAElfChain(request.Network))
             {
-                AssertHelper.IsTrue(request.ChainId != request.Network,
+                AssertHelper.IsTrue(_withdrawInfoOptions.Value.CanCrossSameChain ||
+                                    (!_withdrawInfoOptions.Value.CanCrossSameChain && request.ChainId != request.Network),
                     "Network is invalid. Please refresh and try again.");
+                AssertHelper.IsTrue(VerifyHelper.VerifyAelfAddress(request.Address), ErrorResult.AddressFormatWrongCode);
             }
 
             var tokenInfoGrain =
@@ -465,6 +467,13 @@ public class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppServ
             if (VerifyAElfChain(request.Network) && !_withdrawInfoOptions.Value.CanCrossSameChain)
             {
                 AssertHelper.IsTrue(request.FromChainId != request.Network, ErrorResult.NetworkInvalidCode);
+            }
+            if (VerifyAElfChain(request.Network))
+            {
+                AssertHelper.IsTrue(_withdrawInfoOptions.Value.CanCrossSameChain ||
+                                    (!_withdrawInfoOptions.Value.CanCrossSameChain && request.FromChainId != request.Network),
+                    ErrorResult.NetworkInvalidCode);
+                AssertHelper.IsTrue(VerifyHelper.VerifyAelfAddress(request.ToAddress), ErrorResult.AddressFormatWrongCode);
             }
 
             var userGrain = _clusterClient.GetGrain<IUserGrain>(userId);
