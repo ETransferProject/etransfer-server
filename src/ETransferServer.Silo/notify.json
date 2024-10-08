@@ -108,7 +108,7 @@
           "Title": "❗️ [test3] Withdraw large amount alert",
           "Contents": [
             "OrderType: {orderType}",
-            "OrderId: {orderId}\nTxId: {txId}\nCreateTime: {createTime}\nNetwork: {network}",
+            "OrderId: {orderId}\nTxId: {txId}\nCreateTime: {createTime}\nToNetwork: {toNetwork}",
             "Amount: {amount} Symbol: {symbol}\nToAddress: {toAddress}"
           ]
         }

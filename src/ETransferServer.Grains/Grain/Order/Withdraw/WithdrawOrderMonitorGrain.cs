@@ -155,7 +155,7 @@ public class WithdrawOrderMonitorGrain : Grain<WithdrawOrderMonitorState>, IWith
                 [LargeAmountKeys.Symbol] = dto.FromTransfer.Symbol,
                 [LargeAmountKeys.TxId] = dto.FromTransfer.TxId,
                 [LargeAmountKeys.ToAddress] = dto.ToTransfer.ToAddress,
-                [LargeAmountKeys.Network] = dto.ToTransfer.Network == CommonConstant.Network.AElf 
+                [LargeAmountKeys.ToNetwork] = dto.ToTransfer.Network == CommonConstant.Network.AElf 
                     ? dto.ToTransfer.ChainId
                     : dto.ToTransfer.Network
             }
@@ -190,6 +190,6 @@ public class WithdrawOrderMonitorGrain : Grain<WithdrawOrderMonitorState>, IWith
         public const string Symbol = "symbol";
         public const string TxId = "txId";
         public const string ToAddress = "toAddress";
-        public const string Network = "network";
+        public const string ToNetwork = "toNetwork";
     }
 }
