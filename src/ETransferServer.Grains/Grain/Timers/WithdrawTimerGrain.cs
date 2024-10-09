@@ -236,7 +236,7 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
             foreach (var withdrawItem in State.WithdrawInfoMap)
             {
                 var currentTime = DateTime.UtcNow.ToUtcSeconds();
-                if (currentTime > withdrawItem.Value.ExtraRequestTime && currentTime < withdrawItem.Value.RequestTime)
+                if (currentTime < withdrawItem.Value.ExtraRequestTime && currentTime < withdrawItem.Value.RequestTime)
                 {
                     _logger.LogDebug(
                         "order confirm time not enough, orderId:{orderId}, currentTime:{currentTime}, requestTime:{requestTime}, remainingTime:{remainingTime}, extraRequestTime:{extraRequestTime}",
@@ -245,7 +245,8 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
                     continue;
                 }
 
-                var status = await HandleWithdraw(withdrawItem.Key, withdrawItem.Value);
+                var status = await HandleWithdraw(withdrawItem.Key, withdrawItem.Value, 
+                    currentTime >= withdrawItem.Value.ExtraRequestTime && currentTime < withdrawItem.Value.RequestTime);
                 if (status.Equals(ThirdPartOrderStatusEnum.Pending.ToString(),
                         StringComparison.OrdinalIgnoreCase))
                 {
@@ -276,10 +277,10 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
         }
     }
 
-    private async Task<string> HandleWithdraw(Guid orderId, WithdrawInfo withdrawInfo)
+    private async Task<string> HandleWithdraw(Guid orderId, WithdrawInfo withdrawInfo, bool isRange)
     {
-        _logger.LogDebug("QueryWithdraw timer, {Time}, orderId:{orderId}", DateTime.UtcNow.ToUtc8String(),
-            orderId);
+        _logger.LogDebug("QueryWithdraw timer, {Time}, orderId:{orderId}, {isRange}}", 
+            DateTime.UtcNow.ToUtc8String(), orderId, isRange);
 
         var orderGrain = GrainFactory.GetGrain<IUserWithdrawRecordGrain>(orderId);
         var userWithdrawGrain = GrainFactory.GetGrain<IUserWithdrawGrain>(orderId);
@@ -291,6 +292,11 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
         }
 
         var order = (WithdrawOrderDto)orderResult.Data;
+        if (isRange && order.ToTransfer.Status == PENDING)
+        {
+            _logger.LogWarning("order already pending, orderId:{orderId}", orderId);
+            return PENDING;
+        }
 
         var result = await GetWithdrawInfoByRequest(order.Id.ToString());
         if (result == null)
@@ -334,8 +340,11 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
                 order.ToTransfer.TxId = result.TxId;
                 order.ExtensionInfo ??= new Dictionary<string, string>();
                 order.ExtensionInfo.AddOrReplace(ExtensionKey.ToConfirmedNum, result.ConfirmedNum.ToString());
-                withdrawInfo.RequestTime =
-                    DateTime.UtcNow.AddSeconds(CoBoConstant.WithdrawQueryInterval).ToUtcSeconds();
+                if (!isRange)
+                {
+                    withdrawInfo.RequestTime =
+                        DateTime.UtcNow.AddSeconds(CoBoConstant.WithdrawQueryInterval).ToUtcSeconds();
+                }
                 extensionInfo = ExtensionBuilder.New()
                     .Add(ExtensionKey.IsForward, Boolean.FalseString)
                     .Build();
