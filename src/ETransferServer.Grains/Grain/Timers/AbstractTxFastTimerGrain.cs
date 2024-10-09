@@ -180,10 +180,7 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> 
             if (!IsTxFastConfirmed(pendingTx, order, indexerTx, chainStatusDict[pendingTx.ChainId]))
             {
                 result[orderId] = false;
-                if (pendingTx.TransferType == TransferTypeEnum.FromTransfer.ToString())
-                {
-                    await SaveOrder(order);
-                }
+                await SaveOrder(order);
                 continue;
             }
 

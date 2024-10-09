@@ -22,6 +22,7 @@ public class NetWorkInfo
     public string Coin { get; set; }
     public int ConfirmNum { get; set; }
     public int BlockingTime { get; set; }
+    public int ExtraRequestTime { get; set; } = 30;
     public int Decimal { get; set; }
     public decimal Amount { get; set; } = 0;
     public decimal FeeAlarmPercent { get; set; } = 10;

@@ -195,17 +195,20 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
             var netWorkInfo = _withdrawNetworkOptions.Value.NetworkInfos.FirstOrDefault(t =>
                 t.Coin.Equals(coin, StringComparison.OrdinalIgnoreCase));
             var requestTime = DateTime.UtcNow.AddMinutes(1).ToUtcSeconds();
+            var extraRequestTime = DateTime.UtcNow.AddMinutes(1).ToUtcSeconds();
             if (netWorkInfo != null)
             {
-                _logger.LogDebug("WithdrawTimerGrain requestTime, {blockingTime}, {confirmNum}", 
-                    netWorkInfo.BlockingTime, netWorkInfo.ConfirmNum);
+                _logger.LogDebug("WithdrawTimerGrain requestTime, {blockingTime}, {confirmNum}, {extraRequestTime}", 
+                    netWorkInfo.BlockingTime, netWorkInfo.ConfirmNum, netWorkInfo.ExtraRequestTime);
                 requestTime = DateTime.UtcNow.ToUtcSeconds() + netWorkInfo.BlockingTime * netWorkInfo.ConfirmNum;
+                extraRequestTime = DateTime.UtcNow.ToUtcSeconds() + netWorkInfo.ExtraRequestTime * 2;
             }
 
             State.WithdrawInfoMap[order.Id] = new WithdrawInfo()
             {
                 OrderId = order.Id,
-                RequestTime = requestTime
+                RequestTime = requestTime,
+                ExtraRequestTime = extraRequestTime,
             };
             await WriteStateAsync();
         }
@@ -233,12 +236,12 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
             foreach (var withdrawItem in State.WithdrawInfoMap)
             {
                 var currentTime = DateTime.UtcNow.ToUtcSeconds();
-                if (currentTime < withdrawItem.Value.RequestTime)
+                if (currentTime > withdrawItem.Value.ExtraRequestTime && currentTime < withdrawItem.Value.RequestTime)
                 {
                     _logger.LogDebug(
-                        "order confirm time not enough, orderId:{orderId}, currentTime:{currentTime}, requestTime:{requestTime}, remainingTime:{remainingTime}",
+                        "order confirm time not enough, orderId:{orderId}, currentTime:{currentTime}, requestTime:{requestTime}, remainingTime:{remainingTime}, extraRequestTime:{extraRequestTime}",
                         withdrawItem.Key, currentTime, withdrawItem.Value.RequestTime,
-                        withdrawItem.Value.RequestTime - currentTime);
+                        withdrawItem.Value.RequestTime - currentTime, withdrawItem.Value.ExtraRequestTime);
                     continue;
                 }
 
