@@ -69,19 +69,32 @@ public class OrderAppService : ApplicationService, IOrderAppService
                         .Value(Enum.GetName(typeof(OrderTypeEnum), request.Type))));
             }
 
+            var status = OrderStatusResponseEnum.All;
             if (request.Status > 0)
             {
-                var status =
+                status =
                     (OrderStatusResponseEnum)Enum.Parse(typeof(OrderStatusResponseEnum), request.Status.ToString());
                 switch (status)
                 {
                     case OrderStatusResponseEnum.Processing:
                         mustQuery.Add(q => q.Terms(i =>
                             i.Field(f => f.Status).Terms(OrderStatusHelper.GetProcessingList())));
+                        mustQuery.Add(q => q.Bool(i => i.Should(
+                            s => s.Match(k =>
+                                k.Field("extensionInfo.ToConfirmedNum").Query("0")),
+                            p => p.Bool(j => j.MustNot(
+                                s => s.Exists(k =>
+                                    k.Field("extensionInfo.ToConfirmedNum")))))));
                         break;
                     case OrderStatusResponseEnum.Succeed:
-                        mustQuery.Add(q => q.Terms(i =>
-                            i.Field(f => f.Status).Terms(OrderStatusHelper.GetSucceedList())));
+                        mustQuery.Add(q => q.Bool(i => i.Should(
+                            s => s.Terms(k =>
+                                k.Field(f => f.Status).Terms(OrderStatusHelper.GetSucceedList())),
+                            p => p.Bool(j => j.Must(
+                                s => s.Exists(k =>
+                                    k.Field("extensionInfo.ToConfirmedNum")),
+                                s => s.Terms(k =>
+                                    k.Field(f => f.Status).Terms(OrderStatusHelper.GetProcessingList())))))));
                         break;
                     case OrderStatusResponseEnum.Failed:
                         mustQuery.Add(q => q.Terms(i =>
@@ -107,6 +120,11 @@ public class OrderAppService : ApplicationService, IOrderAppService
             var mustNotQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
             mustNotQuery.Add(q => q.Match(i =>
                 i.Field("extensionInfo.RefundTx").Query(ExtensionKey.RefundTx)));
+            if (status == OrderStatusResponseEnum.Succeed)
+            {
+                mustNotQuery.Add(q => q.Match(i =>
+                    i.Field("extensionInfo.ToConfirmedNum").Query("0")));
+            }
 
             QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery)
                 .MustNot(mustNotQuery));
