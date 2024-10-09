@@ -11,6 +11,7 @@ public class WithdrawInfo
     public Guid OrderId { get; set; }
     public long RequestTime { get; set; }
     public long ExtraRequestTime { get; set; }
+    public long LaterRequestTime { get; set; }
     public int RetryCount { get; set; }
 }
 

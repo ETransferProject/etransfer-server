@@ -200,7 +200,7 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
             {
                 _logger.LogDebug("WithdrawTimerGrain requestTime, {blockingTime}, {confirmNum}, {extraRequestTime}", 
                     netWorkInfo.BlockingTime, netWorkInfo.ConfirmNum, netWorkInfo.ExtraRequestTime);
-                requestTime = DateTime.UtcNow.ToUtcSeconds() + netWorkInfo.BlockingTime * netWorkInfo.ConfirmNum;
+                requestTime = DateTime.UtcNow.ToUtcSeconds() + (long)(netWorkInfo.BlockingTime * netWorkInfo.ConfirmNum);
                 extraRequestTime = DateTime.UtcNow.ToUtcSeconds() + netWorkInfo.ExtraRequestTime;
             }
 
@@ -209,6 +209,7 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
                 OrderId = order.Id,
                 RequestTime = requestTime,
                 ExtraRequestTime = extraRequestTime,
+                LaterRequestTime = 0
             };
             await WriteStateAsync();
         }
@@ -236,12 +237,14 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
             foreach (var withdrawItem in State.WithdrawInfoMap)
             {
                 var currentTime = DateTime.UtcNow.ToUtcSeconds();
-                if (currentTime < withdrawItem.Value.ExtraRequestTime && currentTime < withdrawItem.Value.RequestTime)
+                if ((currentTime < withdrawItem.Value.ExtraRequestTime && currentTime < withdrawItem.Value.RequestTime)
+                    || currentTime < withdrawItem.Value.LaterRequestTime)
                 {
                     _logger.LogDebug(
-                        "order confirm time not enough, orderId:{orderId}, currentTime:{currentTime}, requestTime:{requestTime}, remainingTime:{remainingTime}, extraRequestTime:{extraRequestTime}",
+                        "order confirm time not enough, orderId:{orderId}, currentTime:{currentTime}, requestTime:{requestTime}, " +
+                        "remainingTime:{remainingTime}, extraRequestTime:{extraRequestTime}, laterRequestTime:{laterRequestTime},",
                         withdrawItem.Key, currentTime, withdrawItem.Value.RequestTime,
-                        withdrawItem.Value.RequestTime - currentTime, withdrawItem.Value.ExtraRequestTime);
+                        withdrawItem.Value.RequestTime - currentTime, withdrawItem.Value.ExtraRequestTime, withdrawItem.Value.LaterRequestTime);
                     continue;
                 }
 
@@ -342,7 +345,7 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
                 order.ExtensionInfo.AddOrReplace(ExtensionKey.ToConfirmedNum, result.ConfirmedNum.ToString());
                 if (!isRange)
                 {
-                    withdrawInfo.RequestTime =
+                    withdrawInfo.LaterRequestTime =
                         DateTime.UtcNow.AddSeconds(CoBoConstant.WithdrawQueryInterval).ToUtcSeconds();
                 }
                 extensionInfo = ExtensionBuilder.New()
