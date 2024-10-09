@@ -201,7 +201,7 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
                 _logger.LogDebug("WithdrawTimerGrain requestTime, {blockingTime}, {confirmNum}, {extraRequestTime}", 
                     netWorkInfo.BlockingTime, netWorkInfo.ConfirmNum, netWorkInfo.ExtraRequestTime);
                 requestTime = DateTime.UtcNow.ToUtcSeconds() + netWorkInfo.BlockingTime * netWorkInfo.ConfirmNum;
-                extraRequestTime = DateTime.UtcNow.ToUtcSeconds() + netWorkInfo.ExtraRequestTime * 2;
+                extraRequestTime = DateTime.UtcNow.ToUtcSeconds() + netWorkInfo.ExtraRequestTime;
             }
 
             State.WithdrawInfoMap[order.Id] = new WithdrawInfo()
@@ -331,6 +331,7 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
                 await userWithdrawGrain.AddOrUpdateOrder(order, extensionInfo);
                 break;
             case PENDING:
+                order.ToTransfer.TxId = result.TxId;
                 order.ExtensionInfo ??= new Dictionary<string, string>();
                 order.ExtensionInfo.AddOrReplace(ExtensionKey.ToConfirmedNum, result.ConfirmedNum.ToString());
                 withdrawInfo.RequestTime =
