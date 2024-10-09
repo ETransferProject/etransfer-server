@@ -205,9 +205,10 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
                     var txBlockHeight = info.Items.FirstOrDefault().BlockHeight;
                     order.ExtensionInfo.AddOrReplace(isToTransfer ? ExtensionKey.ToConfirmedNum : ExtensionKey.FromConfirmedNum,
                         (chainStatusDict[pendingTx.ChainId].BestChainHeight - txBlockHeight).ToString());
+                    var direction = isToTransfer ? "to" : "from";
                     _logger.LogDebug(
-                        "TxTimer {transfer} confirmedNum, orderId={orderId}, bestHeight={bestHeight}, txBlockHeight={txBlockHeight}, confirmedNum={confirmedNum}",
-                        isToTransfer ? "to" : "from",orderId, chainStatusDict[pendingTx.ChainId].BestChainHeight, txBlockHeight,
+                        "TxTimer {direction} confirmedNum, orderId={orderId}, bestHeight={bestHeight}, txBlockHeight={txBlockHeight}, confirmedNum={confirmedNum}",
+                        direction, orderId, chainStatusDict[pendingTx.ChainId].BestChainHeight, txBlockHeight,
                         order.ExtensionInfo[isToTransfer ? ExtensionKey.ToConfirmedNum : ExtensionKey.FromConfirmedNum]);
                     await SaveOrder(order);
                 }
