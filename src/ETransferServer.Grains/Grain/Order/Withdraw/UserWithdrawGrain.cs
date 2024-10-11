@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans;
 using Orleans.Streams;
 using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
@@ -11,12 +10,10 @@ using ETransferServer.Grains.Options;
 using ETransferServer.Grains.Provider;
 using ETransferServer.Options;
 using ETransferServer.Orders;
-using ETransferServer.WithdrawOrder.Dtos;
 using MassTransit;
 using NBitcoin;
 using Newtonsoft.Json;
 using Volo.Abp.ObjectMapping;
-using Volo.Abp.Users;
 
 namespace ETransferServer.Grains.Grain.Order.Withdraw;
 
@@ -104,15 +101,15 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         _bus = bus;
     }
 
-    public override async Task OnActivateAsync()
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
-        await base.OnActivateAsync();
+        await base.OnActivateAsync(cancellationToken);
 
         // subscribe stream
-        var streamProvider = GetStreamProvider(CommonConstant.StreamConstant.MessageStreamNameSpace);
+        var streamProvider = this.GetStreamProvider(CommonConstant.StreamConstant.MessageStreamNameSpace);
         _orderChangeStream =
-            streamProvider.GetStream<WithdrawOrderDto>(this.GetPrimaryKey(),
-                _withdrawOptions.Value.OrderChangeTopic);
+            streamProvider.GetStream<WithdrawOrderDto>(_withdrawOptions.Value.OrderChangeTopic,
+                this.GetPrimaryKey());
         await _orderChangeStream.SubscribeAsync(OnNextAsync);
 
         // other grain

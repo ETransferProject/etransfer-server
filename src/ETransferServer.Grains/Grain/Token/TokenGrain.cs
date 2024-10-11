@@ -1,5 +1,4 @@
 using AElf.Contracts.MultiToken;
-using Orleans;
 using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
 using ETransferServer.Common.AElfSdk.Dtos;

@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Grains.Grain.Order.Deposit;
 using ETransferServer.Grains.Options;
@@ -26,11 +25,11 @@ public class DepositOrderRetryTimerGrain : AbstractOrderRetryTimerGrain<DepositO
         _timerOptions = timerOptions;
     }
 
-    public override async Task OnActivateAsync()
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         _logger.LogDebug("DepositOrderRetryTimerGrain {Id} Activate", this.GetPrimaryKey().ToString());
 
-        await base.OnActivateAsync();
+        await base.OnActivateAsync(cancellationToken);
 
         RegisterTimer(TimerCallBack, State,
             TimeSpan.FromSeconds(_timerOptions.Value.DepositRetryTimer.DelaySeconds), 

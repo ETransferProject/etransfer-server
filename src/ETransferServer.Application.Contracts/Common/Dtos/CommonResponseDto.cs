@@ -1,22 +1,27 @@
 using System;
 using AutoResponseWrapper.Response;
 using JetBrains.Annotations;
+using Orleans;
 using Volo.Abp;
 
 namespace ETransferServer.Common.Dtos;
 
-public class CommonResponseDto<T> : ResponseDto where T : class
+[GenerateSerializer]
+public class CommonResponseDto<T> where T : class
 {
     private const string SuccessCode = "20000";
     private const string CommonErrorCode = "50000";
-
+    
+    [Id(0)] public string Code { get; set; }
+    [Id(1)] public object Data { get; set; }
+    [Id(2)] public string Message { get; set; } = string.Empty;
     public bool Success => Code == SuccessCode;
     public T Value => Data as T;
 
 
     public CommonResponseDto()
     {
-        Code = SuccessCode; 
+        Code = SuccessCode;
     }
     
     public CommonResponseDto(T data)

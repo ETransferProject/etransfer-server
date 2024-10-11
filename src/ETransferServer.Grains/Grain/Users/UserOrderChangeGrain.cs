@@ -1,4 +1,3 @@
-using Orleans;
 using ETransferServer.Grains.State.Users;
 
 namespace ETransferServer.Grains.Grain.Users;
@@ -11,16 +10,16 @@ public interface IUserOrderChangeGrain : IGrainWithStringKey
 
 public class UserOrderChangeGrain : Grain<UserOrderChangeState>, IUserOrderChangeGrain
 {
-    public override async Task OnActivateAsync()
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         await ReadStateAsync();
-        await base.OnActivateAsync();
+        await base.OnActivateAsync(cancellationToken);
     }
 
-    public override async Task OnDeactivateAsync()
+    public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
     {
         await WriteStateAsync();
-        await base.OnDeactivateAsync();
+        await base.OnDeactivateAsync(reason, cancellationToken);
     }
 
     public async Task AddOrUpdate(long? time)

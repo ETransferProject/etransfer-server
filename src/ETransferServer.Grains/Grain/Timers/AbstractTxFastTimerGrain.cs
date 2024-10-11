@@ -2,7 +2,6 @@ using AElf.Client.Dto;
 using ETransfer.Contracts.TokenPool;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans;
 using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
 using ETransferServer.Dtos.GraphQL;

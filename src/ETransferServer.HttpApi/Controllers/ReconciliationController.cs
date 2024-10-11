@@ -1,4 +1,6 @@
 using System.Threading.Tasks;
+using AElf.OpenTelemetry.ExecutionTime;
+using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ETransferServer.Dtos.Info;
@@ -13,6 +15,7 @@ namespace ETransferServer.Controllers;
 [Area("app")]
 [ControllerName("Reconciliation")]
 [Route("api/reconciliation/")]
+[AggregateExecutionTime]
 public class ReconciliationController : ETransferController
 {
     private readonly IReconciliationAppService _reconciliationAppService;

@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans;
 using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
 using ETransferServer.Dtos.Order;
@@ -32,10 +31,10 @@ public class UserWithdrawTxTimerGrain : AbstractTxTimerGrain<WithdrawOrderDto>, 
         _userWithdrawProvider = userWithdrawProvider;
     }
 
-    public override async Task OnActivateAsync()
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         _logger.LogDebug("UserWithdrawTxTimerGrain {Id} Activate", this.GetPrimaryKey().ToString());
-        await base.OnActivateAsync();
+        await base.OnActivateAsync(cancellationToken);
 
         _logger.LogDebug("UserWithdrawTxTimerGrain StartTimer {StartTime}", DateTime.UtcNow.ToUtc8String());
         RegisterTimer(TimerCallback, State,

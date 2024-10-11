@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
-using Orleans;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Dtos.User;
@@ -77,11 +76,11 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         _bus = bus;
     }
 
-    public override async Task OnActivateAsync()
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         _logger.LogDebug("CoBoDepositQueryTimerGrain {Id} Activate", this.GetPrimaryKey().ToString());
 
-        await base.OnActivateAsync();
+        await base.OnActivateAsync(cancellationToken);
 
         if (State.ExistOrders == null)
         {

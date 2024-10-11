@@ -32,12 +32,12 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
         _coBoProvider = coBoProvider;
     }
 
-    public override async Task OnActivateAsync()
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         _depositOrderStatusReminderGrain =
             GrainFactory.GetGrain<IDepositOrderStatusReminderGrain>(
                 GuidHelper.UniqGuid(nameof(IDepositOrderStatusReminderGrain)));
-        await base.OnActivateAsync();
+        await base.OnActivateAsync(cancellationToken);
     }
 
     public async Task<bool> TransactionNotification(string timestamp, string signature, string body)

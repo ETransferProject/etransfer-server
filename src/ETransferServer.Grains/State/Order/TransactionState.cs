@@ -1,7 +1,8 @@
 namespace ETransferServer.Grains.State.Order;
 
+[GenerateSerializer]
 public class TransactionState
 {
-    public string Id { get; set; }
-    public DateTime CreateTime { get; set; }
+    [Id(0)] public string Id { get; set; }
+    [Id(1)] public DateTime CreateTime { get; set; }
 }

@@ -1,3 +1,4 @@
+using AElf.OpenTelemetry.ExecutionTime;
 using ETransferServer.Common.GraphQL;
 using ETransferServer.Common.HttpClient;
 using ETransferServer.Dtos.GraphQL;
@@ -19,6 +20,7 @@ public interface ISwapReserveProvider
     Task<long> GetConfirmedHeightAsync(string chainId);
 }
 
+[AggregateExecutionTime]
 public class SwapReserveProvider : ISwapReserveProvider, ISingletonDependency
 {
     private ApiInfo _swapSyncStateUri => new (HttpMethod.Get, _syncStateServiceOption.Value.SwapSyncStateUri);

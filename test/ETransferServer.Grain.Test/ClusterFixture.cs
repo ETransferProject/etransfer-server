@@ -1,7 +1,5 @@
-using AElf;
 using AutoMapper;
 using ETransferServer.Common;
-using ETransferServer.Grains.Options;
 using ETransferServer.ThirdPart.CoBo;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
@@ -9,10 +7,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using Moq;
-using Nethereum.Hex.HexConvertors.Extensions;
-using Orleans;
-using Orleans.Hosting;
 using Orleans.TestingHost;
 using Volo.Abp;
 using Volo.Abp.AutoMapper;
@@ -45,11 +39,11 @@ public class ClusterFixture : IDisposable, ISingletonDependency
         Cluster.StopAllSilos();
     }
     
-        public TestCluster Cluster { get; private set; }
+    public TestCluster Cluster { get; private set; }
 
-    private class TestSiloConfigurations : ISiloBuilderConfigurator
+    private class TestSiloConfigurations : ISiloConfigurator
     {
-        public void Configure(ISiloHostBuilder hostBuilder)
+        public void Configure(ISiloBuilder hostBuilder)
         {
             hostBuilder.ConfigureServices(services =>
                 {
@@ -105,7 +99,6 @@ public class ClusterFixture : IDisposable, ISingletonDependency
                         typeof(ICurrentTenant),
                         typeof(CurrentTenant)
                     );
-                    services.OnRegistred(UnitOfWorkInterceptorRegistrar.RegisterIfNeeded);
                     services.AddTransient(
                         typeof(IUnitOfWorkManager),
                         typeof(UnitOfWorkManager)
@@ -117,12 +110,15 @@ public class ClusterFixture : IDisposable, ISingletonDependency
                     services.OnExposing(onServiceExposingContext =>
                     {
                         //Register types for IObjectMapper<TSource, TDestination> if implements
-                        onServiceExposingContext.ExposedTypes.AddRange(
-                            ReflectionHelper.GetImplementedGenericTypes(
-                                onServiceExposingContext.ImplementationType,
-                                typeof(IObjectMapper<,>)
-                            )
+                        var implementedTypes = ReflectionHelper.GetImplementedGenericTypes(
+                            onServiceExposingContext.ImplementationType,
+                            typeof(IObjectMapper<,>)
                         );
+
+                        foreach (var type in implementedTypes)
+                        {
+                            onServiceExposingContext.ExposedTypes.Add(new ServiceIdentifier(type));
+                        }
                     });
                     services.AddTransient(
                         typeof(IObjectMapper<>),
@@ -672,7 +668,7 @@ public class ClusterFixture : IDisposable, ISingletonDependency
     private class TestClientBuilderConfigurator : IClientBuilderConfigurator
     {
         public void Configure(IConfiguration configuration, IClientBuilder clientBuilder) => clientBuilder
-            .AddSimpleMessageStreamProvider(CommonConstant.StreamConstant.MessageStreamNameSpace);
+            .AddMemoryStreams(CommonConstant.StreamConstant.MessageStreamName);
     }
     
 }

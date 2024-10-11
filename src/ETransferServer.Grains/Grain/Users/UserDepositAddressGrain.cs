@@ -1,15 +1,11 @@
 using ETransferServer.Common;
-using Orleans;
 using ETransferServer.Common.Dtos;
 using ETransferServer.Dtos.User;
-using ETransferServer.Grains.Grain.Worker.Transaction;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.State.Users;
 using ETransferServer.User;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Newtonsoft.Json;
-using Serilog.Core;
 using Volo.Abp.ObjectMapping;
 
 namespace ETransferServer.Grains.Grain.Users;
@@ -39,16 +35,16 @@ public class UserDepositAddressGrain : Grain<TokenDepositAddressState>, IUserDep
         _logger = logger;
     }
 
-    public override async Task OnActivateAsync()
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         await ReadStateAsync();
-        await base.OnActivateAsync();
+        await base.OnActivateAsync(cancellationToken);
     }
 
-    public override async Task OnDeactivateAsync()
+    public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
     {
         await WriteStateAsync();
-        await base.OnDeactivateAsync();
+        await base.OnDeactivateAsync(reason, cancellationToken);
     }
 
     public async Task<string> GetUserAddress(GetUserDepositAddressInput input)

@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans;
 using Orleans.Runtime;
 using Orleans.Timers;
 using ETransferServer.Common;
@@ -38,6 +37,7 @@ public class WatchDogReminderGrain : Orleans.Grain, IWatchDogReminderGrain, IRem
             _timerOptions.Value.WatchDogReminder.DelaySeconds,
             _timerOptions.Value.WatchDogReminder.PeriodSeconds);
         _reminder = await _reminderRegistry.RegisterOrUpdateReminder(
+            this.GetGrainId(),
             reminderName: nameof(WatchDogReminderGrain),
             dueTime: TimeSpan.FromSeconds(_timerOptions.Value.WatchDogReminder.DelaySeconds),
             period: TimeSpan.FromSeconds(_timerOptions.Value.WatchDogReminder.PeriodSeconds));

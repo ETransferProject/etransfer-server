@@ -5,7 +5,6 @@ using ETransferServer.Grains.Grain.Order.Deposit;
 using ETransferServer.Grains.Grain.Order.Withdraw;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans;
 using Orleans.Runtime;
 using Orleans.Timers;
 using ETransferServer.Grains.Options;
@@ -43,6 +42,7 @@ public class OrderStatusReminderGrain : Orleans.Grain, IOrderStatusReminderGrain
             _timerOptions.Value.OrderStatusReminder.DelaySeconds,
             _timerOptions.Value.OrderStatusReminder.PeriodSeconds);
         await _reminderRegistry.RegisterOrUpdateReminder(
+            this.GetGrainId(),
             reminderName: id,
             dueTime: TimeSpan.FromSeconds(_timerOptions.Value.OrderStatusReminder.DelaySeconds),
             period: TimeSpan.FromSeconds(_timerOptions.Value.OrderStatusReminder.PeriodSeconds));
@@ -89,8 +89,8 @@ public class OrderStatusReminderGrain : Orleans.Grain, IOrderStatusReminderGrain
 
     private async Task CancelReminder(string reminderName)
     {
-        var grainReminder = await _reminderRegistry.GetReminder(reminderName);
-        await _reminderRegistry.UnregisterReminder(grainReminder);
+        var grainReminder = await _reminderRegistry.GetReminder(this.GetGrainId(), reminderName);
+        await _reminderRegistry.UnregisterReminder(this.GetGrainId(), grainReminder);
         _reminderCountMap.Remove(reminderName);
     }
 

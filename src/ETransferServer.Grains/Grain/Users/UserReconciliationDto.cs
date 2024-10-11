@@ -1,8 +1,9 @@
 namespace ETransferServer.Grains.Grain.Users;
 
+[GenerateSerializer]
 public class UserReconciliationDto
 {
-    public string UserName { get; set; }
-    public string Address { get; set; }
-    public string PasswordHash { get; set; }
+    [Id(0)] public string UserName { get; set; }
+    [Id(1)] public string Address { get; set; }
+    [Id(2)] public string PasswordHash { get; set; }
 }

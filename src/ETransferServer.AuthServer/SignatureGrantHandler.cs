@@ -229,8 +229,8 @@ public class SignatureGrantHandler : ITokenExtensionGrant
         claimsPrincipal.SetResources(await GetResourcesAsync(context, principal.GetScopes()));
         claimsPrincipal.SetAudiences("ETransferServer");
 
-        await context.HttpContext.RequestServices.GetRequiredService<AbpOpenIddictClaimDestinationsManager>()
-            .SetAsync(principal);
+        await context.HttpContext.RequestServices.GetRequiredService<AbpOpenIddictClaimsPrincipalManager>()
+            .HandleAsync(context.Request, principal);
 
         return new SignInResult(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme, claimsPrincipal);
     }

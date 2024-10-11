@@ -2,21 +2,24 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using Newtonsoft.Json;
+using Orleans;
 
 namespace ETransferServer.Dtos.Order;
 
+[GenerateSerializer]
 public class OrderStatusFlowDto
 {
-    public Guid Id { get; set; }
-    public List<OrderStatus> StatusFlow { get; set; } = new();
+    [Id(0)] public Guid Id { get; set; }
+    [Id(1)] public List<OrderStatus> StatusFlow { get; set; } = new();
     
 }
 
+[GenerateSerializer]
 public class OrderStatus
 {
-    public string Status { get; set; }
-    public long LastModifyTime { get; set; }
-    public Dictionary<string, string> Extension { get; set; }
+    [Id(0)] public string Status { get; set; }
+    [Id(1)] public long LastModifyTime { get; set; }
+    [Id(2)] public Dictionary<string, string> Extension { get; set; }
 }
 
 public static class ExtensionKey

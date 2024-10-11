@@ -1,6 +1,3 @@
-using ETransferServer.ThirdPart.Exchange;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans;
 using Volo.Abp.AutoMapper;
 using Volo.Abp.EventBus;
 using Volo.Abp.Modularity;

@@ -1,17 +1,15 @@
 namespace ETransferServer.Grains.State.Order;
 
+[GenerateSerializer]
 public class OrderRetryState
 {
-    
-    public Dictionary<Guid, OrderRetryFrom> OrderRetryData = new();
-    
-    
+    [Id(0)] public Dictionary<Guid, OrderRetryFrom> OrderRetryData = new();
 }
 
-
+[GenerateSerializer]
 public class OrderRetryFrom
 {
-    public Guid OrderId { get; set; }
-    public string RetryFromState { get; set; }
+    [Id(0)] public Guid OrderId { get; set; }
+    [Id(1)] public string RetryFromState { get; set; }
     
 }

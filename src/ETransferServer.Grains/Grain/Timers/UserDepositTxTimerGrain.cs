@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans;
 using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
 using ETransferServer.Dtos.Order;
@@ -30,10 +29,10 @@ public class UserDepositTxTimerGrain : AbstractTxTimerGrain<DepositOrderDto>, IU
         _timerOptions = timerOptions;
     }
 
-    public override async Task OnActivateAsync()
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         _logger.LogDebug("UserDepositTxTimerGrain {Id} Activate", this.GetPrimaryKey().ToString());
-        await base.OnActivateAsync();
+        await base.OnActivateAsync(cancellationToken);
 
         _logger.LogDebug("UserDepositTxTimerGrain StartTimer {StartTime}", DateTime.UtcNow.ToUtc8String());
         RegisterTimer(TimerCallback, State,

@@ -1,3 +1,4 @@
+using AElf.OpenTelemetry.ExecutionTime;
 using GraphQL;
 using Microsoft.Extensions.Logging;
 using ETransferServer.Common;
@@ -22,6 +23,7 @@ public interface ITokenTransferProvider
         int maxResultCount, int skipCount);
 }
 
+[AggregateExecutionTime]
 public class TokenTransferProvider : ITokenTransferProvider, ISingletonDependency
 {
     private ApiInfo _syncStateUri => new (HttpMethod.Get, _syncStateServiceOption.Value.SyncStateUri);

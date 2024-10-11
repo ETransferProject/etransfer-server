@@ -1,3 +1,4 @@
+using AElf.OpenTelemetry;
 using ETransferServer.Common.AElfSdk;
 using GraphQL.Client.Abstractions;
 using GraphQL.Client.Http;
@@ -25,7 +26,8 @@ namespace ETransferServer.Silo;
     typeof(ETransferServerGrainsModule),
     typeof(AbpAspNetCoreSerilogModule),
     typeof(ETransferServerMongoDbModule),
-    typeof(ETransferServerApplicationModule)
+    typeof(ETransferServerApplicationModule),
+    typeof(OpenTelemetryModule)
 )]
 public class ETransferServerOrleansSiloModule : AbpModule
 {

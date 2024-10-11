@@ -3,11 +3,11 @@
   <Import Project="..\..\common.props" />
 
   <PropertyGroup>
-    <TargetFramework>net7.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <RootNamespace>ETransferServer</RootNamespace>
   </PropertyGroup>
 
-  
+
 
   <ItemGroup>
     <ProjectReference Include="..\ETransferServer.Domain\ETransferServer.Domain.csproj" />
@@ -16,24 +16,24 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Com.Ctrip.Framework.Apollo" Version="2.10.0" />
+    <PackageReference Include="Com.Ctrip.Framework.Apollo.Configuration" Version="2.10.2" />
     <PackageReference Include="GraphQL" Version="7.4.1" />
     <PackageReference Include="GraphQL.Client.Abstractions" Version="6.0.0" />
     <PackageReference Include="GraphQL.SystemTextJson" Version="7.4.1" />
-    <PackageReference Include="Grpc.Core.Api" Version="2.46.1" />
+<!--    <PackageReference Include="Grpc.Core.Api" Version="2.46.1" />-->
     <PackageReference Include="StackExchange.Redis" Version="2.2.4" />
-    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="6.25.1" />
-    <PackageReference Include="Volo.Abp.Account.Application" Version="7.0.0" />
-    <PackageReference Include="Volo.Abp.BlobStoring" Version="7.0.0" />
-    <PackageReference Include="Volo.Abp.Core" Version="7.0.2" />
-    <PackageReference Include="Volo.Abp.Identity.Application" Version="7.0.0" />
-    <PackageReference Include="Volo.Abp.PermissionManagement.Application" Version="7.0.0" />
-    <PackageReference Include="Volo.Abp.TenantManagement.Application" Version="7.0.0" />
-    <PackageReference Include="Volo.Abp.FeatureManagement.Application" Version="7.0.0" />
-    <PackageReference Include="Volo.Abp.SettingManagement.Application" Version="7.0.0" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.0.0-preview1" />
+    <PackageReference Include="Volo.Abp.Account.Application" Version="8.2.0" />
+    <PackageReference Include="Volo.Abp.BlobStoring" Version="8.2.0" />
+    <PackageReference Include="Volo.Abp.Core" Version="8.2.0" />
+    <PackageReference Include="Volo.Abp.Identity.Application" Version="8.2.0" />
+    <PackageReference Include="Volo.Abp.PermissionManagement.Application" Version="8.2.0" />
+    <PackageReference Include="Volo.Abp.TenantManagement.Application" Version="8.2.0" />
+    <PackageReference Include="Volo.Abp.FeatureManagement.Application" Version="8.2.0" />
+    <PackageReference Include="Volo.Abp.SettingManagement.Application" Version="8.2.0" />
     <PackageReference Include="AElf.Whitelist.Application" Version="0.0.3" />
-    <PackageReference Include="GraphQL.Client.Serializer.Newtonsoft" Version="5.1.0" />
-    <PackageReference Include="GraphQL.Client" Version="5.1.0" />
+    <PackageReference Include="GraphQL.Client.Serializer.Newtonsoft" Version="6.0.0" />
+    <PackageReference Include="GraphQL.Client" Version="6.0.0" />
     <PackageReference Include="Nethereum.Web3" Version="4.20.0" />
     <PackageReference Include="Nethereum.Util" Version="4.20.0" />
   </ItemGroup>

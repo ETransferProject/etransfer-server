@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging;
-using Orleans;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Grains.State.Order;
@@ -104,10 +103,5 @@ public abstract class AbstractOrderRetryTimerGrain<TOrder> : Grain<OrderRetrySta
             await WriteStateAsync();
         }
 
-    }
-    
-    
-    
-    
-    
+    }  
 }

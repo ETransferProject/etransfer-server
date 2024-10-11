@@ -3,7 +3,6 @@ using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
 using ETransferServer.Dtos.GraphQL;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Grains.Grain.Order.Deposit;
 using ETransferServer.Grains.Grain.Swap;
@@ -75,10 +74,10 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
         await WriteStateAsync();
     }
     
-    public override async Task OnActivateAsync()
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         _logger.LogDebug("SwapTxTimerGrain {Id} Activate", this.GetPrimaryKey().ToString());
-        await base.OnActivateAsync();
+        await base.OnActivateAsync(cancellationToken);
 
         _logger.LogDebug("SwapTxTimerGrain StartTimer {StartTime}", DateTime.UtcNow.ToUtc8String());
         RegisterTimer(TimerCallback, State,

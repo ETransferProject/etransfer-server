@@ -1,7 +1,8 @@
 namespace ETransferServer.Grains.State.Order;
 
+[GenerateSerializer]
 public class OrderState
 {
-    public long LastTime { get; set; }
-    public List<string> ExistOrders { get; set; } = new();
+    [Id(0)] public long LastTime { get; set; }
+    [Id(1)] public List<string> ExistOrders { get; set; } = new();
 }
