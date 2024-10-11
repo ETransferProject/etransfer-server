@@ -20,14 +20,17 @@ public class UserDepositTxTimerGrain : AbstractTxTimerGrain<DepositOrderDto>, IU
 {
     private readonly ILogger<UserDepositTxTimerGrain> _logger;
     private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
+    private readonly IUserDepositProvider _userDepositProvider;
 
     public UserDepositTxTimerGrain(ILogger<UserDepositTxTimerGrain> logger, IContractProvider contractProvider,
         IOptionsSnapshot<ChainOptions> chainOptions, IOptionsSnapshot<TimerOptions> timerOptions,
-        ITokenTransferProvider transferProvider, IUserWithdrawProvider userWithdrawProvider) 
-        : base(logger, contractProvider, chainOptions, timerOptions, transferProvider, userWithdrawProvider)
+        ITokenTransferProvider transferProvider, IUserWithdrawProvider userWithdrawProvider,
+        IUserDepositProvider userDepositProvider) 
+        : base(logger, contractProvider, chainOptions, timerOptions, transferProvider, userWithdrawProvider, userDepositProvider)
     {
         _logger = logger;
         _timerOptions = timerOptions;
+        _userDepositProvider = userDepositProvider;
     }
 
     public override async Task OnActivateAsync()
@@ -44,6 +47,9 @@ public class UserDepositTxTimerGrain : AbstractTxTimerGrain<DepositOrderDto>, IU
     
     internal override async Task SaveOrder(DepositOrderDto order)
     {
+        var recordGrain = GrainFactory.GetGrain<IUserDepositRecordGrain>(order.Id);
+        var res = await recordGrain.CreateOrUpdateAsync(order);
+        await _userDepositProvider.AddOrUpdateSync(res.Value);
     }
 
     internal override async Task SaveOrder(DepositOrderDto order, Dictionary<string, string> externalInfo)
