@@ -131,7 +131,17 @@ public class ContractProvider : IContractProvider, ISingletonDependency
 
     public async Task<ChainStatusDto> GetChainStatusAsync(string chainId)
     {
-        return await Client(chainId).GetChainStatusAsync();
+        ChainStatusDto dto = null;
+        try
+        {
+            dto = await Client(chainId).GetChainStatusAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "contract error, chainDto:{chainDto}", dto == null);
+        }
+
+        return dto;
     }
 
     public async Task<BlockDto> GetBlockAsync(string chainId, long blockHeight)
@@ -162,12 +172,39 @@ public class ContractProvider : IContractProvider, ISingletonDependency
         string sender, string contractName, string methodName,
         IMessage param, string contractAddress = null)
     {
-        var address = contractAddress ?? await GetContractAddressAsync(chainId, contractName);
-        var client = Client(chainId);
-        var status = await client.GetChainStatusAsync();
+        var address = "";
+        try
+        {
+            address = contractAddress ?? await GetContractAddressAsync(chainId, contractName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "contract error, address:{address}", address);
+        }
 
-        var prevHeight = status.BestChainHeight - 8;
-        var prevBlock = await client.GetBlockByHeightAsync(prevHeight);
+        AElfClient client = null;
+        ChainStatusDto status = null;
+        try
+        {
+            client = Client(chainId);
+            status = await client.GetChainStatusAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "contract error, client:{client}, status:{status}", client == null, status == null);
+        }
+
+        var prevHeight = 0L;
+        BlockDto prevBlock = null;
+        try
+        {
+            prevHeight = status.BestChainHeight - 8;
+            prevBlock = await client.GetBlockByHeightAsync(prevHeight);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "contract error, prevHeight:{height}, prevBlock:{block}", prevHeight, prevBlock == null);
+        }
 
         // create raw transaction
         return new Transaction
