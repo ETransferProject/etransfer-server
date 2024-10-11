@@ -140,6 +140,7 @@ public class ContractProvider : IContractProvider, ISingletonDependency
         {
             _logger.LogError(ex, "contract error, chainDto:{chainDto}", dto == null);
         }
+        _logger.LogInformation("contract query, chainDto:{chainDto}", dto == null);
 
         return dto;
     }
@@ -181,6 +182,7 @@ public class ContractProvider : IContractProvider, ISingletonDependency
         {
             _logger.LogError(ex, "contract error, address:{address}", address);
         }
+        _logger.LogInformation("contract query, address:{address}", address);
 
         AElfClient client = null;
         ChainStatusDto status = null;
@@ -193,7 +195,8 @@ public class ContractProvider : IContractProvider, ISingletonDependency
         {
             _logger.LogError(ex, "contract error, client:{client}, status:{status}", client == null, status == null);
         }
-
+        _logger.LogInformation("contract query, client:{client}, status:{status}", client == null, status == null);
+        
         var prevHeight = 0L;
         BlockDto prevBlock = null;
         try
@@ -205,6 +208,7 @@ public class ContractProvider : IContractProvider, ISingletonDependency
         {
             _logger.LogError(ex, "contract error, prevHeight:{height}, prevBlock:{block}", prevHeight, prevBlock == null);
         }
+        _logger.LogInformation("contract query, prevHeight:{height}, prevBlock:{block}", prevHeight, prevBlock == null);
 
         // create raw transaction
         return new Transaction

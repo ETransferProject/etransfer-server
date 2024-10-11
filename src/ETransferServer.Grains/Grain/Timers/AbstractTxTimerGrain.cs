@@ -7,6 +7,7 @@ using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
 using ETransferServer.Dtos.GraphQL;
 using ETransferServer.Dtos.Order;
+using ETransferServer.Grains.Grain.Order.Deposit;
 using ETransferServer.Grains.Grain.Order.Withdraw;
 using ETransferServer.Grains.GraphQL;
 using ETransferServer.Grains.Options;
@@ -33,13 +34,15 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
     private readonly IContractProvider _contractProvider;
     private readonly ITokenTransferProvider _transferProvider;
     private readonly IUserWithdrawProvider _userWithdrawProvider;
+    private readonly IUserDepositProvider _userDepositProvider;
 
     private readonly IOptionsSnapshot<ChainOptions> _chainOptions;
     private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
 
     protected AbstractTxTimerGrain(ILogger<AbstractTxTimerGrain<TOrder>> logger, IContractProvider contractProvider,
         IOptionsSnapshot<ChainOptions> chainOptions, IOptionsSnapshot<TimerOptions> timerOptions,
-        ITokenTransferProvider transferProvider, IUserWithdrawProvider userWithdrawProvider)
+        ITokenTransferProvider transferProvider, IUserWithdrawProvider userWithdrawProvider,
+        IUserDepositProvider userDepositProvider)
     {
         _logger = logger;
         _contractProvider = contractProvider;
@@ -47,6 +50,7 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
         _timerOptions = timerOptions;
         _transferProvider = transferProvider;
         _userWithdrawProvider = userWithdrawProvider;
+        _userDepositProvider = userDepositProvider;
     }
 
 
