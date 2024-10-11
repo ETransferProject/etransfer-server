@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using System.Text.RegularExpressions;
+using AElf.ExceptionHandler;
 
 namespace ETransferServer.Common;
 
@@ -85,16 +86,11 @@ public static class TimeHelper
         return utcZoneTime.ToString(pattern, CultureInfo.InvariantCulture);
     }
     
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ExceptionHelper),
+        MethodName = nameof(ExceptionHelper.HandleException))]
     public static DateTime? ParseFromUtc8(string dateTimeString, string pattern = DefaultPattern, DateTime? defaultDateTime = null)
     {
-        try
-        {
-            return ParseFromZone(dateTimeString, 8, pattern);
-        }
-        catch (Exception)
-        {
-            return defaultDateTime;
-        }
+        return ParseFromZone(dateTimeString, 8, pattern);
     }
     
     public static DateTime ParseFromZone(string dateTimeString, int utcOffset, string pattern = DefaultPattern)

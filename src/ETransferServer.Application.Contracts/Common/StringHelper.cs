@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text.RegularExpressions;
+using AElf.ExceptionHandler;
 using AElf.Types;
 using JetBrains.Annotations;
 using Newtonsoft.Json;
@@ -34,19 +35,13 @@ public static class StringHelper
     {
         return source.IsNullOrEmpty() ? false : Regex.IsMatch(source, pattern);
     }
-
+    
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ExceptionHelper),
+        MethodName = nameof(ExceptionHelper.HandleException))]
     public static bool TryParseBase58Address([CanBeNull] this string source, out Address outputAddress)
     {
-        try
-        {
-            outputAddress = Address.FromBase58(source);
-            return true;
-        }
-        catch (Exception e)
-        {
-            outputAddress = null;
-            return false;
-        }
+        outputAddress = Address.FromBase58(source);
+        return outputAddress == null ? false : true;
     }
     
     public static double SafeToDouble(this string s, double defaultValue = 0)

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
+using AElf.ExceptionHandler;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Token;
 using ETransferServer.Grains.Grain.Token;
@@ -52,52 +53,27 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
         _tokenOptions = tokenOptions;
     }
 
+    [ExceptionHandler(typeof(UserFriendlyException), typeof(Exception), TargetType = typeof(ExceptionHelper),
+        MethodName = nameof(ExceptionHelper.HandleException))]
     public async Task<GetNetworkListDto> GetNetworkListAsync(GetNetworkListRequestDto request, string version = null)
     {
-        try
+        var getNetworkListDto = await GetNetworkListWithLocalFeeAsync(request, version);
+        if (request.Type == OrderTypeEnum.Deposit.ToString()) return getNetworkListDto;
+
+        // fill withdraw fee
+        foreach (var networkDto in getNetworkListDto.NetworkList)
         {
-            var getNetworkListDto = await GetNetworkListWithLocalFeeAsync(request, version);
-            if (request.Type == OrderTypeEnum.Deposit.ToString()) return getNetworkListDto;
+            networkDto.WithdrawFee = await GetCacheFeeAsync(networkDto.Network, request.Symbol) ??
+                                     networkDto.WithdrawFee;
+        }
 
-            // fill withdraw fee
-            foreach (var networkDto in getNetworkListDto.NetworkList)
-            {
-                networkDto.WithdrawFee = await GetCacheFeeAsync(networkDto.Network, request.Symbol) ??
-                                         networkDto.WithdrawFee;
-            }
-
-            try
-            {
-                getNetworkListDto.NetworkList = request.Symbol == CommonConstant.Symbol.USDT ?
-                    await CalculateNetworkFeeListAsync(getNetworkListDto.NetworkList, request.ChainId, request.Symbol)
-                    : await CalculateAvgNetworkFeeListAsync(getNetworkListDto.NetworkList, request.ChainId, request.Symbol);
-            }
-            catch (Exception e)
-            {
-                foreach (var networkDto in getNetworkListDto.NetworkList)
-                {
-                    networkDto.WithdrawFee = null;
-                    networkDto.WithdrawFeeUnit = request.Symbol;
-                }
-                _logger.LogError(e, "Get withdraw fee failed by exchange.");
-            }
+        getNetworkListDto.NetworkList = request.Symbol == CommonConstant.Symbol.USDT ?
+            await CalculateNetworkFeeListAsync(getNetworkListDto.NetworkList, request.ChainId, request.Symbol)
+            : await CalculateAvgNetworkFeeListAsync(getNetworkListDto.NetworkList, request.ChainId, request.Symbol);
             
-            getNetworkListDto = FilterByChainId(getNetworkListDto, request.ChainId);
+        getNetworkListDto = FilterByChainId(getNetworkListDto, request.ChainId);
 
-            return getNetworkListDto;
-        }
-        catch (UserFriendlyException e)
-        {
-            _logger.LogWarning(e, "Get network list failed.");
-            throw;
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e,
-                "Get network list failed, type={Type}, chainId={ChainId}, address={Address}, symbol={Symbol}",
-                request.Type, request.ChainId, request.Address, request.Symbol);
-            throw;
-        }
+        return getNetworkListDto;
     }
     
     private GetNetworkListDto FilterByChainId(GetNetworkListDto networkListDto, string chainId)
@@ -237,6 +213,8 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
                 .FirstOrDefault(token => token.Symbol == toSymbol)?.Icon);
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ExceptionHelper),
+        MethodName = nameof(ExceptionHelper.HandleException))]
     public async Task<ListResultDto<TokenPriceDataDto>> GetTokenPriceListAsync(GetTokenPriceListRequestDto request)
     {
         if (string.IsNullOrWhiteSpace(request.Symbols)) return new ListResultDto<TokenPriceDataDto>();
@@ -244,24 +222,12 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
         var symbols = request.Symbols.Split(CommonConstant.Comma, StringSplitOptions.TrimEntries).Distinct().ToList();
         foreach (var symbol in symbols)
         {
-            try
+            if (symbol.IsNullOrWhiteSpace()) continue;
+            list.Add(new TokenPriceDataDto
             {
-                if (symbol.IsNullOrWhiteSpace()) continue;
-                list.Add(new TokenPriceDataDto
-                {
-                    Symbol = symbol,
-                    PriceUsd = await GetAvgExchangeAsync(symbol, CommonConstant.Symbol.USD)
-                });
-            }
-            catch (Exception e)
-            {
-                _logger.LogError(e, "GetTokenPriceListAsync error, {symbol}", symbol);
-                list.Add(new TokenPriceDataDto
-                {
-                    Symbol = symbol,
-                    PriceUsd = 0M
-                });
-            }
+                Symbol = symbol,
+                PriceUsd = await GetAvgExchangeAsync(symbol, CommonConstant.Symbol.USD)
+            });
         }
 
         return new ListResultDto<TokenPriceDataDto>(list);

@@ -9,6 +9,7 @@ using AElf.Client.Dto;
 using AElf.Client.Service;
 using AElf.Cryptography;
 using AElf.Cryptography.ECDSA;
+using AElf.ExceptionHandler;
 using AElf.Types;
 using ETransferServer.Common.AElfSdk.Dtos;
 using ETransferServer.Options;
@@ -180,27 +181,20 @@ public class ContractProvider : IContractProvider, ISingletonDependency
             RefBlockPrefix = ByteString.CopyFrom(Hash.LoadFromHex(prevBlock.BlockHash).Value.Take(4).ToArray())
         };
     }
-
+    
     [ItemCanBeNull]
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ExceptionHelper),
+        MethodName = nameof(ExceptionHelper.HandleException))]
     public async Task<Tuple<bool, string>> SendTransactionAsync(string chainId, Transaction transaction)
     {
-        try
+        _logger.LogInformation("Send transaction to {ChainId}, tx: {Tx}", chainId,
+            transaction.ToByteArray().ToHex());
+        var client = Client(chainId);
+        await client.SendTransactionAsync(new SendTransactionInput()
         {
-            _logger.LogInformation("Send transaction to {ChainId}, tx: {Tx}", chainId,
-                transaction.ToByteArray().ToHex());
-            var client = Client(chainId);
-            await client.SendTransactionAsync(new SendTransactionInput()
-            {
-                RawTransaction = transaction.ToByteArray().ToHex()
-            });
-            return Tuple.Create(true, CommonConstant.EmptyString);
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e, "Send transaction error to {ChainId}, tx: {Tx}", chainId,
-                transaction.ToByteArray().ToHex());
-            return Tuple.Create(true, e.Message);
-        }
+            RawTransaction = transaction.ToByteArray().ToHex()
+        });
+        return Tuple.Create(true, CommonConstant.EmptyString);
     }
 
     public async Task<T> CallTransactionAsync<T>(string chainId, string contractName, string methodName,
@@ -242,6 +236,8 @@ public class ContractProvider : IContractProvider, ISingletonDependency
     /// <param name="maxWaitMillis"></param>
     /// <param name="delayMillis"></param>
     /// <returns></returns>
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ExceptionHelper),
+        MethodName = nameof(ExceptionHelper.HandleException))]
     public async Task<TransactionResultDto> WaitTransactionResultAsync(string chainId, string transactionId,
         int maxWaitMillis = 5000, int delayMillis = 1000)
     {
@@ -251,22 +247,15 @@ public class ContractProvider : IContractProvider, ISingletonDependency
         };
         TransactionResultDto rawTxResult = null;
         using var cts = new CancellationTokenSource(maxWaitMillis);
-        try
+        while (!cts.IsCancellationRequested && (rawTxResult == null || waitingStatus.Contains(rawTxResult.Status)))
         {
-            while (!cts.IsCancellationRequested && (rawTxResult == null || waitingStatus.Contains(rawTxResult.Status)))
-            {
-                // delay some times
-                await Task.Delay(delayMillis, cts.Token);
+            // delay some times
+            await Task.Delay(delayMillis, cts.Token);
 
-                rawTxResult = await QueryTransactionResultAsync(chainId, transactionId);
-                _logger.LogDebug(
-                    "WaitTransactionResultAsync chainId={ChainId}, transactionId={TransactionId}, status={Status}" +
-                    ", error={Error}", chainId, transactionId, rawTxResult.Status, rawTxResult.Error);
-            }
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e, "Timed out waiting for transactionId {TransactionId} result", transactionId);
+            rawTxResult = await QueryTransactionResultAsync(chainId, transactionId);
+            _logger.LogDebug(
+                "WaitTransactionResultAsync chainId={ChainId}, transactionId={TransactionId}, status={Status}" +
+                ", error={Error}", chainId, transactionId, rawTxResult.Status, rawTxResult.Error);
         }
 
         return rawTxResult;

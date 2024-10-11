@@ -1,6 +1,7 @@
 using System;
 using System.Net.Http;
 using System.Threading.Tasks;
+using AElf.ExceptionHandler;
 using ETransferServer.Common;
 using ETransferServer.Common.ChainsClient;
 using ETransferServer.Common.HttpClient;
@@ -30,24 +31,19 @@ public class TronClientProvider : IBlockchainClientProvider
 
     public BlockchainType ChainType { get; } = BlockchainType.Tron;
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ExceptionHelper),
+        MethodName = nameof(ExceptionHelper.HandleException))]
     public async Task<BlockDtos> GetBlockTimeAsync(string chainId, string blockHash, string txId = null)
     {
         var url = $"{_blockChainInfoOptions.ChainInfos[chainId].Api}" + BlockById;
         var result = new BlockDtos();
-        try
-        {
-            var res = await _httpProvider.InvokeAsync<TronResponse>(HttpMethod.Post, url,
-                body: JsonConvert.SerializeObject(new TronQueryParam
-                {
-                    Value = blockHash
-                }, HttpProvider.DefaultJsonSettings));
-            result.BlockTimeStamp = res.BlockHeader.RawData.TimeStamp;
-            return result;
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e, "Failed to get tron transaction info, {blockHash},{txId}", blockHash, txId);
-            return result;
-        }
+        
+        var res = await _httpProvider.InvokeAsync<TronResponse>(HttpMethod.Post, url,
+            body: JsonConvert.SerializeObject(new TronQueryParam
+            {
+                Value = blockHash
+            }, HttpProvider.DefaultJsonSettings));
+        result.BlockTimeStamp = res.BlockHeader.RawData.TimeStamp;
+        return result;
     }
 }

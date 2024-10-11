@@ -3,6 +3,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using AElf;
 using AElf.Cryptography;
+using AElf.ExceptionHandler;
 using AElf.Types;
 using Google.Protobuf;
 
@@ -57,31 +58,22 @@ public static class VerifyHelper
         return input.Count(c => c == '@') == 1;
     }
     
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ExceptionHelper),
+        MethodName = nameof(ExceptionHelper.HandleException))]
     public static bool VerifyMemoVersion(string version, string anotherVersion)
     {
         if (string.IsNullOrWhiteSpace(version)) return false;
-        try
-        {
-            return new Version(version.ToLower().Replace(CommonConstant.V, string.Empty))
-                   >= new Version(anotherVersion);
-        }
-        catch (Exception e)
-        {
-            return false;
-        }
+        return new Version(version.ToLower().Replace(CommonConstant.V, string.Empty))
+               >= new Version(anotherVersion);
     }
     
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ExceptionHelper),
+        MethodName = nameof(ExceptionHelper.HandleException))]
     public static bool VerifyAelfAddress(string address)
     {
         if (address.IsNullOrEmpty()) return true;
-        try
-        {
-            var addr = Address.FromBase58(address);
-            return true;
-        }
-        catch (Exception ex)
-        {
-            return false;
-        }
+        
+        var addr = Address.FromBase58(address);
+        return addr == null ? false : true;
     }
 }

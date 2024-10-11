@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using AElf.ExceptionHandler;
 using AElf.Indexing.Elasticsearch;
+using ETransferServer.Common;
 using ETransferServer.Dtos.User;
 using Microsoft.Extensions.Logging;
 using Nest;
@@ -28,17 +30,12 @@ public class UserAppService : ApplicationService, IUserAppService
         _userManager = userManager;
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ExceptionHelper),
+        MethodName = nameof(ExceptionHelper.HandleException))]
     public async Task AddOrUpdateUserAsync(UserDto user)
     {
-        try
-        {
-            await _userIndexRepository.AddOrUpdateAsync(ObjectMapper.Map<UserDto, UserIndex>(user));
-            Logger.LogInformation("Create user success, userId:{userId}, appId:{appId}", user.UserId, user.AppId);
-        }
-        catch (Exception e)
-        {
-            Logger.LogError(e, "Create user error, userId:{userId}, appId:{appId}", user.UserId, user.AppId);
-        }
+        await _userIndexRepository.AddOrUpdateAsync(ObjectMapper.Map<UserDto, UserIndex>(user));
+        Logger.LogInformation("Create user success, userId:{userId}, appId:{appId}", user.UserId, user.AppId);
     }
 
     public async Task<UserDto> GetUserByIdAsync(string userId)

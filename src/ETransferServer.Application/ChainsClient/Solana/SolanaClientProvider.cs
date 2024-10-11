@@ -1,6 +1,7 @@
 using System;
 using System.Net.Http;
 using System.Threading.Tasks;
+using AElf.ExceptionHandler;
 using ETransferServer.ChainsClient.Solana.Helper;
 using ETransferServer.Common;
 using ETransferServer.Common.ChainsClient;
@@ -31,6 +32,8 @@ public class SolanaClientProvider : IBlockchainClientProvider
 
     public BlockchainType ChainType { get; } = BlockchainType.Solana;
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ExceptionHelper),
+        MethodName = nameof(ExceptionHelper.HandleException))]
     public async Task<BlockDtos> GetBlockTimeAsync(string chainId, string blockHash, string txId = null)
     {
         AssertHelper.NotNull(txId, "TxId can not be null.");
@@ -41,20 +44,13 @@ public class SolanaClientProvider : IBlockchainClientProvider
                 KeyValue.Create("maxSupportedTransactionVersion", 0)));
         var parameters = new JsonRpcRequest(_idGenerator.GetNextId(), Method, param);
         var requestJson = JsonConvert.SerializeObject(parameters, HttpProvider.DefaultJsonSettings);
-        try
-        {
-            var res = await _httpProvider.InvokeAsync<SolanaResponse>(HttpMethod.Post,
-                _blockChainInfoOptions.ChainInfos[chainId].Api,
-                body: requestJson);
-            _logger.LogInformation("Result from solana:{res}", JsonConvert.SerializeObject(res));
-            var blockTime = res.Result.BlockTime;
-            result.BlockTimeStamp = blockTime;
-            return result;
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e, "Failed to get solana transaction info, {blockHash},{txId}", blockHash, txId);
-            return result;
-        }
+        
+        var res = await _httpProvider.InvokeAsync<SolanaResponse>(HttpMethod.Post,
+            _blockChainInfoOptions.ChainInfos[chainId].Api,
+            body: requestJson);
+        _logger.LogInformation("Result from solana:{res}", JsonConvert.SerializeObject(res));
+        var blockTime = res.Result.BlockTime;
+        result.BlockTimeStamp = blockTime;
+        return result;
     }
 }

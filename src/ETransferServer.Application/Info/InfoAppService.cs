@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using AElf.ExceptionHandler;
 using AElf.Indexing.Elasticsearch;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Info;
@@ -49,305 +50,279 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
         _logger = logger;
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ExceptionHelper),
+        MethodName = nameof(ExceptionHelper.HandleException))]
     public async Task<GetTransactionOverviewResult> GetTransactionOverviewAsync(GetOverviewRequestDto request)
     {
         var result = new GetTransactionOverviewResult();
-        try
-        {
-            result.Transaction.Latest = DateTime.UtcNow.Date.ToUtcString(TimeHelper.DatePattern);
+        result.Transaction.Latest = DateTime.UtcNow.Date.ToUtcString(TimeHelper.DatePattern);
 
-            var dateDimension = (DateDimensionEnum)Enum.Parse(typeof(DateDimensionEnum), request.Type);
-            switch (dateDimension)
-            {
-                case DateDimensionEnum.Day:
-                    result = await QueryCountAggAsync(DateInterval.Day, request.MaxResultCount, result);
-                    result.Transaction.TotalTx = result.Transaction.Day.Sum(t => t.DepositTx + t.WithdrawTx);
-                    break;
-                case DateDimensionEnum.Week:
-                    result = await QueryCountAggAsync(DateInterval.Week, request.MaxResultCount, result);
-                    result.Transaction.TotalTx = result.Transaction.Week.Sum(t => t.DepositTx + t.WithdrawTx);
-                    break;
-                case DateDimensionEnum.Month:
-                    result = await QueryCountAggAsync(DateInterval.Month, request.MaxResultCount, result);
-                    result.Transaction.TotalTx = result.Transaction.Month.Sum(t => t.DepositTx + t.WithdrawTx);
-                    break;
-            }
-        }
-        catch (Exception e)
+        var dateDimension = (DateDimensionEnum)Enum.Parse(typeof(DateDimensionEnum), request.Type);
+        switch (dateDimension)
         {
-            _logger.LogError(e, "GetTransactionOverviewAsync error, type={type}", request.Type);
+            case DateDimensionEnum.Day:
+                result = await QueryCountAggAsync(DateInterval.Day, request.MaxResultCount, result);
+                result.Transaction.TotalTx = result.Transaction.Day.Sum(t => t.DepositTx + t.WithdrawTx);
+                break;
+            case DateDimensionEnum.Week:
+                result = await QueryCountAggAsync(DateInterval.Week, request.MaxResultCount, result);
+                result.Transaction.TotalTx = result.Transaction.Week.Sum(t => t.DepositTx + t.WithdrawTx);
+                break;
+            case DateDimensionEnum.Month:
+                result = await QueryCountAggAsync(DateInterval.Month, request.MaxResultCount, result);
+                result.Transaction.TotalTx = result.Transaction.Month.Sum(t => t.DepositTx + t.WithdrawTx);
+                break;
         }
-        
+
         return result;
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ExceptionHelper),
+        MethodName = nameof(ExceptionHelper.HandleException))]
     public async Task<GetVolumeOverviewResult> GetVolumeOverviewAsync(GetOverviewRequestDto request)
     {
         var result = new GetVolumeOverviewResult();
-        try
-        {
-            result.Volume.Latest = DateTime.UtcNow.Date.ToUtcString(TimeHelper.DatePattern);
+        
+        result.Volume.Latest = DateTime.UtcNow.Date.ToUtcString(TimeHelper.DatePattern);
 
-            var dateDimension = (DateDimensionEnum)Enum.Parse(typeof(DateDimensionEnum), request.Type);
-            switch (dateDimension)
-            {
-                case DateDimensionEnum.Day:
-                    result = await QuerySumAggAsync(DateInterval.Day, request.MaxResultCount, result);
-                    result.Volume.TotalAmountUsd = result.Volume.Day
-                        .Sum(t => t.DepositAmountUsd.SafeToDecimal() + t.WithdrawAmountUsd.SafeToDecimal()).ToString();
-                    break;
-                case DateDimensionEnum.Week:
-                    result = await QuerySumAggAsync(DateInterval.Week, request.MaxResultCount, result);
-                    result.Volume.TotalAmountUsd = result.Volume.Week
-                        .Sum(t => t.DepositAmountUsd.SafeToDecimal() + t.WithdrawAmountUsd.SafeToDecimal()).ToString();
-                    break;
-                case DateDimensionEnum.Month:
-                    result = await QuerySumAggAsync(DateInterval.Month, request.MaxResultCount, result);
-                    result.Volume.TotalAmountUsd = result.Volume.Month
-                        .Sum(t => t.DepositAmountUsd.SafeToDecimal() + t.WithdrawAmountUsd.SafeToDecimal()).ToString();
-                    break;
-            }
-        }
-        catch (Exception e)
+        var dateDimension = (DateDimensionEnum)Enum.Parse(typeof(DateDimensionEnum), request.Type);
+        switch (dateDimension)
         {
-            _logger.LogError(e, "GetVolumeOverviewAsync error, type={type}", request.Type);
+            case DateDimensionEnum.Day:
+                result = await QuerySumAggAsync(DateInterval.Day, request.MaxResultCount, result);
+                result.Volume.TotalAmountUsd = result.Volume.Day
+                    .Sum(t => t.DepositAmountUsd.SafeToDecimal() + t.WithdrawAmountUsd.SafeToDecimal()).ToString();
+                break;
+            case DateDimensionEnum.Week:
+                result = await QuerySumAggAsync(DateInterval.Week, request.MaxResultCount, result);
+                result.Volume.TotalAmountUsd = result.Volume.Week
+                    .Sum(t => t.DepositAmountUsd.SafeToDecimal() + t.WithdrawAmountUsd.SafeToDecimal()).ToString();
+                break;
+            case DateDimensionEnum.Month:
+                result = await QuerySumAggAsync(DateInterval.Month, request.MaxResultCount, result);
+                result.Volume.TotalAmountUsd = result.Volume.Month
+                    .Sum(t => t.DepositAmountUsd.SafeToDecimal() + t.WithdrawAmountUsd.SafeToDecimal()).ToString();
+                break;
         }
 
         return result;
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ExceptionHelper),
+        MethodName = nameof(ExceptionHelper.HandleException))]
     public async Task<GetTokenResultDto> GetTokensAsync(GetTokenRequestDto request)
     {
         var result = new GetTokenResultDto();
-        try
+        
+        var orderType = Enum.GetName(typeof(OrderTypeEnum), int.Parse(request.Type));
+        if (orderType.IsNullOrEmpty() || orderType == OrderTypeEnum.Deposit.ToString())
         {
-            var orderType = Enum.GetName(typeof(OrderTypeEnum), int.Parse(request.Type));
-            if (orderType.IsNullOrEmpty() || orderType == OrderTypeEnum.Deposit.ToString())
-            {
-                result = await GetTokenAmountAsync(DateRangeEnum._24H, OrderTypeEnum.Deposit, string.Empty, result);
-                result = await GetTokenAmountAsync(DateRangeEnum._7D, OrderTypeEnum.Deposit, string.Empty, result);
-                result = await GetTokenAmountAsync(DateRangeEnum.Total, OrderTypeEnum.Deposit, string.Empty, result);
-            }
-
-            if (orderType.IsNullOrEmpty() || orderType == OrderTypeEnum.Withdraw.ToString())
-            {
-                result = await GetTokenAmountAsync(DateRangeEnum._24H, OrderTypeEnum.Withdraw, string.Empty, result);
-                result = await GetTokenAmountAsync(DateRangeEnum._7D, OrderTypeEnum.Withdraw, string.Empty, result);
-                result = await GetTokenAmountAsync(DateRangeEnum.Total, OrderTypeEnum.Withdraw, string.Empty, result);
-                result = await GetTokenAmountAsync(DateRangeEnum._24H, OrderTypeEnum.Withdraw, ChainId.AELF, result);
-                result = await GetTokenAmountAsync(DateRangeEnum._24H, OrderTypeEnum.Withdraw, ChainId.tDVV, result);
-                result = await GetTokenAmountAsync(DateRangeEnum._24H, OrderTypeEnum.Withdraw, ChainId.tDVW, result);
-                result = await GetTokenAmountAsync(DateRangeEnum._7D, OrderTypeEnum.Withdraw, ChainId.AELF, result);
-                result = await GetTokenAmountAsync(DateRangeEnum._7D, OrderTypeEnum.Withdraw, ChainId.tDVV, result);
-                result = await GetTokenAmountAsync(DateRangeEnum._7D, OrderTypeEnum.Withdraw, ChainId.tDVW, result);
-                result = await GetTokenAmountAsync(DateRangeEnum.Total, OrderTypeEnum.Withdraw, ChainId.AELF, result);
-                result = await GetTokenAmountAsync(DateRangeEnum.Total, OrderTypeEnum.Withdraw, ChainId.tDVV, result);
-                result = await GetTokenAmountAsync(DateRangeEnum.Total, OrderTypeEnum.Withdraw, ChainId.tDVW, result);
-            }
-
-            var tokenConfigs = _tokenOptions.Value.Deposit[ChainId.AELF];
-            foreach (var kvp in result)
-            {
-                kvp.Value.Details.ForEach(item =>
-                {
-                    item.Item.Amount24H = item.Item.Amount24H.SafeToDecimal().ToString(4, DecimalHelper.RoundingOption.Floor);
-                    item.Item.Amount24HUsd = item.Item.Amount24HUsd.SafeToDecimal().ToString(2, DecimalHelper.RoundingOption.Floor);
-                    item.Item.Amount7D = item.Item.Amount7D.SafeToDecimal().ToString(4, DecimalHelper.RoundingOption.Floor);
-                    item.Item.Amount7DUsd = item.Item.Amount7DUsd.SafeToDecimal().ToString(2, DecimalHelper.RoundingOption.Floor);
-                    item.Item.AmountTotal = item.Item.AmountTotal.SafeToDecimal().ToString(4, DecimalHelper.RoundingOption.Floor);
-                    item.Item.AmountTotalUsd = item.Item.AmountTotalUsd.SafeToDecimal().ToString(2, DecimalHelper.RoundingOption.Floor);
-                });
-                var networkConfigs = _networkOptions.Value.NetworkMap[kvp.Key];
-                var networks = networkConfigs.Select(config => config.NetworkInfo.Network).ToList();
-                var names = result[kvp.Key].Details.Select(d => d.Name).ToList();
-                result[kvp.Key].Icon = tokenConfigs.FirstOrDefault(t => t.Symbol == kvp.Key)?.Icon;
-                result[kvp.Key].Networks = networkConfigs.Where(n => names.Contains(n.NetworkInfo.Network))
-                    .Select(t => t.NetworkInfo.Network).ToList();
-                if (orderType.IsNullOrEmpty())
-                {
-                    result[kvp.Key].ChainIds = _tokenInfoOptions.Value[kvp.Key].Deposit
-                        .Concat(_tokenInfoOptions.Value[kvp.Key].Withdraw).Distinct().OrderBy(d =>
-                            new List<string> { ChainId.AELF, ChainId.tDVV, ChainId.tDVW }.IndexOf(d)).ToList();
-                }
-                else if (orderType == OrderTypeEnum.Deposit.ToString())
-                {
-                    result[kvp.Key].ChainIds = _tokenInfoOptions.Value[kvp.Key].Deposit;
-                }
-                else if (orderType == OrderTypeEnum.Withdraw.ToString())
-                {
-                    result[kvp.Key].ChainIds = _tokenInfoOptions.Value[kvp.Key].Withdraw;
-                }
-
-                result[kvp.Key].General.Amount24H = kvp.Value.Details.Sum(d => d.Item.Amount24H.SafeToDecimal())
-                    .ToString(4, DecimalHelper.RoundingOption.Floor);
-                result[kvp.Key].General.Amount24HUsd = kvp.Value.Details.Sum(d => d.Item.Amount24HUsd.SafeToDecimal())
-                    .ToString(2, DecimalHelper.RoundingOption.Floor);
-                result[kvp.Key].General.Amount7D = kvp.Value.Details.Sum(d => d.Item.Amount7D.SafeToDecimal())
-                    .ToString(4, DecimalHelper.RoundingOption.Floor);
-                result[kvp.Key].General.Amount7DUsd = kvp.Value.Details.Sum(d => d.Item.Amount7DUsd.SafeToDecimal())
-                    .ToString(2, DecimalHelper.RoundingOption.Floor);
-                result[kvp.Key].General.AmountTotal = kvp.Value.Details.Sum(d => d.Item.AmountTotal.SafeToDecimal())
-                    .ToString(4, DecimalHelper.RoundingOption.Floor);
-                result[kvp.Key].General.AmountTotalUsd = kvp.Value.Details
-                    .Sum(d => d.Item.AmountTotalUsd.SafeToDecimal())
-                    .ToString(2, DecimalHelper.RoundingOption.Floor);
-                result[kvp.Key].Details = kvp.Value.Details.OrderBy(d => networks.IndexOf(d.Name)).ToList();
-            }
-
-            return result.OrderByDescending(kv => kv.Value.General.AmountTotalUsd.SafeToDecimal())
-                .ToDictionary(kv => kv.Key, kv => kv.Value).ToDictionary();
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e, "GetTokensAsync error, type={type}", request.Type);
+            result = await GetTokenAmountAsync(DateRangeEnum._24H, OrderTypeEnum.Deposit, string.Empty, result);
+            result = await GetTokenAmountAsync(DateRangeEnum._7D, OrderTypeEnum.Deposit, string.Empty, result);
+            result = await GetTokenAmountAsync(DateRangeEnum.Total, OrderTypeEnum.Deposit, string.Empty, result);
         }
 
-        return result;
+        if (orderType.IsNullOrEmpty() || orderType == OrderTypeEnum.Withdraw.ToString())
+        {
+            result = await GetTokenAmountAsync(DateRangeEnum._24H, OrderTypeEnum.Withdraw, string.Empty, result);
+            result = await GetTokenAmountAsync(DateRangeEnum._7D, OrderTypeEnum.Withdraw, string.Empty, result);
+            result = await GetTokenAmountAsync(DateRangeEnum.Total, OrderTypeEnum.Withdraw, string.Empty, result);
+            result = await GetTokenAmountAsync(DateRangeEnum._24H, OrderTypeEnum.Withdraw, ChainId.AELF, result);
+            result = await GetTokenAmountAsync(DateRangeEnum._24H, OrderTypeEnum.Withdraw, ChainId.tDVV, result);
+            result = await GetTokenAmountAsync(DateRangeEnum._24H, OrderTypeEnum.Withdraw, ChainId.tDVW, result);
+            result = await GetTokenAmountAsync(DateRangeEnum._7D, OrderTypeEnum.Withdraw, ChainId.AELF, result);
+            result = await GetTokenAmountAsync(DateRangeEnum._7D, OrderTypeEnum.Withdraw, ChainId.tDVV, result);
+            result = await GetTokenAmountAsync(DateRangeEnum._7D, OrderTypeEnum.Withdraw, ChainId.tDVW, result);
+            result = await GetTokenAmountAsync(DateRangeEnum.Total, OrderTypeEnum.Withdraw, ChainId.AELF, result);
+            result = await GetTokenAmountAsync(DateRangeEnum.Total, OrderTypeEnum.Withdraw, ChainId.tDVV, result);
+            result = await GetTokenAmountAsync(DateRangeEnum.Total, OrderTypeEnum.Withdraw, ChainId.tDVW, result);
+        }
+
+        var tokenConfigs = _tokenOptions.Value.Deposit[ChainId.AELF];
+        foreach (var kvp in result)
+        {
+            kvp.Value.Details.ForEach(item =>
+            {
+                item.Item.Amount24H = item.Item.Amount24H.SafeToDecimal().ToString(4, DecimalHelper.RoundingOption.Floor);
+                item.Item.Amount24HUsd = item.Item.Amount24HUsd.SafeToDecimal().ToString(2, DecimalHelper.RoundingOption.Floor);
+                item.Item.Amount7D = item.Item.Amount7D.SafeToDecimal().ToString(4, DecimalHelper.RoundingOption.Floor);
+                item.Item.Amount7DUsd = item.Item.Amount7DUsd.SafeToDecimal().ToString(2, DecimalHelper.RoundingOption.Floor);
+                item.Item.AmountTotal = item.Item.AmountTotal.SafeToDecimal().ToString(4, DecimalHelper.RoundingOption.Floor);
+                item.Item.AmountTotalUsd = item.Item.AmountTotalUsd.SafeToDecimal().ToString(2, DecimalHelper.RoundingOption.Floor);
+            });
+            var networkConfigs = _networkOptions.Value.NetworkMap[kvp.Key];
+            var networks = networkConfigs.Select(config => config.NetworkInfo.Network).ToList();
+            var names = result[kvp.Key].Details.Select(d => d.Name).ToList();
+            result[kvp.Key].Icon = tokenConfigs.FirstOrDefault(t => t.Symbol == kvp.Key)?.Icon;
+            result[kvp.Key].Networks = networkConfigs.Where(n => names.Contains(n.NetworkInfo.Network))
+                .Select(t => t.NetworkInfo.Network).ToList();
+            if (orderType.IsNullOrEmpty())
+            {
+                result[kvp.Key].ChainIds = _tokenInfoOptions.Value[kvp.Key].Deposit
+                    .Concat(_tokenInfoOptions.Value[kvp.Key].Withdraw).Distinct().OrderBy(d =>
+                        new List<string> { ChainId.AELF, ChainId.tDVV, ChainId.tDVW }.IndexOf(d)).ToList();
+            }
+            else if (orderType == OrderTypeEnum.Deposit.ToString())
+            {
+                result[kvp.Key].ChainIds = _tokenInfoOptions.Value[kvp.Key].Deposit;
+            }
+            else if (orderType == OrderTypeEnum.Withdraw.ToString())
+            {
+                result[kvp.Key].ChainIds = _tokenInfoOptions.Value[kvp.Key].Withdraw;
+            }
+
+            result[kvp.Key].General.Amount24H = kvp.Value.Details.Sum(d => d.Item.Amount24H.SafeToDecimal())
+                .ToString(4, DecimalHelper.RoundingOption.Floor);
+            result[kvp.Key].General.Amount24HUsd = kvp.Value.Details.Sum(d => d.Item.Amount24HUsd.SafeToDecimal())
+                .ToString(2, DecimalHelper.RoundingOption.Floor);
+            result[kvp.Key].General.Amount7D = kvp.Value.Details.Sum(d => d.Item.Amount7D.SafeToDecimal())
+                .ToString(4, DecimalHelper.RoundingOption.Floor);
+            result[kvp.Key].General.Amount7DUsd = kvp.Value.Details.Sum(d => d.Item.Amount7DUsd.SafeToDecimal())
+                .ToString(2, DecimalHelper.RoundingOption.Floor);
+            result[kvp.Key].General.AmountTotal = kvp.Value.Details.Sum(d => d.Item.AmountTotal.SafeToDecimal())
+                .ToString(4, DecimalHelper.RoundingOption.Floor);
+            result[kvp.Key].General.AmountTotalUsd = kvp.Value.Details
+                .Sum(d => d.Item.AmountTotalUsd.SafeToDecimal())
+                .ToString(2, DecimalHelper.RoundingOption.Floor);
+            result[kvp.Key].Details = kvp.Value.Details.OrderBy(d => networks.IndexOf(d.Name)).ToList();
+        }
+
+        return result.OrderByDescending(kv => kv.Value.General.AmountTotalUsd.SafeToDecimal())
+            .ToDictionary(kv => kv.Key, kv => kv.Value).ToDictionary();
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ExceptionHelper),
+        MethodName = nameof(ExceptionHelper.HandleException))]
     public async Task<GetTokenOptionResultDto> GetNetworkOptionAsync()
     {
-        try
+        var networkInfos = _networkOptions.Value.NetworkMap[CommonConstant.Symbol.USDT].Select(config =>
+            config.NetworkInfo).ToList();
+        var tokenConfigs = _tokenOptions.Value.Deposit[ChainId.AELF];
+        var toTokenConfigs = _tokenOptions.Value.DepositSwap.SelectMany(t => t.ToTokenList);
+        foreach (var item in toTokenConfigs)
         {
-            var networkInfos = _networkOptions.Value.NetworkMap[CommonConstant.Symbol.USDT].Select(config =>
+            if (!tokenConfigs.Exists(t => t.Symbol == item.Symbol))
+            {
+                tokenConfigs.Add(_objectMapper.Map<ToTokenConfig, TokenConfig>(item));
+            }
+        }
+        foreach (var item in tokenConfigs)
+        {
+            if (!_networkOptions.Value.NetworkMap.ContainsKey(item.Symbol) 
+                || item.Symbol == CommonConstant.Symbol.USDT) continue;
+            var networks = _networkOptions.Value.NetworkMap[item.Symbol].Select(config =>
                 config.NetworkInfo).ToList();
-            var tokenConfigs = _tokenOptions.Value.Deposit[ChainId.AELF];
-            var toTokenConfigs = _tokenOptions.Value.DepositSwap.SelectMany(t => t.ToTokenList);
-            foreach (var item in toTokenConfigs)
+            foreach (var network in networks)
             {
-                if (!tokenConfigs.Exists(t => t.Symbol == item.Symbol))
-                {
-                    tokenConfigs.Add(_objectMapper.Map<ToTokenConfig, TokenConfig>(item));
-                }
+                if (networkInfos.Exists(t => t.Network == network.Network)) continue;
+                networkInfos.Add(network);
             }
-            foreach (var item in tokenConfigs)
-            {
-                if (!_networkOptions.Value.NetworkMap.ContainsKey(item.Symbol) 
-                    || item.Symbol == CommonConstant.Symbol.USDT) continue;
-                var networks = _networkOptions.Value.NetworkMap[item.Symbol].Select(config =>
-                    config.NetworkInfo).ToList();
-                foreach (var network in networks)
-                {
-                    if (networkInfos.Exists(t => t.Network == network.Network)) continue;
-                    networkInfos.Add(network);
-                }
-            }
-            var result = new GetTokenOptionResultDto
-            {
-                NetworkList = _objectMapper.Map<List<NetworkInfo>, List<NetworkOptionDto>>(networkInfos),
-                TokenList = _objectMapper.Map<List<TokenConfig>, List<TokenConfigOptionDto>>(tokenConfigs)
-            };
-            return await LoopCollectionItemsAsync(result);
         }
-        catch (Exception e)
+        var result = new GetTokenOptionResultDto
         {
-            _logger.LogError(e, "GetNetworkOptionAsync error.");
-            return new GetTokenOptionResultDto();
-        }
+            NetworkList = _objectMapper.Map<List<NetworkInfo>, List<NetworkOptionDto>>(networkInfos),
+            TokenList = _objectMapper.Map<List<TokenConfig>, List<TokenConfigOptionDto>>(tokenConfigs)
+        };
+        return await LoopCollectionItemsAsync(result);
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ExceptionHelper),
+        MethodName = nameof(ExceptionHelper.HandleException))]
     public async Task<PagedResultDto<OrderIndexDto>> GetTransfersAsync(GetTransferRequestDto request)
     {
-        try
-        {
-            var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
-            mustQuery.Add(q => q.Terms(i =>
-                i.Field(f => f.Status).Terms(new List<string>
-                {
-                    OrderStatusEnum.ToTransferConfirmed.ToString(),
-                    OrderStatusEnum.Finish.ToString()
-                })));
-            
-            if (int.Parse(request.Type) > 0)
+        
+        var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+        mustQuery.Add(q => q.Terms(i =>
+            i.Field(f => f.Status).Terms(new List<string>
             {
+                OrderStatusEnum.ToTransferConfirmed.ToString(),
+                OrderStatusEnum.Finish.ToString()
+            })));
+        
+        if (int.Parse(request.Type) > 0)
+        {
+            mustQuery.Add(q => q.Term(i =>
+                i.Field(f => f.OrderType)
+                    .Value(Enum.GetName(typeof(OrderTypeEnum), int.Parse(request.Type)))));
+        }
+
+        if (request.FromToken > 0 || request.FromChainId > 0 || request.ToToken > 0 || request.ToChainId > 0)
+        {
+            var options = await GetNetworkOptionAsync();
+            if (request.FromToken > 0)
+            {
+                var fromToken = options.TokenList.FirstOrDefault(t => t.Key == request.FromToken)?.Symbol;
+                if (fromToken.IsNullOrEmpty()) return new PagedResultDto<OrderIndexDto>();
                 mustQuery.Add(q => q.Term(i =>
-                    i.Field(f => f.OrderType)
-                        .Value(Enum.GetName(typeof(OrderTypeEnum), int.Parse(request.Type)))));
+                    i.Field(f => f.FromTransfer.Symbol).Value(fromToken)));
             }
 
-            if (request.FromToken > 0 || request.FromChainId > 0 || request.ToToken > 0 || request.ToChainId > 0)
+            if (request.ToToken > 0)
             {
-                var options = await GetNetworkOptionAsync();
-                if (request.FromToken > 0)
+                var toToken = options.TokenList.FirstOrDefault(t => t.Key == request.ToToken)?.Symbol;
+                if (toToken.IsNullOrEmpty()) return new PagedResultDto<OrderIndexDto>();
+                mustQuery.Add(q => q.Term(i =>
+                    i.Field(f => f.ToTransfer.Symbol).Value(toToken)));
+            }
+
+            if (request.FromChainId > 0)
+            {
+                var fromChainId = options.NetworkList.FirstOrDefault(t => t.Key == request.FromChainId)?.Network;
+                if (fromChainId.IsNullOrEmpty()) return new PagedResultDto<OrderIndexDto>();
+                if (fromChainId == ChainId.AELF || fromChainId == ChainId.tDVV || fromChainId == ChainId.tDVW)
                 {
-                    var fromToken = options.TokenList.FirstOrDefault(t => t.Key == request.FromToken)?.Symbol;
-                    if (fromToken.IsNullOrEmpty()) return new PagedResultDto<OrderIndexDto>();
                     mustQuery.Add(q => q.Term(i =>
-                        i.Field(f => f.FromTransfer.Symbol).Value(fromToken)));
+                        i.Field(f => f.FromTransfer.ChainId).Value(fromChainId)));
                 }
-
-                if (request.ToToken > 0)
+                else
                 {
-                    var toToken = options.TokenList.FirstOrDefault(t => t.Key == request.ToToken)?.Symbol;
-                    if (toToken.IsNullOrEmpty()) return new PagedResultDto<OrderIndexDto>();
                     mustQuery.Add(q => q.Term(i =>
-                        i.Field(f => f.ToTransfer.Symbol).Value(toToken)));
-                }
-
-                if (request.FromChainId > 0)
-                {
-                    var fromChainId = options.NetworkList.FirstOrDefault(t => t.Key == request.FromChainId)?.Network;
-                    if (fromChainId.IsNullOrEmpty()) return new PagedResultDto<OrderIndexDto>();
-                    if (fromChainId == ChainId.AELF || fromChainId == ChainId.tDVV || fromChainId == ChainId.tDVW)
-                    {
-                        mustQuery.Add(q => q.Term(i =>
-                            i.Field(f => f.FromTransfer.ChainId).Value(fromChainId)));
-                    }
-                    else
-                    {
-                        mustQuery.Add(q => q.Term(i =>
-                            i.Field(f => f.FromTransfer.Network).Value(fromChainId)));
-                    }
-                }
-
-                if (request.ToChainId > 0)
-                {
-                    var toChainId = options.NetworkList.FirstOrDefault(t => t.Key == request.ToChainId)?.Network;
-                    if (toChainId.IsNullOrEmpty()) return new PagedResultDto<OrderIndexDto>();
-                    if (toChainId == ChainId.AELF || toChainId == ChainId.tDVV || toChainId == ChainId.tDVW)
-                    {
-                        mustQuery.Add(q => q.Term(i =>
-                            i.Field(f => f.ToTransfer.ChainId).Value(toChainId)));
-                    }
-                    else
-                    {
-                        mustQuery.Add(q => q.Term(i =>
-                            i.Field(f => f.ToTransfer.Network).Value(toChainId)));
-                    }
+                        i.Field(f => f.FromTransfer.Network).Value(fromChainId)));
                 }
             }
-            
-            var mustNotQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
-            mustNotQuery.Add(q => q.Match(i =>
-                i.Field("extensionInfo.RefundTx").Query(ExtensionKey.RefundTx)));
-            
-            QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery)
-                .MustNot(mustNotQuery));
 
-            var (count, list) = await _orderIndexRepository.GetSortListAsync(Filter,
-                sortFunc: string.IsNullOrWhiteSpace(request.Sorting)
-                    ? s => s.Descending(t => t.CreateTime)
-                    : GetSorting(request.Sorting),
-                limit: request.MaxResultCount == 0 ? OrderOptions.DefaultResultCount :
-                request.MaxResultCount > request.Limit ? request.Limit : request.MaxResultCount,
-                skip: request.SkipCount);
-
-            return new PagedResultDto<OrderIndexDto>
+            if (request.ToChainId > 0)
             {
-                Items = await LoopCollectionItemsAsync(
-                    _objectMapper.Map<List<OrderIndex>, List<OrderIndexDto>>(list)),
-                TotalCount = count <= request.Limit ? count : request.Limit
-            };
+                var toChainId = options.NetworkList.FirstOrDefault(t => t.Key == request.ToChainId)?.Network;
+                if (toChainId.IsNullOrEmpty()) return new PagedResultDto<OrderIndexDto>();
+                if (toChainId == ChainId.AELF || toChainId == ChainId.tDVV || toChainId == ChainId.tDVW)
+                {
+                    mustQuery.Add(q => q.Term(i =>
+                        i.Field(f => f.ToTransfer.ChainId).Value(toChainId)));
+                }
+                else
+                {
+                    mustQuery.Add(q => q.Term(i =>
+                        i.Field(f => f.ToTransfer.Network).Value(toChainId)));
+                }
+            }
         }
-        catch (Exception e)
+        
+        var mustNotQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+        mustNotQuery.Add(q => q.Match(i =>
+            i.Field("extensionInfo.RefundTx").Query(ExtensionKey.RefundTx)));
+        
+        QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery)
+            .MustNot(mustNotQuery));
+
+        var (count, list) = await _orderIndexRepository.GetSortListAsync(Filter,
+            sortFunc: string.IsNullOrWhiteSpace(request.Sorting)
+                ? s => s.Descending(t => t.CreateTime)
+                : GetSorting(request.Sorting),
+            limit: request.MaxResultCount == 0 ? OrderOptions.DefaultResultCount :
+            request.MaxResultCount > request.Limit ? request.Limit : request.MaxResultCount,
+            skip: request.SkipCount);
+
+        return new PagedResultDto<OrderIndexDto>
         {
-            _logger.LogError(e,
-                "GetTransfersAsync error, type={type}, fromToken={fromToken}, fromChainId={fromChainId}, toToken={toToken}, toChainId={toChainId}, ",
-                request.Type, request.FromToken, request.FromChainId, request.ToToken, request.ToChainId);
-            return new PagedResultDto<OrderIndexDto>();
-        }
+            Items = await LoopCollectionItemsAsync(
+                _objectMapper.Map<List<OrderIndex>, List<OrderIndexDto>>(list)),
+            TotalCount = count <= request.Limit ? count : request.Limit
+        };
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ExceptionHelper),
+        MethodName = nameof(ExceptionHelper.HandleException))]
     private async Task<GetTokenResultDto> GetTokenAmountAsync(DateRangeEnum dateRangeEnum, OrderTypeEnum orderTypeEnum,
         string chainId, GetTokenResultDto result)
     {
@@ -448,16 +423,7 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
         var symbolAgg = searchResponse.Aggregations.Terms("symbol");
         foreach (var symbolBucket in symbolAgg.Buckets)
         {
-            var avgExchange = 0M;
-            try
-            {
-                avgExchange =
-                    await _networkAppService.GetAvgExchangeAsync(symbolBucket.Key, CommonConstant.Symbol.USD);
-            }
-            catch (Exception e)
-            {
-                _logger.LogError(e, "GetTokenAmountAsync exchange error, {symbol}", symbolBucket.Key);
-            }
+            var avgExchange = await _networkAppService.GetAvgExchangeAsync(symbolBucket.Key, CommonConstant.Symbol.USD);
 
             var networkAgg = symbolBucket.Terms("network");
             foreach (var networkBucket in networkAgg.Buckets)
@@ -580,6 +546,8 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
         return result;
     }
     
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ExceptionHelper),
+        MethodName = nameof(ExceptionHelper.HandleException))]
     private async Task<GetVolumeOverviewResult> QuerySumAggAsync(DateInterval dateInterval, int? maxResultCount,
         GetVolumeOverviewResult result)
     {
@@ -671,18 +639,10 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
                 var avgExchange = 0M;
                 if (dateInterval == DateInterval.Day)
                 {
-                    try
-                    {
-                        avgExchange =
-                            await _networkAppService.GetAvgExchangeAsync(symbolBucket.Key,
-                                CommonConstant.Symbol.USD,
-                                (long)bucket.Key);
-                    }
-                    catch (Exception e)
-                    {
-                        _logger.LogError(e, "QuerySumAggAsync exchange error, {symbol}, {timestamp}",
-                            symbolBucket.Key, bucket.Key);
-                    }
+                    avgExchange =
+                        await _networkAppService.GetAvgExchangeAsync(symbolBucket.Key,
+                            CommonConstant.Symbol.USD,
+                            (long)bucket.Key);
                 }
                 
                 var orderTypeAgg = symbolBucket.Terms("order_type");
@@ -706,21 +666,10 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
                         {
                             avgExchange = 0M;
                             var dd = (long)ddBucket.Key;
-                            try
-                            {
-                                if (ddBucket.Sum("sum_amount")?.Value > 0)
-                                {
-                                    avgExchange =
-                                        await _networkAppService.GetAvgExchangeAsync(symbolBucket.Key,
-                                            CommonConstant.Symbol.USD,
-                                            (long)ddBucket.Key);
-                                }
-                            }
-                            catch (Exception e)
-                            {
-                                _logger.LogError(e, "QuerySumAggAsync exchange error, {symbol}, {timestamp}", 
-                                    symbolBucket.Key, bucket.Key);
-                            }
+                            avgExchange =
+                                await _networkAppService.GetAvgExchangeAsync(symbolBucket.Key,
+                                    CommonConstant.Symbol.USD,
+                                    (long)ddBucket.Key);
                             if (orderTypeBucket.Key == OrderTypeEnum.Deposit.ToString())
                             {
                                 if (depositDic.ContainsKey(dd))
@@ -803,6 +752,8 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
         return dto;
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ExceptionHelper),
+        MethodName = nameof(ExceptionHelper.HandleException))]
     private async Task<List<OrderIndexDto>> LoopCollectionItemsAsync(List<OrderIndexDto> itemList)
     {
         var fromSymbolList = itemList.Select(i => i.FromTransfer.Symbol).Distinct().ToList();
@@ -812,15 +763,7 @@ public class InfoAppService : ETransferServerAppService, IInfoAppService
         var exchangeDic = new Dictionary<string, decimal>();
         foreach (var item in fromSymbolList)
         {
-            try
-            {
-                exchangeDic.Add(item, await _networkAppService.GetAvgExchangeAsync(item, CommonConstant.Symbol.USD));
-            }
-            catch (Exception e)
-            {
-                _logger.LogError(e, "LoopCollectionItemsAsync exchange error, {symbol}", item);
-                exchangeDic.Add(item, 0M);
-            }
+            exchangeDic.Add(item, await _networkAppService.GetAvgExchangeAsync(item, CommonConstant.Symbol.USD));
         }
 
         itemList.ForEach(item =>

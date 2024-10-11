@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 using System.Web;
+using AElf.ExceptionHandler;
 using ETransferServer.Options;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -83,6 +84,8 @@ public class HttpProvider : IHttpProvider
         _logger = logger;
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ExceptionHelper),
+        MethodName = nameof(ExceptionHelper.HandleException))]
     public async Task<T> InvokeAsync<T>(string domain, ApiInfo apiInfo,
         Dictionary<string, string> pathParams = null,
         Dictionary<string, string> param = null,
@@ -92,14 +95,7 @@ public class HttpProvider : IHttpProvider
     {
         var resp = await InvokeAsync(apiInfo.Method, domain + apiInfo.Path, pathParams, param, body, header, timeout,
             withInfoLog, withDebugLog);
-        try
-        {
-            return JsonConvert.DeserializeObject<T>(resp, settings ?? DefaultJsonSettings);
-        }
-        catch (Exception ex)
-        {
-            throw new HttpRequestException($"Error deserializing service [{apiInfo.Path}] response body: {resp}", ex);
-        }
+        return JsonConvert.DeserializeObject<T>(resp, settings ?? DefaultJsonSettings);
     }
 
     public async Task<T> InvokeAsync<T>(HttpMethod method, string url,
@@ -110,14 +106,7 @@ public class HttpProvider : IHttpProvider
         bool withInfoLog = false, bool withDebugLog = true)
     {
         var resp = await InvokeAsync(method, url, pathParams, param, body, header, timeout, withInfoLog, withDebugLog);
-        try
-        {
-            return JsonConvert.DeserializeObject<T>(resp, settings ?? DefaultJsonSettings);
-        }
-        catch (Exception ex)
-        {
-            throw new HttpRequestException($"Error deserializing service [{url}] response body: {resp}", ex);
-        }
+        return JsonConvert.DeserializeObject<T>(resp, settings ?? DefaultJsonSettings);
     }
 
     public async Task<HttpResponseMessage> InvokeResponseAsync(string domain, ApiInfo apiInfo,

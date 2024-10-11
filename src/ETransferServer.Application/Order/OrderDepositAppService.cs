@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using AElf.ExceptionHandler;
 using AElf.Indexing.Elasticsearch;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -54,76 +55,62 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
         _swapAppService = swapAppService;
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ExceptionHelper),
+        MethodName = nameof(ExceptionHelper.HandleException))]
     public async Task<GetDepositInfoDto> GetDepositInfoAsync(GetDepositRequestDto request)
     {
-        try
+        AssertHelper.IsTrue(request.ChainId == ChainId.AELF || request.ChainId == ChainId.tDVV
+            || request.ChainId == ChainId.tDVW, "Param is invalid. Please refresh and try again.");
+        AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.Symbol), 
+            "Symbol is not exist. Please refresh and try again.");
+        AssertHelper.IsTrue(request.ToSymbol.IsNullOrEmpty() || _networkInfoOptions.Value.NetworkMap.ContainsKey(request.ToSymbol), 
+            "ToSymbol is an invalid parameter. Please refresh and try again. ");
+        AssertHelper.IsTrue(
+            request.ToSymbol.IsNullOrEmpty() || 
+            _tokenAppService.IsValidDeposit(request.ChainId, request.Symbol, request.ToSymbol),
+            "The combination of ChainId, FromSymbol and ToSymbol is an invalid parameter. Please refresh and try again.");
+        
+        var networkConfigs = _networkInfoOptions.Value.NetworkMap[request.Symbol];
+        var depositInfo = networkConfigs.Where(n => n.NetworkInfo.Network == request.Network)
+            .Select(n => n.DepositInfo).FirstOrDefault();
+        AssertHelper.IsTrue(depositInfo != null, "Network is not exist. Please refresh and try again.");
+
+        var getUserDepositAddressInput = new GetUserDepositAddressInput()
         {
-            AssertHelper.IsTrue(request.ChainId == ChainId.AELF || request.ChainId == ChainId.tDVV
-                || request.ChainId == ChainId.tDVW, "Param is invalid. Please refresh and try again.");
-            AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.Symbol), 
-                "Symbol is not exist. Please refresh and try again.");
-            AssertHelper.IsTrue(request.ToSymbol.IsNullOrEmpty() || _networkInfoOptions.Value.NetworkMap.ContainsKey(request.ToSymbol), 
-                "ToSymbol is an invalid parameter. Please refresh and try again. ");
-            AssertHelper.IsTrue(
-                request.ToSymbol.IsNullOrEmpty() || 
-                _tokenAppService.IsValidDeposit(request.ChainId, request.Symbol, request.ToSymbol),
-                "The combination of ChainId, FromSymbol and ToSymbol is an invalid parameter. Please refresh and try again.");
-            
-            var networkConfigs = _networkInfoOptions.Value.NetworkMap[request.Symbol];
-            var depositInfo = networkConfigs.Where(n => n.NetworkInfo.Network == request.Network)
-                .Select(n => n.DepositInfo).FirstOrDefault();
-            AssertHelper.IsTrue(depositInfo != null, "Network is not exist. Please refresh and try again.");
+            UserId = CurrentUser.GetId().ToString(),
+            ChainId = request.ChainId,
+            NetWork = request.Network,
+            Symbol = request.Symbol,
+            ToSymbol = request.ToSymbol
+        };
 
-            var getUserDepositAddressInput = new GetUserDepositAddressInput()
-            {
-                UserId = CurrentUser.GetId().ToString(),
-                ChainId = request.ChainId,
-                NetWork = request.Network,
-                Symbol = request.Symbol,
-                ToSymbol = request.ToSymbol
-            };
-
-            var getDepositInfoDto = new GetDepositInfoDto();
-            var userAddressAsync = await _userAddressService.GetUserAddressAsync(getUserDepositAddressInput);
-            getDepositInfoDto.DepositInfo = new DepositInfoDto()
-            {
-                DepositAddress = userAddressAsync,
-                MinAmount = depositInfo.MinDeposit,
-                ExtraNotes = depositInfo.ExtraNotes,
-            };
-
-            if (DepositSwapHelper.IsDepositSwap(request.Symbol, request.ToSymbol))
-            {
-                getDepositInfoDto.DepositInfo.ExtraNotes = depositInfo.SwapExtraNotes;
-                getDepositInfoDto.DepositInfo.ExtraInfo = new ExtraInfo
-                {
-                    Slippage = _swapAppService.GetSlippage(request.Symbol, request.ToSymbol)
-                };
-            }
-
-            try
-            {
-
-                var avgExchange =
-                    await _networkAppService.GetAvgExchangeAsync(request.Symbol, CommonConstant.Symbol.USD);
-                var decimals =
-                    await _networkAppService.GetDecimalsAsync(request.ChainId, request.Symbol);
-                getDepositInfoDto.DepositInfo.MinAmountUsd =
-                    (depositInfo.MinDeposit.SafeToDecimal() * avgExchange).ToString(
-                        decimals, DecimalHelper.RoundingOption.Ceiling);
-            }
-            catch (Exception e)
-            {
-                _logger.LogError(e, "Get deposit avg exchange failed.");
-            }
-
-            return getDepositInfoDto;
-        }
-        catch (Exception e)
+        var getDepositInfoDto = new GetDepositInfoDto();
+        var userAddressAsync = await _userAddressService.GetUserAddressAsync(getUserDepositAddressInput);
+        getDepositInfoDto.DepositInfo = new DepositInfoDto()
         {
-            _logger.LogError(e, "GetDepositInfo error");
-            throw;
+            DepositAddress = userAddressAsync,
+            MinAmount = depositInfo.MinDeposit,
+            ExtraNotes = depositInfo.ExtraNotes,
+        };
+
+        if (DepositSwapHelper.IsDepositSwap(request.Symbol, request.ToSymbol))
+        {
+            getDepositInfoDto.DepositInfo.ExtraNotes = depositInfo.SwapExtraNotes;
+            getDepositInfoDto.DepositInfo.ExtraInfo = new ExtraInfo
+            {
+                Slippage = _swapAppService.GetSlippage(request.Symbol, request.ToSymbol)
+            };
         }
+
+        var avgExchange =
+            await _networkAppService.GetAvgExchangeAsync(request.Symbol, CommonConstant.Symbol.USD);
+        var decimals =
+            await _networkAppService.GetDecimalsAsync(request.ChainId, request.Symbol);
+        getDepositInfoDto.DepositInfo.MinAmountUsd =
+            (depositInfo.MinDeposit.SafeToDecimal() * avgExchange).ToString(
+                decimals, DecimalHelper.RoundingOption.Ceiling);
+
+        return getDepositInfoDto;
     }
 
     private async Task<int> GetToSymbolDecimalsAsync(String chainId, string fromSymbol, string toSymbol)
@@ -143,35 +130,20 @@ public class OrderDepositAppService : ApplicationService, IOrderDepositAppServic
         return 8;
     }
 
-
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ExceptionHelper),
+        MethodName = nameof(ExceptionHelper.HandleException))]
     public async Task<bool> BulkAddOrUpdateAsync(List<DepositOrderDto> dtoList)
     {
-        try
-        {
-            await _depositOrderIndexRepository.BulkAddOrUpdateAsync(
-                _objectMapper.Map<List<DepositOrderDto>, List<OrderIndex>>(dtoList));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError("Bulk save depositOrderIndex fail: {Count},{Message}", dtoList.Count, ex.Message);
-            return false;
-        }
-
+        await _depositOrderIndexRepository.BulkAddOrUpdateAsync(
+            _objectMapper.Map<List<DepositOrderDto>, List<OrderIndex>>(dtoList));
         return true;
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ExceptionHelper),
+        MethodName = nameof(ExceptionHelper.HandleException))]
     public async Task<bool> AddOrUpdateAsync(DepositOrderDto dto)
     {
-        try
-        {
-            await _depositOrderIndexRepository.AddOrUpdateAsync(_objectMapper.Map<DepositOrderDto, OrderIndex>(dto));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError("Save depositOrderIndex fail: {id},{message}", dto.Id, ex.Message);
-            return false;
-        }
-
+        await _depositOrderIndexRepository.AddOrUpdateAsync(_objectMapper.Map<DepositOrderDto, OrderIndex>(dto));
         return true;
     }
     

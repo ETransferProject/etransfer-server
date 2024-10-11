@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using AElf.ExceptionHandler;
 using CodingSeb.ExpressionEvaluator;
 using ETransferServer.Common.Dtos;
 
@@ -33,16 +34,11 @@ public static class ExpressionHelper
         ["VersionInRange"] = VersionInRangeFunction,
     };
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ExceptionHelper),
+        MethodName = nameof(ExceptionHelper.HandleException))]
     public static bool Evaluate(string expression, Dictionary<string, object> variables = null)
     {
-        try
-        {
-            return Evaluate<bool>(expression, variables);
-        }
-        catch (Exception)
-        {
-            return false;
-        }
+        return Evaluate<bool>(expression, variables);
     }
     
     public static bool Evaluate(IEnumerable<string> multilineExpression, Dictionary<string, object> variables = null)
