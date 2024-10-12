@@ -1,5 +1,4 @@
 using System;
-using AutoResponseWrapper.Response;
 using JetBrains.Annotations;
 using Orleans;
 using Volo.Abp;
@@ -15,7 +14,9 @@ public class CommonResponseDto<T> where T : class
     [Id(0)] public string Code { get; set; }
     [Id(1)] public object Data { get; set; }
     [Id(2)] public string Message { get; set; } = string.Empty;
+    [Id(3)] private readonly bool _success;
     public bool Success => Code == SuccessCode;
+    [Id(4)] private readonly bool _value;
     public T Value => Data as T;
 
 

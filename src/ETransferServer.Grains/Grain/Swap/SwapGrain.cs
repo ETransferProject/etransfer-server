@@ -29,7 +29,7 @@ public interface ISwapGrain : IGrainWithGuidKey
     Task<GrainResultDto<DepositOrderChangeDto>> Swap(DepositOrderDto dto);
 
     // Task<GrainResultDto<DepositOrderChangeDto>> SubsidyTransfer(DepositOrderDto dto，string returnValue);
-    Task<decimal> ParseReturnValue(LogEventDto[] logs);
+    Task<decimal> ParseReturnValue(string swapLog);
     Task<decimal> RecordAmountOut(long amount);
 }
 
@@ -400,22 +400,18 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
         return tokenInfo;
     }
 
-    public async Task<decimal> ParseReturnValue(LogEventDto[] logs)
+    public async Task<decimal> ParseReturnValue(string swapLog)
     {
         decimal actualSwappedAmountOut = 0;
         try
         {
-            if (logs.Length > 0)
+            if (!swapLog.IsNullOrWhiteSpace())
             {
-                var swapLog = logs.FirstOrDefault(l => l.Name == nameof(TokenSwapped))?.NonIndexed;
-                if (!swapLog.IsNullOrWhiteSpace())
-                {
-                    var amountsOut = TokenSwapped.Parser.ParseFrom(ByteString.FromBase64(swapLog)).AmountOut;
-                    _logger.LogInformation("Amounts out parsed:{amount}",amountsOut.AmountOut.Last());
-                    var tokenInfo = await GetTokenAsync(State.SymbolOut, State.ToChainId);
-                    actualSwappedAmountOut = (amountsOut.AmountOut.Last() / (decimal)Math.Pow(10, tokenInfo.Decimals));
-                    State.ActualSwappedAmountOut = actualSwappedAmountOut;
-                }
+                var amountsOut = TokenSwapped.Parser.ParseFrom(ByteString.FromBase64(swapLog)).AmountOut;
+                _logger.LogInformation("Amounts out parsed:{amount}",amountsOut.AmountOut.Last());
+                var tokenInfo = await GetTokenAsync(State.SymbolOut, State.ToChainId);
+                actualSwappedAmountOut = (amountsOut.AmountOut.Last() / (decimal)Math.Pow(10, tokenInfo.Decimals));
+                State.ActualSwappedAmountOut = actualSwappedAmountOut;
             }
         }
         catch (Exception e)

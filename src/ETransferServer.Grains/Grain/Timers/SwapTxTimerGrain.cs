@@ -1,4 +1,5 @@
 using AElf.Client.Dto;
+using ETransfer.Contracts.TokenPool;
 using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
 using ETransferServer.Dtos.GraphQL;
@@ -357,7 +358,13 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
                     transferInfo.Status = OrderTransferStatusEnum.Confirmed.ToString();
                     order.Status = OrderStatusEnum.ToTransferConfirmed.ToString();
                     var swapGrain = GrainFactory.GetGrain<ISwapGrain>(order.Id);
-                    transferInfo.Amount = await swapGrain.ParseReturnValue(txStatus.Logs);
+                    transferInfo.Amount = 0;
+                    if (txStatus.Logs.Length > 0)
+                    {
+                        var swapLog = txStatus.Logs.FirstOrDefault(l => l.Name == nameof(TokenSwapped))?.NonIndexed;
+                        transferInfo.Amount = await swapGrain.ParseReturnValue(swapLog);
+                    }
+
                     order.ExtensionInfo ??= new Dictionary<string, string>();
                     if (order.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus))
                     {

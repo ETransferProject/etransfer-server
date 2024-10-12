@@ -556,7 +556,7 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
             await _orderIndexRepository.AddOrUpdateAsync(orderIndex);
 
             var userWithdrawGrain = _clusterClient.GetGrain<IUserWithdrawGrain>(newOrderId);
-            await userWithdrawGrain.CreateRefundOrder(orderIndex, address);
+            await userWithdrawGrain.CreateRefundOrder(order, address);
 
             return new OrderOperationStatusDto
             {
