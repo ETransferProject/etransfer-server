@@ -154,6 +154,7 @@ public partial class UserDepositGrain
         orderDto.ToTransfer.TxTime = null;
         orderDto.ExtensionInfo.AddOrReplace(ExtensionKey.NeedSwap, Boolean.FalseString);
         orderDto.ExtensionInfo.AddOrReplace(ExtensionKey.SwapStage, SwapStage.SwapTxCheckFailAndToTransfer);
+        orderDto.ExtensionInfo.AddOrReplace(ExtensionKey.ToConfirmedNum, "0");
         
         _logger.LogInformation("Before calling the ToStartTransfer method, after resetting the properties of the order, order: {order}",
             JsonConvert.SerializeObject(orderDto));

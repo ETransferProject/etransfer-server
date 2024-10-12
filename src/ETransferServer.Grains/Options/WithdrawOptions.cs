@@ -9,6 +9,7 @@ public class WithdrawOptions
     public string OrderChangeTopic { get; set; }
     public Dictionary<string, List<string>> SupportWhiteLists { get; set; }
     public Dictionary<string, decimal> MinThirdPartFee { get; set; } = new();
+    public Dictionary<string, decimal> LargeAmount { get; set; } = new();
     public decimal MinWithdraw { get; set; } = new (0.2);
     public decimal FeeFluctuationPercent { get; set; } = (decimal)0.1;
     public int ThirdPartFeeExpireSeconds { get; set; } = 180;

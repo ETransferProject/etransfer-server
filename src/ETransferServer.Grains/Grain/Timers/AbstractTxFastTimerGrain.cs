@@ -180,10 +180,7 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> 
             if (!IsTxFastConfirmed(pendingTx, order, indexerTx, chainStatusDict[pendingTx.ChainId]))
             {
                 result[orderId] = false;
-                if (pendingTx.TransferType == TransferTypeEnum.FromTransfer.ToString())
-                {
-                    await SaveOrder(order);
-                }
+                await SaveOrder(order);
                 continue;
             }
 
@@ -289,10 +286,7 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> 
                 order.Id, timerTx.TxId, txStatus.Status, chainStatus.BestChainHeight, txStatus.BlockNumber, 
                 chainStatus.LastIrreversibleBlockHeight);
 
-            if (!isToTransfer)
-            {
-                order.ExtensionInfo.AddOrReplace(ExtensionKey.FromConfirmedNum, (chainStatus.BestChainHeight - txStatus.BlockNumber).ToString());
-            }
+            order.ExtensionInfo.AddOrReplace(isToTransfer ? ExtensionKey.ToConfirmedNum : ExtensionKey.FromConfirmedNum, (chainStatus.BestChainHeight - txStatus.BlockNumber).ToString());
 
             // pending status, continue waiting
             if (txStatus.Status == CommonConstant.TransactionState.Pending) return false;
@@ -441,14 +435,14 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> 
         try
         {
             (var amount, var symbol, var amountThreshold, var blockHeightUpperThreshold,
-                    var blockHeightLowerThreshold) = GetTxFastTransactionData(pendingTx, order);
+                var blockHeightLowerThreshold) = GetTxFastTransactionData(pendingTx, order);
 
             var indexerHeight = chainStatus.BestChainHeight;
             var txBlockHeight = indexerTx[pendingTx.TxId].BlockHeight;
-            if (pendingTx.TransferType == TransferTypeEnum.FromTransfer.ToString())
-            {
-                order.ExtensionInfo.AddOrReplace(ExtensionKey.FromConfirmedNum, (indexerHeight - txBlockHeight).ToString());
-            }
+            order.ExtensionInfo.AddOrReplace(
+                pendingTx.TransferType == TransferTypeEnum.ToTransfer.ToString()
+                    ? ExtensionKey.ToConfirmedNum
+                    : ExtensionKey.FromConfirmedNum, (indexerHeight - txBlockHeight).ToString());
 
             _logger.LogDebug(
                 "TxFastTimer IsTxFastConfirmed: amount={amount}, symbol={symbol}, amountThreshold={amountThreshold}, " +

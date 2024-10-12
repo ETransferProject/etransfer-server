@@ -4,6 +4,7 @@ using Orleans;
 using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
 using ETransferServer.Dtos.Order;
+using ETransferServer.Grains.Grain.Order.Deposit;
 using ETransferServer.Grains.Grain.Order.Withdraw;
 using ETransferServer.Grains.GraphQL;
 using ETransferServer.Grains.Options;
@@ -24,8 +25,8 @@ public class UserWithdrawTxTimerGrain : AbstractTxTimerGrain<WithdrawOrderDto>, 
     public UserWithdrawTxTimerGrain(ILogger<UserWithdrawTxTimerGrain> logger,
         IContractProvider contractProvider, IOptionsSnapshot<ChainOptions> chainOptions,
         IOptionsSnapshot<TimerOptions> timerOptions, ITokenTransferProvider transferProvider,
-        IUserWithdrawProvider userWithdrawProvider) : base(logger,
-        contractProvider, chainOptions, timerOptions, transferProvider, userWithdrawProvider)
+        IUserWithdrawProvider userWithdrawProvider, IUserDepositProvider userDepositProvider) : base(logger,
+        contractProvider, chainOptions, timerOptions, transferProvider, userWithdrawProvider, userDepositProvider)
     {
         _logger = logger;
         _timerOptions = timerOptions;

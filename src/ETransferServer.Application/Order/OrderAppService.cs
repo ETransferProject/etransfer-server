@@ -69,19 +69,32 @@ public class OrderAppService : ApplicationService, IOrderAppService
                         .Value(Enum.GetName(typeof(OrderTypeEnum), request.Type))));
             }
 
+            var status = OrderStatusResponseEnum.All;
             if (request.Status > 0)
             {
-                var status =
+                status =
                     (OrderStatusResponseEnum)Enum.Parse(typeof(OrderStatusResponseEnum), request.Status.ToString());
                 switch (status)
                 {
                     case OrderStatusResponseEnum.Processing:
                         mustQuery.Add(q => q.Terms(i =>
                             i.Field(f => f.Status).Terms(OrderStatusHelper.GetProcessingList())));
+                        mustQuery.Add(q => q.Bool(i => i.Should(
+                            s => s.Match(k =>
+                                k.Field("extensionInfo.ToConfirmedNum").Query("0")),
+                            p => p.Bool(j => j.MustNot(
+                                s => s.Exists(k =>
+                                    k.Field("extensionInfo.ToConfirmedNum")))))));
                         break;
                     case OrderStatusResponseEnum.Succeed:
-                        mustQuery.Add(q => q.Terms(i =>
-                            i.Field(f => f.Status).Terms(OrderStatusHelper.GetSucceedList())));
+                        mustQuery.Add(q => q.Bool(i => i.Should(
+                            s => s.Terms(k =>
+                                k.Field(f => f.Status).Terms(OrderStatusHelper.GetSucceedList())),
+                            p => p.Bool(j => j.Must(
+                                s => s.Exists(k =>
+                                    k.Field("extensionInfo.ToConfirmedNum")),
+                                s => s.Terms(k =>
+                                    k.Field(f => f.Status).Terms(OrderStatusHelper.GetProcessingList())))))));
                         break;
                     case OrderStatusResponseEnum.Failed:
                         mustQuery.Add(q => q.Terms(i =>
@@ -107,6 +120,11 @@ public class OrderAppService : ApplicationService, IOrderAppService
             var mustNotQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
             mustNotQuery.Add(q => q.Match(i =>
                 i.Field("extensionInfo.RefundTx").Query(ExtensionKey.RefundTx)));
+            if (status == OrderStatusResponseEnum.Succeed)
+            {
+                mustNotQuery.Add(q => q.Match(i =>
+                    i.Field("extensionInfo.ToConfirmedNum").Query("0")));
+            }
 
             QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery)
                 .MustNot(mustNotQuery));
@@ -123,7 +141,7 @@ public class OrderAppService : ApplicationService, IOrderAppService
             var orderIndexDtoPageResult = new PagedResultDto<OrderIndexDto>
             {
                 Items = await LoopCollectionItemsAsync(
-                    _objectMapper.Map<List<OrderIndex>, List<OrderIndexDto>>(list)),
+                    _objectMapper.Map<List<OrderIndex>, List<OrderIndexDto>>(list), list),
                 TotalCount = count
             };
             
@@ -173,7 +191,7 @@ public class OrderAppService : ApplicationService, IOrderAppService
         QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery));
 
         var orderIndex = await _orderIndexRepository.GetAsync(Filter);
-        return Tuple.Create(await GetOrderDetailDtoAsync(orderIndex), orderIndex);
+        return Tuple.Create(await GetOrderDetailDtoAsync(orderIndex, includeAll), orderIndex);
     }
 
     public async Task<UserOrderDto> GetUserOrderRecordListAsync(GetUserOrderRecordRequestDto request, OrderChangeEto orderEto = null)
@@ -309,17 +327,18 @@ public class OrderAppService : ApplicationService, IOrderAppService
         return result;
     }
 
-    private async Task<List<OrderIndexDto>> LoopCollectionItemsAsync(List<OrderIndexDto> itemList)
+    private async Task<List<OrderIndexDto>> LoopCollectionItemsAsync(List<OrderIndexDto> itemList, List<OrderIndex> list)
     {
         foreach (var item in itemList)
         {
-            await HandleItemAsync(item);
+            var index = list.FirstOrDefault(t => t.Id == item.Id);
+            await HandleItemAsync(item, index);
         }
 
         return itemList;
     }
 
-    private async Task<OrderIndexDto> HandleItemAsync(OrderIndexDto item)
+    private async Task<OrderIndexDto> HandleItemAsync(OrderIndexDto item, OrderIndex orderIndex, bool includeAll = false)
     {
         var status = Enum.Parse<OrderStatusEnum>(item.Status);
         switch (status)
@@ -354,6 +373,17 @@ public class OrderAppService : ApplicationService, IOrderAppService
                 item.Status = OrderStatusResponseEnum.Processing.ToString();
                 item.FromTransfer.Status = GetTransferStatus(item.FromTransfer.Status);
                 item.ToTransfer.Status = GetTransferStatus(item.ToTransfer.Status);
+                if (!includeAll && item.FromTransfer.Status == OrderStatusResponseEnum.Succeed.ToString()
+                                && item.ToTransfer.Status == OrderStatusResponseEnum.Processing.ToString()
+                                && orderIndex != null && !orderIndex.ExtensionInfo.IsNullOrEmpty()
+                                && orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.ToConfirmedNum)
+                                && int.TryParse(orderIndex.ExtensionInfo[ExtensionKey.ToConfirmedNum],
+                                    out var confirmedNum) && confirmedNum > 0)
+                {
+                    item.Status = OrderStatusResponseEnum.Succeed.ToString();
+                    item.ToTransfer.Status = OrderStatusResponseEnum.Succeed.ToString();
+                }
+
                 break;
         }
 
@@ -395,6 +425,7 @@ public class OrderAppService : ApplicationService, IOrderAppService
     private string GetTransferStatus(string transferStatus, string orderStatus = null)
     {
         if(transferStatus == CommonConstant.SuccessStatus) return OrderStatusResponseEnum.Succeed.ToString();
+        if(transferStatus == CommonConstant.PendingStatus) return OrderStatusResponseEnum.Processing.ToString();
         try
         {
             var status = Enum.Parse<OrderTransferStatusEnum>(transferStatus);
@@ -422,9 +453,9 @@ public class OrderAppService : ApplicationService, IOrderAppService
         }
     }
 
-    private async Task<OrderDetailDto> GetOrderDetailDtoAsync(OrderIndex orderIndex)
+    private async Task<OrderDetailDto> GetOrderDetailDtoAsync(OrderIndex orderIndex, bool includeAll = false)
     {
-        var orderIndexDto = await HandleItemAsync(_objectMapper.Map<OrderIndex, OrderIndexDto>(orderIndex));
+        var orderIndexDto = await HandleItemAsync(_objectMapper.Map<OrderIndex, OrderIndexDto>(orderIndex), orderIndex, includeAll);
         var detailDto = _objectMapper.Map<OrderIndexDto, OrderDetailDto>(orderIndexDto);
 
         if (!orderIndex.ExtensionInfo.IsNullOrEmpty() &&

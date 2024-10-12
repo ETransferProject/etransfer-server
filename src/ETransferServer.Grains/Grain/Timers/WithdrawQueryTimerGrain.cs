@@ -143,6 +143,7 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
             AssertHelper.IsNull(orderExists.Value, "Withdraw order {OrderId} exists", orderDto.Id);
             if (orderExists.Value == null)
             {
+                await WithdrawLargeAmountAlarmAsync(orderDto);
                 await _bus.Publish(_objectMapper.Map<WithdrawOrderDto, OrderChangeEto>(orderDto));
             }
             
@@ -245,6 +246,12 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
                 transferRecord.Amount, transferRecord.Symbol);
             throw;
         }
+    }
+    
+    private async Task WithdrawLargeAmountAlarmAsync(WithdrawOrderDto orderDto)
+    {
+        var withdrawOrderMonitorGrain = GrainFactory.GetGrain<IWithdrawOrderMonitorGrain>(orderDto.Id.ToString());
+        await withdrawOrderMonitorGrain.DoLargeAmountMonitor(orderDto);
     }
 
     private async Task<Tuple<decimal, decimal, decimal>> CalculateAmountUsdAsync(string symbol, string chainId, long amount, long estimateFee)
