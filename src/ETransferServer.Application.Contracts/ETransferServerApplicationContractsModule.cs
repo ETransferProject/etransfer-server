@@ -1,9 +1,8 @@
 using System;
-using AElf.ExceptionHandler;
+using AElf.ExceptionHandler.ABP;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ETransferServer.Common;
-using ETransferServer.Common.GraphQL;
 using ETransferServer.Options;
 using Volo.Abp.Account;
 using Volo.Abp.AutoMapper;

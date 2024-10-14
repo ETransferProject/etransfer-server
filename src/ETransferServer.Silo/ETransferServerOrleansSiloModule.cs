@@ -1,3 +1,4 @@
+using AElf.ExceptionHandler.Orleans.Extensions;
 using AElf.OpenTelemetry;
 using ETransferServer.Common.AElfSdk;
 using GraphQL.Client.Abstractions;
@@ -53,6 +54,7 @@ public class ETransferServerOrleansSiloModule : AbpModule
         Configure<BlockChainInfoOptions>(configuration.GetSection("BlockChainInfo"));
 
         context.Services.AddHostedService<ETransferServerHostedService>();
+        context.Services.AddOrleansExceptionHandler();
         context.Services.AddHttpClient();
         context.Services.AddSingleton<HttpProvider>();
         context.Services.AddSingleton<SignatureProvider>();
