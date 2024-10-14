@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using AElf;
+using AElf.ExceptionHandler;
 using AElf.Indexing.Elasticsearch;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Info;
@@ -35,7 +36,7 @@ namespace ETransferServer.Reconciliation;
 
 [RemoteService(IsEnabled = false)]
 [DisableAuditing]
-public class ReconciliationAppService : ApplicationService, IReconciliationAppService
+public partial class ReconciliationAppService : ApplicationService, IReconciliationAppService
 {
     private readonly INESTRepository<OrderIndex, Guid> _orderIndexRepository;
     private readonly IClusterClient _clusterClient;
@@ -72,502 +73,430 @@ public class ReconciliationAppService : ApplicationService, IReconciliationAppSe
     {
         return await _infoService.GetNetworkOptionAsync();
     }
-
+    
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ReconciliationAppService),
+        MethodName = nameof(HandleChangePwdExceptionAsync))]
     public async Task<bool> ChangePasswordAsync(ChangePasswordRequestDto request)
     {
-        try
+        var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
+        if (!userId.HasValue || userId == Guid.Empty)
         {
-            var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
-            if (!userId.HasValue || userId == Guid.Empty)
-            {
-                throw new UserFriendlyException("Invalid token.");
-            }
-
-            var identityUser = await _userManager.FindByIdAsync(userId.ToString());
-            if (identityUser == null)
-            {
-                throw new UserFriendlyException("Invalid user.");
-            }
-
-            var password = Encoding.UTF8.GetString(ByteArrayHelper.HexStringToByteArray(request.NewPassword));
-            if (!VerifyHelper.VerifyPassword(password))
-            {
-                throw new UserFriendlyException("Invalid password.");
-            }
-
-            var token = await _userManager.GeneratePasswordResetTokenAsync(identityUser);
-            var result = await _userManager.ResetPasswordAsync(identityUser, token, password);
-            if (!result.Succeeded)
-            {
-                throw new UserFriendlyException(string.Join(",", result.Errors.Select(e => e.Description)));
-            }
-
-            return true;
+            throw new UserFriendlyException("Invalid token.");
         }
-        catch (Exception e)
+
+        var identityUser = await _userManager.FindByIdAsync(userId.ToString());
+        if (identityUser == null)
         {
-            _logger.LogError(e, "Change password failed.");
-            return false;
+            throw new UserFriendlyException("Invalid user.");
         }
+
+        var password = Encoding.UTF8.GetString(ByteArrayHelper.HexStringToByteArray(request.NewPassword));
+        if (!VerifyHelper.VerifyPassword(password))
+        {
+            throw new UserFriendlyException("Invalid password.");
+        }
+
+        var token = await _userManager.GeneratePasswordResetTokenAsync(identityUser);
+        var result = await _userManager.ResetPasswordAsync(identityUser, token, password);
+        if (!result.Succeeded)
+        {
+            throw new UserFriendlyException(string.Join(",", result.Errors.Select(e => e.Description)));
+        }
+
+        return true;
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ReconciliationAppService),
+        MethodName = nameof(HandleInitUserExceptionAsync))]
     public async Task<bool> InitUserAsync(GetUserDto request)
     {
-        try
+        var userGrain = _clusterClient.GetGrain<IUserReconciliationGrain>(GuidHelper.UniqGuid(request.Name));
+        await userGrain.AddOrUpdateUser(new UserReconciliationDto
         {
-            var userGrain = _clusterClient.GetGrain<IUserReconciliationGrain>(GuidHelper.UniqGuid(request.Name));
-            await userGrain.AddOrUpdateUser(new UserReconciliationDto
-            {
-                UserName = request.Name,
-                Address = request.Address,
-                PasswordHash =
-                    EncryptionHelper.Encrypt(request.Password, _stringEncryptionOptions.Value.DefaultPassPhrase)
-            });
-            return true;
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e, "Init user failed.");
-            return false;
-        }
+            UserName = request.Name,
+            Address = request.Address,
+            PasswordHash =
+                EncryptionHelper.Encrypt(request.Password, _stringEncryptionOptions.Value.DefaultPassPhrase)
+        });
+        return true;
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ReconciliationAppService),
+        MethodName = nameof(HandleGetDetailExceptionAsync))]
     public async Task<OrderMoreDetailDto> GetOrderRecordDetailAsync(string id)
     {
-        try
-        {
-            var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
-            if (id.IsNullOrWhiteSpace() || !userId.HasValue || userId == Guid.Empty) return new OrderMoreDetailDto();
+        var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
+        if (id.IsNullOrWhiteSpace() || !userId.HasValue || userId == Guid.Empty) return new OrderMoreDetailDto();
 
-            var (orderDetailDto, orderIndex) = await _orderService.GetOrderDetailAsync(id, userId, true);
-            var result = _objectMapper.Map<OrderDetailDto, OrderMoreDetailDto>(orderDetailDto);
-            result.RelatedOrderId = !orderIndex.ExtensionInfo.IsNullOrEmpty() &&
-                                    orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.RelatedOrderId)
-                ? orderIndex.ExtensionInfo[ExtensionKey.RelatedOrderId]
-                : null;
-            result.ThirdPartFee = !orderIndex.ThirdPartFee.IsNullOrEmpty() &&
-                                  orderIndex.ThirdPartFee[0].Decimals.SafeToInt() > 0
-                ? new FeeInfo
-                {
-                    Symbol = orderIndex.ThirdPartFee[0].Symbol.Split(CommonConstant.Underline).LastOrDefault(),
-                    Amount = (orderIndex.ThirdPartFee[0].Amount.SafeToDecimal() /
-                              (decimal)Math.Pow(10, orderIndex.ThirdPartFee[0].Decimals.SafeToInt())).ToString()
-                }
-                : new FeeInfo();
-            result.RoleType = await GetRoleTypeAsync();
-            result.OperationStatus = !orderIndex.ExtensionInfo.IsNullOrEmpty() &&
-                                     orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)
-                ? orderIndex.ExtensionInfo[ExtensionKey.SubStatus]
-                : null;
-            result.Applicant = !orderIndex.ExtensionInfo.IsNullOrEmpty() && 
-                               orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.RequestUser)
-                ? orderIndex.ExtensionInfo[ExtensionKey.RequestUser]
-                : null;
-            return result;
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e, "Get rec order record detail failed, orderId={id}", id);
-            return new OrderMoreDetailDto();
-        }
+        var (orderDetailDto, orderIndex) = await _orderService.GetOrderDetailAsync(id, userId, true);
+        var result = _objectMapper.Map<OrderDetailDto, OrderMoreDetailDto>(orderDetailDto);
+        result.RelatedOrderId = !orderIndex.ExtensionInfo.IsNullOrEmpty() &&
+                                orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.RelatedOrderId)
+            ? orderIndex.ExtensionInfo[ExtensionKey.RelatedOrderId]
+            : null;
+        result.ThirdPartFee = !orderIndex.ThirdPartFee.IsNullOrEmpty() &&
+                              orderIndex.ThirdPartFee[0].Decimals.SafeToInt() > 0
+            ? new FeeInfo
+            {
+                Symbol = orderIndex.ThirdPartFee[0].Symbol.Split(CommonConstant.Underline).LastOrDefault(),
+                Amount = (orderIndex.ThirdPartFee[0].Amount.SafeToDecimal() /
+                          (decimal)Math.Pow(10, orderIndex.ThirdPartFee[0].Decimals.SafeToInt())).ToString()
+            }
+            : new FeeInfo();
+        result.RoleType = await GetRoleTypeAsync();
+        result.OperationStatus = !orderIndex.ExtensionInfo.IsNullOrEmpty() &&
+                                 orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)
+            ? orderIndex.ExtensionInfo[ExtensionKey.SubStatus]
+            : null;
+        result.Applicant = !orderIndex.ExtensionInfo.IsNullOrEmpty() && 
+                           orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.RequestUser)
+            ? orderIndex.ExtensionInfo[ExtensionKey.RequestUser]
+            : null;
+        return result;
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ReconciliationAppService),
+        MethodName = nameof(HandleGetListExceptionAsync))]
     public async Task<OrderPagedResultDto<OrderRecordDto>> GetDepositOrderRecordListAsync(GetOrderRequestDto request)
     {
-        try
-        {
-            var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
-            if (!userId.HasValue || userId == Guid.Empty) return new OrderPagedResultDto<OrderRecordDto>();
+        var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
+        if (!userId.HasValue || userId == Guid.Empty) return new OrderPagedResultDto<OrderRecordDto>();
 
-            var (count, list) = await GetOrderRecordListAsync(request, OrderTypeEnum.Deposit.ToString());
+        var (count, list) = await GetOrderRecordListAsync(request, OrderTypeEnum.Deposit.ToString());
 
-            return new OrderPagedResultDto<OrderRecordDto>
-            {
-                TotalAmount = await QuerySumAggAsync(request, OrderTypeEnum.Deposit.ToString()),
-                Items = await LoopCollectionItemsAsync(
-                    _objectMapper.Map<List<OrderIndex>, List<OrderRecordDto>>(list)),
-                TotalCount = count
-            };
-        }
-        catch (Exception e)
+        return new OrderPagedResultDto<OrderRecordDto>
         {
-            _logger.LogError(e, "Get rec deposit order record list failed");
-            return new OrderPagedResultDto<OrderRecordDto>();
-        }
+            TotalAmount = await QuerySumAggAsync(request, OrderTypeEnum.Deposit.ToString()),
+            Items = await LoopCollectionItemsAsync(
+                _objectMapper.Map<List<OrderIndex>, List<OrderRecordDto>>(list)),
+            TotalCount = count
+        };
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ReconciliationAppService),
+        MethodName = nameof(HandleGetWithdrawListExceptionAsync))]
     public async Task<OrderPagedResultDto<OrderMoreDetailDto>> GetWithdrawOrderRecordListAsync(GetOrderRequestDto request)
     {
-        try
-        {
-            var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
-            if (!userId.HasValue || userId == Guid.Empty) return new OrderPagedResultDto<OrderMoreDetailDto>();
+        var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
+        if (!userId.HasValue || userId == Guid.Empty) return new OrderPagedResultDto<OrderMoreDetailDto>();
 
-            var (count, list) = await GetOrderRecordListAsync(request, OrderTypeEnum.Withdraw.ToString());
+        var (count, list) = await GetOrderRecordListAsync(request, OrderTypeEnum.Withdraw.ToString());
 
-            return new OrderPagedResultDto<OrderMoreDetailDto>
-            {
-                TotalAmount = await QuerySumAggAsync(request, OrderTypeEnum.Withdraw.ToString()),
-                Items = await LoopWithdrawItemsAsync(await LoopCollectionItemsAsync(
-                    _objectMapper.Map<List<OrderIndex>, List<OrderRecordDto>>(list)), list),
-                TotalCount = count
-            };
-        }
-        catch (Exception e)
+        return new OrderPagedResultDto<OrderMoreDetailDto>
         {
-            _logger.LogError(e, "Get rec withdraw order record list failed");
-            return new OrderPagedResultDto<OrderMoreDetailDto>();
-        }
+            TotalAmount = await QuerySumAggAsync(request, OrderTypeEnum.Withdraw.ToString()),
+            Items = await LoopWithdrawItemsAsync(await LoopCollectionItemsAsync(
+                _objectMapper.Map<List<OrderIndex>, List<OrderRecordDto>>(list)), list),
+            TotalCount = count
+        };
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ReconciliationAppService),
+        MethodName = nameof(HandleGetFailListExceptionAsync))]
     public async Task<PagedResultDto<OrderRecordDto>> GetFailOrderRecordListAsync(GetOrderRequestDto request)
     {
-        try
-        {
-            var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
-            if (!userId.HasValue || userId == Guid.Empty) return new PagedResultDto<OrderRecordDto>();
+        var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
+        if (!userId.HasValue || userId == Guid.Empty) return new PagedResultDto<OrderRecordDto>();
 
-            var (count, list) = await GetOrderRecordListAsync(request, OrderStatusResponseEnum.Failed.ToString());
+        var (count, list) = await GetOrderRecordListAsync(request, OrderStatusResponseEnum.Failed.ToString());
 
-            return new PagedResultDto<OrderRecordDto>
-            {
-                Items = await LoopCollectionItemsAsync(
-                    _objectMapper.Map<List<OrderIndex>, List<OrderRecordDto>>(list), list,
-                    OrderStatusResponseEnum.Failed.ToString()),
-                TotalCount = count
-            };
-        }
-        catch (Exception e)
+        return new PagedResultDto<OrderRecordDto>
         {
-            _logger.LogError(e, "Get rec failed order record list failed");
-            return new PagedResultDto<OrderRecordDto>();
-        }
+            Items = await LoopCollectionItemsAsync(
+                _objectMapper.Map<List<OrderIndex>, List<OrderRecordDto>>(list), list,
+                OrderStatusResponseEnum.Failed.ToString()),
+            TotalCount = count
+        };
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ReconciliationAppService),
+        MethodName = nameof(HandleRequestReleaseExceptionAsync))]
     public async Task<OrderOperationStatusDto> RequestReleaseTokenAsync(GetRequestReleaseDto request)
     {
-        try
+        var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
+        if (!userId.HasValue || userId == Guid.Empty)
+            throw new UserFriendlyException("Invalid user.");
+
+        var orderIndex = await GetOrderIndexAsync(request.OrderId);
+        if (orderIndex == null || orderIndex.OrderType != OrderTypeEnum.Deposit.ToString()
+                               || orderIndex.Status == OrderStatusEnum.Finish.ToString()
+                               || orderIndex.Status == OrderStatusEnum.ToTransferConfirmed.ToString()
+                               || orderIndex.FromTransfer.Status != OrderTransferStatusEnum.Confirmed.ToString())
         {
-            var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
-            if (!userId.HasValue || userId == Guid.Empty)
-                throw new UserFriendlyException("Invalid user.");
-
-            var orderIndex = await GetOrderIndexAsync(request.OrderId);
-            if (orderIndex == null || orderIndex.OrderType != OrderTypeEnum.Deposit.ToString()
-                                   || orderIndex.Status == OrderStatusEnum.Finish.ToString()
-                                   || orderIndex.Status == OrderStatusEnum.ToTransferConfirmed.ToString()
-                                   || orderIndex.FromTransfer.Status != OrderTransferStatusEnum.Confirmed.ToString())
-            {
-                throw new UserFriendlyException("Invalid order.");
-            }
-
-            if (orderIndex.ToTransfer.ToAddress != request.ToAddress
-                || orderIndex.FromTransfer.Amount != request.Amount.SafeToDecimal()
-                || orderIndex.FromTransfer.Symbol != request.Symbol
-                || orderIndex.ToTransfer.ChainId != request.ChainId)
-            {
-                throw new UserFriendlyException("Invalid param.");
-            }
-
-            if (!orderIndex.ExtensionInfo.IsNullOrEmpty() &&
-                orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus) &&
-                orderIndex.ExtensionInfo[ExtensionKey.SubStatus] ==
-                OrderOperationStatusEnum.ReleaseRequested.ToString())
-            {
-                throw new UserFriendlyException("Invalid request.");
-            }
-
-            orderIndex.ExtensionInfo ??= new Dictionary<string, string>();
-            orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.RequestUser, CurrentUser?.Name);
-            orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.RequestTime,
-                DateTime.UtcNow.ToUtcMilliSeconds().ToString());
-            orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus,
-                OrderOperationStatusEnum.ReleaseRequested.ToString());
-            var recordGrain = _clusterClient.GetGrain<IUserDepositRecordGrain>(orderIndex.Id);
-            var order = (await recordGrain.GetAsync()).Value;
-            order.ExtensionInfo = orderIndex.ExtensionInfo;
-            await recordGrain.CreateOrUpdateAsync(order);
-            await _orderIndexRepository.AddOrUpdateAsync(orderIndex);
-
-            return new OrderOperationStatusDto
-            {
-                Status = OrderOperationStatusEnum.ReleaseRequested.ToString()
-            };
+            throw new UserFriendlyException("Invalid order.");
         }
-        catch (Exception e)
+
+        if (orderIndex.ToTransfer.ToAddress != request.ToAddress
+            || orderIndex.FromTransfer.Amount != request.Amount.SafeToDecimal()
+            || orderIndex.FromTransfer.Symbol != request.Symbol
+            || orderIndex.ToTransfer.ChainId != request.ChainId)
         {
-            _logger.LogError(e, "Request release token failed");
-            throw new UserFriendlyException(e.Message);
+            throw new UserFriendlyException("Invalid param.");
         }
+
+        if (!orderIndex.ExtensionInfo.IsNullOrEmpty() &&
+            orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus) &&
+            orderIndex.ExtensionInfo[ExtensionKey.SubStatus] ==
+            OrderOperationStatusEnum.ReleaseRequested.ToString())
+        {
+            throw new UserFriendlyException("Invalid request.");
+        }
+
+        orderIndex.ExtensionInfo ??= new Dictionary<string, string>();
+        orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.RequestUser, CurrentUser?.Name);
+        orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.RequestTime,
+            DateTime.UtcNow.ToUtcMilliSeconds().ToString());
+        orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus,
+            OrderOperationStatusEnum.ReleaseRequested.ToString());
+        var recordGrain = _clusterClient.GetGrain<IUserDepositRecordGrain>(orderIndex.Id);
+        var order = (await recordGrain.GetAsync()).Value;
+        order.ExtensionInfo = orderIndex.ExtensionInfo;
+        await recordGrain.CreateOrUpdateAsync(order);
+        await _orderIndexRepository.AddOrUpdateAsync(orderIndex);
+
+        return new OrderOperationStatusDto
+        {
+            Status = OrderOperationStatusEnum.ReleaseRequested.ToString()
+        };
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ReconciliationAppService),
+        MethodName = nameof(HandleRejectReleaseExceptionAsync))]
     public async Task<OrderOperationStatusDto> RejectReleaseTokenAsync(GetOrderOperationDto request)
     {
-        try
+        var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
+        if (!userId.HasValue || userId == Guid.Empty)
+            throw new UserFriendlyException("Invalid user.");
+
+        var orderIndex = await GetOrderIndexAsync(request.OrderId);
+        if (orderIndex == null || orderIndex.ExtensionInfo.IsNullOrEmpty()
+                               || !orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)
+                               || orderIndex.ExtensionInfo[ExtensionKey.SubStatus] !=
+                               OrderOperationStatusEnum.ReleaseRequested.ToString())
         {
-            var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
-            if (!userId.HasValue || userId == Guid.Empty)
-                throw new UserFriendlyException("Invalid user.");
-
-            var orderIndex = await GetOrderIndexAsync(request.OrderId);
-            if (orderIndex == null || orderIndex.ExtensionInfo.IsNullOrEmpty()
-                                   || !orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)
-                                   || orderIndex.ExtensionInfo[ExtensionKey.SubStatus] !=
-                                   OrderOperationStatusEnum.ReleaseRequested.ToString())
-            {
-                throw new UserFriendlyException("Invalid order.");
-            }
-
-            orderIndex.ExtensionInfo ??= new Dictionary<string, string>();
-            orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.ReleaseUser, CurrentUser?.Name);
-            orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.ReleaseTime,
-                DateTime.UtcNow.ToUtcMilliSeconds().ToString());
-            orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus,
-                OrderOperationStatusEnum.ReleaseRejected.ToString());
-            var recordGrain = _clusterClient.GetGrain<IUserDepositRecordGrain>(orderIndex.Id);
-            var order = (await recordGrain.GetAsync()).Value;
-            order.ExtensionInfo = orderIndex.ExtensionInfo;
-            await recordGrain.CreateOrUpdateAsync(order);
-            await _orderIndexRepository.AddOrUpdateAsync(orderIndex);
-
-            return new OrderOperationStatusDto
-            {
-                Status = OrderOperationStatusEnum.ReleaseRejected.ToString()
-            };
+            throw new UserFriendlyException("Invalid order.");
         }
-        catch (Exception e)
+
+        orderIndex.ExtensionInfo ??= new Dictionary<string, string>();
+        orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.ReleaseUser, CurrentUser?.Name);
+        orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.ReleaseTime,
+            DateTime.UtcNow.ToUtcMilliSeconds().ToString());
+        orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus,
+            OrderOperationStatusEnum.ReleaseRejected.ToString());
+        var recordGrain = _clusterClient.GetGrain<IUserDepositRecordGrain>(orderIndex.Id);
+        var order = (await recordGrain.GetAsync()).Value;
+        order.ExtensionInfo = orderIndex.ExtensionInfo;
+        await recordGrain.CreateOrUpdateAsync(order);
+        await _orderIndexRepository.AddOrUpdateAsync(orderIndex);
+
+        return new OrderOperationStatusDto
         {
-            _logger.LogError(e, "Reject release token failed");
-            throw new UserFriendlyException(e.Message);
-        }
+            Status = OrderOperationStatusEnum.ReleaseRejected.ToString()
+        };
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ReconciliationAppService),
+        MethodName = nameof(HandleReleaseExceptionAsync))]
     public async Task<OrderOperationStatusDto> ReleaseTokenAsync(GetOrderSafeOperationDto request)
     {
-        try
+        var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
+        if (!userId.HasValue || userId == Guid.Empty)
+            throw new UserFriendlyException("Invalid user.");
+
+        await VerifyCode(request.Code);
+
+        var orderIndex = await GetOrderIndexAsync(request.OrderId);
+        if (orderIndex == null || orderIndex.OrderType != OrderTypeEnum.Deposit.ToString()
+                               || orderIndex.Status == OrderStatusEnum.Finish.ToString()
+                               || orderIndex.Status == OrderStatusEnum.ToTransferConfirmed.ToString()
+                               || orderIndex.FromTransfer.Status != OrderTransferStatusEnum.Confirmed.ToString())
         {
-            var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
-            if (!userId.HasValue || userId == Guid.Empty)
-                throw new UserFriendlyException("Invalid user.");
-
-            await VerifyCode(request.Code);
-
-            var orderIndex = await GetOrderIndexAsync(request.OrderId);
-            if (orderIndex == null || orderIndex.OrderType != OrderTypeEnum.Deposit.ToString()
-                                   || orderIndex.Status == OrderStatusEnum.Finish.ToString()
-                                   || orderIndex.Status == OrderStatusEnum.ToTransferConfirmed.ToString()
-                                   || orderIndex.FromTransfer.Status != OrderTransferStatusEnum.Confirmed.ToString())
-            {
-                throw new UserFriendlyException("Invalid order.");
-            }
-
-            if (orderIndex.ExtensionInfo.IsNullOrEmpty()
-                || !orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)
-                || (orderIndex.ExtensionInfo[ExtensionKey.SubStatus] !=
-                    OrderOperationStatusEnum.ReleaseRequested.ToString()
-                    && orderIndex.ExtensionInfo[ExtensionKey.SubStatus] !=
-                    OrderOperationStatusEnum.ReleaseFailed.ToString()))
-            {
-                throw new UserFriendlyException("Invalid release status.");
-            }
-
-            orderIndex.Status = OrderStatusEnum.FromTransferConfirmed.ToString();
-            orderIndex.ToTransfer.Status = OrderTransferStatusEnum.Created.ToString();
-            if (orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.IsSwap))
-            {
-                orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.NeedSwap, Boolean.TrueString);
-                orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.SwapStage, SwapStage.SwapTx);
-            }
-
-            orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.ReleaseUser, CurrentUser?.Name);
-            orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.ReleaseTime,
-                DateTime.UtcNow.ToUtcMilliSeconds().ToString());
-            orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus,
-                OrderOperationStatusEnum.ReleaseConfirming.ToString());
-            var recordGrain = _clusterClient.GetGrain<IUserDepositRecordGrain>(orderIndex.Id);
-            var order = (await recordGrain.GetAsync()).Value;
-            order.ExtensionInfo = orderIndex.ExtensionInfo;
-            await recordGrain.CreateOrUpdateAsync(order);
-            await _orderIndexRepository.AddOrUpdateAsync(orderIndex);
-
-            var userDepositGrain = _clusterClient.GetGrain<IUserDepositGrain>(orderIndex.Id);
-            await userDepositGrain.AddOrUpdateOrder(_objectMapper.Map<OrderIndex, DepositOrderDto>(orderIndex));
-            var depositOrderStatusReminderGrain =
-                _clusterClient.GetGrain<IDepositOrderStatusReminderGrain>(
-                    GuidHelper.UniqGuid(nameof(IDepositOrderStatusReminderGrain)));
-            await depositOrderStatusReminderGrain.AddReminder(GuidHelper.GenerateId(orderIndex.ThirdPartOrderId,
-                orderIndex.Id.ToString()));
-
-            return new OrderOperationStatusDto
-            {
-                Status = OrderOperationStatusEnum.ReleaseConfirming.ToString()
-            };
+            throw new UserFriendlyException("Invalid order.");
         }
-        catch (Exception e)
+
+        if (orderIndex.ExtensionInfo.IsNullOrEmpty()
+            || !orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)
+            || (orderIndex.ExtensionInfo[ExtensionKey.SubStatus] !=
+                OrderOperationStatusEnum.ReleaseRequested.ToString()
+                && orderIndex.ExtensionInfo[ExtensionKey.SubStatus] !=
+                OrderOperationStatusEnum.ReleaseFailed.ToString()))
         {
-            _logger.LogError(e, "Release token failed");
-            throw new UserFriendlyException(e.Message);
+            throw new UserFriendlyException("Invalid release status.");
         }
+
+        orderIndex.Status = OrderStatusEnum.FromTransferConfirmed.ToString();
+        orderIndex.ToTransfer.Status = OrderTransferStatusEnum.Created.ToString();
+        if (orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.IsSwap))
+        {
+            orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.NeedSwap, Boolean.TrueString);
+            orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.SwapStage, SwapStage.SwapTx);
+        }
+
+        orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.ReleaseUser, CurrentUser?.Name);
+        orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.ReleaseTime,
+            DateTime.UtcNow.ToUtcMilliSeconds().ToString());
+        orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus,
+            OrderOperationStatusEnum.ReleaseConfirming.ToString());
+        var recordGrain = _clusterClient.GetGrain<IUserDepositRecordGrain>(orderIndex.Id);
+        var order = (await recordGrain.GetAsync()).Value;
+        order.ExtensionInfo = orderIndex.ExtensionInfo;
+        await recordGrain.CreateOrUpdateAsync(order);
+        await _orderIndexRepository.AddOrUpdateAsync(orderIndex);
+
+        var userDepositGrain = _clusterClient.GetGrain<IUserDepositGrain>(orderIndex.Id);
+        await userDepositGrain.AddOrUpdateOrder(_objectMapper.Map<OrderIndex, DepositOrderDto>(orderIndex));
+        var depositOrderStatusReminderGrain =
+            _clusterClient.GetGrain<IDepositOrderStatusReminderGrain>(
+                GuidHelper.UniqGuid(nameof(IDepositOrderStatusReminderGrain)));
+        await depositOrderStatusReminderGrain.AddReminder(GuidHelper.GenerateId(orderIndex.ThirdPartOrderId,
+            orderIndex.Id.ToString()));
+
+        return new OrderOperationStatusDto
+        {
+            Status = OrderOperationStatusEnum.ReleaseConfirming.ToString()
+        };
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ReconciliationAppService),
+        MethodName = nameof(HandleRequestRefundExceptionAsync))]
     public async Task<OrderOperationStatusDto> RequestRefundTokenAsync(GetRequestRefundDto request)
     {
-        try
+        var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
+        if (!userId.HasValue || userId == Guid.Empty)
+            throw new UserFriendlyException("Invalid user.");
+
+        var orderIndex = await GetOrderIndexAsync(request.OrderId);
+        if (orderIndex == null || orderIndex.OrderType != OrderTypeEnum.Withdraw.ToString()
+                               || orderIndex.Status == OrderStatusEnum.Finish.ToString()
+                               || orderIndex.Status == OrderStatusEnum.ToTransferConfirmed.ToString()
+                               || (orderIndex.FromTransfer.Status != OrderTransferStatusEnum.Confirmed.ToString()
+                                   && orderIndex.FromTransfer.Status !=
+                                   OrderTransferStatusEnum.Transferred.ToString()))
         {
-            var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
-            if (!userId.HasValue || userId == Guid.Empty)
-                throw new UserFriendlyException("Invalid user.");
-
-            var orderIndex = await GetOrderIndexAsync(request.OrderId);
-            if (orderIndex == null || orderIndex.OrderType != OrderTypeEnum.Withdraw.ToString()
-                                   || orderIndex.Status == OrderStatusEnum.Finish.ToString()
-                                   || orderIndex.Status == OrderStatusEnum.ToTransferConfirmed.ToString()
-                                   || (orderIndex.FromTransfer.Status != OrderTransferStatusEnum.Confirmed.ToString()
-                                       && orderIndex.FromTransfer.Status !=
-                                       OrderTransferStatusEnum.Transferred.ToString()))
-            {
-                throw new UserFriendlyException("Invalid order.");
-            }
-
-            if (orderIndex.FromTransfer.FromAddress != request.FromAddress
-                || orderIndex.FromTransfer.Amount != request.Amount.SafeToDecimal()
-                || orderIndex.FromTransfer.Symbol != request.Symbol
-                || orderIndex.FromTransfer.ChainId != request.ChainId)
-            {
-                throw new UserFriendlyException("Invalid param.");
-            }
-            
-            if (!orderIndex.ExtensionInfo.IsNullOrEmpty() &&
-                orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus) &&
-                orderIndex.ExtensionInfo[ExtensionKey.SubStatus] ==
-                OrderOperationStatusEnum.RefundRequested.ToString())
-            {
-                throw new UserFriendlyException("Invalid request.");
-            }
-
-            orderIndex.ExtensionInfo ??= new Dictionary<string, string>();
-            orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.RequestUser, CurrentUser?.Name);
-            orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.RequestTime,
-                DateTime.UtcNow.ToUtcMilliSeconds().ToString());
-            orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus,
-                OrderOperationStatusEnum.RefundRequested.ToString());
-            var recordGrain = _clusterClient.GetGrain<IUserWithdrawRecordGrain>(orderIndex.Id);
-            var order = (await recordGrain.Get()).Value;
-            order.ExtensionInfo = orderIndex.ExtensionInfo;
-            await recordGrain.AddOrUpdate(order);
-            await _orderIndexRepository.AddOrUpdateAsync(orderIndex);
-
-            return new OrderOperationStatusDto
-            {
-                Status = OrderOperationStatusEnum.RefundRequested.ToString()
-            };
+            throw new UserFriendlyException("Invalid order.");
         }
-        catch (Exception e)
+
+        if (orderIndex.FromTransfer.FromAddress != request.FromAddress
+            || orderIndex.FromTransfer.Amount != request.Amount.SafeToDecimal()
+            || orderIndex.FromTransfer.Symbol != request.Symbol
+            || orderIndex.FromTransfer.ChainId != request.ChainId)
         {
-            _logger.LogError(e, "Request refund token failed");
-            throw new UserFriendlyException(e.Message);
+            throw new UserFriendlyException("Invalid param.");
         }
+        
+        if (!orderIndex.ExtensionInfo.IsNullOrEmpty() &&
+            orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus) &&
+            orderIndex.ExtensionInfo[ExtensionKey.SubStatus] ==
+            OrderOperationStatusEnum.RefundRequested.ToString())
+        {
+            throw new UserFriendlyException("Invalid request.");
+        }
+
+        orderIndex.ExtensionInfo ??= new Dictionary<string, string>();
+        orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.RequestUser, CurrentUser?.Name);
+        orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.RequestTime,
+            DateTime.UtcNow.ToUtcMilliSeconds().ToString());
+        orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus,
+            OrderOperationStatusEnum.RefundRequested.ToString());
+        var recordGrain = _clusterClient.GetGrain<IUserWithdrawRecordGrain>(orderIndex.Id);
+        var order = (await recordGrain.Get()).Value;
+        order.ExtensionInfo = orderIndex.ExtensionInfo;
+        await recordGrain.AddOrUpdate(order);
+        await _orderIndexRepository.AddOrUpdateAsync(orderIndex);
+
+        return new OrderOperationStatusDto
+        {
+            Status = OrderOperationStatusEnum.RefundRequested.ToString()
+        };
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ReconciliationAppService),
+        MethodName = nameof(HandleRejectRefundExceptionAsync))]
     public async Task<OrderOperationStatusDto> RejectRefundTokenAsync(GetOrderOperationDto request)
     {
-        try
+        var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
+        if (!userId.HasValue || userId == Guid.Empty)
+            throw new UserFriendlyException("Invalid user.");
+
+        var orderIndex = await GetOrderIndexAsync(request.OrderId);
+        if (orderIndex == null || orderIndex.ExtensionInfo.IsNullOrEmpty()
+                               || !orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)
+                               || orderIndex.ExtensionInfo[ExtensionKey.SubStatus] !=
+                               OrderOperationStatusEnum.RefundRequested.ToString())
         {
-            var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
-            if (!userId.HasValue || userId == Guid.Empty)
-                throw new UserFriendlyException("Invalid user.");
-
-            var orderIndex = await GetOrderIndexAsync(request.OrderId);
-            if (orderIndex == null || orderIndex.ExtensionInfo.IsNullOrEmpty()
-                                   || !orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)
-                                   || orderIndex.ExtensionInfo[ExtensionKey.SubStatus] !=
-                                   OrderOperationStatusEnum.RefundRequested.ToString())
-            {
-                throw new UserFriendlyException("Invalid order.");
-            }
-
-            orderIndex.ExtensionInfo ??= new Dictionary<string, string>();
-            orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.RefundUser, CurrentUser?.Name);
-            orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.RefundTime,
-                DateTime.UtcNow.ToUtcMilliSeconds().ToString());
-            orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus,
-                OrderOperationStatusEnum.RefundRejected.ToString());
-            var recordGrain = _clusterClient.GetGrain<IUserWithdrawRecordGrain>(orderIndex.Id);
-            var order = (await recordGrain.Get()).Value;
-            order.ExtensionInfo = orderIndex.ExtensionInfo;
-            await recordGrain.AddOrUpdate(order);
-            await _orderIndexRepository.AddOrUpdateAsync(orderIndex);
-
-            return new OrderOperationStatusDto
-            {
-                Status = OrderOperationStatusEnum.RefundRejected.ToString()
-            };
+            throw new UserFriendlyException("Invalid order.");
         }
-        catch (Exception e)
+
+        orderIndex.ExtensionInfo ??= new Dictionary<string, string>();
+        orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.RefundUser, CurrentUser?.Name);
+        orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.RefundTime,
+            DateTime.UtcNow.ToUtcMilliSeconds().ToString());
+        orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus,
+            OrderOperationStatusEnum.RefundRejected.ToString());
+        var recordGrain = _clusterClient.GetGrain<IUserWithdrawRecordGrain>(orderIndex.Id);
+        var order = (await recordGrain.Get()).Value;
+        order.ExtensionInfo = orderIndex.ExtensionInfo;
+        await recordGrain.AddOrUpdate(order);
+        await _orderIndexRepository.AddOrUpdateAsync(orderIndex);
+
+        return new OrderOperationStatusDto
         {
-            _logger.LogError(e, "Reject refund token failed");
-            throw new UserFriendlyException(e.Message);
-        }
+            Status = OrderOperationStatusEnum.RefundRejected.ToString()
+        };
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ReconciliationAppService),
+        MethodName = nameof(HandleRefundExceptionAsync))]
     public async Task<OrderOperationStatusDto> RefundTokenAsync(GetOrderSafeOperationDto request)
     {
-        try
+        var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
+        if (!userId.HasValue || userId == Guid.Empty)
+            throw new UserFriendlyException("Invalid user.");
+
+        var address = await VerifyCode(request.Code);
+
+        var orderIndex = await GetOrderIndexAsync(request.OrderId);
+        if (orderIndex == null || orderIndex.OrderType != OrderTypeEnum.Withdraw.ToString()
+                               || orderIndex.Status == OrderStatusEnum.Finish.ToString()
+                               || orderIndex.Status == OrderStatusEnum.ToTransferConfirmed.ToString()
+                               || (orderIndex.FromTransfer.Status != OrderTransferStatusEnum.Confirmed.ToString()
+                                   && orderIndex.FromTransfer.Status !=
+                                   OrderTransferStatusEnum.Transferred.ToString()))
         {
-            var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
-            if (!userId.HasValue || userId == Guid.Empty)
-                throw new UserFriendlyException("Invalid user.");
-
-            var address = await VerifyCode(request.Code);
-
-            var orderIndex = await GetOrderIndexAsync(request.OrderId);
-            if (orderIndex == null || orderIndex.OrderType != OrderTypeEnum.Withdraw.ToString()
-                                   || orderIndex.Status == OrderStatusEnum.Finish.ToString()
-                                   || orderIndex.Status == OrderStatusEnum.ToTransferConfirmed.ToString()
-                                   || (orderIndex.FromTransfer.Status != OrderTransferStatusEnum.Confirmed.ToString()
-                                       && orderIndex.FromTransfer.Status !=
-                                       OrderTransferStatusEnum.Transferred.ToString()))
-            {
-                throw new UserFriendlyException("Invalid order.");
-            }
-
-            if (orderIndex.ExtensionInfo.IsNullOrEmpty()
-                || !orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)
-                || (orderIndex.ExtensionInfo[ExtensionKey.SubStatus] !=
-                    OrderOperationStatusEnum.RefundRequested.ToString()
-                    && orderIndex.ExtensionInfo[ExtensionKey.SubStatus] !=
-                    OrderOperationStatusEnum.RefundFailed.ToString()))
-            {
-                throw new UserFriendlyException("Invalid refund status.");
-            }
-
-            var newOrderId = Guid.NewGuid();
-            orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.RefundUser, CurrentUser?.Name);
-            orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.RefundTime,
-                DateTime.UtcNow.ToUtcMilliSeconds().ToString());
-            orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus,
-                OrderOperationStatusEnum.RefundConfirming.ToString());
-            orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.RelatedOrderId,
-                newOrderId.ToString());
-            var recordGrain = _clusterClient.GetGrain<IUserWithdrawRecordGrain>(orderIndex.Id);
-            var order = (await recordGrain.Get()).Value;
-            order.ExtensionInfo = orderIndex.ExtensionInfo;
-            await recordGrain.AddOrUpdate(order);
-            await _orderIndexRepository.AddOrUpdateAsync(orderIndex);
-
-            var userWithdrawGrain = _clusterClient.GetGrain<IUserWithdrawGrain>(newOrderId);
-            await userWithdrawGrain.CreateRefundOrder(order, address);
-
-            return new OrderOperationStatusDto
-            {
-                Status = OrderOperationStatusEnum.RefundConfirming.ToString()
-            };
+            throw new UserFriendlyException("Invalid order.");
         }
-        catch (Exception e)
+
+        if (orderIndex.ExtensionInfo.IsNullOrEmpty()
+            || !orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)
+            || (orderIndex.ExtensionInfo[ExtensionKey.SubStatus] !=
+                OrderOperationStatusEnum.RefundRequested.ToString()
+                && orderIndex.ExtensionInfo[ExtensionKey.SubStatus] !=
+                OrderOperationStatusEnum.RefundFailed.ToString()))
         {
-            _logger.LogError(e, "Refund token failed");
-            throw new UserFriendlyException(e.Message);
+            throw new UserFriendlyException("Invalid refund status.");
         }
+
+        var newOrderId = Guid.NewGuid();
+        orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.RefundUser, CurrentUser?.Name);
+        orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.RefundTime,
+            DateTime.UtcNow.ToUtcMilliSeconds().ToString());
+        orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus,
+            OrderOperationStatusEnum.RefundConfirming.ToString());
+        orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.RelatedOrderId,
+            newOrderId.ToString());
+        var recordGrain = _clusterClient.GetGrain<IUserWithdrawRecordGrain>(orderIndex.Id);
+        var order = (await recordGrain.Get()).Value;
+        order.ExtensionInfo = orderIndex.ExtensionInfo;
+        await recordGrain.AddOrUpdate(order);
+        await _orderIndexRepository.AddOrUpdateAsync(orderIndex);
+
+        var userWithdrawGrain = _clusterClient.GetGrain<IUserWithdrawGrain>(newOrderId);
+        await userWithdrawGrain.CreateRefundOrder(order, address);
+
+        return new OrderOperationStatusDto
+        {
+            Status = OrderOperationStatusEnum.RefundConfirming.ToString()
+        };
     }
 
     private async Task<string> VerifyCode(string code)

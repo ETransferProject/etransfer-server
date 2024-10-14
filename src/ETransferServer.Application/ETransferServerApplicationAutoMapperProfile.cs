@@ -11,7 +11,7 @@ using ETransferServer.User.Dtos;
 using ETransferServer.Network.Dtos;
 using ETransferServer.Options;
 using ETransferServer.Users;
-using ETransferServer.token.Dtos;
+using ETransferServer.Token.Dtos;
 
 namespace ETransferServer;
 

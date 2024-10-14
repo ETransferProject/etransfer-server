@@ -1,10 +1,10 @@
 using System.Threading.Tasks;
 using ETransferServer.Models;
-using ETransferServer.token.Dtos;
+using ETransferServer.Token.Dtos;
 using JetBrains.Annotations;
 using Volo.Abp.Application.Services;
 
-namespace ETransferServer.token;
+namespace ETransferServer.Token;
 
 public interface ITokenAppService : IApplicationService
 {

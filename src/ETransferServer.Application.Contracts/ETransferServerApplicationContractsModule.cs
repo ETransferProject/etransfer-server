@@ -1,4 +1,5 @@
 using System;
+using AElf.ExceptionHandler;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ETransferServer.Common;
@@ -24,7 +25,8 @@ namespace ETransferServer;
     typeof(AbpPermissionManagementApplicationContractsModule),
     typeof(AbpSettingManagementApplicationContractsModule),
     typeof(AbpTenantManagementApplicationContractsModule),
-    typeof(AbpObjectExtendingModule)
+    typeof(AbpObjectExtendingModule),
+    typeof(AOPExceptionModule)
 )]
 public class ETransferServerApplicationContractsModule : AbpModule
 {

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
+using AElf.ExceptionHandler;
 using AElf.Indexing.Elasticsearch;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Transaction;
@@ -20,7 +21,7 @@ namespace ETransferServer.Service.Transaction;
 
 [RemoteService(IsEnabled = false)]
 [DisableAuditing]
-public class TransactionAppService : ETransferServerAppService, ITransactionAppService
+public partial class TransactionAppService : ETransferServerAppService, ITransactionAppService
 {
     private readonly INESTRepository<OrderIndex, Guid> _orderIndexRepository;
     private readonly ILogger<TransactionAppService> _logger;
@@ -44,6 +45,8 @@ public class TransactionAppService : ETransferServerAppService, ITransactionAppS
         _httpContextAccessor = httpContextAccessor;
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(TransactionAppService),
+        MethodName = nameof(HandleExceptionAsync))]
     public async Task<string> TransactionNotificationAsync(string timestamp, string signature)
     {
         var body = await GetBodyAsync();
@@ -52,26 +55,15 @@ public class TransactionAppService : ETransferServerAppService, ITransactionAppS
             timestamp, signature, body);
 
         var handleResult = false;
-        try
-        {
-            var content = $"{body}|{timestamp}";
-            var verifyResult =
-                SignatureHelper.VerifySignature(content, signature, publicKey: _options.Value.PublicKey);
-            AssertHelper.IsTrue(verifyResult, reason: "valid signature fail.");
+        var content = $"{body}|{timestamp}";
+        var verifyResult =
+            SignatureHelper.VerifySignature(content, signature, publicKey: _options.Value.PublicKey);
+        AssertHelper.IsTrue(verifyResult, reason: "valid signature fail.");
 
-            var notificationGrain = _clusterClient.GetGrain<ITransactionNotificationGrain>(Guid.NewGuid());
-            handleResult = await notificationGrain.TransactionNotification(timestamp, signature, body);
-            AssertHelper.IsTrue(handleResult, reason: "handle transaction fail.");
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e,
-                "handle receive transaction callback error, timestamp:{timestamp}, signature:{signature}, body:{body}",
-                timestamp, signature, body);
-            handleResult = false;
-        }
-
-        return handleResult ? NotificationEnum.Ok.ToString().ToLower() : NotificationEnum.Deny.ToString().ToLower();
+        var notificationGrain = _clusterClient.GetGrain<ITransactionNotificationGrain>(Guid.NewGuid());
+        handleResult = await notificationGrain.TransactionNotification(timestamp, signature, body);
+        AssertHelper.IsTrue(handleResult, reason: "handle transaction fail.");
+        return NotificationEnum.Ok.ToString().ToLower();
     }
 
     public async Task<TransactionCheckResult> TransactionCheckAsync(GetTransactionCheckRequestDto request)

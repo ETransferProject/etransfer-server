@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
+using AElf.ExceptionHandler;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Token;
 using ETransferServer.Grains.Grain.Token;
@@ -25,7 +26,7 @@ namespace ETransferServer.Network;
 
 [RemoteService(IsEnabled = false)]
 [DisableAuditing]
-public class NetworkAppService : ETransferServerAppService, INetworkAppService
+public partial class NetworkAppService : ETransferServerAppService, INetworkAppService
 {
     private readonly ILogger<NetworkAppService> _logger;
     private readonly IOptionsSnapshot<NetworkOptions> _networkOptions;
@@ -52,52 +53,39 @@ public class NetworkAppService : ETransferServerAppService, INetworkAppService
         _tokenOptions = tokenOptions;
     }
 
+    [ExceptionHandler(typeof(UserFriendlyException), typeof(Exception), 
+        TargetType = typeof(NetworkAppService), MethodName = nameof(HandleGetListExceptionAsync))]
     public async Task<GetNetworkListDto> GetNetworkListAsync(GetNetworkListRequestDto request, string version = null)
     {
+        var getNetworkListDto = await GetNetworkListWithLocalFeeAsync(request, version);
+        if (request.Type == OrderTypeEnum.Deposit.ToString()) return getNetworkListDto;
+
+        // fill withdraw fee
+        foreach (var networkDto in getNetworkListDto.NetworkList)
+        {
+            networkDto.WithdrawFee = await GetCacheFeeAsync(networkDto.Network, request.Symbol) ??
+                                     networkDto.WithdrawFee;
+        }
+
         try
         {
-            var getNetworkListDto = await GetNetworkListWithLocalFeeAsync(request, version);
-            if (request.Type == OrderTypeEnum.Deposit.ToString()) return getNetworkListDto;
-
-            // fill withdraw fee
-            foreach (var networkDto in getNetworkListDto.NetworkList)
-            {
-                networkDto.WithdrawFee = await GetCacheFeeAsync(networkDto.Network, request.Symbol) ??
-                                         networkDto.WithdrawFee;
-            }
-
-            try
-            {
-                getNetworkListDto.NetworkList = request.Symbol == CommonConstant.Symbol.USDT ?
-                    await CalculateNetworkFeeListAsync(getNetworkListDto.NetworkList, request.ChainId, request.Symbol)
-                    : await CalculateAvgNetworkFeeListAsync(getNetworkListDto.NetworkList, request.ChainId, request.Symbol);
-            }
-            catch (Exception e)
-            {
-                foreach (var networkDto in getNetworkListDto.NetworkList)
-                {
-                    networkDto.WithdrawFee = null;
-                    networkDto.WithdrawFeeUnit = request.Symbol;
-                }
-                _logger.LogError(e, "Get withdraw fee failed by exchange.");
-            }
-            
-            getNetworkListDto = FilterByChainId(getNetworkListDto, request.ChainId);
-
-            return getNetworkListDto;
-        }
-        catch (UserFriendlyException e)
-        {
-            _logger.LogWarning(e, "Get network list failed.");
-            throw;
+            getNetworkListDto.NetworkList = request.Symbol == CommonConstant.Symbol.USDT ?
+                await CalculateNetworkFeeListAsync(getNetworkListDto.NetworkList, request.ChainId, request.Symbol)
+                : await CalculateAvgNetworkFeeListAsync(getNetworkListDto.NetworkList, request.ChainId, request.Symbol);
         }
         catch (Exception e)
         {
-            _logger.LogError(e,
-                "Get network list failed, type={Type}, chainId={ChainId}, address={Address}, symbol={Symbol}",
-                request.Type, request.ChainId, request.Address, request.Symbol);
-            throw;
+            foreach (var networkDto in getNetworkListDto.NetworkList)
+            {
+                networkDto.WithdrawFee = null;
+                networkDto.WithdrawFeeUnit = request.Symbol;
+            }
+            _logger.LogError(e, "Get withdraw fee failed by exchange.");
         }
+        
+        getNetworkListDto = FilterByChainId(getNetworkListDto, request.ChainId);
+
+        return getNetworkListDto;
     }
     
     private GetNetworkListDto FilterByChainId(GetNetworkListDto networkListDto, string chainId)
