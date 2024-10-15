@@ -6,6 +6,7 @@ using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
 using ETransferServer.Dtos.GraphQL;
 using ETransferServer.Dtos.Order;
+using ETransferServer.Grains.Grain.Order.Deposit;
 using ETransferServer.Grains.Grain.Order.Withdraw;
 using ETransferServer.Grains.GraphQL;
 using ETransferServer.Grains.Options;
@@ -32,13 +33,15 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
     private readonly IContractProvider _contractProvider;
     private readonly ITokenTransferProvider _transferProvider;
     private readonly IUserWithdrawProvider _userWithdrawProvider;
+    private readonly IUserDepositProvider _userDepositProvider;
 
     private readonly IOptionsSnapshot<ChainOptions> _chainOptions;
     private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
 
     protected AbstractTxTimerGrain(ILogger<AbstractTxTimerGrain<TOrder>> logger, IContractProvider contractProvider,
         IOptionsSnapshot<ChainOptions> chainOptions, IOptionsSnapshot<TimerOptions> timerOptions,
-        ITokenTransferProvider transferProvider, IUserWithdrawProvider userWithdrawProvider)
+        ITokenTransferProvider transferProvider, IUserWithdrawProvider userWithdrawProvider,
+        IUserDepositProvider userDepositProvider)
     {
         _logger = logger;
         _contractProvider = contractProvider;
@@ -46,6 +49,7 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
         _timerOptions = timerOptions;
         _transferProvider = transferProvider;
         _userWithdrawProvider = userWithdrawProvider;
+        _userDepositProvider = userDepositProvider;
     }
 
 
@@ -202,13 +206,12 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
                 if (info.TotalCount > 0)
                 {
                     var txBlockHeight = info.Items.FirstOrDefault().BlockHeight;
-                    order.ExtensionInfo.AddOrReplace(isToTransfer ? ExtensionKey.ToConfirmedNum : ExtensionKey.FromConfirmedNum,
+                    order.ExtensionInfo.AddOrReplace(
+                        isToTransfer ? ExtensionKey.ToConfirmedNum : ExtensionKey.FromConfirmedNum,
                         (chainStatusDict[pendingTx.ChainId].BestChainHeight - txBlockHeight).ToString());
                     var direction = isToTransfer ? "to" : "from";
                     _logger.LogDebug(
-                        "TxTimer {direction} confirmedNum, orderId={orderId}, bestHeight={bestHeight}, txBlockHeight={txBlockHeight}, confirmedNum={confirmedNum}",
-                        direction, orderId, chainStatusDict[pendingTx.ChainId].BestChainHeight, txBlockHeight,
-                        order.ExtensionInfo[isToTransfer ? ExtensionKey.ToConfirmedNum : ExtensionKey.FromConfirmedNum]);
+                        $"TxTimer {direction} confirmedNum, orderId={orderId}, bestHeight={chainStatusDict[pendingTx.ChainId].BestChainHeight}, txBlockHeight={txBlockHeight}, confirmedNum={order.ExtensionInfo[isToTransfer ? ExtensionKey.ToConfirmedNum : ExtensionKey.FromConfirmedNum]}");
                     await SaveOrder(order);
                 }
                 
