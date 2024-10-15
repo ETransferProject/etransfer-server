@@ -264,8 +264,8 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
 
     private bool IsForward(WithdrawOrderDto orderDto, Dictionary<string, string> externalInfo)
     {
-        var status = Enum.Parse<OrderStatusEnum>(orderDto.Status);
-        if (status == OrderStatusEnum.FromTransferConfirmed && !externalInfo.IsNullOrEmpty() &&
+        if ((orderDto.Status == OrderStatusEnum.FromTransferConfirmed.ToString() ||
+             orderDto.ToTransfer.Status == CommonConstant.PendingStatus) && !externalInfo.IsNullOrEmpty() &&
             externalInfo.ContainsKey(ExtensionKey.IsForward))
         {
             var result = bool.TryParse(externalInfo[ExtensionKey.IsForward], out var isForward);

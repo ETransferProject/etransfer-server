@@ -32,6 +32,7 @@ public partial class UserWithdrawGrain
             case OrderStatusEnum.Pending:
                 orderDto.Status = OrderStatusEnum.FromStartTransfer.ToString();
                 await AddOrUpdateOrder(orderDto);
+                await WithdrawLargeAmountAlarmAsync(orderDto);
                 await _bus.Publish(_objectMapper.Map<WithdrawOrderDto, OrderChangeEto>(orderDto));
                 break;
             case OrderStatusEnum.FromStartTransfer:
@@ -118,6 +119,12 @@ public partial class UserWithdrawGrain
     {
         _logger.LogError(ex, "withdraw order {Id} stream OnError", this.GetPrimaryKey());
         return Task.CompletedTask;
+    }
+    
+    private async Task WithdrawLargeAmountAlarmAsync(WithdrawOrderDto orderDto)
+    {
+        var withdrawOrderMonitorGrain = GrainFactory.GetGrain<IWithdrawOrderMonitorGrain>(orderDto.Id.ToString());
+        await withdrawOrderMonitorGrain.DoLargeAmountMonitor(orderDto);
     }
 
     private async Task AddToStartTransfer(WithdrawOrderDto orderDto, bool isAElf)

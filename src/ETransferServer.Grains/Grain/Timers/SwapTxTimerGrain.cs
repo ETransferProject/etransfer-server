@@ -29,16 +29,21 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
     private readonly ILogger<SwapTxTimerGrain> _logger;
     private readonly IContractProvider _contractProvider;
     private readonly ITokenTransferProvider _transferProvider;
+    private readonly IUserDepositProvider _userDepositProvider;
     
     private readonly IOptionsSnapshot<ChainOptions> _chainOptions;
     private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
 
-    public SwapTxTimerGrain(ILogger<SwapTxTimerGrain> logger, IContractProvider contractProvider,
-        IOptionsSnapshot<ChainOptions> chainOptions, IOptionsSnapshot<TimerOptions> timerOptions,
+    public SwapTxTimerGrain(ILogger<SwapTxTimerGrain> logger, 
+        IContractProvider contractProvider,
+        IUserDepositProvider userDepositProvider,
+        IOptionsSnapshot<ChainOptions> chainOptions, 
+        IOptionsSnapshot<TimerOptions> timerOptions,
         ITokenTransferProvider transferProvider)
     {
         _logger = logger;
         _contractProvider = contractProvider;
+        _userDepositProvider = userDepositProvider;
         _chainOptions = chainOptions;
         _timerOptions = timerOptions;
         _transferProvider = transferProvider;
@@ -208,6 +213,18 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
             if (!indexerTx.ContainsKey(pendingTx.TxId))
             {
                 result[orderId] = false;
+                var info = await _transferProvider.GetSwapTokenInfoByTxIdsAsync(new List<string> { pendingTx.TxId }, 0);
+                if (info.TotalCount > 0)
+                {
+                    var txBlockHeight = info.Items.FirstOrDefault().BlockHeight;
+                    order.ExtensionInfo.AddOrReplace(ExtensionKey.ToConfirmedNum,
+                        (chainStatusDict[pendingTx.ChainId].BestChainHeight - txBlockHeight).ToString());
+                    _logger.LogDebug(
+                        "TxTimer to confirmedNum, orderId={orderId}, bestHeight={bestHeight}, txBlockHeight={txBlockHeight}, confirmedNum={confirmedNum}",
+                        orderId, chainStatusDict[pendingTx.ChainId].BestChainHeight, txBlockHeight,
+                        order.ExtensionInfo[ExtensionKey.ToConfirmedNum]);
+                    await SaveOrder(order);
+                }
                 continue;
             }
 
@@ -226,6 +243,12 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
                 order.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus,
                     OrderOperationStatusEnum.ReleaseConfirmed.ToString());
             }
+            order.ExtensionInfo.AddOrReplace(ExtensionKey.ToConfirmedNum,
+                (chainStatusDict[pendingTx.ChainId].BestChainHeight - transfer.BlockHeight).ToString());
+            _logger.LogDebug(
+                "SwapTxTimer to confirmedNum, orderId={orderId}, bestHeight={bestHeight}, blockHeight={blockHeight}, confirmedNum={confirmedNum}",
+                orderId, chainStatusDict[pendingTx.ChainId].BestChainHeight, transfer.BlockHeight,
+                order.ExtensionInfo[ExtensionKey.ToConfirmedNum]);
 
             await SaveOrder(order, ExtensionBuilder.New()
                 .Add(ExtensionKey.TransactionStatus, CommonConstant.TransactionState.Mined)
@@ -318,6 +341,8 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
                 "TxOrderTimer order={OrderId}, txId={TxId}, status={Status}, txHeight={Height}, LIB={Lib}, returnValue={ReturnValue}", order.Id,
                 timerTx.TxId, txStatus.Status, txStatus.BlockNumber, chainStatus.LastIrreversibleBlockHeight, txStatus.ReturnValue);
 
+            order.ExtensionInfo.AddOrReplace(ExtensionKey.ToConfirmedNum, (chainStatus.BestChainHeight - txStatus.BlockNumber).ToString());
+
             // pending status, continue waiting
             if (txStatus.Status == CommonConstant.TransactionState.Pending) return false;
 
@@ -368,11 +393,12 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
                 // transferInfo.Status = OrderTransferStatusEnum.Failed.ToString();
                 // order.Status = OrderStatusEnum.ToTransferFailed.ToString();
 
-                _logger.LogInformation("SwapTx result Confirmed failed, will call ToStartTransfer, status: {result}, order: {order}",
+                _logger.LogInformation(
+                    "SwapTx result Confirmed failed, will call ToStartTransfer, status: {result}, order: {order}",
                     txStatus.Status, JsonConvert.SerializeObject(order));
 
                 await DepositSwapFailureAlarmAsync(order, SwapStage.SwapTxHandleFailAndToTransfer);
-                
+
                 transferInfo.Status = OrderTransferStatusEnum.StartTransfer.ToString();
                 order.Status = OrderStatusEnum.ToStartTransfer.ToString();
                 transferInfo.Symbol = order.FromTransfer.Symbol;
@@ -381,6 +407,7 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
                 transferInfo.TxTime = null;
                 order.ExtensionInfo[ExtensionKey.NeedSwap] = Boolean.FalseString;
                 order.ExtensionInfo[ExtensionKey.SwapStage] = SwapStage.SwapTxHandleFailAndToTransfer;
+                order.ExtensionInfo[ExtensionKey.ToConfirmedNum] = "0";
 
                 _logger.LogInformation("Before calling the ToStartTransfer method, after resetting the properties of the order, order: {order}",
                     JsonConvert.SerializeObject(order));
@@ -423,6 +450,13 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
         var confirmBlocks = _chainOptions.Value.Contract.SafeBlockHeight;
         return txBlockNumber < chainStatus.LastIrreversibleBlockHeight ||
                txBlockNumber < chainStatus.BestChainHeight - confirmBlocks;
+    }
+    
+    private async Task SaveOrder(DepositOrderDto order)
+    {
+        var recordGrain = GrainFactory.GetGrain<IUserDepositRecordGrain>(order.Id);
+        var res = await recordGrain.CreateOrUpdateAsync(order);
+        await _userDepositProvider.AddOrUpdateSync(res.Value);
     }
     
     private async Task SaveOrder(DepositOrderDto order, Dictionary<string, string> externalInfo)
