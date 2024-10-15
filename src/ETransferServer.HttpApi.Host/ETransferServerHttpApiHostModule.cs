@@ -16,7 +16,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.OpenApi.Models;
 using StackExchange.Redis;
-using ETransferServer.Middleware;
 using ETransferServer.MongoDB;
 using ETransferServer.Options;
 using Microsoft.AspNetCore.Identity;
@@ -285,7 +284,6 @@ namespace ETransferServer
             app.UseAbpSwaggerUI(options => { options.SwaggerEndpoint("/swagger/v1/swagger.json", "Support APP API"); });
             // }
 
-            app.UseMiddleware<DeviceInfoMiddleware>();
             app.UseAuditing();
             app.UseAbpSerilogEnrichers();
             app.UseUnitOfWork();
