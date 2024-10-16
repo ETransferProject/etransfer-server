@@ -16,7 +16,7 @@ public class CommonResponseDto<T> where T : class
     [Id(2)] public string Message { get; set; } = string.Empty;
     [Id(3)] private readonly bool _success;
     public bool Success => Code == SuccessCode;
-    [Id(4)] private readonly bool _value;
+    [Id(4)] private readonly T _value;
     public T Value => Data as T;
 
 
