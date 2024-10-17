@@ -22,7 +22,7 @@ public interface ISwapTxTimerGrain : IBaseTxTimerGrain
 {
 }
 
-public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
+public class SwapTxTimerGrain : Grain<OrderSwapTimerState>, ISwapTxTimerGrain
 {
     internal DateTime LastCallBackTime;
 

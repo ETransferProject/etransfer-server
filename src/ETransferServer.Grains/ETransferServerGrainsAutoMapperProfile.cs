@@ -37,6 +37,7 @@ public class ETransferServerGrainsAutoMapperProfile : Profile
         CreateMap<TokenState, TokenInfo>().ReverseMap();
 
         CreateMap<UserAddressDto, TokenDepositAddressState>().ReverseMap();
+        CreateMap<UserAddressDto, UserDepositAddressState>().ReverseMap();
 
         CreateMap<CoBoCoinDetailDto, CoBoCoinDto>().ReverseMap();
         CreateMap<CoBoCoinState, CoBoCoinDto>().ReverseMap();

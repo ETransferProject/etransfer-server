@@ -24,7 +24,7 @@ public interface IBaseTxFastTimerGrain : IGrainWithGuidKey
     public Task<DateTime> GetLastCallBackTime();
 }
 
-public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> where TOrder : BaseOrderDto
+public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderFastTimerState> where TOrder : BaseOrderDto
 {
     internal DateTime LastCallBackTime;
 
