@@ -7,6 +7,16 @@ public class OrderTimerState
 }
 
 [GenerateSerializer]
+public class DepositOrderTimerState : OrderTimerState
+{
+}
+
+[GenerateSerializer]
+public class WithdrawOrderTimerState : OrderTimerState
+{
+}
+
+[GenerateSerializer]
 public class TimerTransaction
 {
     [Id(0)] public string ChainId { get; set; }

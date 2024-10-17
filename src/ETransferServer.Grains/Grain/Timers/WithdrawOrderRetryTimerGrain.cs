@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Grains.Grain.Order.Withdraw;
 using ETransferServer.Grains.Options;
+using ETransferServer.Grains.State.Order;
 
 namespace ETransferServer.Grains.Grain.Timers;
 
@@ -12,7 +13,7 @@ public interface IWithdrawOrderRetryTimerGrain: IGrainWithGuidKey
     Task AddToPendingList(Guid orderId, string retryFromStatus);
 }
 
-public class WithdrawOrderRetryTimerGrain : AbstractOrderRetryTimerGrain<WithdrawOrderDto>, IWithdrawOrderRetryTimerGrain
+public class WithdrawOrderRetryTimerGrain : AbstractOrderRetryTimerGrain<WithdrawOrderDto, WithdrawOrderRetryState>, IWithdrawOrderRetryTimerGrain
 {
     private readonly ILogger<WithdrawOrderRetryTimerGrain> _logger;
     private readonly IOptionsSnapshot<TimerOptions> _timerOptions;

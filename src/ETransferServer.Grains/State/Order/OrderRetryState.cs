@@ -7,6 +7,16 @@ public class OrderRetryState
 }
 
 [GenerateSerializer]
+public class DepositOrderRetryState : OrderRetryState
+{
+}
+
+[GenerateSerializer]
+public class WithdrawOrderRetryState : OrderRetryState
+{
+}
+
+[GenerateSerializer]
 public class OrderRetryFrom
 {
     [Id(0)] public Guid OrderId { get; set; }

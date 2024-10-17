@@ -7,6 +7,7 @@ using ETransferServer.Grains.Grain.Order.Deposit;
 using ETransferServer.Grains.Grain.Order.Withdraw;
 using ETransferServer.Grains.GraphQL;
 using ETransferServer.Grains.Options;
+using ETransferServer.Grains.State.Order;
 using ETransferServer.Options;
 
 namespace ETransferServer.Grains.Grain.Timers;
@@ -15,7 +16,7 @@ public interface IUserDepositTxTimerGrain : IBaseTxTimerGrain
 {
 }
 
-public class UserDepositTxTimerGrain : AbstractTxTimerGrain<DepositOrderDto>, IUserDepositTxTimerGrain
+public class UserDepositTxTimerGrain : AbstractTxTimerGrain<DepositOrderDto, DepositOrderTimerState>, IUserDepositTxTimerGrain
 {
     private readonly ILogger<UserDepositTxTimerGrain> _logger;
     private readonly IOptionsSnapshot<TimerOptions> _timerOptions;

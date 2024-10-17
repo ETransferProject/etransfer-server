@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Grains.Grain.Order.Deposit;
 using ETransferServer.Grains.Options;
+using ETransferServer.Grains.State.Order;
 
 namespace ETransferServer.Grains.Grain.Timers;
 
@@ -13,7 +14,7 @@ public interface IDepositOrderRetryTimerGrain: IGrainWithGuidKey
 }
 
 
-public class DepositOrderRetryTimerGrain : AbstractOrderRetryTimerGrain<DepositOrderDto>, IDepositOrderRetryTimerGrain
+public class DepositOrderRetryTimerGrain : AbstractOrderRetryTimerGrain<DepositOrderDto, DepositOrderRetryState>, IDepositOrderRetryTimerGrain
 {
     private readonly ILogger<DepositOrderRetryTimerGrain> _logger;
     private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
