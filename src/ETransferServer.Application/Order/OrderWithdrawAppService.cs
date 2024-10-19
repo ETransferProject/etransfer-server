@@ -517,9 +517,15 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
 
         var expectedAmount = request.Amount * (decimal)Math.Pow(10, tokenDto.Decimals);
         AssertHelper.IsTrue(transferTokenInput.Amount == expectedAmount, ErrorResult.AmountNotEqualCode);
+        
+        return new CreateWithdrawOrderDto()
+        {
+            OrderId = Guid.Empty.ToString(),
+            TransactionId = string.Empty
+        };
 
         // Do create
-        return await DoCreateOrderAsync(request, transaction, withdrawAmount, inputThirdPartFee.ToString());
+        // return await DoCreateOrderAsync(request, transaction, withdrawAmount, inputThirdPartFee.ToString());
     }
 
     private bool IsNetworkOpen(string symbol, string network)

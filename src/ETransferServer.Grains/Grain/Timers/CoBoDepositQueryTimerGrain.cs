@@ -110,56 +110,57 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         var offset = 0;
         var now = DateTime.UtcNow.ToUtcMilliSeconds();
         var maxTime = State.LastTime;
+        _logger.LogInformation("CoBoDepositQueryTimerGrain lastTime: {LastTime}", maxTime);
 
-        while (true)
-        {
-            var list = new List<CoBoTransactionDto>();
-            try
-            {
-                list = await _coBoProvider.GetTransactionsByTimeExAsync(new TransactionRequestDto
-                {
-                    Side = CoBoConstant.CoBoTransactionSideEnum.TransactionDeposit,
-                    Status = CoBoConstant.CoBoTransactionStatusEnum.Success,
-                    BeginTime = State.LastTime,
-                    EndTime = now,
-                    Order = CoBoConstant.Order.Asc,
-                    Limit = PageSize,
-                    Offset = offset,
-                });
-            }
-            catch (Exception e)
-            {
-                _logger.LogError(e, "get deposit transaction error.");
-            }
-
-            if (list.IsNullOrEmpty()) break;
-            offset += list.Count;
-            maxTime = list.Max(t => t.CreatedTime);
-            foreach (var coBoTransaction in list)
-            {
-                if (coBoTransaction.AbsAmount.SafeToDecimal() <= 0M)
-                {
-                    _logger.LogInformation("transaction amount invalid");
-                    continue;
-                }
-                if (State.ExistOrders.Contains(coBoTransaction.Id))
-                {
-                    _logger.LogInformation("order already handle: {orderId}",
-                        coBoTransaction.Id);
-                    continue;
-                }
-
-                await AddAfter(coBoTransaction);
-                _logger.LogInformation("create deposit order, orderInfo:{orderInfo}",
-                    JsonConvert.SerializeObject(coBoTransaction));
-                await CreateDepositOrder(coBoTransaction);
-            }
-
-            if (list.Count < PageSize) break;
-        }
-
-        State.LastTime = maxTime;
-        await WriteStateAsync();
+        // while (true)
+        // {
+        //     var list = new List<CoBoTransactionDto>();
+        //     try
+        //     {
+        //         list = await _coBoProvider.GetTransactionsByTimeExAsync(new TransactionRequestDto
+        //         {
+        //             Side = CoBoConstant.CoBoTransactionSideEnum.TransactionDeposit,
+        //             Status = CoBoConstant.CoBoTransactionStatusEnum.Success,
+        //             BeginTime = State.LastTime,
+        //             EndTime = now,
+        //             Order = CoBoConstant.Order.Asc,
+        //             Limit = PageSize,
+        //             Offset = offset,
+        //         });
+        //     }
+        //     catch (Exception e)
+        //     {
+        //         _logger.LogError(e, "get deposit transaction error.");
+        //     }
+        //
+        //     if (list.IsNullOrEmpty()) break;
+        //     offset += list.Count;
+        //     maxTime = list.Max(t => t.CreatedTime);
+        //     foreach (var coBoTransaction in list)
+        //     {
+        //         if (coBoTransaction.AbsAmount.SafeToDecimal() <= 0M)
+        //         {
+        //             _logger.LogInformation("transaction amount invalid");
+        //             continue;
+        //         }
+        //         if (State.ExistOrders.Contains(coBoTransaction.Id))
+        //         {
+        //             _logger.LogInformation("order already handle: {orderId}",
+        //                 coBoTransaction.Id);
+        //             continue;
+        //         }
+        //
+        //         await AddAfter(coBoTransaction);
+        //         _logger.LogInformation("create deposit order, orderInfo:{orderInfo}",
+        //             JsonConvert.SerializeObject(coBoTransaction));
+        //         await CreateDepositOrder(coBoTransaction);
+        //     }
+        //
+        //     if (list.Count < PageSize) break;
+        // }
+        //
+        // State.LastTime = maxTime;
+        // await WriteStateAsync();
     }
 
     private async Task CreateDepositOrder(CoBoTransactionDto coBoTransaction)
