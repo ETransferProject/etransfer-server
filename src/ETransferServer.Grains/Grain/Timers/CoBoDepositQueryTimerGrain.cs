@@ -110,7 +110,8 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         var offset = 0;
         var now = DateTime.UtcNow.ToUtcMilliSeconds();
         var maxTime = State.LastTime;
-        _logger.LogInformation("CoBoDepositQueryTimerGrain lastTime: {LastTime}", maxTime);
+        _logger.LogInformation("CoBoDepositQueryTimerGrain lastTime: {LastTime},{GrainId},{Key},{Count}", 
+            maxTime, this.GetGrainId(), this.GetPrimaryKey(), State.ExistOrders.Count);
 
         // while (true)
         // {
@@ -159,8 +160,9 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         //     if (list.Count < PageSize) break;
         // }
         //
-        // State.LastTime = maxTime;
-        // await WriteStateAsync();
+        if (maxTime == 0) maxTime = 1729333600000L;
+        State.LastTime = maxTime;
+        await WriteStateAsync();
     }
 
     private async Task CreateDepositOrder(CoBoTransactionDto coBoTransaction)

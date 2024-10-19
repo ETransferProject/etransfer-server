@@ -6,6 +6,7 @@ using ETransferServer.Dtos.GraphQL;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Etos.Order;
 using ETransferServer.Grains.Common;
+using ETransferServer.Grains.Grain.Order.Deposit;
 using ETransferServer.Grains.Grain.Order.Withdraw;
 using ETransferServer.Grains.Grain.Token;
 using ETransferServer.Grains.Grain.TokenLimit;
@@ -91,7 +92,17 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
         var offset = 0;
         var now = DateTime.UtcNow.ToUtcMilliSeconds();
         var maxTime = State.LastTime;
-        _logger.LogInformation("WithdrawQueryTimerGrain lastTime: {LastTime}", maxTime);
+        _logger.LogInformation("WithdrawQueryTimerGrain lastTime: {LastTime},{GrainId},{Key},{Count}", 
+            maxTime, this.GetGrainId(), this.GetPrimaryKey(), State.ExistOrders.Count);
+        
+        var grain2 = GrainFactory.GetGrain<IUserDepositRecordGrain>(Guid.Parse("93449376-70ae-543f-45f2-baf34c19f297"));
+        var deposit = await grain2.GetAsync();
+
+        var grain3 = GrainFactory.GetGrain<IUserWithdrawRecordGrain>(Guid.Parse("89807a6f-708a-4a24-9400-9a6c8c0d94fd"));
+        var withdraw = await grain3.Get();
+        
+        _logger.LogInformation("WithdrawQueryTimerGrain order: {DepositOrderId},{WithdrawOrderId}", 
+            deposit?.Value?.Id.ToString(), withdraw?.Value?.Id.ToString());
         
         // while (true)
         // {
@@ -126,8 +137,9 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
         //     if (list.Items.Count < PageSize) break;
         // }
         //
-        // State.LastTime = maxTime;
-        // await WriteStateAsync();
+        if (maxTime == 0) maxTime = 1729333800000L;
+        State.LastTime = maxTime;
+        await WriteStateAsync();
     }
 
     private async Task CreateWithdrawOrder(TransferRecordDto transferRecord)
