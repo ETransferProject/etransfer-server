@@ -153,8 +153,10 @@ public class ContractProvider : IContractProvider, ISingletonDependency
 
         var transactionId = HashHelper.ComputeFrom(transaction.ToByteArray());
         var signature = await _signatureProvider.GetTransactionSignature(sender, transactionId);
+        _logger.LogInformation("swap signature: {signature}", signature);
         AssertHelper.NotEmpty(signature, "Get transaction signature failed, sender={Sender}", sender);
         transaction.Signature = ByteStringHelper.FromHexString(signature);
+        _logger.LogInformation("swap signature: {signature},{transactionId}", signature, transactionId);
         return (transactionId, transaction);
     }
 
