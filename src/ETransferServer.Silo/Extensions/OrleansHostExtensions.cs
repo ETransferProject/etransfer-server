@@ -65,7 +65,7 @@ public static class OrleansHostExtensions
                         var grainType = id.Type.ToString();
                         if (grainIdPrefix.TryGetValue(grainType, out var prefix))
                         {
-                            return $"{prefix}+{id.Key}";
+                            return prefix.StartsWith("GrainReference=000000") ? $"{prefix}+{id.Key}" : prefix;
                         }
 
                         return id.ToString();
