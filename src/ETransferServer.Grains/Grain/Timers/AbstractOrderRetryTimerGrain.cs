@@ -75,6 +75,8 @@ public abstract class AbstractOrderRetryTimerGrain<TOrder, TRetryState> : Grain<
 
         var total = State.OrderRetryData.Count;
         Logger.LogDebug("OrderRetryTimerGrain callback, Total={Total}", total);
+        Logger.LogInformation("OrderRetryTimerGrain grainId: {GrainId},{Key},{Count}", 
+            this.GetGrainId(), this.GetPrimaryKey(), total);
 
         if (total < 1) return;
         

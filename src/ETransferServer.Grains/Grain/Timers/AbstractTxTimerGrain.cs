@@ -82,6 +82,8 @@ public abstract class AbstractTxTimerGrain<TOrder, TTimeState> : Grain<TTimeStat
     {
         var total = State.OrderTransactionDict.Count;
         _logger.LogDebug("OrderTxTimerGrain callback, Total={Total}", total);
+        _logger.LogInformation("OrderTxTimerGrain grainId: {GrainId},{Key},{Count}", 
+            this.GetGrainId(), this.GetPrimaryKey(), total);
         LastCallBackTime = DateTime.UtcNow;
         if (total < 1)
         {

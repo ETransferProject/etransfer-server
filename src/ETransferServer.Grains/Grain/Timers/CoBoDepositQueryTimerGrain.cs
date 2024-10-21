@@ -160,7 +160,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         //     if (list.Count < PageSize) break;
         // }
         //
-        if (maxTime == 0) maxTime = 1729333600000L;
+        if (maxTime == 0) maxTime = 1729477700000L;
         State.LastTime = maxTime;
         await WriteStateAsync();
     }

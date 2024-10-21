@@ -79,6 +79,8 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderFastTimerSta
     {
         var total = State.OrderTransactionDict.Count;
         _logger.LogDebug("OrderTxFastTimerGrain callback, Total={Total}", total);
+        _logger.LogInformation("OrderTxFastTimerGrain grainId: {GrainId},{Key},{Count}", 
+            this.GetGrainId(), this.GetPrimaryKey(), total);
         LastCallBackTime = DateTime.UtcNow;
         if (total < 1)
         {
