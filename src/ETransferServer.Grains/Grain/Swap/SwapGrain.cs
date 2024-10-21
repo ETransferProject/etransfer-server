@@ -119,7 +119,6 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
                 dto.FromTransfer.TxTime = timestamp;
                 var (swapCheckResult, swapInput) =
                     await StructSwapTransactionAsync(dto.Id, fromTransfer, toTransfer, timestamp, swapInfo);
-                _logger.LogInformation("swap structSwapTransactionAsync: {success}", swapCheckResult.Success);
                 if (!swapCheckResult.Success)
                 {
                     result.Message = swapCheckResult.Message;
@@ -127,20 +126,17 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
                     return result;
                 }
 
-                _logger.LogInformation("swap before createTransactionAsync");
                 // create swap transaction
                 var (txId, newTransaction) = await _contractProvider.CreateTransactionAsync(toTransfer.ChainId,
                     _chainOptions.ChainInfos[toTransfer.ChainId].ReleaseAccount,
                     CommonConstant.ETransferTokenPoolContractName, CommonConstant.ETransferSwapToken, swapInput);
 
-                _logger.LogInformation("swap after createTransactionAsync: {txId},{newTransaction}", txId, newTransaction);
                 toTransfer.TxId = txId.ToHex();
                 rawTransaction = newTransaction;
                 dto.FromRawTransaction = newTransaction.ToByteArray().ToHex();
             }
             else
             {
-                _logger.LogInformation("swap rawTransaction");
                 rawTransaction = Transaction.Parser.ParseFrom(ByteStringHelper.FromHexString(dto.FromRawTransaction));
             }
 
@@ -149,23 +145,20 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
 
             dto.Status = OrderStatusEnum.ToTransferring.ToString();
 
-            _logger.LogInformation("swap before addOrUpdateOrder");
             var depositRecordGrain = GrainFactory.GetGrain<IUserDepositGrain>(this.GetPrimaryKey());
             await depositRecordGrain.AddOrUpdateOrder(dto, ExtensionBuilder.New()
                 .Add(ExtensionKey.IsForward, Boolean.FalseString)
                 .Add(ExtensionKey.TransactionId, toTransfer.TxId)
                 .Add(ExtensionKey.Transaction, JsonConvert.SerializeObject(rawTransaction, JsonSettings))
                 .Build());
-            _logger.LogInformation("swap after addOrUpdateOrder");
+
             // send 
             var (isSuccess, error) = await _contractProvider.SendTransactionAsync(toTransfer.ChainId, rawTransaction);
             AssertHelper.IsTrue(isSuccess, error);
-            _logger.LogInformation("swap sendTransactionAsync");
 
             var txResult = await _contractProvider.WaitTransactionResultAsync(toTransfer.ChainId, toTransfer.TxId,
                 _chainOptions.Contract.WaitSecondsAfterSend * 1000,
                 _chainOptions.Contract.RetryDelaySeconds * 1000);
-            _logger.LogInformation("swap waitTransactionResultAsync");
 
             switch (txResult.Status)
             {
@@ -184,7 +177,6 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
                     break;
             }
 
-            _logger.LogInformation("swap return result");
             result.Data = new DepositOrderChangeDto
             {
                 DepositOrder = dto,

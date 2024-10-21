@@ -126,6 +126,7 @@ public static class OrleansHostExtensions
                 })
                 .ConfigureLogging(logging => { logging.SetMinimumLevel(LogLevel.Debug).AddConsole(); })
                 .AddStartupTask<GrainStartupTask>()
+                .AddMemoryStreams(CommonConstant.StreamConstant.MessageStreamNameSpace)
                 .AddActivityPropagation()
                 .AddKafka(CommonConstant.StreamConstant.MessageStreamNameSpace)
                 .WithOptions(options =>

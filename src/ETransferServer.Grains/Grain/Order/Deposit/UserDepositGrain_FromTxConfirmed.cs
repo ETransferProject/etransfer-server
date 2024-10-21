@@ -134,7 +134,6 @@ public partial class UserDepositGrain
         
         var swapGrain = GrainFactory.GetGrain<ISwapGrain>(orderDto.Id);
         var result = await swapGrain.Swap(orderDto);
-        _logger.LogInformation("swap result: {success}", result.Success);
         if (result.Success)
         {
             // orderDto.ExtensionInfo.AddOrReplace(ExtensionKey.SwapStage, SwapStage.SwapSubsidy);
