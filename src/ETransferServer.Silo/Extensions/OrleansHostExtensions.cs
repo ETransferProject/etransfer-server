@@ -98,12 +98,12 @@ public static class OrleansHostExtensions
                     options.ClusterId = clusterId;
                     options.ServiceId = serviceId;
                 })
-                // .Configure<SiloMessagingOptions>(options =>
-                // {
-                //     options.ResponseTimeout = TimeSpan.FromSeconds(configSection.GetValue<int>("GrainResponseTimeOut"));
-                //     options.MaxMessageBodySize = configSection.GetValue<int>("GrainMaxMessageBodySize");
-                //     options.MaxForwardCount = configSection.GetValue<int>("MaxForwardCount");
-                // })
+                .Configure<SiloMessagingOptions>(options =>
+                {
+                    options.ResponseTimeout = TimeSpan.FromSeconds(configSection.GetValue<int>("GrainResponseTimeOut"));
+                    options.MaxMessageBodySize = configSection.GetValue<int>("GrainMaxMessageBodySize");
+                    options.MaxForwardCount = configSection.GetValue<int>("MaxForwardCount");
+                })
                 .AddETransferMongoDBGrainStorage("PubSubStore", options =>
                 {
                     // Config PubSubStore Storage for Persistent Stream 

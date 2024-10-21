@@ -281,7 +281,7 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
 
     private async Task<string> HandleWithdraw(Guid orderId, WithdrawInfo withdrawInfo, bool isRange)
     {
-        _logger.LogDebug("QueryWithdraw timer, {Time}, orderId:{orderId}, {isRange}}", 
+        _logger.LogDebug("QueryWithdraw timer, {Time}, orderId:{orderId}, {isRange}", 
             DateTime.UtcNow.ToUtc8String(), orderId, isRange);
 
         var orderGrain = GrainFactory.GetGrain<IUserWithdrawRecordGrain>(orderId);
