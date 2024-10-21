@@ -6,7 +6,6 @@ using ETransferServer.Dtos.GraphQL;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Etos.Order;
 using ETransferServer.Grains.Common;
-using ETransferServer.Grains.Grain.Order.Deposit;
 using ETransferServer.Grains.Grain.Order.Withdraw;
 using ETransferServer.Grains.Grain.Token;
 using ETransferServer.Grains.Grain.TokenLimit;
@@ -95,49 +94,39 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
         _logger.LogInformation("WithdrawQueryTimerGrain lastTime: {LastTime},{GrainId},{Key},{Count}", 
             maxTime, this.GetGrainId(), this.GetPrimaryKey(), State.ExistOrders.Count);
         
-        var grain2 = GrainFactory.GetGrain<IUserDepositRecordGrain>(Guid.Parse("93449376-70ae-543f-45f2-baf34c19f297"));
-        var deposit = await grain2.GetAsync();
+        while (true)
+        {
+            var list = new PagedResultDto<TransferRecordDto>();
+            try
+            {
+                list = await _tokenTransferProvider.GetTokenPoolRecordListAsync(State.LastTime,
+                    now, PageSize, offset);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "get withdraw records error.");
+            }
 
-        var grain3 = GrainFactory.GetGrain<IUserWithdrawRecordGrain>(Guid.Parse("89807a6f-708a-4a24-9400-9a6c8c0d94fd"));
-        var withdraw = await grain3.Get();
-        
-        _logger.LogInformation("WithdrawQueryTimerGrain order: {DepositOrderId},{WithdrawOrderId}", 
-            deposit?.Value?.Id.ToString(), withdraw?.Value?.Id.ToString());
-        
-        // while (true)
-        // {
-        //     var list = new PagedResultDto<TransferRecordDto>();
-        //     try
-        //     {
-        //         list = await _tokenTransferProvider.GetTokenPoolRecordListAsync(State.LastTime,
-        //             now, PageSize, offset);
-        //     }
-        //     catch (Exception e)
-        //     {
-        //         _logger.LogError(e, "get withdraw records error.");
-        //     }
-        //
-        //     if (list.Items.IsNullOrEmpty()) break;
-        //     offset += list.Items.Count;
-        //     maxTime = list.Items.Max(t => t.Timestamp);
-        //     foreach (var transferRecord in list.Items)
-        //     {
-        //         if (State.ExistOrders.Contains(transferRecord.TransactionId))
-        //         {
-        //             _logger.LogInformation("order already handle: {id}", transferRecord.TransactionId);
-        //             continue;
-        //         }
-        //
-        //         await AddAfter(transferRecord);
-        //         _logger.LogInformation("create withdraw order, orderInfo:{orderInfo}",
-        //             JsonConvert.SerializeObject(transferRecord));
-        //         await CreateWithdrawOrder(transferRecord);
-        //     }
-        //
-        //     if (list.Items.Count < PageSize) break;
-        // }
-        //
-        if (maxTime == 0) maxTime = 1729477800000L;
+            if (list.Items.IsNullOrEmpty()) break;
+            offset += list.Items.Count;
+            maxTime = list.Items.Max(t => t.Timestamp);
+            foreach (var transferRecord in list.Items)
+            {
+                if (State.ExistOrders.Contains(transferRecord.TransactionId))
+                {
+                    _logger.LogInformation("order already handle: {id}", transferRecord.TransactionId);
+                    continue;
+                }
+
+                await AddAfter(transferRecord);
+                _logger.LogInformation("create withdraw order, orderInfo:{orderInfo}",
+                    JsonConvert.SerializeObject(transferRecord));
+                await CreateWithdrawOrder(transferRecord);
+            }
+
+            if (list.Items.Count < PageSize) break;
+        }
+
         State.LastTime = maxTime;
         await WriteStateAsync();
     }
