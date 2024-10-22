@@ -128,10 +128,6 @@ public static class OrleansHostExtensions
                 .ConfigureLogging(logging => { logging.SetMinimumLevel(LogLevel.Debug).AddConsole(); })
                 .AddStartupTask<GrainStartupTask>()
                 .AddActivityPropagation()
-                .AddPersistentStreams(CommonConstant.StreamConstant.MessageStreamNameSpace, GeneratorAdapterFactory.Create,
-                    providerConfigurator => providerConfigurator
-                        .Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(
-                            options=>{ options.TotalQueueCount = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES; })))
                 .AddKafka(CommonConstant.StreamConstant.MessageStreamNameSpace)
                 .WithOptions(options =>
                 {
