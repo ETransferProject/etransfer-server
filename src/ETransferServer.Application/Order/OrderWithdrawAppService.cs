@@ -703,6 +703,8 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
                         transferTokenInput.Amount);
                     AssertHelper.IsTrue((transferTokenInput.Memo.IsNullOrEmpty() && request.Memo.IsNullOrEmpty())
                         || transferTokenInput.Memo == request.Memo, "Memo invalid");
+                    AssertHelper.IsTrue(transferTokenInput.ToChainId.IsNullOrEmpty() 
+                        || transferTokenInput.ToAddress.IsNullOrEmpty() , "ToChainId or toAddress invalid");
                     break;
                 case CommonConstant.DefaultConst.TransferToken:
                     tokenPoolContractAddress =
@@ -715,6 +717,8 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
                         transferTokenInput.Amount);
                     AssertHelper.IsTrue((transferTokenInput.Memo.IsNullOrEmpty() && request.Memo.IsNullOrEmpty())
                         || transferTokenInput.Memo == request.Memo, "Memo invalid");
+                    AssertHelper.IsTrue(transferTokenInput.ToChainId.IsNullOrEmpty() 
+                        || transferTokenInput.ToAddress.IsNullOrEmpty() , "ToChainId or toAddress invalid");
                     break;
                 default:
                     throw new UserFriendlyException("invalid method name");

@@ -110,6 +110,7 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
             streamProvider.GetStream<WithdrawOrderDto>(_withdrawOptions.Value.OrderChangeTopic,
                 this.GetPrimaryKey());
         await _orderChangeStream.SubscribeAsync(OnNextAsync);
+        _logger.LogInformation("StreamProvider withdraw subscribe ok.");
 
         // other grain
         _recordGrain = GrainFactory.GetGrain<IUserWithdrawRecordGrain>(this.GetPrimaryKey());

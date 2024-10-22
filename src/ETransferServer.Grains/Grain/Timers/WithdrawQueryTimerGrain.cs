@@ -91,6 +91,8 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
         var offset = 0;
         var now = DateTime.UtcNow.ToUtcMilliSeconds();
         var maxTime = State.LastTime;
+        _logger.LogInformation("WithdrawQueryTimerGrain lastTime: {LastTime},{GrainId},{Key},{Count}", 
+            maxTime, this.GetGrainId(), this.GetPrimaryKey(), State.ExistOrders.Count);
 
         while (true)
         {

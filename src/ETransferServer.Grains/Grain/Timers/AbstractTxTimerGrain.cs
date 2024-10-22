@@ -25,13 +25,13 @@ public interface IBaseTxTimerGrain : IGrainWithGuidKey
     public Task<DateTime> GetLastCallBackTime();
 }
 
-public abstract class AbstractTxTimerGrain<TOrder, TTimeState> : Grain<TTimeState> 
-    where TOrder : BaseOrderDto 
-    where TTimeState : OrderTimerState
+public abstract class AbstractTxTimerGrain<TOrder, TTimerState> : Grain<OrderTimerState> 
+    where TOrder : BaseOrderDto
+    where TTimerState : OrderTimerState
 {
     internal DateTime LastCallBackTime;
 
-    private readonly ILogger<AbstractTxTimerGrain<TOrder, TTimeState>> _logger;
+    private readonly ILogger<AbstractTxTimerGrain<TOrder, TTimerState>> _logger;
     private readonly IContractProvider _contractProvider;
     private readonly ITokenTransferProvider _transferProvider;
     private readonly IUserWithdrawProvider _userWithdrawProvider;
@@ -40,7 +40,7 @@ public abstract class AbstractTxTimerGrain<TOrder, TTimeState> : Grain<TTimeStat
     private readonly IOptionsSnapshot<ChainOptions> _chainOptions;
     private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
 
-    protected AbstractTxTimerGrain(ILogger<AbstractTxTimerGrain<TOrder, TTimeState>> logger, IContractProvider contractProvider,
+    protected AbstractTxTimerGrain(ILogger<AbstractTxTimerGrain<TOrder, TTimerState>> logger, IContractProvider contractProvider,
         IOptionsSnapshot<ChainOptions> chainOptions, IOptionsSnapshot<TimerOptions> timerOptions,
         ITokenTransferProvider transferProvider, IUserWithdrawProvider userWithdrawProvider,
         IUserDepositProvider userDepositProvider)

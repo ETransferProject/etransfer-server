@@ -110,6 +110,8 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         var offset = 0;
         var now = DateTime.UtcNow.ToUtcMilliSeconds();
         var maxTime = State.LastTime;
+        _logger.LogInformation("CoBoDepositQueryTimerGrain lastTime: {LastTime},{GrainId},{Key},{Count}", 
+            maxTime, this.GetGrainId(), this.GetPrimaryKey(), State.ExistOrders.Count);
 
         while (true)
         {

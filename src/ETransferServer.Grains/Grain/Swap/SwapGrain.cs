@@ -1,6 +1,5 @@
 using System.Numerics;
 using AElf;
-using AElf.Client.Dto;
 using AElf.Types;
 using ETransfer.Contracts.TokenPool;
 using ETransferServer.Common;
@@ -40,15 +39,17 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
     private readonly ChainOptions _chainOptions;
     private readonly ILogger<SwapGrain> _logger;
     private readonly IObjectMapper _objectMapper;
+    private readonly IUserDepositProvider _userDepositProvider;
     private readonly IBlockchainClientProviderFactory _blockchainClientProvider;
 
     public SwapGrain(IOptionsSnapshot<SwapInfosOptions> swapInfosOptions, IContractProvider contractProvider,
         IOptionsSnapshot<ChainOptions> chainOptions, ILogger<SwapGrain> logger, IObjectMapper objectMapper,
-        IBlockchainClientProviderFactory blockchainClientProvider)
+        IUserDepositProvider userDepositProvider, IBlockchainClientProviderFactory blockchainClientProvider)
     {
         _contractProvider = contractProvider;
         _logger = logger;
         _objectMapper = objectMapper;
+        _userDepositProvider = userDepositProvider;
         _blockchainClientProvider = blockchainClientProvider;
         _chainOptions = chainOptions.Value;
         _swapInfosOptions = swapInfosOptions.Value;
@@ -145,12 +146,10 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
 
             dto.Status = OrderStatusEnum.ToTransferring.ToString();
 
-            var depositRecordGrain = GrainFactory.GetGrain<IUserDepositGrain>(this.GetPrimaryKey());
-            await depositRecordGrain.AddOrUpdateOrder(dto, ExtensionBuilder.New()
-                .Add(ExtensionKey.IsForward, Boolean.FalseString)
-                .Add(ExtensionKey.TransactionId, toTransfer.TxId)
-                .Add(ExtensionKey.Transaction, JsonConvert.SerializeObject(rawTransaction, JsonSettings))
-                .Build());
+            var recordGrain = GrainFactory.GetGrain<IUserDepositRecordGrain>(dto.Id);
+            var response = await recordGrain.CreateOrUpdateAsync(dto);
+            await _userDepositProvider.AddOrUpdateSync(response.Value);
+            _logger.LogInformation("swap save grain, {orderId}", dto.Id);
 
             // send 
             var (isSuccess, error) = await _contractProvider.SendTransactionAsync(toTransfer.ChainId, rawTransaction);

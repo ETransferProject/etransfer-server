@@ -5,7 +5,7 @@ using ETransferServer.Grains.State.Order;
 
 namespace ETransferServer.Grains.Grain.Timers;
 
-public abstract class AbstractOrderRetryTimerGrain<TOrder, TRetryState> : Grain<TRetryState> 
+public abstract class AbstractOrderRetryTimerGrain<TOrder, TRetryState> : Grain<OrderRetryState> 
     where TOrder : BaseOrderDto
     where TRetryState : OrderRetryState
 {

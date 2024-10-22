@@ -78,6 +78,7 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
             streamProvider.GetStream<DepositOrderDto>(_depositOptions.Value.OrderChangeTopic,
                 this.GetPrimaryKey());
         await _orderChangeStream.SubscribeAsync(OnNextAsync, OnErrorAsync, OnCompletedAsync);
+        _logger.LogInformation("StreamProvider deposit subscribe ok.");
 
         // other grain
         _recordGrain = GrainFactory.GetGrain<IUserDepositRecordGrain>(this.GetPrimaryKey());

@@ -65,9 +65,8 @@ public static class OrleansHostExtensions
                         var grainType = id.Type.ToString();
                         if (grainIdPrefix.TryGetValue(grainType, out var prefix))
                         {
-                            return $"{prefix}+{id.Key}";
+                            return prefix.StartsWith("GrainReference=000000") ? $"{prefix}+{id.Key}" : prefix;
                         }
-
                         return id.ToString();
                     };
                     op.CreateShardKeyForCosmos = configSection.GetValue<bool>("CreateShardKeyForMongoDB", false);
@@ -98,12 +97,12 @@ public static class OrleansHostExtensions
                     options.ClusterId = clusterId;
                     options.ServiceId = serviceId;
                 })
-                // .Configure<SiloMessagingOptions>(options =>
-                // {
-                //     options.ResponseTimeout = TimeSpan.FromSeconds(configSection.GetValue<int>("GrainResponseTimeOut"));
-                //     options.MaxMessageBodySize = configSection.GetValue<int>("GrainMaxMessageBodySize");
-                //     options.MaxForwardCount = configSection.GetValue<int>("MaxForwardCount");
-                // })
+                .Configure<SiloMessagingOptions>(options =>
+                {
+                    options.ResponseTimeout = TimeSpan.FromSeconds(configSection.GetValue<int>("GrainResponseTimeOut"));
+                    options.MaxMessageBodySize = configSection.GetValue<int>("GrainMaxMessageBodySize");
+                    options.MaxForwardCount = configSection.GetValue<int>("MaxForwardCount");
+                })
                 .AddETransferMongoDBGrainStorage("PubSubStore", options =>
                 {
                     // Config PubSubStore Storage for Persistent Stream 
