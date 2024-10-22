@@ -11,6 +11,7 @@ using ETransferServer.Common;
 using ETransferServer.Silo.MongoDB;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Providers.MongoDB.StorageProviders.Serializers;
+using Orleans.Providers.Streams.Generator;
 using Orleans.Serialization;
 
 namespace ETransferServer.Silo.Extensions;
@@ -126,8 +127,11 @@ public static class OrleansHostExtensions
                 })
                 .ConfigureLogging(logging => { logging.SetMinimumLevel(LogLevel.Debug).AddConsole(); })
                 .AddStartupTask<GrainStartupTask>()
-                .AddMemoryStreams(CommonConstant.StreamConstant.MessageStreamNameSpace)
                 .AddActivityPropagation()
+                .AddPersistentStreams(CommonConstant.StreamConstant.MessageStreamNameSpace, GeneratorAdapterFactory.Create,
+                    providerConfigurator => providerConfigurator
+                        .Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(
+                            options=>{ options.TotalQueueCount = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES; })))
                 .AddKafka(CommonConstant.StreamConstant.MessageStreamNameSpace)
                 .WithOptions(options =>
                 {
