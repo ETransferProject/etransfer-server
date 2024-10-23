@@ -3,7 +3,6 @@ using System.Threading.Tasks;
 using AElf.ExceptionHandler;
 using ETransferServer.Dtos.Reconciliation;
 using Microsoft.Extensions.Logging;
-using Volo.Abp;
 using Volo.Abp.Application.Dtos;
 
 namespace ETransferServer.Reconciliation;
@@ -75,8 +74,7 @@ public partial class ReconciliationAppService
         _logger.LogError(ex, "Request release token failed");
         return new FlowBehavior
         {
-            ExceptionHandlingStrategy = ExceptionHandlingStrategy.Throw,
-            ReturnValue = new UserFriendlyException(ex.Message)
+            ExceptionHandlingStrategy = ExceptionHandlingStrategy.Rethrow
         };
     }
     
@@ -85,8 +83,7 @@ public partial class ReconciliationAppService
         _logger.LogError(ex, "Reject release token failed");
         return new FlowBehavior
         {
-            ExceptionHandlingStrategy = ExceptionHandlingStrategy.Throw,
-            ReturnValue = new UserFriendlyException(ex.Message)
+            ExceptionHandlingStrategy = ExceptionHandlingStrategy.Rethrow
         };
     }
     
@@ -95,8 +92,7 @@ public partial class ReconciliationAppService
         _logger.LogError(ex, "Release token failed");
         return new FlowBehavior
         {
-            ExceptionHandlingStrategy = ExceptionHandlingStrategy.Throw,
-            ReturnValue = new UserFriendlyException(ex.Message)
+            ExceptionHandlingStrategy = ExceptionHandlingStrategy.Rethrow
         };
     }
     
@@ -105,8 +101,7 @@ public partial class ReconciliationAppService
         _logger.LogError(ex, "Request refund token failed");
         return new FlowBehavior
         {
-            ExceptionHandlingStrategy = ExceptionHandlingStrategy.Throw,
-            ReturnValue = new UserFriendlyException(ex.Message)
+            ExceptionHandlingStrategy = ExceptionHandlingStrategy.Rethrow
         };
     }
     
@@ -115,8 +110,7 @@ public partial class ReconciliationAppService
         _logger.LogError(ex, "Reject refund token failed");
         return new FlowBehavior
         {
-            ExceptionHandlingStrategy = ExceptionHandlingStrategy.Throw,
-            ReturnValue = new UserFriendlyException(ex.Message)
+            ExceptionHandlingStrategy = ExceptionHandlingStrategy.Rethrow
         };
     }
     
@@ -125,8 +119,7 @@ public partial class ReconciliationAppService
         _logger.LogError(ex, "Refund token failed");
         return new FlowBehavior
         {
-            ExceptionHandlingStrategy = ExceptionHandlingStrategy.Throw,
-            ReturnValue = new UserFriendlyException(ex.Message)
+            ExceptionHandlingStrategy = ExceptionHandlingStrategy.Rethrow
         };
     }
 }
