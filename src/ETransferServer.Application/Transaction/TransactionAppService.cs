@@ -59,11 +59,12 @@ public partial class TransactionAppService : ETransferServerAppService, ITransac
         var verifyResult =
             SignatureHelper.VerifySignature(content, signature, publicKey: _options.Value.PublicKey);
         AssertHelper.IsTrue(verifyResult, reason: "valid signature fail.");
+        return NotificationEnum.Deny.ToString().ToLower();
 
-        var notificationGrain = _clusterClient.GetGrain<ITransactionNotificationGrain>(Guid.NewGuid());
-        handleResult = await notificationGrain.TransactionNotification(timestamp, signature, body);
-        AssertHelper.IsTrue(handleResult, reason: "handle transaction fail.");
-        return NotificationEnum.Ok.ToString().ToLower();
+        // var notificationGrain = _clusterClient.GetGrain<ITransactionNotificationGrain>(Guid.NewGuid());
+        // handleResult = await notificationGrain.TransactionNotification(timestamp, signature, body);
+        // AssertHelper.IsTrue(handleResult, reason: "handle transaction fail.");
+        // return NotificationEnum.Ok.ToString().ToLower();
     }
 
     public async Task<TransactionCheckResult> TransactionCheckAsync(GetTransactionCheckRequestDto request)

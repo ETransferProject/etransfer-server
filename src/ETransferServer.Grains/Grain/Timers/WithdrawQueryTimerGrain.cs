@@ -94,41 +94,41 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
         _logger.LogInformation("WithdrawQueryTimerGrain lastTime: {LastTime},{GrainId},{Key},{Count}", 
             maxTime, this.GetGrainId(), this.GetPrimaryKey(), State.ExistOrders.Count);
 
-        while (true)
-        {
-            var list = new PagedResultDto<TransferRecordDto>();
-            try
-            {
-                list = await _tokenTransferProvider.GetTokenPoolRecordListAsync(State.LastTime,
-                    now, PageSize, offset);
-            }
-            catch (Exception e)
-            {
-                _logger.LogError(e, "get withdraw records error.");
-            }
-
-            if (list.Items.IsNullOrEmpty()) break;
-            offset += list.Items.Count;
-            maxTime = list.Items.Max(t => t.Timestamp);
-            foreach (var transferRecord in list.Items)
-            {
-                if (State.ExistOrders.Contains(transferRecord.TransactionId))
-                {
-                    _logger.LogInformation("order already handle: {id}", transferRecord.TransactionId);
-                    continue;
-                }
-
-                await AddAfter(transferRecord);
-                _logger.LogInformation("create withdraw order, orderInfo:{orderInfo}",
-                    JsonConvert.SerializeObject(transferRecord));
-                await CreateWithdrawOrder(transferRecord);
-            }
-
-            if (list.Items.Count < PageSize) break;
-        }
-
-        State.LastTime = maxTime;
-        await WriteStateAsync();
+        // while (true)
+        // {
+        //     var list = new PagedResultDto<TransferRecordDto>();
+        //     try
+        //     {
+        //         list = await _tokenTransferProvider.GetTokenPoolRecordListAsync(State.LastTime,
+        //             now, PageSize, offset);
+        //     }
+        //     catch (Exception e)
+        //     {
+        //         _logger.LogError(e, "get withdraw records error.");
+        //     }
+        //
+        //     if (list.Items.IsNullOrEmpty()) break;
+        //     offset += list.Items.Count;
+        //     maxTime = list.Items.Max(t => t.Timestamp);
+        //     foreach (var transferRecord in list.Items)
+        //     {
+        //         if (State.ExistOrders.Contains(transferRecord.TransactionId))
+        //         {
+        //             _logger.LogInformation("order already handle: {id}", transferRecord.TransactionId);
+        //             continue;
+        //         }
+        //
+        //         await AddAfter(transferRecord);
+        //         _logger.LogInformation("create withdraw order, orderInfo:{orderInfo}",
+        //             JsonConvert.SerializeObject(transferRecord));
+        //         await CreateWithdrawOrder(transferRecord);
+        //     }
+        //
+        //     if (list.Items.Count < PageSize) break;
+        // }
+        //
+        // State.LastTime = maxTime;
+        // await WriteStateAsync();
     }
 
     private async Task CreateWithdrawOrder(TransferRecordDto transferRecord)
