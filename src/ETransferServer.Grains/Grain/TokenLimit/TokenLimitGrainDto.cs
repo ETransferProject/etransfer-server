@@ -1,6 +1,7 @@
 namespace ETransferServer.Grains.Grain.TokenLimit;
 
+[GenerateSerializer]
 public class TokenLimitGrainDto
 {
-    public decimal RemainingLimit { get; set; }
+    [Id(0)] public decimal RemainingLimit { get; set; }
 }

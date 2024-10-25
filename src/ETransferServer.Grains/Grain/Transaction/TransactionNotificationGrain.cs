@@ -1,3 +1,4 @@
+using AElf.ExceptionHandler;
 using ETransferServer.Common;
 using ETransferServer.Grains.Grain.Order.Deposit;
 using ETransferServer.Grains.Grain.Timers;
@@ -32,27 +33,31 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
         _coBoProvider = coBoProvider;
     }
 
-    public override async Task OnActivateAsync()
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         _depositOrderStatusReminderGrain =
             GrainFactory.GetGrain<IDepositOrderStatusReminderGrain>(
                 GuidHelper.UniqGuid(nameof(IDepositOrderStatusReminderGrain)));
-        await base.OnActivateAsync();
+        await base.OnActivateAsync(cancellationToken);
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(TransactionNotificationGrain), 
+        MethodName = nameof(HandleExceptionAsync))]
     public async Task<bool> TransactionNotification(string timestamp, string signature, string body)
     {
-        try
+        return await HandleTransaction(body);
+    }
+    
+    public async Task<FlowBehavior> HandleExceptionAsync(Exception ex, string timestamp, string signature, string body)
+    {
+        _logger.LogError(ex,
+            "transaction notification error, timestamp:{timestamp}, signature:{signature}, body:{body}", timestamp,
+            signature, body);
+        return new FlowBehavior
         {
-            return await HandleTransaction(body);
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e,
-                "transaction notification error, timestamp:{timestamp}, signature:{signature}, body:{body}", timestamp,
-                signature, body);
-            return false;
-        }
+            ExceptionHandlingStrategy = ExceptionHandlingStrategy.Return,
+            ReturnValue = false
+        };
     }
 
     private async Task<bool> HandleTransaction(string body)

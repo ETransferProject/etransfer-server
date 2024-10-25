@@ -4,7 +4,6 @@ using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
 using ETransferServer.Dtos.Token;
 using ETransferServer.Grains.Grain.Token;
-using Orleans;
 using ETransferServer.Grains.State.Swap;
 using Microsoft.Extensions.Logging;
 

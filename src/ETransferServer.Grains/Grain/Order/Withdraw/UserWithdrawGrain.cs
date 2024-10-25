@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans;
 using Orleans.Streams;
 using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
@@ -10,13 +9,10 @@ using ETransferServer.Grains.Grain.TokenLimit;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.Provider;
 using ETransferServer.Options;
-using ETransferServer.Orders;
-using ETransferServer.WithdrawOrder.Dtos;
 using MassTransit;
 using NBitcoin;
 using Newtonsoft.Json;
 using Volo.Abp.ObjectMapping;
-using Volo.Abp.Users;
 
 namespace ETransferServer.Grains.Grain.Order.Withdraw;
 
@@ -30,7 +26,7 @@ public interface IUserWithdrawGrain : IGrainWithGuidKey
     /// <returns></returns>
     Task<WithdrawOrderDto> CreateOrder(WithdrawOrderDto withdrawOrderDto);
     
-    Task<WithdrawOrderDto> CreateRefundOrder(OrderIndex orderIndex, string address);
+    Task<WithdrawOrderDto> CreateRefundOrder(WithdrawOrderDto withdrawOrderDto, string address);
 
     /// <summary>
     ///     Forward transaction information from the front end
@@ -104,16 +100,17 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         _bus = bus;
     }
 
-    public override async Task OnActivateAsync()
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
-        await base.OnActivateAsync();
+        await base.OnActivateAsync(cancellationToken);
 
         // subscribe stream
-        var streamProvider = GetStreamProvider(CommonConstant.StreamConstant.MessageStreamNameSpace);
+        var streamProvider = this.GetStreamProvider(CommonConstant.StreamConstant.MessageStreamNameSpace);
         _orderChangeStream =
-            streamProvider.GetStream<WithdrawOrderDto>(this.GetPrimaryKey(),
-                _withdrawOptions.Value.OrderChangeTopic);
+            streamProvider.GetStream<WithdrawOrderDto>(_withdrawOptions.Value.OrderChangeTopic,
+                this.GetPrimaryKey());
         await _orderChangeStream.SubscribeAsync(OnNextAsync);
+        _logger.LogInformation("StreamProvider withdraw subscribe ok.");
 
         // other grain
         _recordGrain = GrainFactory.GetGrain<IUserWithdrawRecordGrain>(this.GetPrimaryKey());
@@ -165,12 +162,12 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         return await AddOrUpdateOrder(withdrawOrderDto);
     }
 
-    public async Task<WithdrawOrderDto> CreateRefundOrder(OrderIndex orderIndex, string address)
+    public async Task<WithdrawOrderDto> CreateRefundOrder(WithdrawOrderDto withdrawDto, string address)
     {
         // amount limit
-        var amountUsd = await _withdrawQueryTimerGrain.GetAvgExchangeAsync(orderIndex.FromTransfer.Symbol, CommonConstant.Symbol.USD);
+        var amountUsd = await _withdrawQueryTimerGrain.GetAvgExchangeAsync(withdrawDto.FromTransfer.Symbol, CommonConstant.Symbol.USD);
         var tokenInfoGrain =
-            GrainFactory.GetGrain<ITokenWithdrawLimitGrain>(ITokenWithdrawLimitGrain.GenerateGrainId(orderIndex.FromTransfer.Symbol));
+            GrainFactory.GetGrain<ITokenWithdrawLimitGrain>(ITokenWithdrawLimitGrain.GenerateGrainId(withdrawDto.FromTransfer.Symbol));
         AssertHelper.IsTrue(await tokenInfoGrain.Acquire(amountUsd), ErrorResult.WithdrawLimitInsufficientCode, null,
             (await tokenInfoGrain.GetLimit()).RemainingLimit, TimeHelper.GetHourDiff(DateTime.UtcNow,
                 DateTime.UtcNow.AddDays(1).Date));
@@ -183,28 +180,28 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
                 UserId = await _withdrawQueryTimerGrain.GetUserIdAsync(address),
                 OrderType = OrderTypeEnum.Withdraw.ToString(),
                 AmountUsd = amountUsd,
-                FromTransfer = _objectMapper.Map<Transfer, TransferInfo>(orderIndex.FromTransfer),
+                FromTransfer = withdrawDto.FromTransfer,
                 ToTransfer = new TransferInfo
                 {
-                    Network = orderIndex.FromTransfer.Network,
-                    ChainId = orderIndex.FromTransfer.ChainId,
-                    FromAddress = orderIndex.FromTransfer.ToAddress,
-                    ToAddress = orderIndex.FromTransfer.FromAddress,
-                    Amount = orderIndex.FromTransfer.Amount,
-                    Symbol = orderIndex.FromTransfer.Symbol
+                    Network = withdrawDto.FromTransfer.Network,
+                    ChainId = withdrawDto.FromTransfer.ChainId,
+                    FromAddress = withdrawDto.FromTransfer.ToAddress,
+                    ToAddress = withdrawDto.FromTransfer.FromAddress,
+                    Amount = withdrawDto.FromTransfer.Amount,
+                    Symbol = withdrawDto.FromTransfer.Symbol
                 }
             };
 
             withdrawOrderDto.ExtensionInfo ??= new Dictionary<string, string>();
             withdrawOrderDto.ExtensionInfo.AddOrReplace(ExtensionKey.RefundTx, ExtensionKey.RefundTx);
-            withdrawOrderDto.ExtensionInfo.AddOrReplace(ExtensionKey.RelatedOrderId, orderIndex.Id.ToString());
-            if (!orderIndex.ExtensionInfo.IsNullOrEmpty() &&
-                orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.FromConfirmingThreshold))
+            withdrawOrderDto.ExtensionInfo.AddOrReplace(ExtensionKey.RelatedOrderId, withdrawDto.Id.ToString());
+            if (!withdrawDto.ExtensionInfo.IsNullOrEmpty() &&
+                withdrawDto.ExtensionInfo.ContainsKey(ExtensionKey.FromConfirmingThreshold))
             {
                 withdrawOrderDto.ExtensionInfo.AddOrReplace(ExtensionKey.FromConfirmedNum,
-                    orderIndex.ExtensionInfo[ExtensionKey.FromConfirmingThreshold]);
+                    withdrawDto.ExtensionInfo[ExtensionKey.FromConfirmingThreshold]);
                 withdrawOrderDto.ExtensionInfo.AddOrReplace(ExtensionKey.FromConfirmingThreshold,
-                    orderIndex.ExtensionInfo[ExtensionKey.FromConfirmingThreshold]);
+                    withdrawDto.ExtensionInfo[ExtensionKey.FromConfirmingThreshold]);
             }
 
             return await AddOrUpdateOrder(withdrawOrderDto);
@@ -212,7 +209,7 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         catch (Exception e)
         {
             await tokenInfoGrain.Reverse(amountUsd);
-            _logger.LogError(e, "Create refund withdraw order error, relatedOrderId:{OrderId}", orderIndex.Id);
+            _logger.LogError(e, "Create refund withdraw order error, relatedOrderId:{OrderId}", withdrawDto.Id);
             throw;
         }
     }

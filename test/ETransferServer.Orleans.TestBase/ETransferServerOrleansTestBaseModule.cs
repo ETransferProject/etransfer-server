@@ -7,7 +7,6 @@ using Volo.Abp.Autofac;
 using Volo.Abp.AutoMapper;
 using Volo.Abp.Caching;
 using Volo.Abp.Modularity;
-using Volo.Abp.ObjectMapping;
 
 namespace ETransferServer;
 
@@ -17,7 +16,6 @@ namespace ETransferServer;
     typeof(AbpAuthorizationModule),
     typeof(AbpCachingModule),
     typeof(AbpAutoMapperModule),
-    typeof(AbpObjectMappingModule),
     typeof(ETransferServerDomainModule)
 )]
 public class ETransferServerOrleansTestBaseModule : AbpModule

@@ -1,4 +1,3 @@
-using Orleans;
 using ETransferServer.Grains.State.Users;
 using ETransferServer.User;
 using ETransferServer.User.Dtos;
@@ -23,16 +22,16 @@ public class UserGrain : Grain<UserState>, IUserGrain
         _userAppService = userAppService;
     }
 
-    public override async Task OnActivateAsync()
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         await ReadStateAsync();
-        await base.OnActivateAsync();
+        await base.OnActivateAsync(cancellationToken);
     }
 
-    public override async Task OnDeactivateAsync()
+    public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
     {
         await WriteStateAsync();
-        await base.OnDeactivateAsync();
+        await base.OnDeactivateAsync(reason, cancellationToken);
     }
 
     public async Task<GrainResultDto<UserGrainDto>> AddOrUpdateUser(UserGrainDto input)

@@ -7,7 +7,7 @@ using ETransferServer.Models;
 using ETransferServer.Options;
 using ETransferServer.Swap;
 using ETransferServer.Swap.Dtos;
-using ETransferServer.token;
+using ETransferServer.Token;
 using ETransferServer.User;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;

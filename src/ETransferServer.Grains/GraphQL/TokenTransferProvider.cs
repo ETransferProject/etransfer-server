@@ -1,3 +1,5 @@
+using AElf.ExceptionHandler;
+using AElf.OpenTelemetry.ExecutionTime;
 using GraphQL;
 using Microsoft.Extensions.Logging;
 using ETransferServer.Common;
@@ -22,6 +24,7 @@ public interface ITokenTransferProvider
         int maxResultCount, int skipCount);
 }
 
+[AggregateExecutionTime]
 public class TokenTransferProvider : ITokenTransferProvider, ISingletonDependency
 {
     private ApiInfo _syncStateUri => new (HttpMethod.Get, _syncStateServiceOption.Value.SyncStateUri);
@@ -42,20 +45,14 @@ public class TokenTransferProvider : ITokenTransferProvider, ISingletonDependenc
         _logger = logger;
     }
     
+    [ExceptionHandler(typeof(Exception), LogLevel = LogLevel.Error, 
+        Message = "Query syncState error", ReturnDefault = ReturnDefault.Default)]
     public async Task<long> GetIndexBlockHeightAsync(string chainId)
     {
-        try
-        {
-            var res = await _httpProvider.InvokeAsync<SyncStateResponse>(_syncStateServiceOption.Value.BaseUrl, _syncStateUri);
-            return res.CurrentVersion.Items.FirstOrDefault(i => i.ChainId == chainId)?.LastIrreversibleBlockHeight ?? 0;
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e, "Query syncState error");
-            return 0;
-        }
+        var res = await _httpProvider.InvokeAsync<SyncStateResponse>(_syncStateServiceOption.Value.BaseUrl, _syncStateUri);
+        return res.CurrentVersion.Items.FirstOrDefault(i => i.ChainId == chainId)?.LastIrreversibleBlockHeight ?? 0;
     }
-
+    
     public async Task<LatestBlockDto> GetLatestBlockAsync(string chainId)
     {
         try
@@ -90,6 +87,8 @@ public class TokenTransferProvider : ITokenTransferProvider, ISingletonDependenc
         }
     }
 
+    [ExceptionHandler(typeof(Exception), LogLevel = LogLevel.Error, 
+        Message = "Query token transfer error", ReturnDefault = ReturnDefault.New)]
     public async Task<PagedResultDto<TransferDto>> GetTokenTransferInfoByTxIdsAsync(List<string> txIds, long endHeight)
     {
         if (txIds.IsNullOrEmpty())
@@ -98,6 +97,8 @@ public class TokenTransferProvider : ITokenTransferProvider, ISingletonDependenc
         return await GetTokenTransferInfoAsync(txIds, 0, endHeight, txIds.Count, 0);
     }
 
+    [ExceptionHandler(typeof(Exception), LogLevel = LogLevel.Error, 
+        Message = "Query swap token error", ReturnDefault = ReturnDefault.New)]
     public async Task<PagedResultDto<SwapRecordDto>> GetSwapTokenInfoByTxIdsAsync(List<string> txIds, long endHeight)
     {
         if (txIds.IsNullOrEmpty())
@@ -106,165 +107,140 @@ public class TokenTransferProvider : ITokenTransferProvider, ISingletonDependenc
         return await GetSwapTokenInfoAsync(txIds, 0, endHeight, txIds.Count, 0);
     }
 
+    [ExceptionHandler(typeof(Exception), LogLevel = LogLevel.Error, 
+        Message = "Query token pool records error", ReturnDefault = ReturnDefault.New)]
     public async Task<PagedResultDto<TransferRecordDto>> GetTokenPoolRecordListAsync(long timestampMin, long timestampMax, 
         int maxResultCount, int skipCount = 0)
     {
-        try
+        var res = await _graphQlHelper.QueryAsync<GraphQLResponse<PagedResultDto<TransferRecordDto>>>(new GraphQLRequest
         {
-            var res = await _graphQlHelper.QueryAsync<GraphQLResponse<PagedResultDto<TransferRecordDto>>>(new GraphQLRequest
-            {
-                Query = @"
-			    query(
-                    $timestampMin:Long!,
-                    $timestampMax:Long!,
-                    $startBlockHeight:Long!,
-                    $endBlockHeight:Long!,
-                    $skipCount:Int,
-                    $maxResultCount:Int,
-                    $isFilterEmpty: Boolean!,
-                    $transferType: TokenTransferType!
-                ) {
-                    data:getTokenPoolRecords(
-                        input: {
-                            timestampMin:$timestampMin,
-                            timestampMax:$timestampMax,
-                            startBlockHeight:$startBlockHeight,
-                            endBlockHeight:$endBlockHeight,
-                            skipCount:$skipCount,
-                            maxResultCount:$maxResultCount,
-                            isFilterEmpty:$isFilterEmpty,
-                            transferType:$transferType
-                        }
-                    ){
-                        items:data{
-                            id,transactionId,methodName,from,to,
-                            toChainId,toAddress,symbol,amount,maxEstimateFee,
-                            timestamp,transferType,chainId,blockHash,blockHeight,memo
-                        },
-                        totalCount
+            Query = @"
+			query(
+                $timestampMin:Long!,
+                $timestampMax:Long!,
+                $startBlockHeight:Long!,
+                $endBlockHeight:Long!,
+                $skipCount:Int,
+                $maxResultCount:Int,
+                $isFilterEmpty: Boolean!,
+                $transferType: TokenTransferType!
+            ) {
+                data:getTokenPoolRecords(
+                    input: {
+                        timestampMin:$timestampMin,
+                        timestampMax:$timestampMax,
+                        startBlockHeight:$startBlockHeight,
+                        endBlockHeight:$endBlockHeight,
+                        skipCount:$skipCount,
+                        maxResultCount:$maxResultCount,
+                        isFilterEmpty:$isFilterEmpty,
+                        transferType:$transferType
                     }
-                }",
-                Variables = new
-                {
-                    timestampMin = timestampMin,
-                    timestampMax = timestampMax,
-                    startBlockHeight = 0,
-                    endBlockHeight = 0,
-                    skipCount = skipCount,
-                    maxResultCount = maxResultCount,
-                    isFilterEmpty = true,
-                    transferType = TokenTransferType.In
+                ){
+                    items:data{
+                        id,transactionId,methodName,from,to,
+                        toChainId,toAddress,symbol,amount,maxEstimateFee,
+                        timestamp,transferType,chainId,blockHash,blockHeight,memo
+                    },
+                    totalCount
                 }
-            });
-            return res.Data;
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e, "Query token pool records error");
-            return new PagedResultDto<TransferRecordDto>();
-        }
+            }",
+            Variables = new
+            {
+                timestampMin = timestampMin,
+                timestampMax = timestampMax,
+                startBlockHeight = 0,
+                endBlockHeight = 0,
+                skipCount = skipCount,
+                maxResultCount = maxResultCount,
+                isFilterEmpty = true,
+                transferType = TokenTransferType.In
+            }
+        });
+        return res.Data;
     }
-
-
+    
     private async Task<PagedResultDto<TransferDto>> GetTokenTransferInfoAsync(List<string> txIds, long startBlockHeight,
         long endBlockHeight, int inputMaxResultCount, int inputSkipCount = 0)
     {
-        try
+        var res = await _graphQlHelper.QueryAsync<GraphQLResponse<PagedResultDto<TransferDto>>>(new GraphQLRequest
         {
-            var res = await _graphQlHelper.QueryAsync<GraphQLResponse<PagedResultDto<TransferDto>>>(new GraphQLRequest
-            {
-                Query = @"
-			    query(
-                    $txIds:[String!]!,
-                    $startBlockHeight:Long!,
-                    $endBlockHeight:Long!,
-                    $skipCount:Int,
-                    $maxResultCount:Int
-                ) {
-                    data:getTransaction(
-                        input: {
-                            startBlockHeight:$startBlockHeight,
-                            endBlockHeight:$endBlockHeight,
-                            transactionIds:$txIds,
-                            skipCount:$skipCount,
-                            maxResultCount:$maxResultCount
-                        }
-                    ){
-                        items:data{
-                            id,transactionId,methodName,timestamp,chainId,
-                            blockHash,blockHeight,amount,symbol,fromAddress,from,
-                            toAddress,to,params,index,status
-                        },
-                        totalCount
+            Query = @"
+			query(
+                $txIds:[String!]!,
+                $startBlockHeight:Long!,
+                $endBlockHeight:Long!,
+                $skipCount:Int,
+                $maxResultCount:Int
+            ) {
+                data:getTransaction(
+                    input: {
+                        startBlockHeight:$startBlockHeight,
+                        endBlockHeight:$endBlockHeight,
+                        transactionIds:$txIds,
+                        skipCount:$skipCount,
+                        maxResultCount:$maxResultCount
                     }
-                }",
-                Variables = new
-                {
-                    txIds = txIds,
-                    skipCount = inputSkipCount,
-                    maxResultCount = inputMaxResultCount,
-                    startBlockHeight = startBlockHeight,
-                    endBlockHeight = endBlockHeight
+                ){
+                    items:data{
+                        id,transactionId,methodName,timestamp,chainId,
+                        blockHash,blockHeight,amount,symbol,fromAddress,from,
+                        toAddress,to,params,index,status
+                    },
+                    totalCount
                 }
-            });
-            return res.Data;
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e, "Query token transfer error");
-            return new PagedResultDto<TransferDto>();
-        }
-
+            }",
+            Variables = new
+            {
+                txIds = txIds,
+                skipCount = inputSkipCount,
+                maxResultCount = inputMaxResultCount,
+                startBlockHeight = startBlockHeight,
+                endBlockHeight = endBlockHeight
+            }
+        });
+        return res.Data;
     }
     
     private async Task<PagedResultDto<SwapRecordDto>> GetSwapTokenInfoAsync(List<string> txIds, long startBlockHeight,
         long endBlockHeight, int inputMaxResultCount, int inputSkipCount = 0)
     {
-        try
+        var res = await _graphQlHelper.QueryAsync<GraphQLResponse<PagedResultDto<SwapRecordDto>>>(new GraphQLRequest
         {
-            var res = await _graphQlHelper.QueryAsync<GraphQLResponse<PagedResultDto<SwapRecordDto>>>(new GraphQLRequest
-            {
-                Query = @"
-			    query(
-                    $txIds:[String!]!,
-                    $startBlockHeight:Long,
-                    $endBlockHeight:Long,
-                    $skipCount:Int,
-                    $maxResultCount:Int
-                ) {
-                    data:getSwapTokenRecord(
-                        input: {
-                            startBlockHeight:$startBlockHeight,
-                            endBlockHeight:$endBlockHeight,
-                            transactionIds:$txIds,
-                            skipCount:$skipCount,
-                            maxResultCount:$maxResultCount
-                        }
-                    ){
-                        items:data{
-                            transactionId,symbolIn,symbolOut,amountIn,amountOut,
-                            fromAddress,toAddress,channel,feeRate,blockHeight
-                        },
-                        totalCount
+            Query = @"
+			query(
+                $txIds:[String!]!,
+                $startBlockHeight:Long,
+                $endBlockHeight:Long,
+                $skipCount:Int,
+                $maxResultCount:Int
+            ) {
+                data:getSwapTokenRecord(
+                    input: {
+                        startBlockHeight:$startBlockHeight,
+                        endBlockHeight:$endBlockHeight,
+                        transactionIds:$txIds,
+                        skipCount:$skipCount,
+                        maxResultCount:$maxResultCount
                     }
-                }",
-                Variables = new
-                {
-                    txIds = txIds,
-                    skipCount = inputSkipCount,
-                    maxResultCount = inputMaxResultCount,
-                    startBlockHeight = startBlockHeight,
-                    endBlockHeight = endBlockHeight
+                ){
+                    items:data{
+                        transactionId,symbolIn,symbolOut,amountIn,amountOut,
+                        fromAddress,toAddress,channel,feeRate,blockHeight
+                    },
+                    totalCount
                 }
-            });
-            return res.Data;
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e, "Query swap token error");
-            return new PagedResultDto<SwapRecordDto>();
-        }
-
+            }",
+            Variables = new
+            {
+                txIds = txIds,
+                skipCount = inputSkipCount,
+                maxResultCount = inputMaxResultCount,
+                startBlockHeight = startBlockHeight,
+                endBlockHeight = endBlockHeight
+            }
+        });
+        return res.Data;
     }
 }
 

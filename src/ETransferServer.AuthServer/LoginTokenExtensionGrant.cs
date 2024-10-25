@@ -57,8 +57,8 @@ public class LoginTokenExtensionGrant : ITokenExtensionGrant
         principal.SetResources(await GetResourcesAsync(context.Request.GetScopes(), scopeManager));
         principal.SetAudiences("ETransferServer");
 
-        await context.HttpContext.RequestServices.GetRequiredService<AbpOpenIddictClaimDestinationsManager>()
-            .SetAsync(principal);
+        await context.HttpContext.RequestServices.GetRequiredService<AbpOpenIddictClaimsPrincipalManager>()
+            .HandleAsync(context.Request, principal);
 
         return new SignInResult(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme, principal);
     }

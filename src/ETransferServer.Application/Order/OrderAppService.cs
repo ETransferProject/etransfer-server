@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using AElf.ExceptionHandler;
 using AElf.Indexing.Elasticsearch;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Order;
@@ -27,7 +28,7 @@ namespace ETransferServer.Order;
 
 [RemoteService(IsEnabled = false)]
 [DisableAuditing]
-public class OrderAppService : ApplicationService, IOrderAppService
+public partial class OrderAppService : ApplicationService, IOrderAppService
 {
     private readonly INESTRepository<OrderIndex, Guid> _orderIndexRepository;
     private readonly INESTRepository<UserIndex, Guid> _userIndexRepository;
@@ -51,130 +52,117 @@ public class OrderAppService : ApplicationService, IOrderAppService
         _networkAppService = networkAppService;
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(OrderAppService),
+        MethodName = nameof(HandleGetListExceptionAsync))]
     public async Task<PagedResultDto<OrderIndexDto>> GetOrderRecordListAsync(GetOrderRecordRequestDto request)
     {
-        try
-        {
-            var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
-            if (!userId.HasValue || userId == Guid.Empty) return new PagedResultDto<OrderIndexDto>();
+        var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
+        if (!userId.HasValue || userId == Guid.Empty) return new PagedResultDto<OrderIndexDto>();
 
-            var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+        var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+        mustQuery.Add(q => q.Term(i =>
+            i.Field(f => f.UserId).Value(userId.ToString())));
+
+        if (request.Type > 0)
+        {
             mustQuery.Add(q => q.Term(i =>
-                i.Field(f => f.UserId).Value(userId.ToString())));
-
-            if (request.Type > 0)
-            {
-                mustQuery.Add(q => q.Term(i =>
-                    i.Field(f => f.OrderType)
-                        .Value(Enum.GetName(typeof(OrderTypeEnum), request.Type))));
-            }
-
-            var status = OrderStatusResponseEnum.All;
-            if (request.Status > 0)
-            {
-                status =
-                    (OrderStatusResponseEnum)Enum.Parse(typeof(OrderStatusResponseEnum), request.Status.ToString());
-                switch (status)
-                {
-                    case OrderStatusResponseEnum.Processing:
-                        mustQuery.Add(q => q.Terms(i =>
-                            i.Field(f => f.Status).Terms(OrderStatusHelper.GetProcessingList())));
-                        mustQuery.Add(q => q.Bool(i => i.Should(
-                            s => s.Match(k =>
-                                k.Field("extensionInfo.ToConfirmedNum").Query("0")),
-                            p => p.Bool(j => j.MustNot(
-                                s => s.Exists(k =>
-                                    k.Field("extensionInfo.ToConfirmedNum")))))));
-                        break;
-                    case OrderStatusResponseEnum.Succeed:
-                        mustQuery.Add(q => q.Bool(i => i.Should(
-                            s => s.Terms(k =>
-                                k.Field(f => f.Status).Terms(OrderStatusHelper.GetSucceedList())),
-                            p => p.Bool(j => j.Must(
-                                s => s.Exists(k =>
-                                    k.Field("extensionInfo.ToConfirmedNum")),
-                                s => s.Terms(k =>
-                                    k.Field(f => f.Status).Terms(OrderStatusHelper.GetProcessingList())))))));
-                        break;
-                    case OrderStatusResponseEnum.Failed:
-                        mustQuery.Add(q => q.Terms(i =>
-                            i.Field(f => f.Status).Terms(OrderStatusHelper.GetFailedList())));
-                        break;
-                }
-            }
-
-            if (request.StartTimestamp.HasValue)
-            {
-                mustQuery.Add(q => q.Range(i =>
-                    i.Field(f => f.ArrivalTime)
-                        .GreaterThanOrEquals(request.StartTimestamp.Value)));
-            }
-
-            if (request.EndTimestamp.HasValue)
-            {
-                mustQuery.Add(q => q.Range(i =>
-                    i.Field(f => f.ArrivalTime)
-                        .LessThanOrEquals(request.EndTimestamp.Value)));
-            }
-            
-            var mustNotQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
-            mustNotQuery.Add(q => q.Match(i =>
-                i.Field("extensionInfo.RefundTx").Query(ExtensionKey.RefundTx)));
-            if (status == OrderStatusResponseEnum.Succeed)
-            {
-                mustNotQuery.Add(q => q.Match(i =>
-                    i.Field("extensionInfo.ToConfirmedNum").Query("0")));
-            }
-
-            QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery)
-                .MustNot(mustNotQuery));
-
-            var (count, list) = await _orderIndexRepository.GetSortListAsync(Filter,
-                sortFunc: string.IsNullOrWhiteSpace(request.Sorting)
-                    ? s => s.Descending(t => t.ArrivalTime)
-                    : GetSorting(request.Sorting),
-                limit: request.MaxResultCount == 0 ? OrderOptions.DefaultResultCount :
-                request.MaxResultCount > OrderOptions.MaxResultCount ? OrderOptions.MaxResultCount :
-                request.MaxResultCount,
-                skip: request.SkipCount);
-
-            var orderIndexDtoPageResult = new PagedResultDto<OrderIndexDto>
-            {
-                Items = await LoopCollectionItemsAsync(
-                    _objectMapper.Map<List<OrderIndex>, List<OrderIndexDto>>(list), list),
-                TotalCount = count
-            };
-            
-            if (orderIndexDtoPageResult.Items.Any())
-            {
-                var maxCreateTime = orderIndexDtoPageResult.Items.Max(item => item.CreateTime);
-                var userOrderActionGrain = _clusterClient.GetGrain<IUserOrderActionGrain>(userId.ToString());
-                await userOrderActionGrain.AddOrUpdate(maxCreateTime);
-            }
-            
-            return orderIndexDtoPageResult;
+                i.Field(f => f.OrderType)
+                    .Value(Enum.GetName(typeof(OrderTypeEnum), request.Type))));
         }
-        catch (Exception e)
+
+        var status = OrderStatusResponseEnum.All;
+        if (request.Status > 0)
         {
-            _logger.LogError(e, "Get order record list failed, type={Type}, status={Status}",
-                request.Type, request.Status);
-            return new PagedResultDto<OrderIndexDto>();
+            status =
+                (OrderStatusResponseEnum)Enum.Parse(typeof(OrderStatusResponseEnum), request.Status.ToString());
+            switch (status)
+            {
+                case OrderStatusResponseEnum.Processing:
+                    mustQuery.Add(q => q.Terms(i =>
+                        i.Field(f => f.Status).Terms(OrderStatusHelper.GetProcessingList())));
+                    mustQuery.Add(q => q.Bool(i => i.Should(
+                        s => s.Match(k =>
+                            k.Field("extensionInfo.ToConfirmedNum").Query("0")),
+                        p => p.Bool(j => j.MustNot(
+                            s => s.Exists(k =>
+                                k.Field("extensionInfo.ToConfirmedNum")))))));
+                    break;
+                case OrderStatusResponseEnum.Succeed:
+                    mustQuery.Add(q => q.Bool(i => i.Should(
+                        s => s.Terms(k =>
+                            k.Field(f => f.Status).Terms(OrderStatusHelper.GetSucceedList())),
+                        p => p.Bool(j => j.Must(
+                            s => s.Exists(k =>
+                                k.Field("extensionInfo.ToConfirmedNum")),
+                            s => s.Terms(k =>
+                                k.Field(f => f.Status).Terms(OrderStatusHelper.GetProcessingList())))))));
+                    break;
+                case OrderStatusResponseEnum.Failed:
+                    mustQuery.Add(q => q.Terms(i =>
+                        i.Field(f => f.Status).Terms(OrderStatusHelper.GetFailedList())));
+                    break;
+            }
         }
+
+        if (request.StartTimestamp.HasValue)
+        {
+            mustQuery.Add(q => q.Range(i =>
+                i.Field(f => f.ArrivalTime)
+                    .GreaterThanOrEquals(request.StartTimestamp.Value)));
+        }
+
+        if (request.EndTimestamp.HasValue)
+        {
+            mustQuery.Add(q => q.Range(i =>
+                i.Field(f => f.ArrivalTime)
+                    .LessThanOrEquals(request.EndTimestamp.Value)));
+        }
+        
+        var mustNotQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+        mustNotQuery.Add(q => q.Match(i =>
+            i.Field("extensionInfo.RefundTx").Query(ExtensionKey.RefundTx)));
+        if (status == OrderStatusResponseEnum.Succeed)
+        {
+            mustNotQuery.Add(q => q.Match(i =>
+                i.Field("extensionInfo.ToConfirmedNum").Query("0")));
+        }
+
+        QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery)
+            .MustNot(mustNotQuery));
+
+        var (count, list) = await _orderIndexRepository.GetSortListAsync(Filter,
+            sortFunc: string.IsNullOrWhiteSpace(request.Sorting)
+                ? s => s.Descending(t => t.ArrivalTime)
+                : GetSorting(request.Sorting),
+            limit: request.MaxResultCount == 0 ? OrderOptions.DefaultResultCount :
+            request.MaxResultCount > OrderOptions.MaxResultCount ? OrderOptions.MaxResultCount :
+            request.MaxResultCount,
+            skip: request.SkipCount);
+
+        var orderIndexDtoPageResult = new PagedResultDto<OrderIndexDto>
+        {
+            Items = await LoopCollectionItemsAsync(
+                _objectMapper.Map<List<OrderIndex>, List<OrderIndexDto>>(list), list),
+            TotalCount = count
+        };
+        
+        if (orderIndexDtoPageResult.Items.Any())
+        {
+            var maxCreateTime = orderIndexDtoPageResult.Items.Max(item => item.CreateTime);
+            var userOrderActionGrain = _clusterClient.GetGrain<IUserOrderActionGrain>(userId.ToString());
+            await userOrderActionGrain.AddOrUpdate(maxCreateTime);
+        }
+        
+        return orderIndexDtoPageResult;
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(OrderAppService),
+        MethodName = nameof(HandleGetDetailExceptionAsync))]
     public async Task<OrderDetailDto> GetOrderRecordDetailAsync(string id)
     {
-        try
-        {
-            var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
-            if (id.IsNullOrWhiteSpace() || !userId.HasValue || userId == Guid.Empty) return new OrderDetailDto();
-            return (await GetOrderDetailAsync(id, userId, false)).Item1;
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e, "Get order record detail failed, orderId={id}", id);
-            return new OrderDetailDto();
-        }
+        var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
+        if (id.IsNullOrWhiteSpace() || !userId.HasValue || userId == Guid.Empty) return new OrderDetailDto();
+        return (await GetOrderDetailAsync(id, userId, false)).Item1;
     }
 
     public async Task<Tuple<OrderDetailDto, OrderIndex>> GetOrderDetailAsync(string id, Guid? userId, bool includeAll = false)
@@ -194,103 +182,89 @@ public class OrderAppService : ApplicationService, IOrderAppService
         return Tuple.Create(await GetOrderDetailDtoAsync(orderIndex, includeAll), orderIndex);
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(OrderAppService),
+        MethodName = nameof(HandleGetUserListExceptionAsync))]
     public async Task<UserOrderDto> GetUserOrderRecordListAsync(GetUserOrderRecordRequestDto request, OrderChangeEto orderEto = null)
     {
         var userOrderDto = new UserOrderDto
         {
             Address = request.Address
         };
-        try
+        var preQuery = new List<Func<QueryContainerDescriptor<UserIndex>, QueryContainer>>();
+        preQuery.Add(q => q.Term(i => i.Field("addressInfos.address").Value(request.Address)));
+
+        QueryContainer PreFilter(QueryContainerDescriptor<UserIndex> f) => f.Bool(b => b.Must(preQuery));
+        var user = await _userIndexRepository.GetListAsync(PreFilter);
+        var userDto = ObjectMapper.Map<UserIndex, UserDto>(user.Item2.FirstOrDefault());
+        if (userDto == null || userDto.UserId == Guid.Empty)
         {
-            var preQuery = new List<Func<QueryContainerDescriptor<UserIndex>, QueryContainer>>();
-            preQuery.Add(q => q.Term(i => i.Field("addressInfos.address").Value(request.Address)));
-
-            QueryContainer PreFilter(QueryContainerDescriptor<UserIndex> f) => f.Bool(b => b.Must(preQuery));
-            var user = await _userIndexRepository.GetListAsync(PreFilter);
-            var userDto = ObjectMapper.Map<UserIndex, UserDto>(user.Item2.FirstOrDefault());
-            if (userDto == null || userDto.UserId == Guid.Empty)
-            {
-                return userOrderDto;
-            }
-
-            var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
-            mustQuery.Add(q => q.Term(i =>
-                i.Field(f => f.UserId).Value(userDto.UserId.ToString())));
-
-            if (request.Time.HasValue && request.Time.Value > 0)
-            {
-                mustQuery.Add(q => q.Range(i =>
-                    i.Field(f => f.CreateTime)
-                        .GreaterThanOrEquals(DateTime.UtcNow.AddHours(-1 * request.Time.Value).ToUtcMilliSeconds())));
-            }
-            else
-            {
-                mustQuery.Add(q => q.Range(i =>
-                    i.Field(f => f.CreateTime).GreaterThanOrEquals(DateTime.UtcNow
-                        .AddDays(OrderOptions.ValidOrderMessageThreshold).ToUtcMilliSeconds())));
-            }
-
-            QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery));
-
-            var (count, list) = await _orderIndexRepository.GetSortListAsync(Filter,
-                sortFunc: s => s.Descending(t => t.CreateTime));
-
-            if (orderEto != null)
-            {
-                var orderFirst = list.FirstOrDefault(item => item.Id == orderEto.Id);
-                if (orderFirst != null)
-                {
-                    list.Remove(orderFirst);
-                }
-                list.Add(_objectMapper.Map<OrderChangeEto, OrderIndex>(orderEto));
-            }
-
-            return await LoopCollectionRecordsAsync(list, userOrderDto);
-
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e, "Get user order record list failed, address={Address}, time=" +
-                                "{Time}", request.Address, request.Time);
             return userOrderDto;
         }
+
+        var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+        mustQuery.Add(q => q.Term(i =>
+            i.Field(f => f.UserId).Value(userDto.UserId.ToString())));
+
+        if (request.Time.HasValue && request.Time.Value > 0)
+        {
+            mustQuery.Add(q => q.Range(i =>
+                i.Field(f => f.CreateTime)
+                    .GreaterThanOrEquals(DateTime.UtcNow.AddHours(-1 * request.Time.Value).ToUtcMilliSeconds())));
+        }
+        else
+        {
+            mustQuery.Add(q => q.Range(i =>
+                i.Field(f => f.CreateTime).GreaterThanOrEquals(DateTime.UtcNow
+                    .AddDays(OrderOptions.ValidOrderMessageThreshold).ToUtcMilliSeconds())));
+        }
+
+        QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery));
+
+        var (count, list) = await _orderIndexRepository.GetSortListAsync(Filter,
+            sortFunc: s => s.Descending(t => t.CreateTime));
+
+        if (orderEto != null)
+        {
+            var orderFirst = list.FirstOrDefault(item => item.Id == orderEto.Id);
+            if (orderFirst != null)
+            {
+                list.Remove(orderFirst);
+            }
+            list.Add(_objectMapper.Map<OrderChangeEto, OrderIndex>(orderEto));
+        }
+
+        return await LoopCollectionRecordsAsync(list, userOrderDto);
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(OrderAppService),
+        MethodName = nameof(HandleGetStatusExceptionAsync))]
     public async Task<OrderStatusDto> GetOrderRecordStatusAsync()
     {
-        try
+        var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
+        if (!userId.HasValue || userId == Guid.Empty)
         {
-            var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
-            if (!userId.HasValue || userId == Guid.Empty)
-            {
-                return new OrderStatusDto();
-            }
-
-            var userOrderActionGrain = _clusterClient.GetGrain<IUserOrderActionGrain>(userId.ToString());
-            var lastModifyTime = await userOrderActionGrain.Get();
-
-            var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>
-            {
-                q => q.Term(i => i.Field(f => f.UserId).Value(userId.ToString())),
-                q => q.Range(i => i.Field(f => f.CreateTime).GreaterThan(lastModifyTime)),
-                q => q.Range(i => i.Field(f => f.CreateTime).GreaterThan(DateTime.UtcNow.AddDays(OrderOptions.ValidOrderThreshold).ToUtcMilliSeconds())),
-                q => q.Terms(i => i.Field(f => f.Status).Terms((IEnumerable<string>)OrderStatusHelper.GetProcessingList()))
-            };
-
-            QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery));
-            
-            var count = await _orderIndexRepository.CountAsync(Filter);
-            
-            return new OrderStatusDto
-            {
-                Status = count.Count > 0
-            };
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e, "Get order record status failed");
             return new OrderStatusDto();
         }
+
+        var userOrderActionGrain = _clusterClient.GetGrain<IUserOrderActionGrain>(userId.ToString());
+        var lastModifyTime = await userOrderActionGrain.Get();
+
+        var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>
+        {
+            q => q.Term(i => i.Field(f => f.UserId).Value(userId.ToString())),
+            q => q.Range(i => i.Field(f => f.CreateTime).GreaterThan(lastModifyTime)),
+            q => q.Range(i => i.Field(f => f.CreateTime).GreaterThan(DateTime.UtcNow.AddDays(OrderOptions.ValidOrderThreshold).ToUtcMilliSeconds())),
+            q => q.Terms(i => i.Field(f => f.Status).Terms((IEnumerable<string>)OrderStatusHelper.GetProcessingList()))
+        };
+
+        QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery));
+        
+        var count = await _orderIndexRepository.CountAsync(Filter);
+        
+        return new OrderStatusDto
+        {
+            Status = count.Count > 0
+        };
     }
 
     private static Func<SortDescriptor<OrderIndex>, IPromise<IList<ISort>>> GetSorting(string sorting)

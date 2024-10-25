@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans;
 using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
 using ETransferServer.Dtos.Order;
@@ -8,6 +7,7 @@ using ETransferServer.Grains.Grain.Order.Deposit;
 using ETransferServer.Grains.Grain.Order.Withdraw;
 using ETransferServer.Grains.GraphQL;
 using ETransferServer.Grains.Options;
+using ETransferServer.Grains.State.Order;
 using ETransferServer.Options;
 
 namespace ETransferServer.Grains.Grain.Timers;
@@ -16,7 +16,7 @@ public interface IUserWithdrawTxTimerGrain : IBaseTxTimerGrain
 {
 }
 
-public class UserWithdrawTxTimerGrain : AbstractTxTimerGrain<WithdrawOrderDto>, IUserWithdrawTxTimerGrain
+public class UserWithdrawTxTimerGrain : AbstractTxTimerGrain<WithdrawOrderDto, WithdrawOrderTimerState>, IUserWithdrawTxTimerGrain
 {
     private readonly ILogger<UserWithdrawTxTimerGrain> _logger;
     private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
@@ -33,10 +33,10 @@ public class UserWithdrawTxTimerGrain : AbstractTxTimerGrain<WithdrawOrderDto>, 
         _userWithdrawProvider = userWithdrawProvider;
     }
 
-    public override async Task OnActivateAsync()
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         _logger.LogDebug("UserWithdrawTxTimerGrain {Id} Activate", this.GetPrimaryKey().ToString());
-        await base.OnActivateAsync();
+        await base.OnActivateAsync(cancellationToken);
 
         _logger.LogDebug("UserWithdrawTxTimerGrain StartTimer {StartTime}", DateTime.UtcNow.ToUtc8String());
         RegisterTimer(TimerCallback, State,

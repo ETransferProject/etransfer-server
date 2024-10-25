@@ -1,3 +1,4 @@
+using AElf.ExceptionHandler.ABP;
 using ETransferServer.ChainsClient.Evm;
 using ETransferServer.ChainsClient.Solana;
 using ETransferServer.ChainsClient.Ton;
@@ -28,7 +29,8 @@ namespace ETransferServer;
     typeof(AbpTenantManagementApplicationModule),
     typeof(AbpFeatureManagementApplicationModule),
     typeof(ETransferServerGrainsModule),
-    typeof(AbpSettingManagementApplicationModule)
+    typeof(AbpSettingManagementApplicationModule),
+    typeof(AOPExceptionModule)
 )]
 public class ETransferServerApplicationModule : AbpModule
 {

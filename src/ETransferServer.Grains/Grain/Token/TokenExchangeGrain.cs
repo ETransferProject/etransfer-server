@@ -5,7 +5,6 @@ using ETransferServer.Options;
 using ETransferServer.ThirdPart.Exchange;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans;
 
 namespace ETransferServer.Grains.Grain.Token;
 

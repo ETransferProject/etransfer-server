@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
-using Orleans;
 using ETransferServer.Common;
 using ETransferServer.Dtos.GraphQL;
 using ETransferServer.Dtos.Order;
@@ -62,11 +61,11 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
         _bus = bus;
     }
 
-    public override async Task OnActivateAsync()
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         _logger.LogDebug("WithdrawQueryTimerGrain {Id} Activate", this.GetPrimaryKey().ToString());
 
-        await base.OnActivateAsync();
+        await base.OnActivateAsync(cancellationToken);
 
         if (State.ExistOrders == null)
         {
@@ -92,6 +91,8 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
         var offset = 0;
         var now = DateTime.UtcNow.ToUtcMilliSeconds();
         var maxTime = State.LastTime;
+        _logger.LogInformation("WithdrawQueryTimerGrain lastTime: {LastTime},{GrainId},{Key},{Count}", 
+            maxTime, this.GetGrainId(), this.GetPrimaryKey(), State.ExistOrders.Count);
 
         while (true)
         {

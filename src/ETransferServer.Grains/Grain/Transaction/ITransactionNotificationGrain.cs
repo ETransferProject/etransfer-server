@@ -1,5 +1,3 @@
-using Orleans;
-
 namespace ETransferServer.Grains.Grain.Worker.Transaction;
 
 public interface ITransactionNotificationGrain : IGrainWithGuidKey

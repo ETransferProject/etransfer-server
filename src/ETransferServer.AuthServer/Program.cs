@@ -36,6 +36,7 @@ public class Program
 #if !DEBUG
                 .UseApollo()
 #endif
+                .UseOrleansClient()
                 .UseSerilog();
             await builder.AddApplicationAsync<ETransferAuthServerModule>();
             var app = builder.Build();

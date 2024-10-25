@@ -2,11 +2,10 @@ using ETransferServer.Dtos.Token;
 
 namespace ETransferServer.Grains.State.Token;
 
+[GenerateSerializer]
 public class TokenExchangeState
 {
-    
-    public long LastModifyTime { get; set; }
-    public long ExpireTime { get; set; }
-    public Dictionary<string, TokenExchangeDto> ExchangeInfos { get; set; }
-    
+    [Id(0)] public long LastModifyTime { get; set; }
+    [Id(1)] public long ExpireTime { get; set; }
+    [Id(2)] public Dictionary<string, TokenExchangeDto> ExchangeInfos { get; set; }
 }

@@ -1,20 +1,29 @@
 namespace ETransferServer.Grains.State.Order;
 
+[GenerateSerializer]
 public class OrderTimerState
 {
-
-    public Dictionary<Guid, TimerTransaction> OrderTransactionDict = new();
-
+    [Id(0)] public Dictionary<Guid, TimerTransaction> OrderTransactionDict = new();
 }
 
+[GenerateSerializer]
+public class DepositOrderTimerState : OrderTimerState
+{
+}
 
+[GenerateSerializer]
+public class WithdrawOrderTimerState : OrderTimerState
+{
+}
+
+[GenerateSerializer]
 public class TimerTransaction
 {
-    public string ChainId { get; set; }
-    public string TxId { get; set; }
-    public long? TxTime { get; set; }
-    public string TransferType { get; set; }
-    public bool IsForward { get; set; } = true;
+    [Id(0)] public string ChainId { get; set; }
+    [Id(1)] public string TxId { get; set; }
+    [Id(2)] public long? TxTime { get; set; }
+    [Id(3)] public string TransferType { get; set; }
+    [Id(4)] public bool IsForward { get; set; } = true;
 }
 
 public enum TransferTypeEnum

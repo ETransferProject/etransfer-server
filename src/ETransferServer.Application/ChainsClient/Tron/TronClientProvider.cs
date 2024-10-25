@@ -1,6 +1,7 @@
 using System;
 using System.Net.Http;
 using System.Threading.Tasks;
+using AElf.ExceptionHandler;
 using ETransferServer.Common;
 using ETransferServer.Common.ChainsClient;
 using ETransferServer.Common.HttpClient;
@@ -30,24 +31,28 @@ public class TronClientProvider : IBlockchainClientProvider
 
     public BlockchainType ChainType { get; } = BlockchainType.Tron;
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(TronClientProvider), 
+        MethodName = nameof(HandleExceptionAsync))]
     public async Task<BlockDtos> GetBlockTimeAsync(string chainId, string blockHash, string txId = null)
     {
         var url = $"{_blockChainInfoOptions.ChainInfos[chainId].Api}" + BlockById;
         var result = new BlockDtos();
-        try
+        var res = await _httpProvider.InvokeAsync<TronResponse>(HttpMethod.Post, url,
+            body: JsonConvert.SerializeObject(new TronQueryParam
+            {
+                Value = blockHash
+            }, HttpProvider.DefaultJsonSettings));
+        result.BlockTimeStamp = res.BlockHeader.RawData.TimeStamp;
+        return result;
+    }
+    
+    public async Task<FlowBehavior> HandleExceptionAsync(Exception ex, string chainId, string blockHash, string txId)
+    {
+        _logger.LogError(ex, "Failed to get tron transaction info, {blockHash},{txId}", blockHash, txId);
+        return new FlowBehavior
         {
-            var res = await _httpProvider.InvokeAsync<TronResponse>(HttpMethod.Post, url,
-                body: JsonConvert.SerializeObject(new TronQueryParam
-                {
-                    Value = blockHash
-                }, HttpProvider.DefaultJsonSettings));
-            result.BlockTimeStamp = res.BlockHeader.RawData.TimeStamp;
-            return result;
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e, "Failed to get tron transaction info, {blockHash},{txId}", blockHash, txId);
-            return result;
-        }
+            ExceptionHandlingStrategy = ExceptionHandlingStrategy.Return,
+            ReturnValue = new BlockDtos()
+        };
     }
 }

@@ -6,7 +6,6 @@ using ETransferServer.Options;
 using ETransferServer.ThirdPart.CoBo;
 using ETransferServer.ThirdPart.CoBo.Dtos;
 using Microsoft.Extensions.Options;
-using Orleans;
 using Volo.Abp.ObjectMapping;
 
 namespace ETransferServer.Grains.Grain.Token;

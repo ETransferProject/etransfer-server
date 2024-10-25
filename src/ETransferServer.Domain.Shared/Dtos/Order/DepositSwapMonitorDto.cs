@@ -1,18 +1,21 @@
+using Orleans;
+
 namespace ETransferServer.Dtos.Order;
 
+[GenerateSerializer]
 public class DepositSwapMonitorDto
 {
-    public string OrderId { get; set; }
-    public string OrderType { get; set; }
-    public string UserId { get; set; }
-    public string txId { get; set; }
-    public string FromSymbol { get; set; }
-    public string ToSymbol { get; set; }
-    public string NetWork { get; set; }
-    public string ToChainId { get; set; }
-    public decimal FromAmount { get; set; }
-    public string Reason { get; set; }
-    public long? CreateTime { get; set; }
+    [Id(0)] public string OrderId { get; set; }
+    [Id(1)] public string OrderType { get; set; }
+    [Id(2)] public string UserId { get; set; }
+    [Id(3)] public string txId { get; set; }
+    [Id(4)] public string FromSymbol { get; set; }
+    [Id(5)] public string ToSymbol { get; set; }
+    [Id(6)] public string NetWork { get; set; }
+    [Id(7)] public string ToChainId { get; set; }
+    [Id(8)] public decimal FromAmount { get; set; }
+    [Id(9)] public string Reason { get; set; }
+    [Id(10)] public long? CreateTime { get; set; }
     
     public static DepositSwapMonitorDto Create(DepositOrderDto orderDto, string reason)
     {

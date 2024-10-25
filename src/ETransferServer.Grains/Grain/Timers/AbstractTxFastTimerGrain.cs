@@ -2,7 +2,6 @@ using AElf.Client.Dto;
 using ETransfer.Contracts.TokenPool;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans;
 using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
 using ETransferServer.Dtos.GraphQL;
@@ -25,7 +24,7 @@ public interface IBaseTxFastTimerGrain : IGrainWithGuidKey
     public Task<DateTime> GetLastCallBackTime();
 }
 
-public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderTimerState> where TOrder : BaseOrderDto
+public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderFastTimerState> where TOrder : BaseOrderDto
 {
     internal DateTime LastCallBackTime;
 

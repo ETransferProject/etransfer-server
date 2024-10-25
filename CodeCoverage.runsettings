@@ -33,6 +33,7 @@
           ,**/src/ETransferServer.Application/Reconciliation/*.cs
           ,**/src/ETransferServer.Application/Swap/*.cs
           ,**/src/ETransferServer.Application/Transaction/*.cs
+          ,**/src/ETransferServer.Application/**/*_Exception.cs
           ,**/src/ETransferServer.Application/User/UserAddressOptions.cs
           ,**/src/ETransferServer.Application/User/UserAppService.cs
           ,**/src/ETransferServer.Application/Order/OrderWithdrawAppService.cs

@@ -4,12 +4,10 @@ using ETransferServer.Dtos.Order;
 using ETransferServer.Grains.Grain.Order.Deposit;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans;
 using Orleans.Runtime;
 using Orleans.Timers;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.Provider.Notify;
-using JetBrains.Annotations;
 using Newtonsoft.Json;
 
 namespace ETransferServer.Grains.Grain.Timers;
@@ -51,10 +49,11 @@ public class DepositOrderStatusReminderGrain : Orleans.Grain, IDepositOrderStatu
             _timerOptions.Value.DepositOrderStatusReminder.DelaySeconds,
             _timerOptions.Value.DepositOrderStatusReminder.PeriodSeconds);
         
-        var existingReminder = await _reminderRegistry.GetReminder(id);
+        var existingReminder = await _reminderRegistry.GetReminder(this.GetGrainId(), id);
         if (existingReminder == null)
         {
             await _reminderRegistry.RegisterOrUpdateReminder(
+                this.GetGrainId(),
                 reminderName: id,
                 dueTime: TimeSpan.FromSeconds(_timerOptions.Value.DepositOrderStatusReminder.DelaySeconds),
                 period: TimeSpan.FromSeconds(_timerOptions.Value.DepositOrderStatusReminder.PeriodSeconds));
@@ -135,8 +134,8 @@ public class DepositOrderStatusReminderGrain : Orleans.Grain, IDepositOrderStatu
     private async Task CancelReminder(string reminderName)
     {
         _logger.LogInformation("DepositOrderStatusReminderGrain UnregisterReminder, reminderName={reminderName}", reminderName);
-        var grainReminder = await _reminderRegistry.GetReminder(reminderName);
-        await _reminderRegistry.UnregisterReminder(grainReminder);
+        var grainReminder = await _reminderRegistry.GetReminder(this.GetGrainId(), reminderName);
+        await _reminderRegistry.UnregisterReminder(this.GetGrainId(), grainReminder);
         _reminderCountMap.Remove(reminderName);
     }
 

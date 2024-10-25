@@ -72,8 +72,8 @@ public static class CommonConstant
 
     public static class StreamConstant
     {
+        public const string MessageStreamName = "ETransfer";
         public const string MessageStreamNameSpace = "ETransferServer";
-
     }
     
     public static class TransactionState
