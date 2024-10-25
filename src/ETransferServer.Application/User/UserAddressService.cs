@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using AElf.ExceptionHandler;
 using AElf.Indexing.Elasticsearch;
 using ETransferServer.Common;
 using Microsoft.Extensions.Logging;
@@ -22,7 +23,7 @@ namespace ETransferServer.User;
 
 [RemoteService(IsEnabled = false)]
 [DisableAuditing]
-public class UserAddressService : ApplicationService, IUserAddressService
+public partial class UserAddressService : ApplicationService, IUserAddressService
 {
     private readonly INESTRepository<UserAddress, Guid> _userAddressIndexRepository;
     private readonly IClusterClient _clusterClient;
@@ -118,34 +119,20 @@ public class UserAddressService : ApplicationService, IUserAddressService
         return _objectMapper.Map<List<UserAddress>, List<UserAddressDto>>(result.Item2);
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(UserAddressService),
+        MethodName = nameof(HandleBulkExceptionAsync))]
     public async Task<bool> BulkAddOrUpdateAsync(List<UserAddressDto> dtoList)
     {
-        try
-        {
-            await _userAddressIndexRepository.BulkAddOrUpdateAsync(
-                _objectMapper.Map<List<UserAddressDto>, List<UserAddress>>(dtoList));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError("Bulk save userAddressIndex fail: {count},{Message}", dtoList.Count, ex.Message);
-            return false;
-        }
-
+        await _userAddressIndexRepository.BulkAddOrUpdateAsync(
+            _objectMapper.Map<List<UserAddressDto>, List<UserAddress>>(dtoList));
         return true;
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(UserAddressService),
+        MethodName = nameof(HandleExceptionAsync))]
     public async Task<bool> AddOrUpdateAsync(UserAddressDto dto)
     {
-        try
-        {
-            await _userAddressIndexRepository.AddOrUpdateAsync(_objectMapper.Map<UserAddressDto, UserAddress>(dto));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError("Save userAddressIndex fail: {id},{message}", dto.Id, ex.Message);
-            return false;
-        }
-
+        await _userAddressIndexRepository.AddOrUpdateAsync(_objectMapper.Map<UserAddressDto, UserAddress>(dto));
         return true;
     }
 

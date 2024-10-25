@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using AElf.ExceptionHandler;
 using AElf.Indexing.Elasticsearch;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Orders;
@@ -13,7 +14,7 @@ namespace ETransferServer.Order;
 
 [RemoteService(IsEnabled = false)]
 [DisableAuditing]
-public class OrderStatusFlowAppService : IOrderStatusFlowAppService, ITransientDependency
+public partial class OrderStatusFlowAppService : IOrderStatusFlowAppService, ITransientDependency
 {
     private readonly ILogger<OrderStatusFlowAppService> _logger;
     private readonly INESTRepository<OrderStatusFlow, Guid> _depositOrderIndexRepository;
@@ -26,21 +27,13 @@ public class OrderStatusFlowAppService : IOrderStatusFlowAppService, ITransientD
         _objectMapper = objectMapper;
         _logger = logger;
     }
-
-
+    
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(OrderStatusFlowAppService),
+        MethodName = nameof(HandleExceptionAsync))]
     public async Task<bool> AddOrUpdateAsync(OrderStatusFlowDto dto)
     {
-        try
-        {
-            await _depositOrderIndexRepository.AddOrUpdateAsync(
-                _objectMapper.Map<OrderStatusFlowDto, OrderStatusFlow>(dto));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError("Save depositOrderIndex fail: {id},{message}", dto.Id, ex.Message);
-            return false;
-        }
-
+        await _depositOrderIndexRepository.AddOrUpdateAsync(
+            _objectMapper.Map<OrderStatusFlowDto, OrderStatusFlow>(dto));
         return true;
     }
 }

@@ -1,18 +1,19 @@
 using Microsoft.Extensions.Logging;
-using Orleans;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Grains.State.Order;
 
 namespace ETransferServer.Grains.Grain.Timers;
 
-public abstract class AbstractOrderRetryTimerGrain<TOrder> : Grain<OrderRetryState> where TOrder : BaseOrderDto
+public abstract class AbstractOrderRetryTimerGrain<TOrder, TRetryState> : Grain<OrderRetryState> 
+    where TOrder : BaseOrderDto
+    where TRetryState : OrderRetryState
 {
     internal DateTime LastCallBackTime;
 
-    public readonly ILogger<AbstractOrderRetryTimerGrain<TOrder>> Logger;
+    public readonly ILogger<AbstractOrderRetryTimerGrain<TOrder, TRetryState>> Logger;
 
-    protected AbstractOrderRetryTimerGrain(ILogger<AbstractOrderRetryTimerGrain<TOrder>> logger)
+    protected AbstractOrderRetryTimerGrain(ILogger<AbstractOrderRetryTimerGrain<TOrder, TRetryState>> logger)
     {
         Logger = logger;
     }
@@ -104,10 +105,5 @@ public abstract class AbstractOrderRetryTimerGrain<TOrder> : Grain<OrderRetrySta
             await WriteStateAsync();
         }
 
-    }
-    
-    
-    
-    
-    
+    }  
 }

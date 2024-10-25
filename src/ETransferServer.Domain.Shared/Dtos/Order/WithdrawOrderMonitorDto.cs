@@ -1,10 +1,12 @@
 using ETransferServer.Dtos.GraphQL;
+using Orleans;
 
 namespace ETransferServer.Dtos.Order;
 
+[GenerateSerializer]
 public class WithdrawOrderMonitorDto : TransferRecordDto
 {
-    public string Reason { get; set; }
+    [Id(0)] public string Reason { get; set; }
     
     public static WithdrawOrderMonitorDto Create(TransferRecordDto recordDto, string reason)
     {

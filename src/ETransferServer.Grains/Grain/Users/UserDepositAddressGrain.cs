@@ -1,15 +1,11 @@
 using ETransferServer.Common;
-using Orleans;
 using ETransferServer.Common.Dtos;
 using ETransferServer.Dtos.User;
-using ETransferServer.Grains.Grain.Worker.Transaction;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.State.Users;
 using ETransferServer.User;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Newtonsoft.Json;
-using Serilog.Core;
 using Volo.Abp.ObjectMapping;
 
 namespace ETransferServer.Grains.Grain.Users;
@@ -19,10 +15,10 @@ public interface IUserDepositAddressGrain : IGrainWithStringKey
     Task<string> GetUserAddress(GetUserDepositAddressInput input);
     Task<bool> Exist();
     Task<string> GetAddress();
-    Task<CommonResponseDto<TokenDepositAddressState>> AddOrUpdate(UserAddressDto dto);
+    Task<CommonResponseDto<UserDepositAddressState>> AddOrUpdate(UserAddressDto dto);
 }
 
-public class UserDepositAddressGrain : Grain<TokenDepositAddressState>, IUserDepositAddressGrain
+public class UserDepositAddressGrain : Grain<UserDepositAddressState>, IUserDepositAddressGrain
 {
     private readonly IUserAddressProvider _userAddressProvider;
     private readonly IOptionsSnapshot<DepositAddressOptions> _depositAddressOptions;
@@ -39,16 +35,16 @@ public class UserDepositAddressGrain : Grain<TokenDepositAddressState>, IUserDep
         _logger = logger;
     }
 
-    public override async Task OnActivateAsync()
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         await ReadStateAsync();
-        await base.OnActivateAsync();
+        await base.OnActivateAsync(cancellationToken);
     }
 
-    public override async Task OnDeactivateAsync()
+    public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
     {
         await WriteStateAsync();
-        await base.OnDeactivateAsync();
+        await base.OnDeactivateAsync(reason, cancellationToken);
     }
 
     public async Task<string> GetUserAddress(GetUserDepositAddressInput input)
@@ -92,12 +88,12 @@ public class UserDepositAddressGrain : Grain<TokenDepositAddressState>, IUserDep
         return Task.FromResult(State.UserToken.Address);
     }
 
-    public async Task<CommonResponseDto<TokenDepositAddressState>> AddOrUpdate(UserAddressDto dto)
+    public async Task<CommonResponseDto<UserDepositAddressState>> AddOrUpdate(UserAddressDto dto)
     {
-        State = _objectMapper.Map<UserAddressDto, TokenDepositAddressState>(dto);
+        State = _objectMapper.Map<UserAddressDto, UserDepositAddressState>(dto);
         await WriteStateAsync();
 
-        return new CommonResponseDto<TokenDepositAddressState>()
+        return new CommonResponseDto<UserDepositAddressState>()
         {
             Data = State
         };

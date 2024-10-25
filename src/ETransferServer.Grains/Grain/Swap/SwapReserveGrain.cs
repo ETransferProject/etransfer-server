@@ -5,7 +5,6 @@ using ETransferServer.Common.AElfSdk;
 using ETransferServer.Dtos.GraphQL;
 using ETransferServer.Grains.GraphQL;
 using ETransferServer.Grains.Options;
-using Orleans;
 using ETransferServer.Grains.State.Swap;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;

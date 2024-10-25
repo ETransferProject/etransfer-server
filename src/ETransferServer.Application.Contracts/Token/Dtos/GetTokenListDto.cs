@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace ETransferServer.token.Dtos;
+namespace ETransferServer.Token.Dtos;
 
 public class GetTokenListDto
 {

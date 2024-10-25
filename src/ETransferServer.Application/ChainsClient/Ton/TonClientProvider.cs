@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
+using AElf.ExceptionHandler;
 using ETransferServer.ChainsClient.Ton.Helper;
 using ETransferServer.Common;
 using ETransferServer.Common.ChainsClient;
@@ -30,59 +31,63 @@ public class TonClientProvider : IBlockchainClientProvider
 
     public BlockchainType ChainType { get; } = BlockchainType.Ton;
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(TonClientProvider), 
+        MethodName = nameof(HandleExceptionAsync))]
     public async Task<BlockDtos> GetBlockTimeAsync(string chainId, string blockHash, string txId = null)
     {
         _logger.LogInformation("GetBlockTimeAsync ton, chainId:{chanId}, blockHash:{blockHash}, txId:{txId}", 
             chainId, blockHash, txId);
         var result = new BlockDtos();
-        try
+        var baseUrlList = _blockChainInfoOptions.ChainInfos[chainId].Api.Split(CommonConstant.Comma, StringSplitOptions.TrimEntries).ToList();
+        foreach (var baseUrl in baseUrlList)
         {
-            var baseUrlList = _blockChainInfoOptions.ChainInfos[chainId].Api.Split(CommonConstant.Comma, StringSplitOptions.TrimEntries).ToList();
-            foreach (var baseUrl in baseUrlList)
+            try
             {
-                try
+                var (tonType, url, param) = ApiHelper.GetApiInfo(baseUrl, txId);
+                switch (tonType)
                 {
-                    var (tonType, url, param) = ApiHelper.GetApiInfo(baseUrl, txId);
-                    switch (tonType)
-                    {
-                        case TonType.TonApi:
-                            var respApi = await _httpProvider.InvokeAsync<TonApiResponse>(HttpMethod.Get,
-                                url, param: param);
-                            AssertHelper.NotNull(respApi, "Empty tonApi result");
-                            result.BlockTimeStamp = respApi.Utime;
-                            break;
-                        case TonType.TonCenter:
-                            var respCenter = await _httpProvider.InvokeAsync<TonCenterResponse>(HttpMethod.Get,
-                                url, param: param);
-                            AssertHelper.NotNull(respCenter, "Empty tonCenter result");
-                            var txs = respCenter.Transactions;
-                            if (!txs.IsNullOrEmpty() && txs.Count > 0)
-                            {
-                                result.BlockTimeStamp = txs[0].Now;
-                            }
-                            break;
-                        default:
-                            throw new NotSupportedException();
-                    }
+                    case TonType.TonApi:
+                        var respApi = await _httpProvider.InvokeAsync<TonApiResponse>(HttpMethod.Get,
+                            url, param: param);
+                        AssertHelper.NotNull(respApi, "Empty tonApi result");
+                        result.BlockTimeStamp = respApi.Utime;
+                        break;
+                    case TonType.TonCenter:
+                        var respCenter = await _httpProvider.InvokeAsync<TonCenterResponse>(HttpMethod.Get,
+                            url, param: param);
+                        AssertHelper.NotNull(respCenter, "Empty tonCenter result");
+                        var txs = respCenter.Transactions;
+                        if (!txs.IsNullOrEmpty() && txs.Count > 0)
+                        {
+                            result.BlockTimeStamp = txs[0].Now;
+                        }
+                        break;
+                    default:
+                        throw new NotSupportedException();
+                }
 
-                    AssertHelper.IsTrue(
-                        result.BlockTimeStamp != null &&
-                        long.TryParse(result.BlockTimeStamp.ToString(), out var time) && time > 0,
-                        "GetBlockTimeAsync BlockTimeStamp, time:{time}", result.BlockTimeStamp);
-                    return result;
-                }
-                catch (Exception e)
-                {
-                    _logger.LogError(e, "GetBlockTimeAsync ton error, url:{url}", baseUrl);
-                }
+                AssertHelper.IsTrue(
+                    result.BlockTimeStamp != null &&
+                    long.TryParse(result.BlockTimeStamp.ToString(), out var time) && time > 0,
+                    "GetBlockTimeAsync BlockTimeStamp, time:{time}", result.BlockTimeStamp);
+                return result;
             }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "GetBlockTimeAsync ton error, url:{url}", baseUrl);
+            }
+        }
 
-            return result;
-        }
-        catch (Exception e)
+        return result;
+    }
+    
+    public async Task<FlowBehavior> HandleExceptionAsync(Exception ex, string chainId, string blockHash, string txId)
+    {
+        _logger.LogError(ex, "Failed to get ton transaction info, {blockHash},{txId}", blockHash, txId);
+        return new FlowBehavior
         {
-            _logger.LogError(e, "Failed to get ton transaction info, {blockHash},{txId}", blockHash, txId);
-            return result;
-        }
+            ExceptionHandlingStrategy = ExceptionHandlingStrategy.Return,
+            ReturnValue = new BlockDtos()
+        };
     }
 }

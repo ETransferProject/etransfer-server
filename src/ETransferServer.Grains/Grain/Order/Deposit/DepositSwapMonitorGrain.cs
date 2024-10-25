@@ -1,20 +1,18 @@
+using AElf.ExceptionHandler;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Notify;
 using ETransferServer.Dtos.Order;
-using ETransferServer.Grains.Grain.Order.Withdraw;
-using ETransferServer.Grains.Options;
 using ETransferServer.Grains.Provider.Notify;
 using ETransferServer.Grains.State.Order;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
-using Orleans;
 using Volo.Abp;
 
 namespace ETransferServer.Grains.Grain.Order.Deposit;
 
 public interface IDepositSwapMonitorGrain : IGrainWithStringKey
 {
-    Task DoMonitor(DepositSwapMonitorDto depositSwapMonitorDto);
+    Task<bool> DoMonitor(DepositSwapMonitorDto depositSwapMonitorDto);
 }
 
 public class DepositSwapMonitorGrain : Grain<DepositSwapMonitorState>, IDepositSwapMonitorGrain
@@ -30,25 +28,35 @@ public class DepositSwapMonitorGrain : Grain<DepositSwapMonitorState>, IDepositS
         _notifyProvider = notifyProvider.ToDictionary(p => p.NotifyType().ToString());
     }
     
-    public async Task DoMonitor(DepositSwapMonitorDto dto)
+    [ExceptionHandler(typeof(UserFriendlyException), typeof(Exception),
+        TargetType = typeof(DepositSwapMonitorGrain), MethodName = nameof(HandleExceptionAsync))]
+    public async Task<bool> DoMonitor(DepositSwapMonitorDto dto)
     {
-        try
-        {
-            var sendSuccess =
-                await SendNotifyAsync(dto);
-            AssertHelper.IsTrue(sendSuccess, "Send notify failed");
-        }
-        catch (UserFriendlyException e)
+        var sendSuccess =
+            await SendNotifyAsync(dto);
+        AssertHelper.IsTrue(sendSuccess, "Send notify failed");
+        return true;
+    }
+    
+    public async Task<FlowBehavior> HandleExceptionAsync(Exception ex, DepositSwapMonitorDto dto)
+    {
+        if (ex is UserFriendlyException)
         {
             _logger.LogWarning(
-                "Deposit swap monitor handle failed , Message={Msg}, GrainId={GrainId} dto={dto}", e.Message,
+                "Deposit swap monitor handle failed , Message={Msg}, GrainId={GrainId} dto={dto}", ex.Message,
                 this.GetPrimaryKeyString(), JsonConvert.SerializeObject(dto));
         }
-        catch (Exception e)
+        else
         {
-            _logger.LogError(e, "Deposit swap monitor handle failed GrainId={GrainId}, feeInfo={dto}",
+            _logger.LogError(ex, "Deposit swap monitor handle failed GrainId={GrainId}, feeInfo={dto}",
                 this.GetPrimaryKeyString(), JsonConvert.SerializeObject(dto));
         }
+
+        return new FlowBehavior
+        {
+            ExceptionHandlingStrategy = ExceptionHandlingStrategy.Return,
+            ReturnValue = false
+        };
     }
     
     private async Task<bool> SendNotifyAsync(DepositSwapMonitorDto dto)

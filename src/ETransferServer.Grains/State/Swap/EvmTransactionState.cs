@@ -1,7 +1,8 @@
 namespace ETransferServer.Grains.State.Swap;
 
+[GenerateSerializer]
 public class EvmTransactionState
 {
-    public string TxId { get; set; }
-    public long BlockTime { get; set; }
+    [Id(0)] public string TxId { get; set; }
+    [Id(1)] public long BlockTime { get; set; }
 }

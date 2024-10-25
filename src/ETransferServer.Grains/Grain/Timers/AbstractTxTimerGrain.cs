@@ -2,7 +2,6 @@ using AElf.Client.Dto;
 using ETransfer.Contracts.TokenPool;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans;
 using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
 using ETransferServer.Dtos.GraphQL;
@@ -26,11 +25,13 @@ public interface IBaseTxTimerGrain : IGrainWithGuidKey
     public Task<DateTime> GetLastCallBackTime();
 }
 
-public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> where TOrder : BaseOrderDto
+public abstract class AbstractTxTimerGrain<TOrder, TTimerState> : Grain<OrderTimerState> 
+    where TOrder : BaseOrderDto
+    where TTimerState : OrderTimerState
 {
     internal DateTime LastCallBackTime;
 
-    private readonly ILogger<AbstractTxTimerGrain<TOrder>> _logger;
+    private readonly ILogger<AbstractTxTimerGrain<TOrder, TTimerState>> _logger;
     private readonly IContractProvider _contractProvider;
     private readonly ITokenTransferProvider _transferProvider;
     private readonly IUserWithdrawProvider _userWithdrawProvider;
@@ -39,7 +40,7 @@ public abstract class AbstractTxTimerGrain<TOrder> : Grain<OrderTimerState> wher
     private readonly IOptionsSnapshot<ChainOptions> _chainOptions;
     private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
 
-    protected AbstractTxTimerGrain(ILogger<AbstractTxTimerGrain<TOrder>> logger, IContractProvider contractProvider,
+    protected AbstractTxTimerGrain(ILogger<AbstractTxTimerGrain<TOrder, TTimerState>> logger, IContractProvider contractProvider,
         IOptionsSnapshot<ChainOptions> chainOptions, IOptionsSnapshot<TimerOptions> timerOptions,
         ITokenTransferProvider transferProvider, IUserWithdrawProvider userWithdrawProvider,
         IUserDepositProvider userDepositProvider)

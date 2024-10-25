@@ -1,25 +1,26 @@
 namespace ETransferServer.Grains.State.Swap;
 
+[GenerateSerializer]
 public class SwapState
 { 
-    public string ToChainId { get; set; }
-    public string SymbolIn { get; set; }
-    public string SymbolOut { get; set; }
-    public decimal AmountIn { get; set; }
+    [Id(0)] public string ToChainId { get; set; }
+    [Id(1)] public string SymbolIn { get; set; }
+    [Id(2)] public string SymbolOut { get; set; }
+    [Id(3)] public decimal AmountIn { get; set; }
     // The order create time.
-    public long? TimeStamp { get; set; }
-    public long ReserveIn { get; set; }
-    public long ReserveOut { get; set; }
+    [Id(4)] public long? TimeStamp { get; set; }
+    [Id(5)] public long ReserveIn { get; set; }
+    [Id(6)] public long ReserveOut { get; set; }
     // The amount that can be swapped when an order is created.
-    public decimal AmountOutPre { get; set; }
+    [Id(7)] public decimal AmountOutPre { get; set; }
     // The amount that can be swapped now.
-    public decimal AmountOutNow { get; set; }
+    [Id(8)] public decimal AmountOutNow { get; set; }
 
-    public long AmountOutMin { get; set; }
+    [Id(9)] public long AmountOutMin { get; set; }
 
     // If project has subsidy.
-    public decimal Subsidy { get; set; }
-    public decimal SubsidyMax { get; set; }
+    [Id(10)] public decimal Subsidy { get; set; }
+    [Id(11)] public decimal SubsidyMax { get; set; }
     // After swap transaction completed，amount out.
-    public decimal ActualSwappedAmountOut { get; set; }
+    [Id(12)] public decimal ActualSwappedAmountOut { get; set; }
 }

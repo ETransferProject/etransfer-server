@@ -1,9 +1,9 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Grains.Grain.Order.Withdraw;
 using ETransferServer.Grains.Options;
+using ETransferServer.Grains.State.Order;
 
 namespace ETransferServer.Grains.Grain.Timers;
 
@@ -13,7 +13,7 @@ public interface IWithdrawOrderRetryTimerGrain: IGrainWithGuidKey
     Task AddToPendingList(Guid orderId, string retryFromStatus);
 }
 
-public class WithdrawOrderRetryTimerGrain : AbstractOrderRetryTimerGrain<WithdrawOrderDto>, IWithdrawOrderRetryTimerGrain
+public class WithdrawOrderRetryTimerGrain : AbstractOrderRetryTimerGrain<WithdrawOrderDto, WithdrawOrderRetryState>, IWithdrawOrderRetryTimerGrain
 {
     private readonly ILogger<WithdrawOrderRetryTimerGrain> _logger;
     private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
@@ -24,11 +24,11 @@ public class WithdrawOrderRetryTimerGrain : AbstractOrderRetryTimerGrain<Withdra
         _timerOptions = timerOptions;
     }
 
-    public override async Task OnActivateAsync()
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         _logger.LogDebug("WithdrawOrderRetryTimerGrain {Id} Activate", this.GetPrimaryKey().ToString());
 
-        await base.OnActivateAsync();
+        await base.OnActivateAsync(cancellationToken);
 
         RegisterTimer(TimerCallBack, State,
             TimeSpan.FromSeconds(_timerOptions.Value.WithdrawRetryTimer.DelaySeconds), 

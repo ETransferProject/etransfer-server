@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
-using Orleans;
 using Orleans.Streams;
 using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
@@ -69,16 +68,17 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
         _bus = bus;
     }
 
-    public override async Task OnActivateAsync()
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
-        await base.OnActivateAsync();
+        await base.OnActivateAsync(cancellationToken);
 
         // subscribe stream
-        var streamProvider = GetStreamProvider(CommonConstant.StreamConstant.MessageStreamNameSpace);
+        var streamProvider = this.GetStreamProvider(CommonConstant.StreamConstant.MessageStreamNameSpace);
         _orderChangeStream =
-            streamProvider.GetStream<DepositOrderDto>(this.GetPrimaryKey(),
-                _depositOptions.Value.OrderChangeTopic);
+            streamProvider.GetStream<DepositOrderDto>(_depositOptions.Value.OrderChangeTopic,
+                this.GetPrimaryKey());
         await _orderChangeStream.SubscribeAsync(OnNextAsync, OnErrorAsync, OnCompletedAsync);
+        _logger.LogInformation("StreamProvider deposit subscribe ok.");
 
         // other grain
         _recordGrain = GrainFactory.GetGrain<IUserDepositRecordGrain>(this.GetPrimaryKey());

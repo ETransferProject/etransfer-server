@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
-using Orleans;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Grains.Grain.Order.Withdraw;
@@ -48,11 +47,11 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
         _coBoOptions = coBoOptions;
     }
 
-    public override async Task OnActivateAsync()
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         _logger.LogDebug("WithdrawTimerGrain {Id} Activate", this.GetPrimaryKey().ToString());
 
-        await base.OnActivateAsync();
+        await base.OnActivateAsync(cancellationToken);
         await StartTimer(TimeSpan.FromSeconds(_timerOptions.WithdrawTimer.PeriodSeconds),
             TimeSpan.FromSeconds(_timerOptions.WithdrawTimer.DelaySeconds));
 
@@ -282,7 +281,7 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
 
     private async Task<string> HandleWithdraw(Guid orderId, WithdrawInfo withdrawInfo, bool isRange)
     {
-        _logger.LogDebug("QueryWithdraw timer, {Time}, orderId:{orderId}, {isRange}}", 
+        _logger.LogDebug("QueryWithdraw timer, {Time}, orderId:{orderId}, {isRange}", 
             DateTime.UtcNow.ToUtc8String(), orderId, isRange);
 
         var orderGrain = GrainFactory.GetGrain<IUserWithdrawRecordGrain>(orderId);

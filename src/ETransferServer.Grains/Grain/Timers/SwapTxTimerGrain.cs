@@ -1,9 +1,9 @@
 using AElf.Client.Dto;
+using ETransfer.Contracts.TokenPool;
 using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
 using ETransferServer.Dtos.GraphQL;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Grains.Grain.Order.Deposit;
 using ETransferServer.Grains.Grain.Swap;
@@ -22,7 +22,7 @@ public interface ISwapTxTimerGrain : IBaseTxTimerGrain
 {
 }
 
-public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
+public class SwapTxTimerGrain : Grain<OrderSwapTimerState>, ISwapTxTimerGrain
 {
     internal DateTime LastCallBackTime;
 
@@ -75,10 +75,10 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
         await WriteStateAsync();
     }
     
-    public override async Task OnActivateAsync()
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         _logger.LogDebug("SwapTxTimerGrain {Id} Activate", this.GetPrimaryKey().ToString());
-        await base.OnActivateAsync();
+        await base.OnActivateAsync(cancellationToken);
 
         _logger.LogDebug("SwapTxTimerGrain StartTimer {StartTime}", DateTime.UtcNow.ToUtc8String());
         RegisterTimer(TimerCallback, State,
@@ -358,7 +358,13 @@ public class SwapTxTimerGrain : Grain<OrderTimerState>, ISwapTxTimerGrain
                     transferInfo.Status = OrderTransferStatusEnum.Confirmed.ToString();
                     order.Status = OrderStatusEnum.ToTransferConfirmed.ToString();
                     var swapGrain = GrainFactory.GetGrain<ISwapGrain>(order.Id);
-                    transferInfo.Amount = await swapGrain.ParseReturnValue(txStatus.Logs);
+                    transferInfo.Amount = 0;
+                    if (txStatus.Logs.Length > 0)
+                    {
+                        var swapLog = txStatus.Logs.FirstOrDefault(l => l.Name == nameof(TokenSwapped))?.NonIndexed;
+                        transferInfo.Amount = await swapGrain.ParseReturnValue(swapLog);
+                    }
+
                     order.ExtensionInfo ??= new Dictionary<string, string>();
                     if (order.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus))
                     {

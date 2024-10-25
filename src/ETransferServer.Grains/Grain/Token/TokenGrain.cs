@@ -1,5 +1,5 @@
 using AElf.Contracts.MultiToken;
-using Orleans;
+using AElf.ExceptionHandler;
 using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
 using ETransferServer.Common.AElfSdk.Dtos;
@@ -39,31 +39,34 @@ public class TokenGrain : Grain<TokenState>, ITokenGrain
         _logger = logger;
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(TokenGrain), 
+        MethodName = nameof(HandleExceptionAsync))]
     public async Task<TokenDto> GetToken()
     {
-        try
-        {
-            if (State.Symbol.NotNullOrEmpty())
-                return _objectMapper.Map<TokenState, TokenDto>(State);
-
-            var grainId = TokenGrainId.FromGrainId(this.GetPrimaryKeyString());
-            if (grainId == null) return null;
-
-            var tokenInfo = await _contractProvider.CallTransactionAsync<TokenInfo>(grainId.ChainId,
-                SystemContractName.TokenContract, "GetTokenInfo", new GetTokenInfoInput { Symbol = grainId.Symbol });
-            if (tokenInfo == null) return null;
-
-            _objectMapper.Map(tokenInfo, State);
-            await WriteStateAsync();
-            _logger.LogInformation("Get token Info {Token}", JsonConvert.SerializeObject(State));
-
+        if (State.Symbol.NotNullOrEmpty())
             return _objectMapper.Map<TokenState, TokenDto>(State);
-        }
-        catch (Exception e)
+
+        var grainId = TokenGrainId.FromGrainId(this.GetPrimaryKeyString());
+        if (grainId == null) return null;
+
+        var tokenInfo = await _contractProvider.CallTransactionAsync<TokenInfo>(grainId.ChainId,
+            SystemContractName.TokenContract, "GetTokenInfo", new GetTokenInfoInput { Symbol = grainId.Symbol });
+        if (tokenInfo == null) return null;
+
+        _objectMapper.Map(tokenInfo, State);
+        await WriteStateAsync();
+        _logger.LogInformation("Get token Info {Token}", JsonConvert.SerializeObject(State));
+
+        return _objectMapper.Map<TokenState, TokenDto>(State);
+    }
+    
+    public async Task<FlowBehavior> HandleExceptionAsync(Exception ex)
+    {
+        _logger.LogError(ex, "Get token failed {Pk}", this.GetPrimaryKeyString());
+        return new FlowBehavior
         {
-            _logger.LogError(e, "Get token failed {Pk}", this.GetPrimaryKeyString());
-            throw;
-        }
+            ExceptionHandlingStrategy = ExceptionHandlingStrategy.Rethrow
+        };
     }
 }
 

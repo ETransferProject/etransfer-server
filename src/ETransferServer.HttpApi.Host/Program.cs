@@ -35,6 +35,7 @@ namespace ETransferServer
                 #if !DEBUG
                     .UseApollo()
                 #endif
+                    .UseOrleansClient()
                     .UseSerilog();
 
                 await builder.AddApplicationAsync<ETransferServerHttpApiHostModule>();

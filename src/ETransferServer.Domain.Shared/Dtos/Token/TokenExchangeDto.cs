@@ -1,16 +1,15 @@
-using System;
-using System.Collections.Generic;
-using ETransferServer.Common;
+using Orleans;
 
 namespace ETransferServer.Dtos.Token;
 
+[GenerateSerializer]
 public class TokenExchangeDto
 {
     
-    public string FromSymbol { get; set; }
-    public string ToSymbol { get; set; }
-    public decimal Exchange { get; set; }
-    public long Timestamp { get; set; }
+    [Id(0)] public string FromSymbol { get; set; }
+    [Id(1)] public string ToSymbol { get; set; }
+    [Id(2)] public decimal Exchange { get; set; }
+    [Id(3)] public long Timestamp { get; set; }
 
 
     public static TokenExchangeDto One(string fromSymbol, string toSymbol, long timestamp)

@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans;
 using ETransferServer.Common;
 using ETransferServer.Dtos.User;
 using ETransferServer.Grains.Grain.Users;
@@ -39,10 +38,10 @@ public class TokenAddressTimerGrain: Grain<TokenAddressState>, ITokenAddressTime
         _logger = logger;
     }
 
-    public override async Task OnActivateAsync()
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         _logger.LogDebug("TokenAddressTimerGrain {Id} Activate", this.GetPrimaryKey().ToString());
-        await base.OnActivateAsync();
+        await base.OnActivateAsync(cancellationToken);
         
         await StartTimer(TimeSpan.FromSeconds(_timerOptions.Value.TokenAddressTimer.PeriodSeconds),
             TimeSpan.FromSeconds(_timerOptions.Value.TokenAddressTimer.DelaySeconds));

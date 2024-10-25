@@ -4,7 +4,6 @@ using ETransferServer.Grains.Options;
 using ETransferServer.Grains.State.Swap;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans;
 
 namespace ETransferServer.Grains.Grain.Swap;
 

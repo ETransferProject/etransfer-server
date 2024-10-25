@@ -1,6 +1,7 @@
 namespace ETransferServer.Grains.State.Swap;
 
+[GenerateSerializer]
 public class SwapAmountsState
 {
-    public decimal ConversionRate { get; set; }
+    [Id(0)] public decimal ConversionRate { get; set; }
 }

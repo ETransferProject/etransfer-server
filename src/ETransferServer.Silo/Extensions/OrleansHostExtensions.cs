@@ -1,63 +1,40 @@
 using System.Net;
+using ETransfer.Silo.MongoDB;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
-using Orleans;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Providers.MongoDB.Configuration;
-using Orleans.Statistics;
 using Orleans.Streams.Kafka.Config;
 using ETransferServer.Common;
+using ETransferServer.Silo.MongoDB;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Providers.MongoDB.StorageProviders.Serializers;
+using Orleans.Serialization;
 
 namespace ETransferServer.Silo.Extensions;
 
 public static class OrleansHostExtensions
 {
-    public static ISiloBuilder UseKafkaMqStreamProvider(this ISiloBuilder siloBuilder,
-        IConfigurationRoot configuration)
+    public static IHostBuilder UseOrleans(this IHostBuilder hostBuilder)
     {
-        siloBuilder
-            .AddKafka(CommonConstant.StreamConstant.MessageStreamNameSpace)
-            .WithOptions(options =>
-            {
-                var topics = configuration.GetSection("KafkaStream:Topics").Get<List<string>>() ??
-                             new List<string> { "DefaultTopic" };
-                options.BrokerList = configuration.GetSection("KafkaStream:BrokerList").Get<List<string>>();
-                options.ConsumerGroupId = CommonConstant.StreamConstant.MessageStreamNameSpace;
-                options.ConsumeMode = ConsumeMode.LastCommittedMessage;
-                foreach (var topic in topics)
-                {
-                    options.AddTopic(topic, new TopicCreationConfig { AutoCreate = true});
-                }
-                options.MessageMaxBytes = configuration.GetSection("KafkaStream:MessageMaxBytes").Get<int>();
-            })
-            .AddJson()
-            .AddLoggingTracker().Build();
-        return siloBuilder;
-    }
-
-
-    public static IHostBuilder UseOrleansSnapshot(this IHostBuilder hostBuilder)
-    {
-        var configuration = new ConfigurationBuilder()
-            .AddJsonFile("appsettings.json")
-            .Build();
-        if (configuration == null) throw new ArgumentNullException(nameof(configuration));
-        var configSection = configuration.GetSection("Orleans");
-        if (configSection == null)
-            throw new ArgumentNullException(nameof(configSection), "The OrleansServer node is missing");
         return hostBuilder.UseOrleans((context, siloBuilder) =>
         {
-            //Configure OrleansSnapshot
+            var configuration = context.Configuration;
             var configSection = context.Configuration.GetSection("Orleans");
-            
-            var IsRunningInKubernetes = configSection.GetValue<bool>("IsRunningInKubernetes");
-            var advertisedIP = IsRunningInKubernetes ?  Environment.GetEnvironmentVariable("POD_IP") :configSection.GetValue<string>("AdvertisedIP");
-            var clusterId = IsRunningInKubernetes ? Environment.GetEnvironmentVariable("ORLEANS_CLUSTER_ID") : configSection.GetValue<string>("ClusterId");
-            var serviceId = IsRunningInKubernetes ? Environment.GetEnvironmentVariable("ORLEANS_SERVICE_ID") : configSection.GetValue<string>("ServiceId");
-            
+            if (configSection == null)
+                throw new ArgumentNullException(nameof(configSection), "The OrleansServer node is missing");
+            var isRunningInKubernetes = configSection.GetValue<bool>("IsRunningInKubernetes");
+            var advertisedIP = isRunningInKubernetes
+                ? Environment.GetEnvironmentVariable("POD_IP")
+                : configSection.GetValue<string>("AdvertisedIP");
+            var clusterId = isRunningInKubernetes
+                ? Environment.GetEnvironmentVariable("ORLEANS_CLUSTER_ID")
+                : configSection.GetValue<string>("ClusterId");
+            var serviceId = isRunningInKubernetes
+                ? Environment.GetEnvironmentVariable("ORLEANS_SERVICE_ID")
+                : configSection.GetValue<string>("ServiceId");
             siloBuilder
                 .ConfigureEndpoints(advertisedIP: IPAddress.Parse(advertisedIP),
                     siloPort: configSection.GetValue<int>("SiloPort"),
@@ -66,21 +43,49 @@ public static class OrleansHostExtensions
                 .UseMongoDBClustering(options =>
                 {
                     options.DatabaseName = configSection.GetValue<string>("DataBase");
-                    ;
                     options.Strategy = MongoDBMembershipStrategy.SingleDocument;
                 })
-                .AddMongoDBGrainStorage("Default", (MongoDBGrainStorageOptions op) =>
+                .Configure<JsonGrainStateSerializerOptions>(options => options.ConfigureJsonSerializerSettings =
+                    settings =>
+                    {
+                        settings.NullValueHandling = NullValueHandling.Include;
+                        settings.ObjectCreationHandling = ObjectCreationHandling.Replace;
+                        settings.DefaultValueHandling = DefaultValueHandling.Populate;
+                    })
+                .ConfigureServices(services => services.AddSingleton<IGrainStateSerializer, ETransferJsonGrainStateSerializer>())
+                .AddETransferMongoDBGrainStorage("Default", (MongoDBGrainStorageOptions op) =>
                 {
                     op.CollectionPrefix = "GrainStorage";
                     op.DatabaseName = configSection.GetValue<string>("DataBase");
 
-                    op.ConfigureJsonSerializerSettings = jsonSettings =>
+                    var grainIdPrefix = configSection
+                        .GetSection("GrainSpecificIdPrefix").GetChildren().ToDictionary(o => o.Key.ToLower(), o => o.Value);
+                    op.KeyGenerator = id =>
                     {
-                        // jsonSettings.ContractResolver = new PrivateSetterContractResolver();
-                        jsonSettings.NullValueHandling = NullValueHandling.Include;
-                        jsonSettings.DefaultValueHandling = DefaultValueHandling.Populate;
-                        jsonSettings.ObjectCreationHandling = ObjectCreationHandling.Replace;
+                        var grainType = id.Type.ToString();
+                        if (grainIdPrefix.TryGetValue(grainType, out var prefix))
+                        {
+                            return prefix.StartsWith("GrainReference=000000") ? $"{prefix}+{id.Key}" : prefix;
+                        }
+                        return id.ToString();
                     };
+                    op.CreateShardKeyForCosmos = configSection.GetValue<bool>("CreateShardKeyForMongoDB", false);
+                })
+                .Configure<GrainCollectionOptions>(options =>
+                {
+                    // Override the value of CollectionAge to
+                    var collection = configSection.GetSection(nameof(GrainCollectionOptions.ClassSpecificCollectionAge))
+                        .GetChildren();
+                    foreach (var item in collection)
+                    {
+                        options.ClassSpecificCollectionAge[item.Key] = TimeSpan.FromSeconds(int.Parse(item.Value));
+                    }
+                })
+                .Configure<GrainCollectionNameOptions>(options =>
+                {
+                    var collectionName = configSection
+                        .GetSection(nameof(GrainCollectionNameOptions.GrainSpecificCollectionName)).GetChildren();
+                    options.GrainSpecificCollectionName = collectionName.ToDictionary(o => o.Key, o => o.Value);
                 })
                 .UseMongoDBReminders(options =>
                 {
@@ -92,8 +97,23 @@ public static class OrleansHostExtensions
                     options.ClusterId = clusterId;
                     options.ServiceId = serviceId;
                 })
-                .AddMemoryGrainStorage("PubSubStore")
-                .ConfigureApplicationParts(parts => parts.AddFromApplicationBaseDirectory())
+                .Configure<SiloMessagingOptions>(options =>
+                {
+                    options.ResponseTimeout = TimeSpan.FromSeconds(configSection.GetValue<int>("GrainResponseTimeOut"));
+                    options.MaxMessageBodySize = configSection.GetValue<int>("GrainMaxMessageBodySize");
+                    options.MaxForwardCount = configSection.GetValue<int>("MaxForwardCount");
+                })
+                .AddETransferMongoDBGrainStorage("PubSubStore", options =>
+                {
+                    // Config PubSubStore Storage for Persistent Stream 
+                    options.CollectionPrefix = "StreamStorage";
+                    options.DatabaseName = configSection.GetValue<string>("DataBase");
+                })
+                .Configure<ExceptionSerializationOptions>(options=>
+                {
+                    options.SupportedNamespacePrefixes.Add("Volo.Abp");
+                    options.SupportedNamespacePrefixes.Add("Newtonsoft.Json");
+                })
                 .UseDashboard(options =>
                 {
                     options.Username = configSection.GetValue<string>("DashboardUserName");
@@ -103,11 +123,27 @@ public static class OrleansHostExtensions
                     options.HostSelf = true;
                     options.CounterUpdateIntervalMs = configSection.GetValue<int>("DashboardCounterUpdateIntervalMs");
                 })
-                .UseLinuxEnvironmentStatistics()
                 .ConfigureLogging(logging => { logging.SetMinimumLevel(LogLevel.Debug).AddConsole(); })
                 .AddStartupTask<GrainStartupTask>()
-            .UseKafkaMqStreamProvider(configuration);
-            //.AddStartupTask<TestWithdraw>();
+                .AddActivityPropagation()
+                .AddKafka(CommonConstant.StreamConstant.MessageStreamNameSpace)
+                .WithOptions(options =>
+                {
+                    options.BrokerList = configuration.GetSection("KafkaStream:BrokerList").Get<List<string>>();
+                    options.ConsumerGroupId = CommonConstant.StreamConstant.MessageStreamNameSpace;
+                    options.ConsumeMode = ConsumeMode.LastCommittedMessage;
+
+                    var topics = configuration.GetSection("KafkaStream:Topics").Get<List<string>>() ??
+                                 new List<string> { "DefaultTopic" };
+                    foreach (var topic in topics)
+                    {
+                        options.AddTopic(topic, new TopicCreationConfig { AutoCreate = true});
+                    }
+                    options.MessageMaxBytes = configuration.GetSection("KafkaStream:MessageMaxBytes").Get<int>();
+                })
+                .AddJson()
+                .AddLoggingTracker()
+                .Build();
         });
     }
 }

@@ -1,18 +1,13 @@
 using ETransferServer.Grains;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans;
-using Volo.Abp.AutoMapper;
 using Volo.Abp.Modularity;
-using Volo.Abp.ObjectMapping;
 
 namespace ETransferServer.Grain.Test;
 
 [DependsOn(
     typeof(ETransferServerGrainsModule),
     typeof(ETransferServerDomainTestModule),
-    typeof(ETransferServerDomainModule),
-    typeof(AbpAutoMapperModule),
-    typeof(AbpObjectMappingModule)
+    typeof(ETransferServerDomainModule)
 )]
 public class ETransferServerGrainTestModule : AbpModule
 {

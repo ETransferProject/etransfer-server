@@ -1,8 +1,6 @@
 using System.Numerics;
 using AElf;
-using AElf.Client.Dto;
 using AElf.Types;
-using Awaken.Contracts.Swap;
 using ETransfer.Contracts.TokenPool;
 using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
@@ -13,7 +11,6 @@ using ETransferServer.Dtos.Token;
 using ETransferServer.Grains.Grain.Order.Deposit;
 using ETransferServer.Grains.Grain.Token;
 using ETransferServer.Grains.Options;
-using Orleans;
 using ETransferServer.Grains.State.Swap;
 using ETransferServer.Options;
 using Google.Protobuf;
@@ -31,7 +28,7 @@ public interface ISwapGrain : IGrainWithGuidKey
     Task<GrainResultDto<DepositOrderChangeDto>> Swap(DepositOrderDto dto);
 
     // Task<GrainResultDto<DepositOrderChangeDto>> SubsidyTransfer(DepositOrderDto dto，string returnValue);
-    Task<decimal> ParseReturnValue(LogEventDto[] logs);
+    Task<decimal> ParseReturnValue(string swapLog);
     Task<decimal> RecordAmountOut(long amount);
 }
 
@@ -42,15 +39,17 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
     private readonly ChainOptions _chainOptions;
     private readonly ILogger<SwapGrain> _logger;
     private readonly IObjectMapper _objectMapper;
+    private readonly IUserDepositProvider _userDepositProvider;
     private readonly IBlockchainClientProviderFactory _blockchainClientProvider;
 
     public SwapGrain(IOptionsSnapshot<SwapInfosOptions> swapInfosOptions, IContractProvider contractProvider,
         IOptionsSnapshot<ChainOptions> chainOptions, ILogger<SwapGrain> logger, IObjectMapper objectMapper,
-        IBlockchainClientProviderFactory blockchainClientProvider)
+        IUserDepositProvider userDepositProvider, IBlockchainClientProviderFactory blockchainClientProvider)
     {
         _contractProvider = contractProvider;
         _logger = logger;
         _objectMapper = objectMapper;
+        _userDepositProvider = userDepositProvider;
         _blockchainClientProvider = blockchainClientProvider;
         _chainOptions = chainOptions.Value;
         _swapInfosOptions = swapInfosOptions.Value;
@@ -147,12 +146,10 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
 
             dto.Status = OrderStatusEnum.ToTransferring.ToString();
 
-            var depositRecordGrain = GrainFactory.GetGrain<IUserDepositGrain>(this.GetPrimaryKey());
-            await depositRecordGrain.AddOrUpdateOrder(dto, ExtensionBuilder.New()
-                .Add(ExtensionKey.IsForward, Boolean.FalseString)
-                .Add(ExtensionKey.TransactionId, toTransfer.TxId)
-                .Add(ExtensionKey.Transaction, JsonConvert.SerializeObject(rawTransaction, JsonSettings))
-                .Build());
+            var recordGrain = GrainFactory.GetGrain<IUserDepositRecordGrain>(dto.Id);
+            var response = await recordGrain.CreateOrUpdateAsync(dto);
+            await _userDepositProvider.AddOrUpdateSync(response.Value);
+            _logger.LogInformation("swap save grain, {orderId}", dto.Id);
 
             // send 
             var (isSuccess, error) = await _contractProvider.SendTransactionAsync(toTransfer.ChainId, rawTransaction);
@@ -402,22 +399,18 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
         return tokenInfo;
     }
 
-    public async Task<decimal> ParseReturnValue(LogEventDto[] logs)
+    public async Task<decimal> ParseReturnValue(string swapLog)
     {
         decimal actualSwappedAmountOut = 0;
         try
         {
-            if (logs.Length > 0)
+            if (!swapLog.IsNullOrWhiteSpace())
             {
-                var swapLog = logs.FirstOrDefault(l => l.Name == nameof(TokenSwapped))?.NonIndexed;
-                if (!swapLog.IsNullOrWhiteSpace())
-                {
-                    var amountsOut = TokenSwapped.Parser.ParseFrom(ByteString.FromBase64(swapLog)).AmountOut;
-                    _logger.LogInformation("Amounts out parsed:{amount}",amountsOut.AmountOut.Last());
-                    var tokenInfo = await GetTokenAsync(State.SymbolOut, State.ToChainId);
-                    actualSwappedAmountOut = (amountsOut.AmountOut.Last() / (decimal)Math.Pow(10, tokenInfo.Decimals));
-                    State.ActualSwappedAmountOut = actualSwappedAmountOut;
-                }
+                var amountsOut = TokenSwapped.Parser.ParseFrom(ByteString.FromBase64(swapLog)).AmountOut;
+                _logger.LogInformation("Amounts out parsed:{amount}",amountsOut.AmountOut.Last());
+                var tokenInfo = await GetTokenAsync(State.SymbolOut, State.ToChainId);
+                actualSwappedAmountOut = (amountsOut.AmountOut.Last() / (decimal)Math.Pow(10, tokenInfo.Decimals));
+                State.ActualSwappedAmountOut = actualSwappedAmountOut;
             }
         }
         catch (Exception e)

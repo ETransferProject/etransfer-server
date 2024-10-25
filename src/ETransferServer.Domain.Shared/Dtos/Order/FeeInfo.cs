@@ -1,11 +1,14 @@
+using Orleans;
+
 namespace ETransferServer.Dtos.Order;
 
+[GenerateSerializer]
 public class FeeInfo
 {
-    public string? Name { get; set; }
-    public string Symbol { get; set; }
-    public string Amount { get; set; }
-    public string Decimals { get; set; }
+    [Id(0)] public string? Name { get; set; }
+    [Id(1)] public string Symbol { get; set; }
+    [Id(2)] public string Amount { get; set; }
+    [Id(3)] public string Decimals { get; set; }
 
 
     public FeeInfo()

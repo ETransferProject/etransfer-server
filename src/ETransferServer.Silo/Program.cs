@@ -48,7 +48,7 @@ public class Program
             .ConfigureAppConfiguration((h, c) => c.AddJsonFile("apollosettings.json"))
             .UseApollo()
             #endif
-            .UseOrleansSnapshot()
+            .UseOrleans()
             .UseAutofac()
             .UseSerilog();
 }
