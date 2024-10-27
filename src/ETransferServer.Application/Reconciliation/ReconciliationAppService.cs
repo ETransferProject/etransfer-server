@@ -10,6 +10,7 @@ using ETransferServer.Common;
 using ETransferServer.Dtos.Info;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Dtos.Reconciliation;
+using ETransferServer.Dtos.Token;
 using ETransferServer.Grains.Grain.Order.Deposit;
 using ETransferServer.Grains.Grain.Order.Withdraw;
 using ETransferServer.Grains.Grain.Timers;
@@ -19,6 +20,7 @@ using ETransferServer.Options;
 using ETransferServer.Order;
 using ETransferServer.Orders;
 using ETransferServer.Service.Info;
+using ETransferServer.Tokens;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NBitcoin;
@@ -39,6 +41,7 @@ namespace ETransferServer.Reconciliation;
 public partial class ReconciliationAppService : ApplicationService, IReconciliationAppService
 {
     private readonly INESTRepository<OrderIndex, Guid> _orderIndexRepository;
+    private readonly INESTRepository<TokenPoolIndex, Guid> _tokenPoolIndexRepository;
     private readonly IClusterClient _clusterClient;
     private readonly IObjectMapper _objectMapper;
     private readonly ILogger<OrderAppService> _logger;
@@ -49,6 +52,7 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
     private readonly IOptionsSnapshot<StringEncryptionOptions> _stringEncryptionOptions;
 
     public ReconciliationAppService(INESTRepository<OrderIndex, Guid> orderIndexRepository,
+        INESTRepository<TokenPoolIndex, Guid> tokenPoolIndexRepository,
         IClusterClient clusterClient,
         IObjectMapper objectMapper,
         ILogger<OrderAppService> logger,
@@ -59,6 +63,7 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         IOptionsSnapshot<StringEncryptionOptions> stringEncryptionOptions)
     {
         _orderIndexRepository = orderIndexRepository;
+        _tokenPoolIndexRepository = tokenPoolIndexRepository;
         _clusterClient = clusterClient;
         _objectMapper = objectMapper;
         _logger = logger;
@@ -499,6 +504,22 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         };
     }
 
+    [ExceptionHandler(typeof(Exception), LogLevel = Microsoft.Extensions.Logging.LogLevel.Error, 
+        Message = "Save token pool error", ReturnDefault = ReturnDefault.Default)]
+    public async Task<bool> AddOrUpdateTokenPoolAsync(TokenPoolDto dto)
+    {
+        var index = _objectMapper.Map<TokenPoolDto, TokenPoolIndex>(dto);
+        await _tokenPoolIndexRepository.AddOrUpdateAsync(index);
+        return true;
+    }
+    
+    public async Task<Tuple<Dictionary<string, string>, Dictionary<string, string>>> GetFeeListAsync(bool includeAll)
+    {
+        var thirdPartFee = await QueryThirdPartFeeSumAggAsync(includeAll, 0);
+        var aelfFee = await QueryThirdPartFeeSumAggAsync(includeAll, 1);
+        return Tuple.Create(thirdPartFee, aelfFee);
+    }
+
     private async Task<string> VerifyCode(string code)
     {
         var userGrain = _clusterClient.GetGrain<IUserReconciliationGrain>(GuidHelper.UniqGuid(CurrentUser?.Name));
@@ -701,6 +722,119 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         mustNotQuery.Add(q => q.Match(i =>
             i.Field("extensionInfo.RefundTx").Query(ExtensionKey.RefundTx)));
         return mustNotQuery;
+    }
+    
+    private async Task<Dictionary<string, string>> QueryThirdPartFeeSumAggAsync(bool includeAll, int type)
+    {
+        var result = new Dictionary<string, string>();
+        var mustQuery = await GetMustQueryFeeAsync(includeAll, type);
+        if (mustQuery == null) return result;
+
+        var s = new SearchDescriptor<OrderIndex>()
+            .Size(0)
+            .Query(f => f.Bool(b => b.Must(mustQuery)));
+        s.Aggregations(agg => agg
+            .Terms("symbol", ts => ts
+                .Field("thirdPartFee.symbol")
+                .Aggregations(d => d
+                    .Terms("decimals", terms => terms
+                        .Field("thirdPartFee.decimals")
+                        .Aggregations(sumAgg => sumAgg
+                            .Sum("sum_amount", sum => sum
+                                .Field("thirdPartFee.amount"))
+                        )
+                    )
+                )
+            )
+        );
+
+        var searchResponse = await _orderIndexRepository.SearchAsync(s, 0, 0);
+        if (!searchResponse.IsValid)
+        {
+            _logger.LogError("Rec QueryThirdPartFeeSumAggAsync error: {error}", searchResponse.ServerError?.Error);
+            return result;
+        }
+
+        var symbolAgg = searchResponse.Aggregations.Terms("symbol");
+        foreach (var symbolBucket in symbolAgg.Buckets)
+        {
+            var feeCoin = symbolBucket.Key.Split(CommonConstant.Underline);
+            var feeSymbol = feeCoin.Length == 1 ? feeCoin[0] : feeCoin[1];
+            var decimals = symbolBucket.Terms("decimals");
+            foreach (var decimalsBucket in decimals.Buckets)
+            {
+                var amount = (decimal)decimalsBucket.Sum("sum_amount")?.Value / decimalsBucket.Key.SafeToInt();
+                result.Add(feeSymbol, amount.ToString());
+            }
+        }
+
+        return result;
+    }
+    
+    private async Task<Dictionary<string, string>> QueryAELfFeeSumAggAsync(bool includeAll, int type)
+    {
+        var result = new Dictionary<string, string>();
+        var mustQuery = await GetMustQueryFeeAsync(includeAll, type);
+        if (mustQuery == null) return result;
+
+        var s = new SearchDescriptor<OrderIndex>()
+            .Size(0)
+            .Query(f => f.Bool(b => b.Must(mustQuery)));
+        s.Aggregations(agg => agg
+            .Terms("symbol", ts => ts
+                .Field("toTransfer.feeInfo.symbol")
+                .Aggregations(sumAgg => sumAgg
+                    .Sum("sum_amount", sum => sum
+                        .Field("toTransfer.feeInfo.amount"))
+                )
+            )
+        );
+
+        var searchResponse = await _orderIndexRepository.SearchAsync(s, 0, 0);
+        if (!searchResponse.IsValid)
+        {
+            _logger.LogError("Rec QueryAELfFeeSumAggAsync error: {error}", searchResponse.ServerError?.Error);
+            return result;
+        }
+
+        var symbolAgg = searchResponse.Aggregations.Terms("symbol");
+        foreach (var symbolBucket in symbolAgg.Buckets)
+        {
+            var amount = (decimal)symbolBucket.Sum("sum_amount")?.Value;
+            result.Add(symbolBucket.Key, amount.ToString());
+        }
+
+        return result;
+    }
+    
+    private async Task<List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>> GetMustQueryFeeAsync(
+        bool includeAll, int type)
+    {
+        var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+        mustQuery.Add(q => q.Terms(i =>
+            i.Field(f => f.Status).Terms(OrderStatusHelper.GetSucceedList())));
+        mustQuery.Add(q => q.Term(i =>
+            i.Field(f => f.OrderType).Value(OrderTypeEnum.Withdraw.ToString())));
+        if (type == 0)
+        {
+            mustQuery.Add(q => q.Exists(i =>
+                i.Field("thirdPartFee.decimals")));
+        }
+        else
+        {
+            mustQuery.Add(q => q.Exists(i =>
+                i.Field("toTransfer.feeInfo.symbol")));
+        }
+
+        if (!includeAll)
+        {
+            mustQuery.Add(q => q.Range(i =>
+                i.Field(f => f.CreateTime).GreaterThanOrEquals(DateTime.UtcNow.AddDays(-1).Date.ToUtcMilliSeconds())));
+            mustQuery.Add(q => q.Range(i =>
+                i.Field(f => f.CreateTime).LessThanOrEquals(DateTime.UtcNow.Date.ToUtcMilliSeconds())));
+        }
+
+        return mustQuery;
     }
 
     private async Task<List<OrderRecordDto>> LoopCollectionItemsAsync(List<OrderRecordDto> itemList,
