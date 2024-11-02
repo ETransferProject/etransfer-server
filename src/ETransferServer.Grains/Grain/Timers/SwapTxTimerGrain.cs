@@ -5,6 +5,7 @@ using ETransferServer.Common.AElfSdk;
 using ETransferServer.Dtos.GraphQL;
 using Microsoft.Extensions.Logging;
 using ETransferServer.Dtos.Order;
+using ETransferServer.Grains.Grain.Order;
 using ETransferServer.Grains.Grain.Order.Deposit;
 using ETransferServer.Grains.Grain.Swap;
 using ETransferServer.Grains.GraphQL;
@@ -403,6 +404,7 @@ public class SwapTxTimerGrain : Grain<OrderSwapTimerState>, ISwapTxTimerGrain
                     "SwapTx result Confirmed failed, will call ToStartTransfer, status: {result}, order: {order}",
                     txStatus.Status, JsonConvert.SerializeObject(order));
 
+                await SaveOrderTxFlowAsync(order, ThirdPartOrderStatusEnum.Fail.ToString());
                 await DepositSwapFailureAlarmAsync(order, SwapStage.SwapTxHandleFailAndToTransfer);
 
                 transferInfo.Status = OrderTransferStatusEnum.StartTransfer.ToString();
@@ -482,7 +484,19 @@ public class SwapTxTimerGrain : Grain<OrderSwapTimerState>, ISwapTxTimerGrain
         }
         return resp.Data as DepositOrderDto;
     }
-    
+
+    private async Task SaveOrderTxFlowAsync(DepositOrderDto order, string status)
+    {
+        if (order.ToTransfer.TxId.IsNullOrEmpty()) return;
+        var orderTxFlowGrain = GrainFactory.GetGrain<IOrderTxFlowGrain>(order.Id);
+        await orderTxFlowGrain.AddOrUpdate(new OrderTxData
+        {
+            TxId = order.ToTransfer.TxId,
+            ChainId = order.ToTransfer.ChainId,
+            Status = status
+        });
+    }
+
     private async Task DepositSwapFailureAlarmAsync(DepositOrderDto orderDto, string reason)
     {
         var depositSwapMonitorGrain = GrainFactory.GetGrain<IDepositSwapMonitorGrain>(orderDto.Id.ToString());
