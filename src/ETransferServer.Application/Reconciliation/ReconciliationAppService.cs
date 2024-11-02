@@ -10,6 +10,7 @@ using ETransferServer.Common;
 using ETransferServer.Dtos.Info;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Dtos.Reconciliation;
+using ETransferServer.Grains.Grain.Order;
 using ETransferServer.Grains.Grain.Order.Deposit;
 using ETransferServer.Grains.Grain.Order.Withdraw;
 using ETransferServer.Grains.Grain.Timers;
@@ -342,6 +343,9 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         order.ExtensionInfo = orderIndex.ExtensionInfo;
         await recordGrain.CreateOrUpdateAsync(order);
         await _orderIndexRepository.AddOrUpdateAsync(orderIndex);
+        
+        var txFlowGrain = _clusterClient.GetGrain<IOrderTxFlowGrain>(orderIndex.Id);
+        await txFlowGrain.Reset(orderIndex.ToTransfer.ChainId);
 
         var userDepositGrain = _clusterClient.GetGrain<IUserDepositGrain>(orderIndex.Id);
         await userDepositGrain.AddOrUpdateOrder(_objectMapper.Map<OrderIndex, DepositOrderDto>(orderIndex));
