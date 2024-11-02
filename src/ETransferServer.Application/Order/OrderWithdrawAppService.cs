@@ -16,6 +16,7 @@ using ETransferServer.Common.AElfSdk.Dtos;
 using ETransferServer.Common.Dtos;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Dtos.Token;
+using ETransferServer.Grains.Common;
 using ETransferServer.Grains.Grain.Order.Withdraw;
 using ETransferServer.Grains.Grain.Token;
 using ETransferServer.Grains.Grain.TokenLimit;
@@ -544,9 +545,10 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
                 DateTime.UtcNow.AddDays(1).Date));
         try
         {
-            var orderId = Guid.NewGuid();
+            var orderId = OrderIdHelper.WithdrawOrderId(request.RawTransaction, request.FromChainId,
+                request.ToAddress);
             var grain = _clusterClient.GetGrain<IUserWithdrawGrain>(orderId);
-            var withdrawOrderDto = new WithdrawOrderDto()
+            var withdrawOrderDto = new WithdrawOrderDto
             {
                 UserId = CurrentUser.GetId(),
                 RawTransaction = request.RawTransaction,
