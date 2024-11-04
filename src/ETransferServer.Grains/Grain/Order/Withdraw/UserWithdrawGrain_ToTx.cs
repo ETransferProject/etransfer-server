@@ -16,6 +16,7 @@ public partial class UserWithdrawGrain
     {
         try
         {
+            var newTxId = string.Empty;
             Transaction rawTransaction;
             var toTransfer = orderDto.ToTransfer;
 
@@ -48,25 +49,40 @@ public partial class UserWithdrawGrain
                     CommonConstant.ETransferTokenPoolContractName, CommonConstant.ETransferReleaseToken,
                     releaseTokenInput);
                 
-                toTransfer.TxId = txId.ToHex();
+                newTxId = txId.ToHex();
                 rawTransaction = newTransaction;
-                orderDto.FromRawTransaction = newTransaction.ToByteArray().ToHex();
             }
             else
             {
                 rawTransaction = Transaction.Parser.ParseFrom(ByteStringHelper.FromHexString(orderDto.FromRawTransaction));
             }
 
-            toTransfer.TxTime = DateTime.UtcNow.ToUtcMilliSeconds();
             toTransfer.Status = OrderTransferStatusEnum.Transferring.ToString();
-
             orderDto.Status = OrderStatusEnum.ToTransferring.ToString();
 
+            // check
+            if (!await _orderTxFlowGrain.Check(orderDto.ToTransfer.ChainId))
+            {
+                _logger.LogInformation("Withdraw send transaction intercept hit: {OrderId}, {ChainId}",
+                    orderDto.Id, orderDto.ToTransfer.ChainId);
+                return new WithdrawOrderChangeDto
+                {
+                    WithdrawOrder = orderDto
+                };
+            }
+            
+            if (!newTxId.IsNullOrEmpty())
+            {
+                toTransfer.TxId = newTxId;
+                orderDto.FromRawTransaction = rawTransaction.ToByteArray().ToHex();
+            }
+            toTransfer.TxTime = DateTime.UtcNow.ToUtcMilliSeconds();
+            await SaveOrderTxFlowAsync(orderDto, ThirdPartOrderStatusEnum.Pending.ToString());
             await AddOrUpdateOrder(orderDto, ExtensionBuilder.New()
                 .Add(ExtensionKey.TransactionId, toTransfer.TxId)
                 .Add(ExtensionKey.Transaction, JsonConvert.SerializeObject(rawTransaction, JsonSettings))
                 .Build());
-
+            
             // send 
             var (isSuccess, error) = await _contractProvider.SendTransactionAsync(toTransfer.ChainId, rawTransaction);
             AssertHelper.IsTrue(isSuccess, error);

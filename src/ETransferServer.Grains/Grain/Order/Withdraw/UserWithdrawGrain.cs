@@ -60,6 +60,7 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
 
     private IUserWithdrawRecordGrain _recordGrain;
     private IOrderStatusFlowGrain _orderStatusFlowGrain;
+    private IOrderTxFlowGrain _orderTxFlowGrain;
     private IUserWithdrawTxTimerGrain _withdrawTxTimerGrain;
     private IUserWithdrawTxFastTimerGrain _withdrawFastTimerGrain;
     private IWithdrawOrderRetryTimerGrain _withdrawOrderRetryTimerGrain;
@@ -102,6 +103,7 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
 
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
+        _logger.LogInformation("StreamProvider withdraw subscribe start, {Key}", this.GetPrimaryKey());
         await base.OnActivateAsync(cancellationToken);
 
         // subscribe stream
@@ -109,13 +111,14 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         _orderChangeStream =
             streamProvider.GetStream<WithdrawOrderDto>(_withdrawOptions.Value.OrderChangeTopic,
                 this.GetPrimaryKey());
-        await _orderChangeStream.SubscribeAsync(OnNextAsync);
+        await _orderChangeStream.SubscribeAsync(OnNextAsync, OnErrorAsync, OnCompletedAsync);
         _logger.LogInformation("StreamProvider withdraw subscribe ok.");
 
         // other grain
         _recordGrain = GrainFactory.GetGrain<IUserWithdrawRecordGrain>(this.GetPrimaryKey());
         _orderStatusFlowGrain = GrainFactory.GetGrain<IOrderStatusFlowGrain>(this.GetPrimaryKey());
-
+        _orderTxFlowGrain = GrainFactory.GetGrain<IOrderTxFlowGrain>(this.GetPrimaryKey());
+        
         _withdrawTxTimerGrain =
             GrainFactory.GetGrain<IUserWithdrawTxTimerGrain>(
                 GuidHelper.UniqGuid(nameof(IUserWithdrawTxTimerGrain)));

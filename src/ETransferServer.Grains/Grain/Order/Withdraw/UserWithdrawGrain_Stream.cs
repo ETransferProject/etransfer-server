@@ -74,10 +74,12 @@ public partial class UserWithdrawGrain
             case OrderStatusEnum.ToTransferConfirmed:
                 orderDto.Status = OrderStatusEnum.Finish.ToString();
                 await AddOrUpdateOrder(orderDto);
+                await SaveOrderTxFlowAsync(orderDto);
                 break;
             case OrderStatusEnum.ToTransferFailed:
                 _logger.LogError("Order {Id} ToTransferFailed, invalid status, current status={Status}",
                     this.GetPrimaryKey(), status.ToString());
+                await SaveOrderTxFlowAsync(orderDto);
                 await AddToRetryTx(orderDto);
                 break;
             
@@ -87,6 +89,7 @@ public partial class UserWithdrawGrain
                     status.ToString());
                 await HandleWithdrawQueryGrain(orderDto.FromTransfer.TxId);
                 await ChangeOperationStatus(orderDto);
+                await SaveOrderTxFlowAsync(orderDto);
                 await _bus.Publish(_objectMapper.Map<WithdrawOrderDto, OrderChangeEto>(orderDto));
                 break;
             case OrderStatusEnum.Expired:
@@ -96,6 +99,7 @@ public partial class UserWithdrawGrain
                 await ReverseTokenLimitAsync(orderDto.Id, orderDto.ToTransfer.Symbol, orderDto.AmountUsd);
                 await HandleWithdrawQueryGrain(orderDto.FromTransfer.TxId);
                 await ChangeOperationStatus(orderDto, false);
+                await SaveOrderTxFlowAsync(orderDto);
                 await _bus.Publish(_objectMapper.Map<WithdrawOrderDto, OrderChangeEto>(orderDto));
                 break;
 
@@ -236,6 +240,22 @@ public partial class UserWithdrawGrain
             await recordGrain.AddOrUpdate(orderRelated);
             await _userWithdrawProvider.AddOrUpdateSync(orderRelated);
         }
+    }
+    
+    private async Task SaveOrderTxFlowAsync(WithdrawOrderDto order, string status = null)
+    {
+        if (order.ToTransfer.TxId.IsNullOrEmpty()) return;
+        await _orderTxFlowGrain.AddOrUpdate(new OrderTxData
+        {
+            TxId = order.ToTransfer.TxId,
+            ChainId = order.ToTransfer.ChainId,
+            Status = !status.IsNullOrEmpty()
+                ? status
+                : order.Status == OrderStatusEnum.ToTransferConfirmed.ToString() ||
+                  order.Status == OrderStatusEnum.Finish.ToString()
+                    ? ThirdPartOrderStatusEnum.Success.ToString()
+                    : ThirdPartOrderStatusEnum.Fail.ToString()
+        });
     }
 
     private async Task HandleWithdrawQueryGrain(string transactionId)

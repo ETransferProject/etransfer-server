@@ -8,9 +8,11 @@ using ETransferServer.Common.ChainsClient;
 using ETransferServer.Dtos.GraphQL;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Dtos.Token;
+using ETransferServer.Grains.Grain.Order;
 using ETransferServer.Grains.Grain.Order.Deposit;
 using ETransferServer.Grains.Grain.Token;
 using ETransferServer.Grains.Options;
+using ETransferServer.Grains.State.Order;
 using ETransferServer.Grains.State.Swap;
 using ETransferServer.Options;
 using Google.Protobuf;
@@ -85,6 +87,7 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
                 return result;
             }
 
+            var newTxId = string.Empty;
             Transaction rawTransaction;
             if (dto.FromRawTransaction.IsNullOrEmpty())
             {
@@ -132,25 +135,48 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
                     _chainOptions.ChainInfos[toTransfer.ChainId].ReleaseAccount,
                     CommonConstant.ETransferTokenPoolContractName, CommonConstant.ETransferSwapToken, swapInput);
 
-                toTransfer.TxId = txId.ToHex();
+                newTxId = txId.ToHex();
                 rawTransaction = newTransaction;
-                dto.FromRawTransaction = newTransaction.ToByteArray().ToHex();
             }
             else
             {
                 rawTransaction = Transaction.Parser.ParseFrom(ByteStringHelper.FromHexString(dto.FromRawTransaction));
             }
 
-            toTransfer.TxTime = DateTime.UtcNow.ToUtcMilliSeconds();
             toTransfer.Status = OrderTransferStatusEnum.Transferring.ToString();
-
             dto.Status = OrderStatusEnum.ToTransferring.ToString();
 
+            // check
+            var txFlowGrain = GrainFactory.GetGrain<IOrderTxFlowGrain>(dto.Id);
+            if (!await txFlowGrain.Check(dto.ToTransfer.ChainId))
+            {
+                _logger.LogInformation("Swap send transaction intercept hit: {OrderId}, {ChainId}",
+                    dto.Id, dto.ToTransfer.ChainId);
+                result.Data = new DepositOrderChangeDto
+                {
+                    DepositOrder = dto
+                };
+                return result;
+            }
+            
+            if (!newTxId.IsNullOrEmpty())
+            {
+                toTransfer.TxId = newTxId;
+                dto.FromRawTransaction = rawTransaction.ToByteArray().ToHex();
+            }
+            toTransfer.TxTime = DateTime.UtcNow.ToUtcMilliSeconds();
+            await txFlowGrain.AddOrUpdate(new OrderTxData
+            {
+                TxId = toTransfer.TxId,
+                ChainId = toTransfer.ChainId,
+                Status = ThirdPartOrderStatusEnum.Pending.ToString()
+            });
+            
             var recordGrain = GrainFactory.GetGrain<IUserDepositRecordGrain>(dto.Id);
             var response = await recordGrain.CreateOrUpdateAsync(dto);
             await _userDepositProvider.AddOrUpdateSync(response.Value);
             _logger.LogInformation("swap save grain, {orderId}", dto.Id);
-
+            
             // send 
             var (isSuccess, error) = await _contractProvider.SendTransactionAsync(toTransfer.ChainId, rawTransaction);
             AssertHelper.IsTrue(isSuccess, error);
