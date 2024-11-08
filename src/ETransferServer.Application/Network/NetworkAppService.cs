@@ -107,17 +107,23 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
     public async Task<GetNetworkListDto> GetNetworkListWithLocalFeeAsync(GetNetworkListRequestDto request, string version = null)
     {
         AssertHelper.NotNull(request, "Request empty. Please refresh and try again.");
-        AssertHelper.NotEmpty(request.ChainId, "Invalid chainId. Please refresh and try again.");
-        AssertHelper.NotEmpty(request.Type, "Invalid type. Please refresh and try again.");
         AssertHelper.NotEmpty(request.Symbol, "Invalid symbol. Please refresh and try again.");
+        AssertHelper.NotEmpty(request.Type, "Invalid type. Please refresh and try again.");
+        if (request.Type == OrderTypeEnum.Deposit.ToString() || request.Type == OrderTypeEnum.Withdraw.ToString())
+        {
+            AssertHelper.NotEmpty(request.ChainId, "Invalid chainId. Please refresh and try again.");
+        }
         AssertHelper.IsTrue(request.Type == OrderTypeEnum.Deposit.ToString()
-                            || request.Type == OrderTypeEnum.Withdraw.ToString(),
+                            || request.Type == OrderTypeEnum.Withdraw.ToString()
+                            || request.Type == OrderTypeEnum.Transfer.ToString(),
             "Invalid type value. Please refresh and try again.");
         AssertHelper.IsTrue(_networkOptions.Value.NetworkMap.ContainsKey(request.Symbol),
             "Symbol is not exist. Please refresh and try again.");
 
         var networkConfigs = _networkOptions.Value.NetworkMap[request.Symbol].Where(a =>
-                a.SupportType.Contains(request.Type) && a.SupportChain.Contains(request.ChainId))
+                request.Type == OrderTypeEnum.Transfer.ToString() 
+                    ? a.SupportType.Contains(request.Type) 
+                    : a.SupportType.Contains(request.Type) && a.SupportChain.Contains(request.ChainId))
             .ToList();
         networkConfigs = await FilterByVersionAndWhiteList(networkConfigs, version);
 
@@ -207,7 +213,7 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
 
     public Task<int> GetDecimalsAsync(string chainId, string symbol)
     {
-        return Task.FromResult((_tokenOptions.Value.Withdraw.ContainsKey(chainId)
+        return Task.FromResult((!chainId.IsNullOrEmpty() && _tokenOptions.Value.Withdraw.ContainsKey(chainId)
                 ? _tokenOptions.Value.Withdraw[chainId]
                 : null)
             ?.FirstOrDefault(t => t.Symbol == symbol)
@@ -357,7 +363,8 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
                 multiConfirmSeconds = config.DepositInfo.MultiConfirmSeconds;
             }
 
-            if (type == OrderTypeEnum.Withdraw.ToString() && config.WithdrawInfo != null)
+            if ((type == OrderTypeEnum.Withdraw.ToString() || type == OrderTypeEnum.Transfer.ToString())
+                && config.WithdrawInfo != null)
             {
                 networkDto.Status = config.WithdrawInfo.IsOpen
                     ? CommonConstant.NetworkStatus.Health

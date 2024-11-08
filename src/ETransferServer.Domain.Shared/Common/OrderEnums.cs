@@ -4,6 +4,7 @@ public enum OrderTypeEnum
 {
     Deposit = 1,
     Withdraw,
+    Transfer
 }
 
 public enum OrderTransferStatusEnum
