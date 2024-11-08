@@ -72,4 +72,13 @@ public partial class UserAppService : ApplicationService, IUserAppService
             Result = user != null
         };
     }
+
+    public async Task<RegistrationResult> CheckRegistrationAsync(GetRegistrationResultRequestDto requestDto)
+    {
+        var user = await _userManager.FindByNameAsync(requestDto.Address);
+        return new RegistrationResult
+        {
+            Result = user != null && user.Email.ToLower().Contains(requestDto.SourceType.ToLower())
+        };
+    }
 }
