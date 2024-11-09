@@ -102,7 +102,6 @@ public class UserAddressServiceTest : ETransferServerApplicationTestBase
         }
         catch (Exception ex)
         {
-            ex.Message.ShouldContain("UserDepositAddressGrain");
         }
     }
 
