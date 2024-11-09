@@ -69,9 +69,13 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
 
         try
         {
-            getNetworkListDto.NetworkList = request.Symbol == CommonConstant.Symbol.USDT ?
-                await CalculateNetworkFeeListAsync(getNetworkListDto.NetworkList, request.ChainId, request.Symbol)
-                : await CalculateAvgNetworkFeeListAsync(getNetworkListDto.NetworkList, request.ChainId, request.Symbol);
+            if (!request.Symbol.IsNullOrEmpty())
+            {
+                getNetworkListDto.NetworkList = request.Symbol == CommonConstant.Symbol.USDT
+                    ? await CalculateNetworkFeeListAsync(getNetworkListDto.NetworkList, request.ChainId, request.Symbol)
+                    : await CalculateAvgNetworkFeeListAsync(getNetworkListDto.NetworkList, request.ChainId,
+                        request.Symbol);
+            }
         }
         catch (Exception e)
         {
@@ -107,20 +111,25 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
     public async Task<GetNetworkListDto> GetNetworkListWithLocalFeeAsync(GetNetworkListRequestDto request, string version = null)
     {
         AssertHelper.NotNull(request, "Request empty. Please refresh and try again.");
-        AssertHelper.NotEmpty(request.Symbol, "Invalid symbol. Please refresh and try again.");
         AssertHelper.NotEmpty(request.Type, "Invalid type. Please refresh and try again.");
         if (request.Type == OrderTypeEnum.Deposit.ToString() || request.Type == OrderTypeEnum.Withdraw.ToString())
         {
+            AssertHelper.NotEmpty(request.Symbol, "Invalid symbol. Please refresh and try again.");
             AssertHelper.NotEmpty(request.ChainId, "Invalid chainId. Please refresh and try again.");
         }
         AssertHelper.IsTrue(request.Type == OrderTypeEnum.Deposit.ToString()
                             || request.Type == OrderTypeEnum.Withdraw.ToString()
                             || request.Type == OrderTypeEnum.Transfer.ToString(),
             "Invalid type value. Please refresh and try again.");
-        AssertHelper.IsTrue(_networkOptions.Value.NetworkMap.ContainsKey(request.Symbol),
+        AssertHelper.IsTrue(request.Symbol.IsNullOrEmpty() || (!request.Symbol.IsNullOrEmpty() 
+                            && _networkOptions.Value.NetworkMap.ContainsKey(request.Symbol)),
             "Symbol is not exist. Please refresh and try again.");
 
-        var networkConfigs = _networkOptions.Value.NetworkMap[request.Symbol].Where(a =>
+        var networkConfigs = request.Symbol.IsNullOrEmpty()
+            ? _networkOptions.Value.NetworkMap.SelectMany(kvp => kvp.Value).Where(a =>
+                a.SupportType.Contains(request.Type)).GroupBy(g => g.NetworkInfo.Network)
+                .Select(s => s.First()).ToList()
+            : _networkOptions.Value.NetworkMap[request.Symbol].Where(a =>
                 request.Type == OrderTypeEnum.Transfer.ToString() 
                     ? a.SupportType.Contains(request.Type) 
                     : a.SupportType.Contains(request.Type) && a.SupportChain.Contains(request.ChainId))
@@ -316,6 +325,7 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
 
     private async Task<string> GetCacheFeeAsync(string network, string symbol)
     {
+        if (symbol.IsNullOrEmpty()) return null;
         var coBoCoinGrain = _clusterClient.GetGrain<ICoBoCoinGrain>(ICoBoCoinGrain.Id(network, symbol));
         var coin = await coBoCoinGrain.GetCache();
         return coin?.AbsEstimateFee;
