@@ -1,3 +1,4 @@
+using AElf.ExceptionHandler.ABP;
 using AElf.OpenTelemetry;
 using Localization.Resources.AbpUi;
 using Medallion.Threading;
@@ -45,7 +46,8 @@ namespace ETransferServer.Auth;
     typeof(AbpAspNetCoreSerilogModule),
     typeof(AbpEventBusRabbitMqModule),
     typeof(ETransferServerGrainsModule),
-    typeof(OpenTelemetryModule)
+    typeof(OpenTelemetryModule),
+    typeof(AOPExceptionModule)
 )]
 public class ETransferAuthServerModule : AbpModule
 {
