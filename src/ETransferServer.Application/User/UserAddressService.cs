@@ -50,11 +50,18 @@ public partial class UserAddressService : ApplicationService, IUserAddressServic
         {
             throw new UserFriendlyException("Request invalid. Please refresh and try again.");
         }
+        
+        var userGrain = _clusterClient.GetGrain<IUserGrain>(CurrentUser.GetId());
+        var userDto = await userGrain.GetUser();
+        if (userDto.Success && userDto.Data != null
+                            && Enum.TryParse<WalletEnum>(userDto.Data.AppId, true, out var walletType)
+                            && walletType == WalletEnum.TON)
+            throw new UserFriendlyException("Request invalid. Please refresh and try again.");
 
         input.UserId = CurrentUser.GetId().ToString();
-        var userGrain =
+        var userAddressGrain =
             _clusterClient.GetGrain<IUserDepositAddressGrain>(GenerateGrainId(input));
-        var address = await userGrain.GetUserAddress(input);
+        var address = await userAddressGrain.GetUserAddress(input);
         if (string.IsNullOrEmpty(address))
         {
             _logger.LogError("Assign address fail: {userId},{chainId},{netWork},{symbol}", input.UserId, input.ChainId,
