@@ -77,13 +77,14 @@ public partial class UserAppService : ApplicationService, IUserAppService
 
     public async Task<RegistrationResult> CheckRegistrationAsync(GetRegistrationResultRequestDto requestDto)
     {
-        var user = await _userManager.FindByNameAsync(requestDto.Address);
+        if (!Enum.TryParse<WalletEnum>(requestDto.SourceType, true, out _))
+            return new RegistrationResult { Result = false };
+        var fullAddress = string.Concat(requestDto.SourceType.ToLower(), CommonConstant.Underline, requestDto.Address);
+        var user = await _userManager.FindByNameAsync(fullAddress);
+        if (user == null) user = await _userManager.FindByNameAsync(requestDto.Address);
         return new RegistrationResult
         {
-            Result = user != null && Enum.TryParse<WalletEnum>(requestDto.SourceType, true, out var t)
-                                  && (((int)t <= 1 && user.Email.ToLower().Contains(Abp))
-                                      || ((int)t > 1 && user.Email.ToLower()
-                                          .Contains("@" + requestDto.SourceType.ToLower())))
+            Result = user != null
         };
     }
 }
