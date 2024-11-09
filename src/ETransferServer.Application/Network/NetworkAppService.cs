@@ -126,14 +126,16 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
             "Symbol is not exist. Please refresh and try again.");
 
         var networkConfigs = request.Symbol.IsNullOrEmpty()
-            ? _networkOptions.Value.NetworkMap.SelectMany(kvp => kvp.Value).Where(a =>
-                a.SupportType.Contains(request.Type)).GroupBy(g => g.NetworkInfo.Network)
+            ? _networkOptions.Value.NetworkMap.OrderBy(m => 
+                    _tokenOptions.Value.Transfer.Select(t => t.Symbol).ToList().IndexOf(m.Key))
+                .SelectMany(kvp => kvp.Value).Where(a =>
+                    a.SupportType.Contains(request.Type)).GroupBy(g => g.NetworkInfo.Network)
                 .Select(s => s.First()).ToList()
             : _networkOptions.Value.NetworkMap[request.Symbol].Where(a =>
-                request.Type == OrderTypeEnum.Transfer.ToString() 
-                    ? a.SupportType.Contains(request.Type) 
-                    : a.SupportType.Contains(request.Type) && a.SupportChain.Contains(request.ChainId))
-            .ToList();
+                    request.Type == OrderTypeEnum.Transfer.ToString() 
+                        ? a.SupportType.Contains(request.Type) 
+                        : a.SupportType.Contains(request.Type) && a.SupportChain.Contains(request.ChainId))
+                .ToList();
         networkConfigs = await FilterByVersionAndWhiteList(networkConfigs, version);
 
         var networkInfos = networkConfigs.Select(config => config.NetworkInfo).ToList();
