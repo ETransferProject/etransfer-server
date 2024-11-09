@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using AElf.ExceptionHandler;
 using AElf.Indexing.Elasticsearch;
+using ETransferServer.Common;
 using ETransferServer.Dtos.User;
 using Microsoft.Extensions.Logging;
 using Nest;
@@ -22,6 +23,7 @@ public partial class UserAppService : ApplicationService, IUserAppService
 {
     private readonly INESTRepository<UserIndex, Guid> _userIndexRepository;
     private readonly IdentityUserManager _userManager;
+    private const string Abp = "@abp";
     
     public UserAppService(INESTRepository<UserIndex, Guid> userIndexRepository, IdentityUserManager userManager)
     {
@@ -78,7 +80,10 @@ public partial class UserAppService : ApplicationService, IUserAppService
         var user = await _userManager.FindByNameAsync(requestDto.Address);
         return new RegistrationResult
         {
-            Result = user != null && user.Email.ToLower().Contains(requestDto.SourceType.ToLower())
+            Result = user != null && Enum.TryParse<WalletEnum>(requestDto.SourceType, true, out var t)
+                                  && (((int)t <= 1 && user.Email.ToLower().Contains(Abp))
+                                      || ((int)t > 1 && user.Email.ToLower()
+                                          .Contains("@" + requestDto.SourceType.ToLower())))
         };
     }
 }
