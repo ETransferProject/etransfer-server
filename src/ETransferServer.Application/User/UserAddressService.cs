@@ -55,7 +55,7 @@ public partial class UserAddressService : ApplicationService, IUserAddressServic
         var userDto = await userGrain.GetUser();
         if (userDto.Success && userDto.Data != null
                             && Enum.TryParse<WalletEnum>(userDto.Data.AppId, true, out var walletType)
-                            && walletType == WalletEnum.TON)
+                            && (int)walletType > 1)
             throw new UserFriendlyException("Request invalid. Please refresh and try again.");
 
         input.UserId = CurrentUser.GetId().ToString();
