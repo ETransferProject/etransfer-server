@@ -136,6 +136,7 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
 
     public async Task AddToRequest(WithdrawOrderDto order)
     {
+        var callGrain = GrainFactory.GetGrain<IWithdrawOrderCallGrain>(order.Id);
         try
         {
             var orderGrain = GrainFactory.GetGrain<IUserWithdrawRecordGrain>(order.Id);
@@ -146,8 +147,10 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
                 return;
             }
 
+            await callGrain.AddOrGet(2);
             var result = await Withdraw(order);
 
+            await callGrain.AddOrGet(3);
             if (result.success)
             {
                 order.Status = OrderStatusEnum.ToTransferring.ToString();
@@ -176,6 +179,7 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
         }
         catch (Exception e)
         {
+            await callGrain.AddOrGet(4);
             _logger.LogError(e, "add to request error, orderId:{orderId}", order.Id);
         }
     }
