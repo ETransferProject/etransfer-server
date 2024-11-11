@@ -118,12 +118,30 @@ public partial class UserWithdrawGrain
         return Task.CompletedTask;
     }
 
-    public Task OnErrorAsync(Exception ex)
+    public async Task OnErrorAsync(Exception ex)
     {
         _logger.LogError(ex, "withdraw order {Id} stream OnError", this.GetPrimaryKey());
-        return Task.CompletedTask;
+        await HandlerWithdrawError();
     }
-    
+
+    private async Task HandlerWithdrawError()
+    {
+        var callGrain = GrainFactory.GetGrain<IWithdrawOrderCallGrain>(this.GetPrimaryKey());
+        if (!await callGrain.AddRetry()) return;
+        var order = await _recordGrain.Get();
+        if (order?.Value == null) return;
+        var status = await callGrain.AddOrGet();
+        if (status >= 1 && status <= 2)
+        {
+            await AddToStartTransfer(order.Value, order.Value.ToTransfer.Network == CommonConstant.Network.AElf);
+        }
+        else if (status >= 3)
+        {
+            order.Value.Status = OrderStatusEnum.ToTransferring.ToString();
+            await AddOrUpdateOrder(order.Value);
+        }
+    }
+
     private async Task WithdrawLargeAmountAlarmAsync(WithdrawOrderDto orderDto)
     {
         var withdrawOrderMonitorGrain = GrainFactory.GetGrain<IWithdrawOrderMonitorGrain>(orderDto.Id.ToString());
@@ -132,6 +150,8 @@ public partial class UserWithdrawGrain
 
     private async Task AddToStartTransfer(WithdrawOrderDto orderDto, bool isAElf)
     {
+        var callGrain = GrainFactory.GetGrain<IWithdrawOrderCallGrain>(orderDto.Id);
+        await callGrain.AddOrGet(1);
         if (isAElf)
         {
             var order = await OnToStartTransfer(orderDto, true);
