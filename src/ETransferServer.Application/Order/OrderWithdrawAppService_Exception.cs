@@ -14,8 +14,20 @@ public partial class OrderWithdrawAppService
         string version = null)
     {
         _logger.LogError(ex,
-            "Create withdraw order error, chainId:{chainId}, network:{network}, address:{address}, amount:{amount}, symbol:{symbol}",
+            "Get order info error, chainId:{chainId}, network:{network}, address:{address}, amount:{amount}, symbol:{symbol}",
             request.ChainId, request.Network, request.Address, request.Amount, request.Symbol);
+        return new FlowBehavior
+        {
+            ExceptionHandlingStrategy = ExceptionHandlingStrategy.Rethrow
+        };
+    }
+    
+    public async Task<FlowBehavior> HandleGetTransferInfoExceptionAsync(Exception ex, GetTransferListRequestDto request, 
+        string version = null)
+    {
+        _logger.LogError(ex,
+            "Get order info error, fromNetwork:{fromNetwork}, toNetwork:{toNetwork}, toAddress:{toAddress}, amount:{amount}, symbol:{symbol}",
+            request.FromNetwork, request.ToNetwork, request.ToAddress, request.Amount, request.Symbol);
         return new FlowBehavior
         {
             ExceptionHandlingStrategy = ExceptionHandlingStrategy.Rethrow

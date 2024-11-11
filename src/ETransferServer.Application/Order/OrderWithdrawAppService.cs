@@ -423,7 +423,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
         {
             var network = await _networkAppService.GetNetworkListWithLocalFeeAsync(new GetNetworkListRequestDto
             {
-                Type = OrderTypeEnum.Withdraw.ToString(),
+                Type = VerifyAElfChain(chainId) ? OrderTypeEnum.Withdraw.ToString() : OrderTypeEnum.Transfer.ToString(),
                 ChainId = chainId,
                 Symbol = symbol,
                 Address = address

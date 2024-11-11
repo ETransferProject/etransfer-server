@@ -46,5 +46,14 @@ public class ETransferServerApplicationAutoMapperProfile : Profile
         CreateMap<NetworkInfo, NetworkOptionDto>().ReverseMap();
         CreateMap<OrderStatusFlowDto, OrderStatusFlow>().ReverseMap();
         CreateMap<OrderChangeEto, OrderIndex>().ReverseMap();
+        CreateMap<GetTransferListRequestDto, GetWithdrawListRequestDto>().ForMember(
+                destination => destination.ChainId,
+                opt => opt.MapFrom(source => source.FromNetwork))
+            .ForMember(
+                destination => destination.Network,
+                opt => opt.MapFrom(source => source.ToNetwork))
+            .ForMember(
+                destination => destination.Address,
+                opt => opt.MapFrom(source => source.ToAddress));
     }
 }
