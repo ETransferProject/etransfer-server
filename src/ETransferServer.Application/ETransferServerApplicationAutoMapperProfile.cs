@@ -6,12 +6,14 @@ using ETransferServer.Dtos.Reconciliation;
 using ETransferServer.Dtos.User;
 using ETransferServer.Entities;
 using ETransferServer.Etos.Order;
+using ETransferServer.Models;
 using ETransferServer.Orders;
 using ETransferServer.User.Dtos;
 using ETransferServer.Network.Dtos;
 using ETransferServer.Options;
 using ETransferServer.Users;
 using ETransferServer.Token.Dtos;
+using ETransferServer.WithdrawOrder.Dtos;
 
 namespace ETransferServer;
 
@@ -55,5 +57,15 @@ public class ETransferServerApplicationAutoMapperProfile : Profile
             .ForMember(
                 destination => destination.Address,
                 opt => opt.MapFrom(source => source.ToAddress));
+        CreateMap<CreateWithdrawOrderDto, CreateTransferOrderDto>().ReverseMap();
+        CreateMap<GetTransferOrderRequestDto, GetWithdrawOrderRequestDto>().ForMember(
+                destination => destination.FromChainId,
+                opt => opt.MapFrom(source => source.FromNetwork))
+            .ForMember(
+                destination => destination.Network,
+                opt => opt.MapFrom(source => source.ToNetwork))
+            .ForMember(
+                destination => destination.Symbol,
+                opt => opt.MapFrom(source => source.FromSymbol));
     }
 }

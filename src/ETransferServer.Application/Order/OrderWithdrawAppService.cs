@@ -449,7 +449,8 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
             ErrorResult.SymbolInvalidCode, null, request.Symbol);
         AssertHelper.IsTrue(await IsAddressSupport(request.FromChainId, request.Symbol, request.ToAddress, version),
             ErrorResult.AddressInvalidCode);
-        AssertHelper.IsTrue(IsNetworkOpen(request.Symbol, request.Network), ErrorResult.CoinSuspendedTemporarily);
+        AssertHelper.IsTrue(IsNetworkOpen(request.Symbol, request.Network, OrderTypeEnum.Withdraw.ToString()), 
+            ErrorResult.CoinSuspendedTemporarily);
         AssertHelper.IsTrue(VerifyMemo(request.Memo), ErrorResult.MemoInvalidCode);
         
         var networkConfig = _networkInfoOptions.Value.NetworkMap[request.Symbol]
@@ -523,10 +524,10 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
         return await DoCreateOrderAsync(request, transaction, withdrawAmount, inputThirdPartFee.ToString());
     }
 
-    private bool IsNetworkOpen(string symbol, string network)
+    private bool IsNetworkOpen(string symbol, string network, string orderType)
     {
         return _networkInfoOptions.Value.NetworkMap[symbol].Exists(t =>
-            t.NetworkInfo.Network == network && t.SupportType.Contains(OrderTypeEnum.Withdraw.ToString()) &&
+            t.NetworkInfo.Network == network && t.SupportType.Contains(orderType) &&
             t.WithdrawInfo.IsOpen);
     }
 
@@ -582,7 +583,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
             }
 
             var order = await grain.CreateOrder(withdrawOrderDto);
-            var getWithdrawOrderInfoDto = new CreateWithdrawOrderDto()
+            var getWithdrawOrderInfoDto = new CreateWithdrawOrderDto
             {
                 OrderId = order.Id.ToString(),
                 TransactionId = transaction.GetHash().ToHex()

@@ -51,6 +51,23 @@ public partial class OrderWithdrawAppService
         };
     }
     
+    public async Task<FlowBehavior> HandleCreateTransferExceptionAsync(Exception ex, GetTransferOrderRequestDto request, 
+        string version = null)
+    {
+        if (ex is UserFriendlyException)
+        {
+            _logger.LogWarning(ex, "Create transfer order failed");
+        }
+        else
+        {
+            _logger.LogError(ex, "Create transfer order failed");
+        }
+        return new FlowBehavior
+        {
+            ExceptionHandlingStrategy = ExceptionHandlingStrategy.Rethrow
+        };
+    }
+    
     public async Task<FlowBehavior> HandleSaveExceptionAsync(Exception ex, WithdrawOrderDto dto)
     {
         _logger.LogError(ex, "Save withdrawOrderIndex fail: {id}", dto.Id);

@@ -13,5 +13,6 @@ public interface IOrderWithdrawAppService : IApplicationService
     Task<GetWithdrawInfoDto> GetWithdrawInfoAsync(GetWithdrawListRequestDto request, string version = null);
     Task<GetWithdrawInfoDto> GetTransferInfoAsync(GetTransferListRequestDto request, string version = null);
     Task<CreateWithdrawOrderDto> CreateWithdrawOrderInfoAsync(GetWithdrawOrderRequestDto request, string version = null);
+    Task<CreateTransferOrderDto> CreateTransferOrderInfoAsync(GetTransferOrderRequestDto request, string version = null);
     Task DoMonitorAsync(string network, decimal estimateFee, string feeSymbol, bool isNotify);
 }

@@ -1,12 +1,19 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using AElf.ExceptionHandler;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Order;
+using ETransferServer.Grains.Grain.Order.Withdraw;
 using ETransferServer.Grains.Grain.TokenLimit;
+using ETransferServer.Grains.Grain.Users;
+using ETransferServer.Models;
 using ETransferServer.Withdraw.Dtos;
+using ETransferServer.WithdrawOrder.Dtos;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using Volo.Abp;
 using Volo.Abp.Users;
 
 namespace ETransferServer.Order;
@@ -125,5 +132,144 @@ public partial class OrderWithdrawAppService
         {
             WithdrawInfo = withdrawInfoDto
         };
+    }
+    
+    [ExceptionHandler(typeof(UserFriendlyException), typeof(Exception), 
+        TargetType = typeof(OrderWithdrawAppService), MethodName = nameof(HandleCreateTransferExceptionAsync))]
+    public async Task<CreateTransferOrderDto> CreateTransferOrderInfoAsync(GetTransferOrderRequestDto request, string version = null)
+    {
+        if (request.FromNetwork == ChainId.AELF || request.FromNetwork == ChainId.tDVV ||
+            request.FromNetwork == ChainId.tDVW)
+        {
+            var result = await CreateWithdrawOrderInfoAsync(
+                _objectMapper.Map<GetTransferOrderRequestDto, GetWithdrawOrderRequestDto>(request), version);
+            return _objectMapper.Map<CreateWithdrawOrderDto, CreateTransferOrderDto>(result);
+        }
+        
+        _logger.LogDebug("CreateTransferOrder: {request}", JsonConvert.SerializeObject(request));
+        var userId = CurrentUser.GetId();
+        AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.FromSymbol),
+            ErrorResult.SymbolInvalidCode, null, request.FromSymbol);
+        AssertHelper.IsTrue(request.FromSymbol == request.ToSymbol, 
+            "Symbol is invalid. Please refresh and try again.");
+        AssertHelper.IsTrue(await IsAddressSupport(request.FromNetwork, request.FromSymbol, request.ToAddress, version),
+            ErrorResult.AddressInvalidCode);
+        AssertHelper.IsTrue(IsNetworkOpen(request.ToSymbol, request.ToNetwork, OrderTypeEnum.Transfer.ToString()), 
+            ErrorResult.CoinSuspendedTemporarily);
+        AssertHelper.IsTrue(VerifyMemo(request.Memo), ErrorResult.MemoInvalidCode);
+        
+        var networkConfig = _networkInfoOptions.Value.NetworkMap[request.FromSymbol]
+            .FirstOrDefault(t => t.NetworkInfo.Network == request.FromNetwork);
+        AssertHelper.NotNull(networkConfig, ErrorResult.NetworkInvalidCode);
+        AssertHelper.IsTrue(await VerifyByVersionAndWhiteList(networkConfig, userId, version), ErrorResult.VersionOrWhitelistVerifyFailCode);
+        networkConfig = _networkInfoOptions.Value.NetworkMap[request.ToSymbol]
+            .FirstOrDefault(t => t.NetworkInfo.Network == request.ToNetwork);
+        AssertHelper.NotNull(networkConfig, ErrorResult.NetworkInvalidCode);
+        AssertHelper.IsTrue(await VerifyByVersionAndWhiteList(networkConfig, userId, version), ErrorResult.VersionOrWhitelistVerifyFailCode);
+
+        if (VerifyAElfChain(request.ToNetwork))
+        {
+            AssertHelper.IsTrue(VerifyHelper.VerifyAelfAddress(request.ToAddress), ErrorResult.AddressFormatWrongCode);
+        }
+
+        var userGrain = _clusterClient.GetGrain<IUserGrain>(userId);
+        var userDto = await userGrain.GetUser();
+        AssertHelper.IsTrue(userDto.Success, ErrorResult.JwtInvalidCode);
+
+        var thirdPartFee = 0M;
+        var coBoCoinCacheKey =
+            CacheKey(FeeInfo.FeeName.CoBoFee, userId.ToString(), request.ToNetwork, request.ToSymbol);
+        var thirdPartFeeDto = await _coBoCoinCache.GetAsync(coBoCoinCacheKey);
+        AssertHelper.IsTrue(thirdPartFeeDto != null, ErrorResult.FeeExpiredCode);
+        _logger.LogDebug("Cobo fee get cache: {fee}", thirdPartFeeDto.AbsEstimateFee);
+        var inputThirdPartFee = thirdPartFeeDto.AbsEstimateFee.SafeToDecimal(-1);
+        AssertHelper.IsTrue(inputThirdPartFee >= 0, ErrorResult.FeeInvalidCode);
+        
+        if (!VerifyAElfChain(request.ToNetwork))
+        { 
+            // query fees async
+            thirdPartFee = (await CalculateThirdPartFeeAsync(userId, request.ToNetwork, request.ToSymbol)).Item1;
+            AssertHelper.IsTrue(
+                Math.Abs(inputThirdPartFee - thirdPartFee) / thirdPartFee <=
+                _withdrawInfoOptions.Value.FeeFluctuationPercent,
+                ErrorResult.FeeExceedCode, null, request.ToNetwork);
+        }
+
+        // withdraw fee to thirdPart
+        var withdrawAmount = request.Amount - inputThirdPartFee;
+        AssertHelper.IsTrue(withdrawAmount > 0, ErrorResult.AmountInsufficientCode);
+
+        var minWithdraw = Math.Max(thirdPartFee, _withdrawInfoOptions.Value.MinWithdraw)
+            .ToString(2, DecimalHelper.RoundingOption.Ceiling)
+            .SafeToDecimal();
+        AssertHelper.IsTrue(request.Amount >= minWithdraw, ErrorResult.AmountInsufficientCode);
+
+        // Do create
+        return await DoCreateOrderAsync(request, withdrawAmount, inputThirdPartFee.ToString());
+    }
+    
+    private async Task<CreateTransferOrderDto> DoCreateOrderAsync(GetTransferOrderRequestDto request,
+        decimal withdrawAmount, string feeStr)
+    {
+        // amount limit
+        var amountUsd = await CalculateAmountUsdAsync(request.FromSymbol, request.Amount);
+        var tokenInfoGrain =
+            _clusterClient.GetGrain<ITokenWithdrawLimitGrain>(ITokenWithdrawLimitGrain.GenerateGrainId(request.FromSymbol));
+        AssertHelper.IsTrue(await tokenInfoGrain.Acquire(amountUsd), ErrorResult.WithdrawLimitInsufficientCode, null,
+            (await tokenInfoGrain.GetLimit()).RemainingLimit, TimeHelper.GetHourDiff(DateTime.UtcNow,
+                DateTime.UtcNow.AddDays(1).Date));
+        try
+        {
+            var orderId = Guid.NewGuid();
+            var grain = _clusterClient.GetGrain<IUserWithdrawGrain>(orderId);
+            var withdrawOrderDto = new WithdrawOrderDto
+            {
+                UserId = CurrentUser.GetId(),
+                OrderType = OrderTypeEnum.Withdraw.ToString(),
+                AmountUsd = amountUsd,
+                FromTransfer = new TransferInfo
+                {
+                    Network = request.FromNetwork,
+                    Amount = request.Amount,
+                    Symbol = request.FromSymbol,
+                    FromAddress = request.FromAddress
+                },
+                ToTransfer = new TransferInfo
+                {
+                    Network = VerifyAElfChain(request.ToNetwork) ? CommonConstant.Network.AElf : request.ToNetwork,
+                    ChainId = VerifyAElfChain(request.ToNetwork) ? request.ToNetwork : string.Empty,
+                    ToAddress = request.ToAddress,
+                    Amount = withdrawAmount,
+                    Symbol = request.ToSymbol,
+                    FeeInfo = new List<FeeInfo>
+                    {
+                        new(request.ToSymbol, feeStr)
+                    }
+                }
+            };
+            withdrawOrderDto.ExtensionInfo = new Dictionary<string, string>();
+            withdrawOrderDto.ExtensionInfo.Add(ExtensionKey.OrderType, OrderTypeEnum.Transfer.ToString());
+
+            if (!string.IsNullOrWhiteSpace(request.Memo))
+            {
+                withdrawOrderDto.ExtensionInfo.Add(ExtensionKey.Memo, request.Memo);
+            }
+
+            var order = await grain.CreateTransferOrder(withdrawOrderDto);
+            var getWithdrawOrderInfoDto = new CreateTransferOrderDto
+            {
+                OrderId = order.Id.ToString(),
+                Address = string.Empty
+            };
+            return getWithdrawOrderInfoDto;
+        }
+        catch (Exception e)
+        {
+            await tokenInfoGrain.Reverse(amountUsd);
+            _logger.LogError(e,
+                "Create transfer order error, fromNetwork:{FromNetwork}, toNetwork:{ToNetwork}, toAddress:{ToAddress}, amount:{Amount}, symbol:{Symbol}",
+                request.FromNetwork, request.ToNetwork, request.ToAddress, request.Amount, request.FromSymbol);
+            throw;
+        }
     }
 }

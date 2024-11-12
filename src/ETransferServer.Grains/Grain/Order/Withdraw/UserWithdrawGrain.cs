@@ -5,6 +5,7 @@ using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Grains.Grain.Timers;
+using ETransferServer.Grains.Grain.Token;
 using ETransferServer.Grains.Grain.TokenLimit;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.Provider;
@@ -25,6 +26,8 @@ public interface IUserWithdrawGrain : IGrainWithGuidKey
     /// <param name="withdrawOrderDto"></param>
     /// <returns></returns>
     Task<WithdrawOrderDto> CreateOrder(WithdrawOrderDto withdrawOrderDto);
+    
+    Task<WithdrawOrderDto> CreateTransferOrder(WithdrawOrderDto withdrawOrderDto);
     
     Task<WithdrawOrderDto> CreateRefundOrder(WithdrawOrderDto withdrawOrderDto, string address);
 
@@ -165,6 +168,17 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         return await AddOrUpdateOrder(withdrawOrderDto);
     }
 
+    public async Task<WithdrawOrderDto> CreateTransferOrder(WithdrawOrderDto withdrawOrderDto)
+    {
+        withdrawOrderDto.Id = this.GetPrimaryKey();
+        withdrawOrderDto.Status = OrderStatusEnum.Created.ToString();
+        var coBoCoinGrain =
+            GrainFactory.GetGrain<ICoBoCoinGrain>(ICoBoCoinGrain.Id(withdrawOrderDto.FromTransfer.Network,
+                withdrawOrderDto.FromTransfer.Symbol));
+        withdrawOrderDto.ExtensionInfo.AddOrReplace(ExtensionKey.FromConfirmingThreshold, (await coBoCoinGrain.GetConfirmingThreshold()).ToString());
+        return await AddOrUpdateOrder(withdrawOrderDto);
+    }
+    
     public async Task<WithdrawOrderDto> CreateRefundOrder(WithdrawOrderDto withdrawDto, string address)
     {
         // amount limit
