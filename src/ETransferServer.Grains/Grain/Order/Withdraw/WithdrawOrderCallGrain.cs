@@ -3,8 +3,12 @@ using ETransferServer.Dtos.Order;
 using ETransferServer.Grains.Grain.Timers;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.State.Order;
+using ETransferServer.Options;
+using ETransferServer.ThirdPart.CoBo;
+using ETransferServer.ThirdPart.CoBo.Dtos;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Volo.Abp;
 
 namespace ETransferServer.Grains.Grain.Order.Withdraw;
 
@@ -17,13 +21,22 @@ public interface IWithdrawOrderCallGrain : IGrainWithGuidKey
 
 public class WithdrawOrderCallGrain : Grain<WithdrawOrderCallState>, IWithdrawOrderCallGrain
 {
+    private readonly ICoBoProvider _coBoProvider;
     private readonly IOptionsSnapshot<WithdrawOptions> _withdrawOptions;
+    private readonly IOptionsSnapshot<WithdrawNetworkOptions> _withdrawNetworkOptions;
+    private readonly IOptionsSnapshot<CoBoOptions> _coBoOptions;
     private readonly ILogger<WithdrawOrderCallGrain> _logger;
 
-    public WithdrawOrderCallGrain(IOptionsSnapshot<WithdrawOptions> withdrawOptions,
+    public WithdrawOrderCallGrain(ICoBoProvider coBoProvider, 
+        IOptionsSnapshot<WithdrawOptions> withdrawOptions,
+        IOptionsSnapshot<WithdrawNetworkOptions> withdrawNetworkOptions,
+        IOptionsSnapshot<CoBoOptions> coBoOptions,
         ILogger<WithdrawOrderCallGrain> logger)
     {
+        _coBoProvider = coBoProvider;
         _withdrawOptions = withdrawOptions;
+        _withdrawNetworkOptions = withdrawNetworkOptions;
+        _coBoOptions = coBoOptions;
         _logger = logger;
     }
 
@@ -84,6 +97,7 @@ public class WithdrawOrderCallGrain : Grain<WithdrawOrderCallState>, IWithdrawOr
         {
             _logger.LogError("WithdrawOrderCallGrain addToRequest after retry {times}, {orderId}",
                 State.CallRetry, this.GetPrimaryKey());
+            await HandleWithdrawAsync(order);
             return;
         }
         try
@@ -98,8 +112,100 @@ public class WithdrawOrderCallGrain : Grain<WithdrawOrderCallState>, IWithdrawOr
                 State.CallRetry, this.GetPrimaryKey());
             State.CallRetry += 1;
             await WriteStateAsync();
-            await Task.Delay(1000);
+            await Task.Delay(3000);
             await AddToRequest(order);
+        }
+    }
+    
+    private async Task HandleWithdrawAsync(WithdrawOrderDto order)
+    {
+        try
+        {
+            await AddOrGet(2);
+            var result = await Withdraw(order);
+
+            await AddOrGet(3);
+            if (result.success)
+            {
+                order.Status = OrderStatusEnum.ToTransferring.ToString();
+                await UpdateOrderStatus(order);
+                return;
+            }
+
+            var _withdrawTimerGrain =
+                GrainFactory.GetGrain<IWithdrawTimerGrain>(GuidHelper.UniqGuid(nameof(IWithdrawTimerGrain)));
+            await _withdrawTimerGrain.AddToMap(order, result.message);
+        }
+        catch (Exception e)
+        {
+            await AddOrGet(4);
+            _logger.LogError(e, "WithdrawOrderCallGrain add to request error, orderId:{orderId}", order.Id);
+        }
+    }
+    
+    private async Task UpdateOrderStatus(WithdrawOrderDto order)
+    {
+        var userWithdrawGrain = GrainFactory.GetGrain<IUserWithdrawGrain>(order.Id);
+        await userWithdrawGrain.AddOrUpdateOrder(order);
+    }
+
+    private async Task<(bool success, string message)> Withdraw(WithdrawOrderDto orderDto)
+    {
+        try
+        {
+            var coinInfo =
+                _withdrawNetworkOptions.Value.GetNetworkInfo(orderDto.ToTransfer.Network, orderDto.ToTransfer.Symbol);
+            var amount = BigCalculationHelper.CalculateAmount(orderDto.ToTransfer.Amount, coinInfo.Decimal);
+            var requestDto = new WithdrawRequestDto
+            {
+                Coin = coinInfo.Coin,
+                RequestId = orderDto.Id.ToString(),
+                Address = orderDto.ToTransfer.ToAddress,
+                Amount = amount
+            };
+
+            orderDto.ExtensionInfo ??= new Dictionary<string, string>();
+            if (orderDto.ExtensionInfo.ContainsKey(ExtensionKey.Memo))
+            {
+                requestDto.Memo = orderDto.ExtensionInfo[ExtensionKey.Memo];
+            }
+
+            orderDto.ThirdPartServiceName = ThirdPartServiceNameEnum.Cobo.ToString();
+            var response = await _coBoProvider.WithdrawAsync(requestDto);
+
+            if (response == null)
+            {
+                _logger.LogWarning("WithdrawOrderCallGrain withdraw order {Id} stream error, request to withdraw fail.",
+                    orderDto.Id);
+                return (false, CoBoConstant.ResponseNull);
+            }
+            else
+            {
+                _logger.LogInformation(
+                    "WithdrawOrderCallGrain withdraw order {Id} stream, request to withdraw success.",
+                    orderDto.Id);
+                return (true, string.Empty);
+            }
+        }
+        catch (Exception e)
+        {
+            if (e is UserFriendlyException { Code: CommonConstant.ThirdPartResponseCode.DuplicateRequest })
+            {
+                _logger.LogInformation("WithdrawOrderCallGrain duplicate withdraw requestId:{requestId}", orderDto.Id);
+                return (true, string.Empty);
+            }
+
+            try
+            {
+                _logger.LogError(e,
+                    "WithdrawOrderCallGrain withdraw order {Id} stream error, request to withdraw error.", orderDto.Id);
+                return (false, e.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(CoBoConstant.ResponseParseError);
+                return (false, CoBoConstant.ResponseParseError);
+            }
         }
     }
 }

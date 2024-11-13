@@ -18,6 +18,7 @@ public interface IWithdrawTimerGrain : IGrainWithGuidKey
 {
     public Task AddToRequest(WithdrawOrderDto order);
     public Task AddToQuery(WithdrawOrderDto order);
+    public Task AddToMap(WithdrawOrderDto order, string message);
     public Task<DateTime> GetLastCallBackTime();
 }
 
@@ -158,24 +159,7 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
                 return;
             }
 
-            if (State.WithdrawRequestMap.ContainsKey(order.Id))
-            {
-                _logger.LogWarning("add to request fail, order id {Id} exists in WithdrawTimerGrain state", order.Id);
-                return;
-            }
-
-            var errorKey = GetWithdrawErrorKey();
-            State.WithdrawRequestMap[order.Id] = new WithdrawRequestInfo()
-            {
-                OrderId = order.Id,
-                RetryCount = 1,
-                Success = false,
-                ErrorDic = new Dictionary<string, string>()
-                {
-                    [errorKey] = result.message
-                }
-            };
-            await WriteStateAsync();
+            await AddToMap(order, result.message);
         }
         catch (Exception e)
         {
@@ -220,6 +204,28 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
         {
             _logger.LogError(e, "add to query error, orderId:{orderId}", order.Id);
         }
+    }
+
+    public async Task AddToMap(WithdrawOrderDto order, string message)
+    {
+        if (State.WithdrawRequestMap.ContainsKey(order.Id))
+        {
+            _logger.LogWarning("add to request fail, order id {Id} exists in WithdrawTimerGrain state", order.Id);
+            return;
+        }
+
+        var errorKey = GetWithdrawErrorKey();
+        State.WithdrawRequestMap[order.Id] = new WithdrawRequestInfo()
+        {
+            OrderId = order.Id,
+            RetryCount = 1,
+            Success = false,
+            ErrorDic = new Dictionary<string, string>()
+            {
+                [errorKey] = message
+            }
+        };
+        await WriteStateAsync();
     }
 
     public Task<DateTime> GetLastCallBackTime()
