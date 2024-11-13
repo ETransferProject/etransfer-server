@@ -133,20 +133,7 @@ public partial class UserWithdrawGrain
         var status = await callGrain.AddOrGet();
         if (status >= 1 && status <= 2)
         {
-            await Task.Delay(1000);
-            if (_subscriptionHandle != null)
-            {
-                _logger.LogInformation("Order {Id} stream resumeAsync.", this.GetPrimaryKey());
-                _subscriptionHandle.ResumeAsync(this);
-            }
-            else
-            {
-                _logger.LogInformation("Order {Id} stream reSubscribeAsync.", this.GetPrimaryKey());
-                _subscriptionHandle = await _orderChangeStream.SubscribeAsync(OnNextAsync, OnErrorAsync, OnCompletedAsync);
-            }
-
-            _logger.LogInformation("Order {Id} stream addToStartTransfer.", this.GetPrimaryKey());
-            await AddToStartTransfer(order.Value, order.Value.ToTransfer.Network == CommonConstant.Network.AElf);
+            await callGrain.AddToRequest(order.Value);
         }
         else if (status >= 3)
         {

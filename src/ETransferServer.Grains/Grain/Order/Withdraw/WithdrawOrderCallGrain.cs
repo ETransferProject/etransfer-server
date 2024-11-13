@@ -1,8 +1,10 @@
+using ETransferServer.Common;
+using ETransferServer.Dtos.Order;
+using ETransferServer.Grains.Grain.Timers;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.State.Order;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Volo.Abp.ObjectMapping;
 
 namespace ETransferServer.Grains.Grain.Order.Withdraw;
 
@@ -10,6 +12,7 @@ public interface IWithdrawOrderCallGrain : IGrainWithGuidKey
 {
     Task<int> AddOrGet(int status = 0);
     Task<bool> AddRetry();
+    Task AddToRequest(WithdrawOrderDto order);
 }
 
 public class WithdrawOrderCallGrain : Grain<WithdrawOrderCallState>, IWithdrawOrderCallGrain
@@ -72,5 +75,13 @@ public class WithdrawOrderCallGrain : Grain<WithdrawOrderCallState>, IWithdrawOr
         }
 
         return true;
+    }
+
+    public async Task AddToRequest(WithdrawOrderDto order)
+    {
+        _logger.LogInformation("WithdrawOrderCallGrain addToRequest, orderId:{orderId}", this.GetPrimaryKey());
+        var _withdrawTimerGrain =
+            GrainFactory.GetGrain<IWithdrawTimerGrain>(GuidHelper.UniqGuid(nameof(IWithdrawTimerGrain)));
+        await _withdrawTimerGrain.AddToRequest(order);
     }
 }
