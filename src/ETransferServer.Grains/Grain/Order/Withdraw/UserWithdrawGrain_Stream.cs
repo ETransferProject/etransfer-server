@@ -121,10 +121,10 @@ public partial class UserWithdrawGrain
     public async Task OnErrorAsync(Exception ex)
     {
         _logger.LogError(ex, "withdraw order {Id} stream OnError", this.GetPrimaryKey());
-        await HandlerWithdrawError();
+        await HandlerWithdrawErrorAsync();
     }
 
-    private async Task HandlerWithdrawError()
+    private async Task HandlerWithdrawErrorAsync()
     {
         var callGrain = GrainFactory.GetGrain<IWithdrawOrderCallGrain>(this.GetPrimaryKey());
         if (!await callGrain.AddRetry()) return;
@@ -133,6 +133,19 @@ public partial class UserWithdrawGrain
         var status = await callGrain.AddOrGet();
         if (status >= 1 && status <= 2)
         {
+            await Task.Delay(1000);
+            if (_subscriptionHandle != null)
+            {
+                _logger.LogInformation("Order {Id} stream resumeAsync.", this.GetPrimaryKey());
+                _subscriptionHandle.ResumeAsync(this);
+            }
+            else
+            {
+                _logger.LogInformation("Order {Id} stream reSubscribeAsync.", this.GetPrimaryKey());
+                _subscriptionHandle = await _orderChangeStream.SubscribeAsync(OnNextAsync, OnErrorAsync, OnCompletedAsync);
+            }
+
+            _logger.LogInformation("Order {Id} stream addToStartTransfer.", this.GetPrimaryKey());
             await AddToStartTransfer(order.Value, order.Value.ToTransfer.Network == CommonConstant.Network.AElf);
         }
         else if (status >= 3)
@@ -150,8 +163,6 @@ public partial class UserWithdrawGrain
 
     private async Task AddToStartTransfer(WithdrawOrderDto orderDto, bool isAElf)
     {
-        var callGrain = GrainFactory.GetGrain<IWithdrawOrderCallGrain>(orderDto.Id);
-        await callGrain.AddOrGet(1);
         if (isAElf)
         {
             var order = await OnToStartTransfer(orderDto, true);
@@ -159,6 +170,8 @@ public partial class UserWithdrawGrain
         }
         else
         {
+            var callGrain = GrainFactory.GetGrain<IWithdrawOrderCallGrain>(orderDto.Id);
+            await callGrain.AddOrGet(1);
             await _withdrawTimerGrain.AddToRequest(orderDto);
         }
     }
