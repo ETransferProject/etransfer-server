@@ -80,8 +80,25 @@ public class WithdrawOrderCallGrain : Grain<WithdrawOrderCallState>, IWithdrawOr
     public async Task AddToRequest(WithdrawOrderDto order)
     {
         _logger.LogInformation("WithdrawOrderCallGrain addToRequest, orderId:{orderId}", this.GetPrimaryKey());
-        var _withdrawTimerGrain =
-            GrainFactory.GetGrain<IWithdrawTimerGrain>(GuidHelper.UniqGuid(nameof(IWithdrawTimerGrain)));
-        await _withdrawTimerGrain.AddToRequest(order);
+        if (State.CallRetry > _withdrawOptions.Value.CallMaxRetry)
+        {
+            _logger.LogError("WithdrawOrderCallGrain addToRequest after retry {times}, {orderId}",
+                State.CallRetry, this.GetPrimaryKey());
+        }
+        try
+        {
+            var _withdrawTimerGrain =
+                GrainFactory.GetGrain<IWithdrawTimerGrain>(GuidHelper.UniqGuid(nameof(IWithdrawTimerGrain)));
+            await _withdrawTimerGrain.AddToRequest(order);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "WithdrawOrderCallGrain addToRequest error, {times},{id}", 
+                State.CallRetry, this.GetPrimaryKey());
+            State.CallRetry += 1;
+            await WriteStateAsync();
+            await Task.Delay(1000);
+            await AddToRequest(order);
+        }
     }
 }
