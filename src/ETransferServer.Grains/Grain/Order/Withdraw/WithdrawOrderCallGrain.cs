@@ -84,6 +84,7 @@ public class WithdrawOrderCallGrain : Grain<WithdrawOrderCallState>, IWithdrawOr
         {
             _logger.LogError("WithdrawOrderCallGrain addToRequest after retry {times}, {orderId}",
                 State.CallRetry, this.GetPrimaryKey());
+            return;
         }
         try
         {
