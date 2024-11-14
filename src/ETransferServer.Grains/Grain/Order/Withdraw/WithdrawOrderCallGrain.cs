@@ -17,6 +17,7 @@ public interface IWithdrawOrderCallGrain : IGrainWithGuidKey
     Task<int> AddOrGet(int status = 0);
     Task<bool> AddRetry();
     Task AddToRequest(WithdrawOrderDto order);
+    Task AddToQuery(WithdrawOrderDto order);
 }
 
 public class WithdrawOrderCallGrain : Grain<WithdrawOrderCallState>, IWithdrawOrderCallGrain
@@ -72,21 +73,29 @@ public class WithdrawOrderCallGrain : Grain<WithdrawOrderCallState>, IWithdrawOr
             _logger.LogInformation(
                 "WithdrawOrderCallGrain, orderId:{orderId}, callRetry:{callRetry}, callMaxRetry:{callMaxRetry}",
                 this.GetPrimaryKey(), State.CallRetry, _withdrawOptions.Value.CallMaxRetry);
-            await WriteStateAsync();
             if (State.CallRetry > _withdrawOptions.Value.CallMaxRetry)
                 return false;
         }
-        else if(State.Status > 2)
+        else if(State.Status >= 3 && State.Status <= 4)
         {
             State.CallbackRetry += 1;
             _logger.LogInformation(
                 "WithdrawOrderCallGrain, orderId:{orderId}, callbackRetry:{callbackRetry}, callbackMaxRetry:{callbackMaxRetry}",
                 this.GetPrimaryKey(), State.CallbackRetry, _withdrawOptions.Value.CallbackMaxRetry);
-            await WriteStateAsync();
             if (State.CallbackRetry > _withdrawOptions.Value.CallbackMaxRetry)
                 return false;
         }
+        else if (State.Status > 4)
+        {
+            State.CallQueryRetry += 1;
+            _logger.LogInformation(
+                "WithdrawOrderCallGrain, orderId:{orderId}, callQueryRetry:{callQueryRetry}, callQueryMaxRetry:{callQueryMaxRetry}",
+                this.GetPrimaryKey(), State.CallQueryRetry, _withdrawOptions.Value.CallQueryMaxRetry);
+            if (State.CallQueryRetry > _withdrawOptions.Value.CallQueryMaxRetry)
+                return false;
+        }
 
+        await WriteStateAsync();
         return true;
     }
 
@@ -102,9 +111,9 @@ public class WithdrawOrderCallGrain : Grain<WithdrawOrderCallState>, IWithdrawOr
         }
         try
         {
-            var _withdrawTimerGrain =
-                GrainFactory.GetGrain<IWithdrawTimerGrain>(GuidHelper.UniqGuid(nameof(IWithdrawTimerGrain)));
-            await _withdrawTimerGrain.AddToRequest(order);
+            var _withdrawCoboTimerGrain =
+                GrainFactory.GetGrain<IWithdrawCoboTimerGrain>(GuidHelper.UniqGuid(nameof(IWithdrawCoboTimerGrain)));
+            await _withdrawCoboTimerGrain.AddToRequest(order);
         }
         catch (Exception ex)
         {
@@ -114,6 +123,32 @@ public class WithdrawOrderCallGrain : Grain<WithdrawOrderCallState>, IWithdrawOr
             await WriteStateAsync();
             await Task.Delay(3000);
             await AddToRequest(order);
+        }
+    }
+    
+    public async Task AddToQuery(WithdrawOrderDto order)
+    {
+        _logger.LogInformation("WithdrawOrderCallGrain addToQuery, orderId:{orderId}", this.GetPrimaryKey());
+        if (State.CallQueryRetry > _withdrawOptions.Value.CallQueryMaxRetry)
+        {
+            _logger.LogError("WithdrawOrderCallGrain addToQuery after retry {times}, {orderId}",
+                State.CallQueryRetry, this.GetPrimaryKey());
+            return;
+        }
+        try
+        {
+            var _withdrawTimerGrain =
+                GrainFactory.GetGrain<IWithdrawTimerGrain>(GuidHelper.UniqGuid(nameof(IWithdrawTimerGrain)));
+            await _withdrawTimerGrain.AddToQuery(order);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "WithdrawOrderCallGrain addToQuery error, {times},{id}", 
+                State.CallQueryRetry, this.GetPrimaryKey());
+            State.CallQueryRetry += 1;
+            await WriteStateAsync();
+            await Task.Delay(3000);
+            await AddToQuery(order);
         }
     }
     
@@ -132,9 +167,9 @@ public class WithdrawOrderCallGrain : Grain<WithdrawOrderCallState>, IWithdrawOr
                 return;
             }
 
-            var _withdrawTimerGrain =
-                GrainFactory.GetGrain<IWithdrawTimerGrain>(GuidHelper.UniqGuid(nameof(IWithdrawTimerGrain)));
-            await _withdrawTimerGrain.AddToMap(order, result.message);
+            var _withdrawCoboTimerGrain =
+                GrainFactory.GetGrain<IWithdrawCoboTimerGrain>(GuidHelper.UniqGuid(nameof(IWithdrawCoboTimerGrain)));
+            await _withdrawCoboTimerGrain.AddToMap(order, result.message);
         }
         catch (Exception e)
         {

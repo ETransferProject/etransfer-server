@@ -135,10 +135,14 @@ public partial class UserWithdrawGrain
         {
             await callGrain.AddToRequest(order.Value);
         }
-        else if (status >= 3)
+        else if (status >= 3 && status <= 4)
         {
             order.Value.Status = OrderStatusEnum.ToTransferring.ToString();
             await AddOrUpdateOrder(order.Value);
+        }
+        else if (status > 4)
+        {
+            await callGrain.AddToQuery(order.Value);
         }
     }
 
@@ -159,7 +163,7 @@ public partial class UserWithdrawGrain
         {
             var callGrain = GrainFactory.GetGrain<IWithdrawOrderCallGrain>(orderDto.Id);
             await callGrain.AddOrGet(1);
-            await _withdrawTimerGrain.AddToRequest(orderDto);
+            await _withdrawCoboTimerGrain.AddToRequest(orderDto);
         }
     }
     
@@ -171,6 +175,8 @@ public partial class UserWithdrawGrain
         }
         else
         {
+            var callGrain = GrainFactory.GetGrain<IWithdrawOrderCallGrain>(orderDto.Id);
+            await callGrain.AddOrGet(5);
             await _withdrawTimerGrain.AddToQuery(orderDto);
         }
     }

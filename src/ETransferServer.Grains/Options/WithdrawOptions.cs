@@ -16,6 +16,7 @@ public class WithdrawOptions
     public int ToTransferMaxRetry { get; set; } = 5;
     public int CallMaxRetry { get; set; } = 5;
     public int CallbackMaxRetry { get; set; } = 5;
+    public int CallQueryMaxRetry { get; set; } = 5;
     public int MaxListLength { get; set; } = 1000;
     public Dictionary<string, int> TokenInfo { get; set; } = new()
     {
