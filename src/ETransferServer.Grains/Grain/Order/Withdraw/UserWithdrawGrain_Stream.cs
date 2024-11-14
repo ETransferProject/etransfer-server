@@ -121,10 +121,10 @@ public partial class UserWithdrawGrain
     public async Task OnErrorAsync(Exception ex)
     {
         _logger.LogError(ex, "withdraw order {Id} stream OnError", this.GetPrimaryKey());
-        await HandlerWithdrawError();
+        await HandlerWithdrawErrorAsync();
     }
 
-    private async Task HandlerWithdrawError()
+    private async Task HandlerWithdrawErrorAsync()
     {
         var callGrain = GrainFactory.GetGrain<IWithdrawOrderCallGrain>(this.GetPrimaryKey());
         if (!await callGrain.AddRetry()) return;
@@ -133,12 +133,16 @@ public partial class UserWithdrawGrain
         var status = await callGrain.AddOrGet();
         if (status >= 1 && status <= 2)
         {
-            await AddToStartTransfer(order.Value, order.Value.ToTransfer.Network == CommonConstant.Network.AElf);
+            await callGrain.AddToRequest(order.Value);
         }
-        else if (status >= 3)
+        else if (status >= 3 && status <= 4)
         {
             order.Value.Status = OrderStatusEnum.ToTransferring.ToString();
             await AddOrUpdateOrder(order.Value);
+        }
+        else if (status > 4)
+        {
+            await callGrain.AddToQuery(order.Value);
         }
     }
 
@@ -150,8 +154,6 @@ public partial class UserWithdrawGrain
 
     private async Task AddToStartTransfer(WithdrawOrderDto orderDto, bool isAElf)
     {
-        var callGrain = GrainFactory.GetGrain<IWithdrawOrderCallGrain>(orderDto.Id);
-        await callGrain.AddOrGet(1);
         if (isAElf)
         {
             var order = await OnToStartTransfer(orderDto, true);
@@ -159,7 +161,9 @@ public partial class UserWithdrawGrain
         }
         else
         {
-            await _withdrawTimerGrain.AddToRequest(orderDto);
+            var callGrain = GrainFactory.GetGrain<IWithdrawOrderCallGrain>(orderDto.Id);
+            await callGrain.AddOrGet(1);
+            await _withdrawCoboTimerGrain.AddToRequest(orderDto);
         }
     }
     
@@ -171,6 +175,8 @@ public partial class UserWithdrawGrain
         }
         else
         {
+            var callGrain = GrainFactory.GetGrain<IWithdrawOrderCallGrain>(orderDto.Id);
+            await callGrain.AddOrGet(5);
             await _withdrawTimerGrain.AddToQuery(orderDto);
         }
     }
