@@ -21,14 +21,14 @@ public interface IWithdrawCoboTimerGrain : IGrainWithGuidKey
 
 public class WithdrawCoboTimerGrain : Grain<WithdrawCoboTimerState>, IWithdrawCoboTimerGrain
 {
-    private readonly ILogger<WithdrawTimerGrain> _logger;
+    private readonly ILogger<WithdrawCoboTimerGrain> _logger;
     private readonly TimerOptions _timerOptions;
     private readonly ICoBoProvider _coBoProvider;
     private readonly IOptionsSnapshot<WithdrawNetworkOptions> _withdrawNetworkOptions;
 
     private const int RETRYCOUNT = 4;
 
-    public WithdrawCoboTimerGrain(ILogger<WithdrawTimerGrain> logger, 
+    public WithdrawCoboTimerGrain(ILogger<WithdrawCoboTimerGrain> logger, 
         IOptionsSnapshot<TimerOptions> timerOptions,
         ICoBoProvider coBoProvider, 
         IOptionsSnapshot<WithdrawNetworkOptions> withdrawNetworkOptions)
@@ -152,7 +152,7 @@ public class WithdrawCoboTimerGrain : Grain<WithdrawCoboTimerState>, IWithdrawCo
     {
         if (State.WithdrawRequestMap.ContainsKey(order.Id))
         {
-            _logger.LogWarning("add to request fail, order id {Id} exists in WithdrawTimerGrain state", order.Id);
+            _logger.LogWarning("add to request fail, order id {Id} exists in WithdrawCoboTimerGrain state", order.Id);
             return;
         }
 
