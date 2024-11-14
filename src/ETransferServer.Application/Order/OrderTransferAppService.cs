@@ -9,9 +9,13 @@ using ETransferServer.Grains.Grain.Order.Withdraw;
 using ETransferServer.Grains.Grain.TokenLimit;
 using ETransferServer.Grains.Grain.Users;
 using ETransferServer.Models;
+using ETransferServer.Options;
+using ETransferServer.Orders;
 using ETransferServer.Withdraw.Dtos;
 using ETransferServer.WithdrawOrder.Dtos;
 using Microsoft.Extensions.Logging;
+using NBitcoin;
+using Nest;
 using Newtonsoft.Json;
 using Volo.Abp;
 using Volo.Abp.Users;
@@ -20,6 +24,35 @@ namespace ETransferServer.Order;
 
 public partial class OrderWithdrawAppService
 {
+
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(OrderWithdrawAppService),
+        MethodName = nameof(HandleSaveTransferExceptionAsync))]
+    public async Task<bool> SaveTransferOrderInfoAsync(string orderId, GetTransferOrderInfoRequestDto request)
+    {
+        if (orderId.IsNullOrEmpty() || !Guid.TryParse(orderId, out _)) return false;
+        var recordGrain = _clusterClient.GetGrain<IUserWithdrawRecordGrain>(Guid.Parse(orderId));
+        var order = (await recordGrain.Get())?.Value;
+        if (order == null) return false;
+        if (CurrentUser.GetId() != order.UserId
+            || order.FromTransfer.Amount != request.Amount
+            || order.FromTransfer.Network != request.FromNetwork
+            || order.ToTransfer.Network != (VerifyAElfChain(request.ToNetwork) ? CommonConstant.Network.AElf : request.ToNetwork)
+            || order.FromTransfer.Symbol != request.FromSymbol
+            || order.ToTransfer.Symbol != request.ToSymbol
+            || order.FromTransfer.FromAddress != request.FromAddress
+            || order.ToTransfer.ToAddress != request.ToAddress) return false;
+        if (!request.Address.IsNullOrEmpty() && order.FromTransfer.ToAddress != request.Address) return false;
+        
+        if (!request.TxId.IsNullOrEmpty()) order.FromTransfer.TxId = request.TxId;
+        if (!request.Status.IsNullOrEmpty() && request.Status.ToLower() == OrderOptions.Rejected) 
+            order.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus, OrderOperationStatusEnum.UserRejected.ToString());
+        await recordGrain.AddOrUpdate(order);
+        var orderIndex = await GetOrderIndexAsync(orderId);
+        orderIndex = _objectMapper.Map<WithdrawOrderDto, OrderIndex>(order);
+        await _withdrawOrderIndexRepository.AddOrUpdateAsync(orderIndex);
+        return true;
+    }
+
     [ExceptionHandler(typeof(Exception), TargetType = typeof(OrderWithdrawAppService),
         MethodName = nameof(HandleGetTransferInfoExceptionAsync))]
     public async Task<GetWithdrawInfoDto> GetTransferInfoAsync(GetTransferListRequestDto request, string version = null)
@@ -271,5 +304,14 @@ public partial class OrderWithdrawAppService
                 request.FromNetwork, request.ToNetwork, request.ToAddress, request.Amount, request.FromSymbol);
             throw;
         }
+    }
+    
+    private async Task<OrderIndex> GetOrderIndexAsync(string orderId)
+    {
+        var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+        mustQuery.Add(q => q.Term(i => i.Field(f => f.Id).Value(orderId)));
+
+        QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery));
+        return await _withdrawOrderIndexRepository.GetAsync(Filter);
     }
 }

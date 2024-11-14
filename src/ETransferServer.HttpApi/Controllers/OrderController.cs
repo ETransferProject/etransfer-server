@@ -89,6 +89,13 @@ public class OrderController : ETransferController
     {
         return await _withdrawOrderAppService.CreateTransferOrderInfoAsync(request, version);
     }
+    
+    [Authorize]
+    [HttpPut("transfer/{orderId}")]
+    public async Task<bool> SaveTransferOrderInfoAsync(string orderId, [FromBody] GetTransferOrderInfoRequestDto request)
+    {
+        return await _withdrawOrderAppService.SaveTransferOrderInfoAsync(orderId, request);
+    }
 
     [Authorize]
     [HttpGet("record/list")]

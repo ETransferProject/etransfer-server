@@ -77,4 +77,15 @@ public partial class OrderWithdrawAppService
             ReturnValue = false
         };
     }
+    
+    public async Task<FlowBehavior> HandleSaveTransferExceptionAsync(Exception ex, string orderId, 
+        GetTransferOrderInfoRequestDto dto)
+    {
+        _logger.LogError(ex, "Save transferOrderIndex fail: {id}", orderId);
+        return new FlowBehavior
+        {
+            ExceptionHandlingStrategy = ExceptionHandlingStrategy.Return,
+            ReturnValue = false
+        };
+    }
 }
