@@ -68,7 +68,7 @@ public class OrderController : ETransferController
     
     [Authorize]
     [HttpGet("transfer/info")]
-    public async Task<GetWithdrawInfoDto> GetTransferInfoAsync(GetTransferListRequestDto request,
+    public async Task<GetTransferInfoDto> GetTransferInfoAsync(GetTransferListRequestDto request,
         [FromHeader(Name = "version")] string version = null)
     {
         return await _withdrawOrderAppService.GetTransferInfoAsync(request, version);

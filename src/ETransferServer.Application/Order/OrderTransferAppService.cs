@@ -55,13 +55,17 @@ public partial class OrderWithdrawAppService
 
     [ExceptionHandler(typeof(Exception), TargetType = typeof(OrderWithdrawAppService),
         MethodName = nameof(HandleGetTransferInfoExceptionAsync))]
-    public async Task<GetWithdrawInfoDto> GetTransferInfoAsync(GetTransferListRequestDto request, string version = null)
+    public async Task<GetTransferInfoDto> GetTransferInfoAsync(GetTransferListRequestDto request, string version = null)
     {
         if (request.FromNetwork == ChainId.AELF || request.FromNetwork == ChainId.tDVV ||
             request.FromNetwork == ChainId.tDVW)
         {
-            return await GetWithdrawInfoAsync(
+            var result = await GetWithdrawInfoAsync(
                 _objectMapper.Map<GetTransferListRequestDto, GetWithdrawListRequestDto>(request), version);
+            return new GetTransferInfoDto
+            {
+                TransferInfo = _objectMapper.Map<WithdrawInfoDto, TransferDetailInfoDto>(result.WithdrawInfo)
+            };
         }
 
         var userId = CurrentUser.GetId();
@@ -97,7 +101,9 @@ public partial class OrderWithdrawAppService
                 ITokenWithdrawLimitGrain.GenerateGrainId(request.Symbol));
 
         var tokenLimit = await tokenInfoGrain.GetLimit();
-        var withdrawInfoDto = new WithdrawInfoDto();
+        var withdrawInfoDto = new TransferDetailInfoDto();
+        withdrawInfoDto.ContractAddress = _networkInfoOptions.Value.NetworkMap[request.Symbol]
+            .FirstOrDefault(t => t.NetworkInfo.Network == request.FromNetwork).NetworkInfo.ContractAddress;
         withdrawInfoDto.LimitCurrency = request.Symbol;
         withdrawInfoDto.TransactionUnit = request.Symbol;
 
@@ -157,13 +163,13 @@ public partial class OrderWithdrawAppService
         }
 
         if (request.ToAddress.IsNullOrEmpty())
-            return new GetWithdrawInfoDto { WithdrawInfo = withdrawInfoDto };
+            return new GetTransferInfoDto { TransferInfo = withdrawInfoDto };
 
         AssertHelper.IsTrue(await IsAddressSupport(request.FromNetwork, request.Symbol, request.ToAddress, version),
             ErrorResult.AddressFormatWrongCode);
-        return new GetWithdrawInfoDto
+        return new GetTransferInfoDto
         {
-            WithdrawInfo = withdrawInfoDto
+            TransferInfo = withdrawInfoDto
         };
     }
     
@@ -287,11 +293,11 @@ public partial class OrderWithdrawAppService
             {
                 withdrawOrderDto.ExtensionInfo.Add(ExtensionKey.Memo, request.Memo);
             }
-
-            var order = await grain.CreateTransferOrder(withdrawOrderDto);
+            
+            //var order = await grain.CreateTransferOrder(withdrawOrderDto);
             var getWithdrawOrderInfoDto = new CreateTransferOrderDto
             {
-                OrderId = order.Id.ToString(),
+                OrderId = orderId.ToString(),
                 Address = string.Empty
             };
             return getWithdrawOrderInfoDto;

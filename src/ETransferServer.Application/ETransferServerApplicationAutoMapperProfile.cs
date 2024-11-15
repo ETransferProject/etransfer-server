@@ -13,6 +13,7 @@ using ETransferServer.Network.Dtos;
 using ETransferServer.Options;
 using ETransferServer.Users;
 using ETransferServer.Token.Dtos;
+using ETransferServer.Withdraw.Dtos;
 using ETransferServer.WithdrawOrder.Dtos;
 
 namespace ETransferServer;
@@ -48,6 +49,7 @@ public class ETransferServerApplicationAutoMapperProfile : Profile
         CreateMap<NetworkInfo, NetworkOptionDto>().ReverseMap();
         CreateMap<OrderStatusFlowDto, OrderStatusFlow>().ReverseMap();
         CreateMap<OrderChangeEto, OrderIndex>().ReverseMap();
+        CreateMap<WithdrawInfoDto, TransferDetailInfoDto>().ReverseMap();
         CreateMap<GetTransferListRequestDto, GetWithdrawListRequestDto>().ForMember(
                 destination => destination.ChainId,
                 opt => opt.MapFrom(source => source.FromNetwork))
