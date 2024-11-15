@@ -64,6 +64,7 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
     private IUserWithdrawTxTimerGrain _withdrawTxTimerGrain;
     private IUserWithdrawTxFastTimerGrain _withdrawFastTimerGrain;
     private IWithdrawOrderRetryTimerGrain _withdrawOrderRetryTimerGrain;
+    private IWithdrawCoboTimerGrain _withdrawCoboTimerGrain;
     private IWithdrawTimerGrain _withdrawTimerGrain;
     private IOrderStatusReminderGrain _orderStatusReminderGrain;
     private IWithdrawQueryTimerGrain _withdrawQueryTimerGrain;
@@ -128,6 +129,9 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         _withdrawOrderRetryTimerGrain =
             GrainFactory.GetGrain<IWithdrawOrderRetryTimerGrain>(
                 GuidHelper.UniqGuid(nameof(IWithdrawOrderRetryTimerGrain)));
+        _withdrawCoboTimerGrain =
+            GrainFactory.GetGrain<IWithdrawCoboTimerGrain>(
+                GuidHelper.UniqGuid(nameof(IWithdrawCoboTimerGrain)));
         _withdrawTimerGrain =
             GrainFactory.GetGrain<IWithdrawTimerGrain>(
                 GuidHelper.UniqGuid(nameof(IWithdrawTimerGrain)));
