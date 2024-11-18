@@ -7,6 +7,7 @@ public class OrderIndexDto
 {
     public Guid Id { get; set; }
     public string OrderType { get; set; }
+    public string SecondOrderType { get; set; }
     public string Status { get; set; }
     public long LastModifyTime { get; set; }
     public long ArrivalTime { get; set; }

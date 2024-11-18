@@ -377,6 +377,10 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
             await _networkAppService.GetIconAsync(item.OrderType, ChainId.AELF, item.FromTransfer.Symbol);
         item.ToTransfer.Icon =
             await _networkAppService.GetIconAsync(item.OrderType, ChainId.AELF, item.FromTransfer.Symbol, item.ToTransfer.Symbol);
+        item.SecondOrderType = orderIndex != null && !orderIndex.ExtensionInfo.IsNullOrEmpty() &&
+                               orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.OrderType)
+            ? orderIndex.ExtensionInfo[ExtensionKey.OrderType]
+            : string.Empty;
         return item;
     }
 

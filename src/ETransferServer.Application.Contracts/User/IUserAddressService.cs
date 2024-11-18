@@ -14,4 +14,5 @@ public interface IUserAddressService: IApplicationService
     Task<bool> AddOrUpdateAsync(UserAddressDto dto);
     Task<List<UserAddressDto>> GetAddressListAsync(List<string> addressList);
     Task<UserAddressDto> GetAssignedAddressAsync(string address);
+    Task<List<UserAddressDto>> GetExpiredAddressListAsync();
 }

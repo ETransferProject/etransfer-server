@@ -15,4 +15,5 @@ public class UserAddressDto
     [Id(6)] public string ToSymbol { get; set; }
     [Id(7)] public long UpdateTime { get; set; }
     [Id(8)] public long CreateTime { get; set; }
+    [Id(9)] public string OrderId { get; set; }
 }

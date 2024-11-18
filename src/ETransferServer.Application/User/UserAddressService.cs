@@ -183,6 +183,22 @@ public partial class UserAddressService : ApplicationService, IUserAddressServic
         return remainingList;
     }
 
+    public async Task<List<UserAddressDto>> GetExpiredAddressListAsync()
+    {
+        var mustQuery = new List<Func<QueryContainerDescriptor<UserAddress>, QueryContainer>>();
+
+        mustQuery.Add(q => q.Term(i => i.Field(f => f.IsAssigned).Value(true)));
+        mustQuery.Add(q => q.Range(i =>
+            i.Field(f => f.UpdateTime).LessThanOrEquals(DateTime.UtcNow.AddHours(-48).ToUtcMilliSeconds())));
+
+        var mustNotQuery = new List<Func<QueryContainerDescriptor<UserAddress>, QueryContainer>>();
+        mustNotQuery.Add(q => q.Exists(i => i.Field(t => t.UserId)));
+        
+        QueryContainer Filter(QueryContainerDescriptor<UserAddress> f) => f.Bool(b => b.Must(mustQuery).MustNot(mustNotQuery));
+        var result = await _userAddressIndexRepository.GetListAsync(Filter, skip:0, limit: UserAddressOptions.QueryLimit);
+        return _objectMapper.Map<List<UserAddress>, List<UserAddressDto>>(result.Item2);
+    }
+
     private async Task<UserAddressDto> GetNewAddressAsync(List<string> chainIdList, string symbol)
     {
         var mustQuery = new List<Func<QueryContainerDescriptor<UserAddress>, QueryContainer>>();
