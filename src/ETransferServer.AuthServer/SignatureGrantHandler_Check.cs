@@ -40,7 +40,9 @@ public partial class SignatureGrantHandler
                         var pubKey = new PublicKey(addressRaw);
                         return pubKey.Verify(messageByte, signature);
                     case WalletEnum.TRX:
-                        var fullMessage = String.Concat("\x19TRON Signed Message:\n", message.Length, message);
+                        signature = ByteArrayHelper.HexStringToByteArray(Encoding.UTF8.GetString(signature));
+                        messageRaw = Encoding.UTF8.GetString(ByteArrayHelper.HexStringToByteArray(message));
+                        var fullMessage = String.Concat("\x19TRON Signed Message:\n", messageRaw.Length, messageRaw);
                         var messageHash = new Sha3Keccack().CalculateHash(Encoding.UTF8.GetBytes(fullMessage));
                         if (signature.Length != 65)
                             throw new ArgumentException("Invalid signature length");
