@@ -36,7 +36,7 @@ public partial class SignatureGrantHandler
                         var account = new EthereumMessageSigner().EncodeUTF8AndEcRecover(messageRaw, signatureRaw);
                         return addressRaw == account?.EnsureHexPrefix();
                     case WalletEnum.Solana:
-                        var messageByte = Encoding.UTF8.GetBytes(message);
+                        var messageByte = ByteArrayHelper.HexStringToByteArray(message);
                         var pubKey = new PublicKey(addressRaw);
                         return pubKey.Verify(messageByte, signature);
                     case WalletEnum.TRX:
