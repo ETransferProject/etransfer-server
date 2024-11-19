@@ -4,12 +4,15 @@ using Orleans.Streams;
 using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
 using ETransferServer.Dtos.Order;
+using ETransferServer.Etos.Order;
+using ETransferServer.Grains.Grain.Order.Deposit;
 using ETransferServer.Grains.Grain.Timers;
 using ETransferServer.Grains.Grain.Token;
 using ETransferServer.Grains.Grain.TokenLimit;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.Provider;
 using ETransferServer.Options;
+using ETransferServer.ThirdPart.CoBo.Dtos;
 using MassTransit;
 using NBitcoin;
 using Newtonsoft.Json;
@@ -27,7 +30,9 @@ public interface IUserWithdrawGrain : IGrainWithGuidKey
     /// <returns></returns>
     Task<WithdrawOrderDto> CreateOrder(WithdrawOrderDto withdrawOrderDto);
     
-    Task<WithdrawOrderDto> CreateTransferOrder(WithdrawOrderDto withdrawOrderDto);
+    Task CreateTransferOrder(WithdrawOrderDto withdrawOrderDto);
+
+    Task SaveTransferOrder(CoBoTransactionDto coBoTransaction);
     
     Task<WithdrawOrderDto> CreateRefundOrder(WithdrawOrderDto withdrawOrderDto, string address);
 
@@ -172,15 +177,64 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         return await AddOrUpdateOrder(withdrawOrderDto);
     }
 
-    public async Task<WithdrawOrderDto> CreateTransferOrder(WithdrawOrderDto withdrawOrderDto)
+    public async Task CreateTransferOrder(WithdrawOrderDto withdrawOrderDto)
     {
         withdrawOrderDto.Id = this.GetPrimaryKey();
+        withdrawOrderDto.FromTransfer.Status = OrderTransferStatusEnum.Created.ToString();
         withdrawOrderDto.Status = OrderStatusEnum.Created.ToString();
         var coBoCoinGrain =
             GrainFactory.GetGrain<ICoBoCoinGrain>(ICoBoCoinGrain.Id(withdrawOrderDto.FromTransfer.Network,
                 withdrawOrderDto.FromTransfer.Symbol));
         withdrawOrderDto.ExtensionInfo.AddOrReplace(ExtensionKey.FromConfirmingThreshold, (await coBoCoinGrain.GetConfirmingThreshold()).ToString());
-        return await AddOrUpdateOrder(withdrawOrderDto);
+        var res = await _recordGrain.AddOrUpdate(withdrawOrderDto);
+        await _userWithdrawProvider.AddOrUpdateSync(res.Value);
+    }
+    
+    public async Task SaveTransferOrder(CoBoTransactionDto coBoTransaction)
+    {
+        var coBoDepositGrain = GrainFactory.GetGrain<ICoBoDepositGrain>(coBoTransaction.Id);
+        var coBoDto = await coBoDepositGrain.Get();
+        if (coBoDto != null && coBoDto.Status == CommonConstant.SuccessStatus)
+        {
+            _logger.LogInformation("transfer order already success: {id}", coBoTransaction.Id);
+            return;
+        }
+        await coBoDepositGrain.AddOrUpdate(coBoTransaction);
+        
+        var orderDto = (await _recordGrain.Get())?.Value;
+        if (orderDto == null)
+        {
+            _logger.LogInformation("transfer order empty: {id}", this.GetPrimaryKey());
+            return;
+        }
+        if (coBoDto == null)
+        {
+            await _bus.Publish(_objectMapper.Map<WithdrawOrderDto, OrderChangeEto>(orderDto));
+        }
+
+        orderDto.ThirdPartOrderId = coBoTransaction.Id;
+        orderDto.ThirdPartServiceName = ThirdPartServiceNameEnum.Cobo.ToString();
+        orderDto.FromTransfer.TxId = coBoTransaction.TxId;
+        orderDto.FromTransfer.TxTime ??= DateTimeHelper.ToUnixTimeMilliseconds(DateTime.UtcNow);
+        orderDto.ExtensionInfo.AddOrReplace(ExtensionKey.FromConfirmedNum, coBoTransaction.ConfirmedNum.ToString());
+        orderDto.ExtensionInfo.AddOrReplace(ExtensionKey.FromConfirmingThreshold, coBoTransaction.ConfirmingThreshold > 0
+            ? coBoTransaction.ConfirmingThreshold.ToString()
+            : coBoTransaction.TxDetail.ConfirmingThreshold.ToString());
+
+        if (coBoTransaction.Status == CommonConstant.PendingStatus)
+        {
+            orderDto.FromTransfer.Status = OrderTransferStatusEnum.Transferring.ToString();
+            orderDto.Status = OrderStatusEnum.FromTransferring.ToString();
+            var res = await _recordGrain.AddOrUpdate(orderDto);
+            await _userWithdrawProvider.AddOrUpdateSync(res.Value);
+        }
+
+        if (coBoTransaction.Status == CommonConstant.SuccessStatus)
+        {
+            orderDto.FromTransfer.Status = OrderTransferStatusEnum.Confirmed.ToString();
+            orderDto.Status = OrderStatusEnum.FromTransferConfirmed.ToString();
+            await AddOrUpdateOrder(orderDto);
+        }
     }
     
     public async Task<WithdrawOrderDto> CreateRefundOrder(WithdrawOrderDto withdrawDto, string address)

@@ -250,6 +250,12 @@ public partial class OrderWithdrawAppService
     private async Task<CreateTransferOrderDto> DoCreateOrderAsync(GetTransferOrderRequestDto request,
         decimal withdrawAmount, string feeStr)
     {
+        var orderId = Guid.NewGuid();
+        var userAddressGrain = _clusterClient.GetGrain<IUserDepositAddressGrain>(
+            GuidHelper.GenerateId(request.FromNetwork, request.FromSymbol, orderId.ToString()));
+        var address = await userAddressGrain.GetTransferAddress();
+        AssertHelper.IsTrue(!address.IsNullOrEmpty(), ErrorResult.TransactionFailCode);
+        
         // amount limit
         var amountUsd = await CalculateAmountUsdAsync(request.FromSymbol, request.Amount);
         var tokenInfoGrain =
@@ -259,8 +265,7 @@ public partial class OrderWithdrawAppService
                 DateTime.UtcNow.AddDays(1).Date));
         try
         {
-            var orderId = Guid.NewGuid();
-            var grain = _clusterClient.GetGrain<IUserWithdrawGrain>(orderId);
+            var transferGrain = _clusterClient.GetGrain<IUserWithdrawGrain>(orderId);
             var withdrawOrderDto = new WithdrawOrderDto
             {
                 UserId = CurrentUser.GetId(),
@@ -271,7 +276,8 @@ public partial class OrderWithdrawAppService
                     Network = request.FromNetwork,
                     Amount = request.Amount,
                     Symbol = request.FromSymbol,
-                    FromAddress = request.FromAddress
+                    FromAddress = request.FromAddress,
+                    ToAddress = address
                 },
                 ToTransfer = new TransferInfo
                 {
@@ -294,13 +300,12 @@ public partial class OrderWithdrawAppService
                 withdrawOrderDto.ExtensionInfo.Add(ExtensionKey.Memo, request.Memo);
             }
             
-            //var order = await grain.CreateTransferOrder(withdrawOrderDto);
-            var getWithdrawOrderInfoDto = new CreateTransferOrderDto
+            await transferGrain.CreateTransferOrder(withdrawOrderDto);
+            return new CreateTransferOrderDto
             {
                 OrderId = orderId.ToString(),
-                Address = string.Empty
+                Address = address
             };
-            return getWithdrawOrderInfoDto;
         }
         catch (Exception e)
         {

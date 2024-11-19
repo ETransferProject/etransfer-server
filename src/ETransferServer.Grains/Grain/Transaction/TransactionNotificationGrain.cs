@@ -1,10 +1,13 @@
 using AElf.ExceptionHandler;
 using ETransferServer.Common;
 using ETransferServer.Grains.Grain.Order.Deposit;
+using ETransferServer.Grains.Grain.Order.Withdraw;
 using ETransferServer.Grains.Grain.Timers;
+using ETransferServer.Grains.Grain.Users;
 using ETransferServer.Grains.Options;
 using ETransferServer.ThirdPart.CoBo;
 using ETransferServer.ThirdPart.CoBo.Dtos;
+using ETransferServer.User;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
@@ -19,17 +22,20 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
     private readonly ILogger<TransactionNotificationGrain> _logger;
     private readonly IOptionsSnapshot<NetworkOptions> _networkOption;
     private readonly IOptionsSnapshot<DepositAddressOptions> _depositAddressOption;
+    private readonly IUserAddressService _userAddressService;
     private readonly ICoBoProvider _coBoProvider;
     private IDepositOrderStatusReminderGrain _depositOrderStatusReminderGrain;
 
     public TransactionNotificationGrain(ILogger<TransactionNotificationGrain> logger,
         IOptionsSnapshot<NetworkOptions> networkOption,
         IOptionsSnapshot<DepositAddressOptions> depositAddressOption, 
+        IUserAddressService userAddressService,
         ICoBoProvider coBoProvider)
     {
         _logger = logger;
         _networkOption = networkOption;
         _depositAddressOption = depositAddressOption;
+        _userAddressService = userAddressService;
         _coBoProvider = coBoProvider;
     }
 
@@ -91,6 +97,23 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
     private async Task<bool> HandleDeposit(CoBoTransactionDto coBoTransaction)
     {
         await GetCoinNetwork(coBoTransaction);
+        
+        // transfer
+        var addressGrain = GrainFactory.GetGrain<IUserTokenDepositAddressGrain>(coBoTransaction.Address);
+        var res = await addressGrain.Get();
+        var userAddress = !res.Success || res.Data == null
+            ? await _userAddressService.GetAssignedAddressAsync(coBoTransaction.Address)
+            : res.Value;
+
+        AssertHelper.NotNull(userAddress, "user address empty");
+        if (userAddress.IsAssigned && !userAddress.OrderId.IsNullOrEmpty())
+        {
+            var withdrawGrain = GrainFactory.GetGrain<IUserWithdrawGrain>(Guid.Parse(userAddress.OrderId));
+            await withdrawGrain.SaveTransferOrder(coBoTransaction);
+            return true;
+        }
+        
+        // deposit
         var coBoDepositQueryTimerGrain = GrainFactory.GetGrain<ICoBoDepositQueryTimerGrain>(
             GuidHelper.UniqGuid(nameof(ICoBoDepositQueryTimerGrain)));
         if (coBoTransaction.Status == CommonConstant.PendingStatus)
