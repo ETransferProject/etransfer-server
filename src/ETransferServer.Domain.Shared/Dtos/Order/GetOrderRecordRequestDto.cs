@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using Volo.Abp.Application.Dtos;
 
@@ -13,4 +14,5 @@ public class GetOrderRecordRequestDto : PagedAndSortedResultRequestDto
     public int? Status { get; set; }
     public long? StartTimestamp { get; set; }
     public long? EndTimestamp { get; set; }
+    public List<string>? AddressList { get; set; }
 }

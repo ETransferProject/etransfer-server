@@ -60,8 +60,25 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
         if (!userId.HasValue || userId == Guid.Empty) return new PagedResultDto<OrderIndexDto>();
 
         var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
-        mustQuery.Add(q => q.Term(i =>
-            i.Field(f => f.UserId).Value(userId.ToString())));
+        if (request.AddressList.IsNullOrEmpty())
+        {
+            mustQuery.Add(q => q.Term(i =>
+                i.Field(f => f.UserId).Value(userId.ToString())));
+        }
+        else
+        {
+            mustQuery.Add(q => q.Bool(i => i.Should(
+                s => s.Term(k =>
+                    k.Field(f => f.UserId).Value(userId.ToString())),
+                s => s.Terms(k =>
+                    k.Field(f => f.FromTransfer.FromAddress).Terms(request.AddressList)),
+                s => s.Terms(k =>
+                    k.Field(f => f.FromTransfer.ToAddress).Terms(request.AddressList)),
+                s => s.Terms(k =>
+                    k.Field(f => f.ToTransfer.FromAddress).Terms(request.AddressList)),
+                s => s.Terms(k =>
+                    k.Field(f => f.ToTransfer.ToAddress).Terms(request.AddressList)))));
+        }
 
         if (request.Type > 0)
         {
