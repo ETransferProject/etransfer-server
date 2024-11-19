@@ -93,8 +93,6 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
         MethodName = nameof(HandleGetInfoExceptionAsync))]
     public async Task<GetWithdrawInfoDto> GetWithdrawInfoAsync(GetWithdrawListRequestDto request, string version = null)
     {
-        var userId = CurrentUser.GetId();
-        AssertHelper.IsTrue(userId != Guid.Empty, "User not exists. Please refresh and try again.");
         AssertHelper.IsTrue(request.ChainId == ChainId.AELF || request.ChainId == ChainId.tDVV
                                                             || request.ChainId == ChainId.tDVW,
             "Param is invalid. Please refresh and try again.");
@@ -106,6 +104,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
             CommonConstant.DefaultConst.PortKeyVersion2.Equals(request.Version),
             "Version is invalid. Please refresh and try again.");
         AssertHelper.IsTrue(VerifyMemo(request.Memo), ErrorResult.MemoInvalidCode);
+        var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
         if (!request.Network.IsNullOrEmpty())
         {
             var networkConfig = _networkInfoOptions.Value.NetworkMap[request.Symbol]
@@ -212,7 +211,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
         };
     }
 
-    private async Task<decimal> GetTransactionFeeAsync(GetWithdrawListRequestDto request, Guid userId, decimal feeAmount)
+    private async Task<decimal> GetTransactionFeeAsync(GetWithdrawListRequestDto request, Guid? userId, decimal feeAmount)
     {
         var network = string.IsNullOrEmpty(request.Network) ? ChainId.AELF : request.Network;
         var networkConfig = _networkInfoOptions.Value.NetworkMap[request.Symbol]
@@ -227,7 +226,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
             : withdrawFee;
     }
 
-    private async Task<Tuple<decimal, long>> CalculateThirdPartFeesWithCacheAsync(Guid userId, string symbol, string version = null)
+    private async Task<Tuple<decimal, long>> CalculateThirdPartFeesWithCacheAsync(Guid? userId, string symbol, string version = null)
     {
         var thirdFeeCacheKey = CacheKey("minThirdPartFee", symbol);
         var cachedData = await _minThirdPartFeeCache.GetAsync(thirdFeeCacheKey);
@@ -241,7 +240,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
             });
     }
 
-    private async Task<Tuple<decimal, long>> CalculateThirdPartFeesAsync(Guid userId, string symbol, string version = null)
+    private async Task<Tuple<decimal, long>> CalculateThirdPartFeesAsync(Guid? userId, string symbol, string version = null)
     {
         Dictionary<string, Task<Tuple<decimal, long>>> fees = new();
         var networkList = GetThirdPartNetworkList(symbol);
@@ -293,7 +292,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
 
     // Estimate transaction fee
     // feeAmount in symbol => expire at milliseconds timestamp
-    private async Task<Tuple<decimal, long>> CalculateThirdPartFeeAsync(Guid userId, string network, string symbol, bool isNotify = true)
+    private async Task<Tuple<decimal, long>> CalculateThirdPartFeeAsync(Guid? userId, string network, string symbol, bool isNotify = true)
     {
         var (estimateFee, coin) = await _networkAppService.CalculateNetworkFeeAsync(network, symbol);
         estimateFee = Math.Max(estimateFee, await _networkAppService.GetMinThirdPartFeeAsync(network, symbol));
@@ -315,9 +314,9 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
         return Tuple.Create(estimateFee, coin.ExpireTime);
     }
 
-    private async Task SetFeeCacheAsync(Guid userId, string network, string symbol, decimal fee)
+    private async Task SetFeeCacheAsync(Guid? userId, string network, string symbol, decimal fee)
     {
-        if (network.IsNullOrEmpty()) return;
+        if (!userId.HasValue || network.IsNullOrEmpty()) return;
         var coinFeeCacheKey = CacheKey(FeeInfo.FeeName.CoBoFee, userId.ToString(), network, symbol);
         var decimals = await _networkAppService.GetDecimalsAsync(ChainId.AELF, symbol);
         await _coBoCoinCache.SetAsync(coinFeeCacheKey, new CoBoCoinDto { AbsEstimateFee = fee.ToString(decimals, DecimalHelper.RoundingOption.Ceiling) }, 
@@ -654,21 +653,24 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
         return regex.IsMatch(memo);
     }
 
-    private async Task<bool> VerifyByVersionAndWhiteList(NetworkConfig networkConfig, Guid userId, string version)
+    private async Task<bool> VerifyByVersionAndWhiteList(NetworkConfig networkConfig, Guid? userId, string version)
     {
-        _logger.LogInformation("VerifyByVersionAndWhiteList currentUser:{userId},version:{version}", userId, version);
-        var userGrain = _clusterClient.GetGrain<IUserGrain>(userId);
-        var userDto = await userGrain.GetUser();
-        if (userDto.Success && userDto.Data != null && !userDto.Data.AddressInfos.IsNullOrEmpty())
+        if (userId.HasValue)
         {
-            return networkConfig.NetworkInfo.MinShowVersion.IsNullOrEmpty()
-                   || (VerifyHelper.VerifyMemoVersion(version, networkConfig.NetworkInfo.MinShowVersion)
-                       && (networkConfig.SupportWhiteList.IsNullOrEmpty() ||
-                           networkConfig.SupportWhiteList.Any(t => userDto.Data.AddressInfos.Exists(a =>
-                               a.Address.ToLower() == t.ToLower()))));
+            _logger.LogInformation("VerifyByVersionAndWhiteList currentUser:{userId},version:{version}", userId,
+                version);
+            var userGrain = _clusterClient.GetGrain<IUserGrain>(userId.Value);
+            var userDto = await userGrain.GetUser();
+            if (userDto.Success && userDto.Data != null && !userDto.Data.AddressInfos.IsNullOrEmpty())
+            {
+                return networkConfig.NetworkInfo.MinShowVersion.IsNullOrEmpty()
+                       || (VerifyHelper.VerifyMemoVersion(version, networkConfig.NetworkInfo.MinShowVersion)
+                           && (networkConfig.SupportWhiteList.IsNullOrEmpty() ||
+                               networkConfig.SupportWhiteList.Any(t => userDto.Data.AddressInfos.Exists(a =>
+                                   a.Address.ToLower() == t.ToLower()))));
 
+            }
         }
-
         return networkConfig.NetworkInfo.MinShowVersion.IsNullOrEmpty()
                || (VerifyHelper.VerifyMemoVersion(version, networkConfig.NetworkInfo.MinShowVersion)
                    && networkConfig.SupportWhiteList.IsNullOrEmpty());

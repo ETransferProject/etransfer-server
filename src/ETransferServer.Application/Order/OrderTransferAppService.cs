@@ -67,9 +67,7 @@ public partial class OrderWithdrawAppService
                 TransferInfo = _objectMapper.Map<WithdrawInfoDto, TransferDetailInfoDto>(result.WithdrawInfo)
             };
         }
-
-        var userId = CurrentUser.GetId();
-        AssertHelper.IsTrue(userId != Guid.Empty, "User not exists. Please refresh and try again.");
+        
         AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.Symbol),
             "Symbol is not exist. Please refresh and try again.");
         AssertHelper.IsTrue(
@@ -83,6 +81,7 @@ public partial class OrderWithdrawAppService
             "Version is invalid. Please refresh and try again.");
         AssertHelper.IsTrue(VerifyMemo(request.Memo), ErrorResult.MemoInvalidCode);
         
+        var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
         if (!request.ToNetwork.IsNullOrEmpty())
         {
             var networkConfig = _networkInfoOptions.Value.NetworkMap[request.Symbol]
