@@ -20,14 +20,17 @@ public class TokenAddressRecycleTimerGrain : Grain<TokenAddressRecycleState>, IT
 
     private readonly IUserAddressProvider _userAddressProvider;
     private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
+    private readonly IOptionsSnapshot<DepositAddressOptions> _depositAddressOptions;
     private readonly ILogger<TokenAddressRecycleTimerGrain> _logger;
     
     public TokenAddressRecycleTimerGrain(IUserAddressProvider userAddressProvider,
         IOptionsSnapshot<TimerOptions> timerOptions,
+        IOptionsSnapshot<DepositAddressOptions> depositAddressOptions,
         ILogger<TokenAddressRecycleTimerGrain> logger)
     {
         _userAddressProvider = userAddressProvider;
         _timerOptions = timerOptions;
+        _depositAddressOptions = depositAddressOptions;
         _logger = logger;
     }
 
@@ -52,7 +55,7 @@ public class TokenAddressRecycleTimerGrain : Grain<TokenAddressRecycleState>, IT
         _logger.LogDebug("TokenAddressRecycleTimerGrain callback");
         _lastCallBackTime = DateTime.UtcNow;
 
-        var expiredList = await _userAddressProvider.GetExpiredAddressListAsync();
+        var expiredList = await _userAddressProvider.GetExpiredAddressListAsync(_depositAddressOptions.Value.AssignedAddressExpiredHour);
         var addressLimitGrain = GrainFactory.GetGrain<ITokenAddressLimitGrain>(
             GuidHelper.UniqGuid(nameof(ITokenAddressLimitGrain)));
         _logger.LogDebug("ExpiredList count: {count}, current: {current}", expiredList.Count,
