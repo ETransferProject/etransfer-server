@@ -9,6 +9,7 @@ using ETransferServer.Grains.Grain.Order.Deposit;
 using ETransferServer.Grains.Grain.Timers;
 using ETransferServer.Grains.Grain.Token;
 using ETransferServer.Grains.Grain.TokenLimit;
+using ETransferServer.Grains.Grain.Users;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.Provider;
 using ETransferServer.Options;
@@ -80,6 +81,7 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
     private readonly IContractProvider _contractProvider;
     private readonly IUserWithdrawProvider _userWithdrawProvider;
     private readonly IOrderStatusFlowProvider _orderStatusFlowProvider;
+    private readonly IUserAddressProvider _userAddressProvider;
     private readonly IObjectMapper _objectMapper;
     private readonly IBus _bus;
 
@@ -95,6 +97,7 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         ILogger<UserWithdrawGrain> logger, IOptionsSnapshot<ChainOptions> chainOptions,
         IOptionsSnapshot<WithdrawOptions> withdrawOptions, IContractProvider contractProvider,
         IOrderStatusFlowProvider orderStatusFlowProvider,
+        IUserAddressProvider userAddressProvider,
         IOptionsSnapshot<WithdrawNetworkOptions> withdrawNetworkOptions,
         IObjectMapper objectMapper, 
         IBus bus)
@@ -105,6 +108,7 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         _withdrawOptions = withdrawOptions;
         _contractProvider = contractProvider;
         _orderStatusFlowProvider = orderStatusFlowProvider;
+        _userAddressProvider = userAddressProvider;
         _withdrawNetworkOptions = withdrawNetworkOptions;
         _objectMapper = objectMapper;
         _bus = bus;

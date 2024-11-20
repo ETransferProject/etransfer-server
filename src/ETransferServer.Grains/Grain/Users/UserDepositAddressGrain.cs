@@ -97,17 +97,18 @@ public class UserDepositAddressGrain : Grain<UserDepositAddressState>, IUserDepo
         {
             return null;
         }
-
+        
         var addressDto = await GetNewUserAddressAsync(input[0], input[1]);
         if (addressDto == null) return null;
+        var addressLimitGrain = GrainFactory.GetGrain<ITokenAddressLimitGrain>(
+            GuidHelper.UniqGuid(nameof(ITokenAddressLimitGrain)));
+        if (!await addressLimitGrain.Acquire()) return null;
+        
         addressDto.IsAssigned = true;
         addressDto.OrderId = input[2];
         addressDto.UpdateTime = DateTimeHelper.ToUnixTimeMilliseconds(DateTime.UtcNow);
         var addressGrain = GrainFactory.GetGrain<IUserTokenDepositAddressGrain>(addressDto.UserToken.Address);
         await addressGrain.AddOrUpdate(addressDto);
-        var addressLimitGrain = GrainFactory.GetGrain<ITokenAddressLimitGrain>(
-            GuidHelper.UniqGuid(nameof(ITokenAddressLimitGrain)));
-        await addressLimitGrain.Acquire();
         await _userAddressProvider.UpdateSync(addressDto);
         _logger.LogInformation("GetTransferAddress, orderId:{orderId}, address:{address}, {network}, {symbol}", 
             input[2], addressDto.UserToken.Address, input[0], input[1]);
