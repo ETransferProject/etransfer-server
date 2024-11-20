@@ -21,4 +21,5 @@ public class OrderVolumeOverview
     public string Date { get; set; }
     public string DepositAmountUsd { get; set; }
     public string WithdrawAmountUsd { get; set; }
+    public string TransferAmountUsd { get; set; }
 }

@@ -62,15 +62,15 @@ public partial class InfoAppService : ETransferServerAppService, IInfoAppService
         {
             case DateDimensionEnum.Day:
                 result = await QueryCountAggAsync(DateInterval.Day, request.MaxResultCount, result);
-                result.Transaction.TotalTx = result.Transaction.Day.Sum(t => t.DepositTx + t.WithdrawTx);
+                result.Transaction.TotalTx = result.Transaction.Day.Sum(t => t.DepositTx + t.TransferTx);
                 break;
             case DateDimensionEnum.Week:
                 result = await QueryCountAggAsync(DateInterval.Week, request.MaxResultCount, result);
-                result.Transaction.TotalTx = result.Transaction.Week.Sum(t => t.DepositTx + t.WithdrawTx);
+                result.Transaction.TotalTx = result.Transaction.Week.Sum(t => t.DepositTx + t.TransferTx);
                 break;
             case DateDimensionEnum.Month:
                 result = await QueryCountAggAsync(DateInterval.Month, request.MaxResultCount, result);
-                result.Transaction.TotalTx = result.Transaction.Month.Sum(t => t.DepositTx + t.WithdrawTx);
+                result.Transaction.TotalTx = result.Transaction.Month.Sum(t => t.DepositTx + t.TransferTx);
                 break;
         }
         
@@ -90,17 +90,17 @@ public partial class InfoAppService : ETransferServerAppService, IInfoAppService
             case DateDimensionEnum.Day:
                 result = await QuerySumAggAsync(DateInterval.Day, request.MaxResultCount, result);
                 result.Volume.TotalAmountUsd = result.Volume.Day
-                    .Sum(t => t.DepositAmountUsd.SafeToDecimal() + t.WithdrawAmountUsd.SafeToDecimal()).ToString();
+                    .Sum(t => t.DepositAmountUsd.SafeToDecimal() + t.TransferAmountUsd.SafeToDecimal()).ToString();
                 break;
             case DateDimensionEnum.Week:
                 result = await QuerySumAggAsync(DateInterval.Week, request.MaxResultCount, result);
                 result.Volume.TotalAmountUsd = result.Volume.Week
-                    .Sum(t => t.DepositAmountUsd.SafeToDecimal() + t.WithdrawAmountUsd.SafeToDecimal()).ToString();
+                    .Sum(t => t.DepositAmountUsd.SafeToDecimal() + t.TransferAmountUsd.SafeToDecimal()).ToString();
                 break;
             case DateDimensionEnum.Month:
                 result = await QuerySumAggAsync(DateInterval.Month, request.MaxResultCount, result);
                 result.Volume.TotalAmountUsd = result.Volume.Month
-                    .Sum(t => t.DepositAmountUsd.SafeToDecimal() + t.WithdrawAmountUsd.SafeToDecimal()).ToString();
+                    .Sum(t => t.DepositAmountUsd.SafeToDecimal() + t.TransferAmountUsd.SafeToDecimal()).ToString();
                 break;
         }
 
@@ -511,7 +511,8 @@ public partial class InfoAppService : ETransferServerAppService, IInfoAppService
             {
                 Date = GetDateString(dateInterval, (long)bucket.Key),
                 DepositTx = 0L,
-                WithdrawTx = 0L
+                WithdrawTx = 0L,
+                TransferTx = 0L
             };
 
             var orderTypeAgg = bucket.Terms("order_type");
@@ -524,23 +525,24 @@ public partial class InfoAppService : ETransferServerAppService, IInfoAppService
                 else
                 {
                     item.WithdrawTx = orderTypeBucket.DocCount.Value;
+                    item.TransferTx = orderTypeBucket.DocCount.Value;
                 }
             }
             
             switch (dateInterval)
             {
                 case DateInterval.Day:
-                    if (item.DepositTx > 0 || item.WithdrawTx > 0) result.Transaction.Day.Add(item);
+                    if (item.DepositTx > 0 || item.TransferTx > 0) result.Transaction.Day.Add(item);
                     if (maxResultCount.HasValue)
                         result.Transaction.Day = result.Transaction.Day.TakeLast(maxResultCount.Value).ToList();
                     break;
                 case DateInterval.Week:
-                    if (item.DepositTx > 0 || item.WithdrawTx > 0) result.Transaction.Week.Add(item);
+                    if (item.DepositTx > 0 || item.TransferTx > 0) result.Transaction.Week.Add(item);
                     if (maxResultCount.HasValue)
                         result.Transaction.Week = result.Transaction.Week.TakeLast(maxResultCount.Value).ToList();
                     break;
                 case DateInterval.Month:
-                    if (item.DepositTx > 0 || item.WithdrawTx > 0) result.Transaction.Month.Add(item);
+                    if (item.DepositTx > 0 || item.TransferTx > 0) result.Transaction.Month.Add(item);
                     if (maxResultCount.HasValue)
                         result.Transaction.Month = result.Transaction.Month.TakeLast(maxResultCount.Value).ToList();
                     break;
@@ -628,12 +630,13 @@ public partial class InfoAppService : ETransferServerAppService, IInfoAppService
             {
                 Date = GetDateString(dateInterval, (long)bucket.Key),
                 DepositAmountUsd = "0",
-                WithdrawAmountUsd = "0"
+                WithdrawAmountUsd = "0",
+                TransferAmountUsd = "0"
             };
             var depositAmountUsd = 0M;
-            var withdrawAmountUsd = 0M;
+            var transferAmountUsd = 0M;
             var depositDic = new Dictionary<long, decimal>();
-            var withdrawDic = new Dictionary<long, decimal>();
+            var transferDic = new Dictionary<long, decimal>();
             
             var symbolAgg = bucket.Terms("symbol");
             foreach (var symbolBucket in symbolAgg.Buckets)
@@ -666,7 +669,7 @@ public partial class InfoAppService : ETransferServerAppService, IInfoAppService
                         }
                         else
                         {
-                            withdrawAmountUsd += (decimal)orderTypeBucket.Sum("sum_amount")?.Value * avgExchange;
+                            transferAmountUsd += (decimal)orderTypeBucket.Sum("sum_amount")?.Value * avgExchange;
                         }
                     }
                     else
@@ -700,10 +703,10 @@ public partial class InfoAppService : ETransferServerAppService, IInfoAppService
                             }
                             else
                             {
-                                if (withdrawDic.ContainsKey(dd))
-                                    withdrawDic[dd] += (decimal)ddBucket.Sum("sum_amount")?.Value * avgExchange;
+                                if (transferDic.ContainsKey(dd))
+                                    transferDic[dd] += (decimal)ddBucket.Sum("sum_amount")?.Value * avgExchange;
                                 else
-                                    withdrawDic.Add(dd, (decimal)ddBucket.Sum("sum_amount")?.Value * avgExchange);
+                                    transferDic.Add(dd, (decimal)ddBucket.Sum("sum_amount")?.Value * avgExchange);
                             }
                         }
                     }
@@ -714,27 +717,28 @@ public partial class InfoAppService : ETransferServerAppService, IInfoAppService
                 ? depositAmountUsd.ToString(2, DecimalHelper.RoundingOption.Floor)
                 : depositDic.Sum(t => decimal.Parse(t.Value.ToString(2, DecimalHelper.RoundingOption.Floor)))
                     .ToString(2, DecimalHelper.RoundingOption.Floor);
-            item.WithdrawAmountUsd = dateInterval == DateInterval.Day
-                ? withdrawAmountUsd.ToString(2, DecimalHelper.RoundingOption.Floor)
-                : withdrawDic.Sum(t => decimal.Parse(t.Value.ToString(2, DecimalHelper.RoundingOption.Floor)))
+            item.TransferAmountUsd = dateInterval == DateInterval.Day
+                ? transferAmountUsd.ToString(2, DecimalHelper.RoundingOption.Floor)
+                : transferDic.Sum(t => decimal.Parse(t.Value.ToString(2, DecimalHelper.RoundingOption.Floor)))
                     .ToString(2, DecimalHelper.RoundingOption.Floor);
+            item.WithdrawAmountUsd = item.TransferAmountUsd;
 
             switch (dateInterval)
             {
                 case DateInterval.Day:
-                    if (decimal.Parse(item.DepositAmountUsd) > 0 || decimal.Parse(item.WithdrawAmountUsd) > 0)
+                    if (decimal.Parse(item.DepositAmountUsd) > 0 || decimal.Parse(item.TransferAmountUsd) > 0)
                         result.Volume.Day.Add(item);
                     if (maxResultCount.HasValue)
                         result.Volume.Day = result.Volume.Day.TakeLast(maxResultCount.Value).ToList();
                     break;
                 case DateInterval.Week:
-                    if (decimal.Parse(item.DepositAmountUsd) > 0 || decimal.Parse(item.WithdrawAmountUsd) > 0)
+                    if (decimal.Parse(item.DepositAmountUsd) > 0 || decimal.Parse(item.TransferAmountUsd) > 0)
                         result.Volume.Week.Add(item);
                     if (maxResultCount.HasValue)
                         result.Volume.Week = result.Volume.Week.TakeLast(maxResultCount.Value).ToList();
                     break;
                 case DateInterval.Month:
-                    if (decimal.Parse(item.DepositAmountUsd) > 0 || decimal.Parse(item.WithdrawAmountUsd) > 0)
+                    if (decimal.Parse(item.DepositAmountUsd) > 0 || decimal.Parse(item.TransferAmountUsd) > 0)
                         result.Volume.Month.Add(item);
                     if (maxResultCount.HasValue)
                         result.Volume.Month = result.Volume.Month.TakeLast(maxResultCount.Value).ToList();

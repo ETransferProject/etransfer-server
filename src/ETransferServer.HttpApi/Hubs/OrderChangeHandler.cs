@@ -59,10 +59,10 @@ namespace ETransferServer.Hubs
                 Time = time
             }, eventData.Message);
             _logger.LogInformation(
-                "OrderChangeHandler, address: {address}, time: {time}, pending: {depositCount1},{withdrawCount1}, success: {depositCount2},{withdrawCount2}, fail: {depositCount3},{withdrawCount3}",
-                address, time, result?.Processing.DepositCount, result?.Processing.WithdrawCount,
-                result?.Succeed.DepositCount, result?.Succeed.WithdrawCount, result?.Failed.DepositCount,
-                result?.Failed.WithdrawCount);
+                "OrderChangeHandler, address: {address}, time: {time}, pending: {depositCount1},{transferCount1}, success: {depositCount2},{transferCount2}, fail: {depositCount3},{transferCount3}",
+                address, time, result?.Processing.DepositCount, result?.Processing.TransferCount,
+                result?.Succeed.DepositCount, result?.Succeed.TransferCount, result?.Failed.DepositCount,
+                result?.Failed.TransferCount);
             foreach (var connectionId in connectionIds)
             {
                 await _hubContext.Clients.Client(connectionId).SendAsync("ReceiveUserOrderRecords", result);

@@ -527,23 +527,29 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
         dto.Processing.Deposit =
             await GetUserDepositOrderInfoListAsync(itemList, OrderStatusResponseEnum.Processing, OrderTypeEnum.Deposit);
         dto.Processing.DepositCount = dto.Processing.Deposit.Count;
-        dto.Processing.Withdraw =
-            await GetUserWithdrawOrderInfoListAsync(itemList, OrderStatusResponseEnum.Processing, OrderTypeEnum.Withdraw);
-        dto.Processing.WithdrawCount = dto.Processing.Withdraw.Count;
+        dto.Processing.Transfer =
+            await GetUserTransferOrderInfoListAsync(itemList, OrderStatusResponseEnum.Processing, OrderTypeEnum.Withdraw);
+        dto.Processing.TransferCount = dto.Processing.Transfer.Count;
+        dto.Processing.Withdraw = dto.Processing.Transfer;
+        dto.Processing.WithdrawCount = dto.Processing.TransferCount;
 
         dto.Succeed.Deposit =
             await GetUserDepositOrderInfoListAsync(itemList, OrderStatusResponseEnum.Succeed, OrderTypeEnum.Deposit);
         dto.Succeed.DepositCount = dto.Succeed.Deposit.Count;
-        dto.Succeed.Withdraw =
-            await GetUserWithdrawOrderInfoListAsync(itemList, OrderStatusResponseEnum.Succeed, OrderTypeEnum.Withdraw);
-        dto.Succeed.WithdrawCount = dto.Succeed.Withdraw.Count;
+        dto.Succeed.Transfer =
+            await GetUserTransferOrderInfoListAsync(itemList, OrderStatusResponseEnum.Succeed, OrderTypeEnum.Withdraw);
+        dto.Succeed.TransferCount = dto.Succeed.Transfer.Count;
+        dto.Succeed.Withdraw = dto.Succeed.Transfer;
+        dto.Succeed.WithdrawCount = dto.Succeed.TransferCount;
 
         dto.Failed.Deposit =
             await GetUserDepositOrderInfoListAsync(itemList, OrderStatusResponseEnum.Failed, OrderTypeEnum.Deposit);
         dto.Failed.DepositCount = dto.Failed.Deposit.Count;
-        dto.Failed.Withdraw =
-            await GetUserWithdrawOrderInfoListAsync(itemList, OrderStatusResponseEnum.Failed, OrderTypeEnum.Withdraw);
-        dto.Failed.WithdrawCount = dto.Failed.Withdraw.Count;
+        dto.Failed.Transfer =
+            await GetUserTransferOrderInfoListAsync(itemList, OrderStatusResponseEnum.Failed, OrderTypeEnum.Withdraw);
+        dto.Failed.TransferCount = dto.Failed.Transfer.Count;
+        dto.Failed.Withdraw = dto.Failed.Transfer;
+        dto.Failed.WithdrawCount = dto.Failed.TransferCount;
 
         return dto;
     }
@@ -576,15 +582,15 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
         return result;
     }
     
-    private async Task<List<UserWithdrawOrderInfo>> GetUserWithdrawOrderInfoListAsync(List<OrderIndex> itemList,
+    private async Task<List<UserTransferOrderInfo>> GetUserTransferOrderInfoListAsync(List<OrderIndex> itemList,
         OrderStatusResponseEnum orderStatus, OrderTypeEnum orderType)
     {
-        var result = new List<UserWithdrawOrderInfo>();
+        var result = new List<UserTransferOrderInfo>();
         var recordList = await FilterOrderIndexListAsync(itemList, orderStatus, orderType);
         
         foreach (var item in recordList)
         {
-            var record = new UserWithdrawOrderInfo
+            var record = new UserTransferOrderInfo
             {
                 Id = item.Id.ToString(),
                 Symbol = item.ToTransfer.Symbol,
