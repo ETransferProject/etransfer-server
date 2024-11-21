@@ -149,22 +149,37 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
         return Task.FromResult(true);
     }
 
-    private async Task<string> GetTransferOrderIdAsync(CoBoTransactionDto coBoTransaction)
+    private async Task<string> GetTransferOrderIdAsync(CoBoTransactionDto coBoTransaction, int retryTime = 0)
     {
         var memo = string.Empty;
-        var coin = coBoTransaction.Coin.Split(CommonConstant.Underline);
-        var provider = await _blockchainClientProvider.GetBlockChainClientProviderAsync(coin[0]);
-        switch (provider.ChainType)
+        if (retryTime > _depositAddressOption.Value.MaxRequestRetryTimes)
         {
-            case BlockchainType.Ton:
-                memo = await provider.GetMemoAsync(coin[0], coBoTransaction.TxId);
-                AssertHelper.IsTrue(!memo.IsNullOrEmpty(), "get memo empty.");
-                break;
-            default:
-                throw new ArgumentOutOfRangeException();
+            _logger.LogError("Get memo failed after retry {times}, {coin}.",
+                _depositAddressOption.Value.MaxRequestRetryTimes, coBoTransaction.Coin);
+            return memo.ConvertToGuidString();
+        }
+        try
+        {
+            var coin = coBoTransaction.Coin.Split(CommonConstant.Underline);
+            var provider = await _blockchainClientProvider.GetBlockChainClientProviderAsync(coin[0]);
+            switch (provider.ChainType)
+            {
+                case BlockchainType.Ton:
+                    memo = await provider.GetMemoAsync(coin[0], coBoTransaction.TxId);
+                    AssertHelper.IsTrue(!memo.IsNullOrEmpty(), "get memo empty.");
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Failed to get memo: {coin}.", coBoTransaction.Coin);
+            retryTime += 1;
+            await GetTransferOrderIdAsync(coBoTransaction, retryTime);
         }
 
-        return StringHelper.ConvertToGuidString(memo);
+        return memo.ConvertToGuidString();
     }
 
     private async Task<CoBoHelper.CoinNetwork> GetCoinNetwork(CoBoTransactionDto coBoTransaction)

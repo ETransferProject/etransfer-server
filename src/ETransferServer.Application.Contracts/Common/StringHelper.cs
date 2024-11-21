@@ -4,7 +4,6 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using AElf.Types;
 using JetBrains.Annotations;
-using MongoDB.Bson;
 using Newtonsoft.Json;
 
 namespace ETransferServer.Common;
