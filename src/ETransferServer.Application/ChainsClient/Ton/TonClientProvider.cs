@@ -81,6 +81,42 @@ public class TonClientProvider : IBlockchainClientProvider
         return result;
     }
     
+    public async Task<string> GetMemoAsync(string chainId, string txId)
+    {
+        if (txId.IsNullOrEmpty()) return null;
+        _logger.LogInformation("GetMemoAsync ton, txId:{txId}", txId);
+        var memo = string.Empty;
+        var baseUrlList = _blockChainInfoOptions.ChainInfos[chainId].Api.Split(CommonConstant.Comma, StringSplitOptions.TrimEntries).ToList();
+        foreach (var baseUrl in baseUrlList)
+        {
+            try
+            {
+                var (tonType, url, param) = ApiHelper.GetApiInfo(baseUrl, txId);
+                switch (tonType)
+                {
+                    case TonType.TonApi:
+                        var respApi = await _httpProvider.InvokeAsync<TonApiMemoResponse>(HttpMethod.Get,
+                            url, param: param);
+                        AssertHelper.NotNull(respApi, "Empty tonApi response");
+                        AssertHelper.NotEmpty(respApi.OutMsgs, "Empty tonApi outMsgs");
+                        memo = respApi.OutMsgs[0].DecodedBody.ForwardPayload.Value.Value.Text;
+                        break;
+                    default:
+                        throw new NotSupportedException();
+                }
+
+                AssertHelper.IsTrue(!memo.IsNullOrEmpty(), "GetMemoAsync ton, memo:{memo}", memo);
+                return memo;
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "GetMemoAsync ton error, url:{url}", baseUrl);
+            }
+        }
+
+        return memo;
+    }
+    
     public async Task<FlowBehavior> HandleExceptionAsync(Exception ex, string chainId, string blockHash, string txId)
     {
         _logger.LogError(ex, "Failed to get ton transaction info, {blockHash},{txId}", blockHash, txId);

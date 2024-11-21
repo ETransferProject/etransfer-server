@@ -1,5 +1,6 @@
 using AElf.ExceptionHandler;
 using ETransferServer.Common;
+using ETransferServer.Common.ChainsClient;
 using ETransferServer.Grains.Grain.Order.Deposit;
 using ETransferServer.Grains.Grain.Order.Withdraw;
 using ETransferServer.Grains.Grain.Timers;
@@ -23,6 +24,7 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
     private readonly IOptionsSnapshot<NetworkOptions> _networkOption;
     private readonly IOptionsSnapshot<DepositAddressOptions> _depositAddressOption;
     private readonly IUserAddressService _userAddressService;
+    private readonly IBlockchainClientProviderFactory _blockchainClientProvider;
     private readonly ICoBoProvider _coBoProvider;
     private IDepositOrderStatusReminderGrain _depositOrderStatusReminderGrain;
 
@@ -30,12 +32,14 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
         IOptionsSnapshot<NetworkOptions> networkOption,
         IOptionsSnapshot<DepositAddressOptions> depositAddressOption, 
         IUserAddressService userAddressService,
+        IBlockchainClientProviderFactory blockchainClientProvider,
         ICoBoProvider coBoProvider)
     {
         _logger = logger;
         _networkOption = networkOption;
         _depositAddressOption = depositAddressOption;
         _userAddressService = userAddressService;
+        _blockchainClientProvider = blockchainClientProvider;
         _coBoProvider = coBoProvider;
     }
 
@@ -105,10 +109,18 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
             ? await _userAddressService.GetAssignedAddressAsync(coBoTransaction.Address)
             : res.Value;
 
-        AssertHelper.NotNull(userAddress, "user address empty");
+        AssertHelper.NotNull(userAddress, "user address empty.");
         if (userAddress.IsAssigned && !userAddress.OrderId.IsNullOrEmpty())
         {
-            var withdrawGrain = GrainFactory.GetGrain<IUserWithdrawGrain>(Guid.Parse(userAddress.OrderId));
+            var orderId = !_depositAddressOption.Value.TransferAddressLists.IsNullOrEmpty() &&
+                          _depositAddressOption.Value.TransferAddressLists.ContainsKey(coBoTransaction.Coin) &&
+                          _depositAddressOption.Value.TransferAddressLists[coBoTransaction.Coin]
+                              .Contains(coBoTransaction.Address)
+                ? await GetTransferOrderIdAsync(coBoTransaction)
+                : userAddress.OrderId;
+
+            AssertHelper.IsTrue(Guid.TryParse(orderId, out _), "transfer orderId invalid.");
+            var withdrawGrain = GrainFactory.GetGrain<IUserWithdrawGrain>(Guid.Parse(orderId));
             await withdrawGrain.SaveTransferOrder(coBoTransaction);
             return true;
         }
@@ -135,6 +147,24 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
     private Task<bool> HandleWithdraw(CoBoTransactionDto coBoTransaction)
     {
         return Task.FromResult(true);
+    }
+
+    private async Task<string> GetTransferOrderIdAsync(CoBoTransactionDto coBoTransaction)
+    {
+        var memo = string.Empty;
+        var coin = coBoTransaction.Coin.Split(CommonConstant.Underline);
+        var provider = await _blockchainClientProvider.GetBlockChainClientProviderAsync(coin[0]);
+        switch (provider.ChainType)
+        {
+            case BlockchainType.Ton:
+                memo = await provider.GetMemoAsync(coin[0], coBoTransaction.TxId);
+                AssertHelper.IsTrue(!memo.IsNullOrEmpty(), "get memo empty.");
+                break;
+            default:
+                throw new ArgumentOutOfRangeException();
+        }
+
+        return StringHelper.ConvertToGuidString(memo);
     }
 
     private async Task<CoBoHelper.CoinNetwork> GetCoinNetwork(CoBoTransactionDto coBoTransaction)

@@ -12,6 +12,36 @@ public class TonApiResponse : TonResponse
     [JsonProperty("utime")] public long Utime { get; set; }
 }
 
+public class TonApiMemoResponse : TonResponse
+{
+    [JsonProperty("out_msgs")] public List<OutMsg> OutMsgs { get; set; }
+}
+
+public class OutMsg
+{
+    [JsonProperty("decoded_body")] public DecodedBody DecodedBody { get; set; }
+}
+
+public class DecodedBody
+{
+    [JsonProperty("forward_payload")] public ForwardPayload ForwardPayload { get; set; }
+}
+
+public class ForwardPayload
+{
+    [JsonProperty("value")] public PayloadValue Value { get; set; }
+}
+
+public class PayloadValue
+{
+    [JsonProperty("value")] public TextCommentValue Value { get; set; }
+}
+
+public class TextCommentValue
+{
+    [JsonProperty("text")] public string Text { get; set; }
+}
+
 public class TonCenterResponse : TonResponse
 {
     [JsonProperty("transactions")] public List<TonCenterItem> Transactions { get; set; }

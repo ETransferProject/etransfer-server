@@ -52,4 +52,9 @@ public class EvmClientProvider : IBlockchainClientProvider
             TransactionIdList = block.Transactions.ToList().Select(t => t.TransactionHash).ToList()
         };
     }
+
+    public async Task<string> GetMemoAsync(string chainId, string txId)
+    {
+        return null;
+    }
 }

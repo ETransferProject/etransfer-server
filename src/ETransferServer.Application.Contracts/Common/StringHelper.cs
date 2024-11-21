@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using AElf.Types;
 using JetBrains.Annotations;
+using MongoDB.Bson;
 using Newtonsoft.Json;
 
 namespace ETransferServer.Common;
@@ -72,7 +73,13 @@ public static class StringHelper
     {
         return bool.TryParse(s, out var result) ? result : defaultValue;
     }
-    
+
+    public static string ConvertToGuidString(this string s)
+    {
+        if (s.IsNullOrEmpty() || s.Length < 32) return null;
+        return $"{s.Substring(0, 8)}-{s.Substring(8, 4)}-{s.Substring(12, 4)}-{s.Substring(16, 4)}-{s.Substring(20)}";
+    }
+
     /// replace all {param.key} in string
     public static string ReplaceWithDict(this string input, Dictionary<string, string> replacements, bool throwErrorIfNotFound = true, string defaultValue = "")
     {
