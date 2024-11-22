@@ -86,7 +86,7 @@ public partial class OrderWithdrawAppService
             "Version is invalid. Please refresh and try again.");
         AssertHelper.IsTrue(VerifyMemo(request.Memo), ErrorResult.MemoInvalidCode);
         
-        var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
+        var userId = await GetUserIdAsync(request.SourceType, request.FromAddress);
         if (!request.ToNetwork.IsNullOrEmpty())
         {
             var networkConfig = _networkInfoOptions.Value.NetworkMap[request.Symbol]
@@ -224,7 +224,8 @@ public partial class OrderWithdrawAppService
             CacheKey(FeeInfo.FeeName.CoBoFee, userId.ToString(), request.ToNetwork, request.ToSymbol);
         var thirdPartFeeDto = await _coBoCoinCache.GetAsync(coBoCoinCacheKey);
         AssertHelper.IsTrue(thirdPartFeeDto != null, ErrorResult.FeeExpiredCode);
-        _logger.LogDebug("Cobo fee get cache: {fee}", thirdPartFeeDto.AbsEstimateFee);
+        _logger.LogDebug("Cobo fee get transfer cache: {fee}, {userId}, {network}, {symbol}", 
+            thirdPartFeeDto.AbsEstimateFee, userId, request.ToNetwork, request.ToSymbol);
         var inputThirdPartFee = thirdPartFeeDto.AbsEstimateFee.SafeToDecimal(-1);
         AssertHelper.IsTrue(inputThirdPartFee >= 0, ErrorResult.FeeInvalidCode);
         
@@ -351,5 +352,28 @@ public partial class OrderWithdrawAppService
         userAddressDto.UpdateTime = DateTimeHelper.ToUnixTimeMilliseconds(DateTime.UtcNow);
         await addressGrain.AddOrUpdate(userAddressDto);
         await _userAddressIndexRepository.AddOrUpdateAsync(_objectMapper.Map<UserAddressDto, UserAddress>(userAddressDto));
-    } 
+    }
+
+    private async Task<Guid?> GetUserIdAsync(string sourceType, string address)
+    {
+        var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
+        if (userId.HasValue) return userId;
+        if (sourceType.IsNullOrEmpty() || address.IsNullOrEmpty()
+                                       || !Enum.TryParse<WalletEnum>(sourceType, true, out _)) return null;
+
+        if (Enum.TryParse<WalletEnum>(sourceType, true, out var walletType)
+            && (int)walletType > 1)
+        {
+            var fullAddress = string.Concat(sourceType.ToLower(), CommonConstant.Underline, address);
+            userId = GuidHelper.UniqGuid(fullAddress);
+            _logger.LogInformation("GetUserId from wallet, {sourceType}, {address}, {userId}", 
+                sourceType, address, userId);
+            return userId;
+        }
+        
+        var user = await _userAppService.GetUserByAddressAsync(address);
+        _logger.LogInformation("GetUserId from portkey or nightElf, {sourceType}, {address}, {userId}, {newUserId}",
+            sourceType, address, user?.Id, GuidHelper.UniqGuid(address));
+        return user?.Id ?? GuidHelper.UniqGuid(address);
+    }
 }

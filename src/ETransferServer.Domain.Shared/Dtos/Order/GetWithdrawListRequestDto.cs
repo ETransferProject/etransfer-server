@@ -12,6 +12,8 @@ public class GetWithdrawListRequestDto : IValidatableObject
     public string? Address { get; set; }
     public string? Version { get; set; }
     public string? Memo { get; set; }
+    public string? SourceType { get; set; }
+    public string? FromAddress { get; set; }
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {

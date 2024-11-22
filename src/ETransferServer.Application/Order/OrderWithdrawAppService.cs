@@ -24,6 +24,7 @@ using ETransferServer.Grains.Grain.Users;
 using ETransferServer.Models;
 using ETransferServer.Network;
 using ETransferServer.Options;
+using ETransferServer.User;
 using ETransferServer.User.Dtos;
 using ETransferServer.Users;
 using ETransferServer.Withdraw.Dtos;
@@ -55,6 +56,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
     private readonly ILogger<OrderWithdrawAppService> _logger;
     private readonly IClusterClient _clusterClient;
     private readonly INetworkAppService _networkAppService;
+    private readonly IUserAppService _userAppService;
     private readonly IContractProvider _contractProvider;
     private readonly IOptionsSnapshot<WithdrawInfoOptions> _withdrawInfoOptions;
     private readonly IOptionsSnapshot<DepositInfoOptions> _depositInfoOptions;
@@ -71,6 +73,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
         IOptionsSnapshot<NetworkOptions> networkInfoOptions,
         IClusterClient clusterClient, 
         INetworkAppService networkAppService, 
+        IUserAppService userAppService,
         IContractProvider contractProvider,
         IOptionsSnapshot<WithdrawInfoOptions> withdrawInfoOptions,
         IOptionsSnapshot<DepositInfoOptions> depositInfoOptions,
@@ -87,6 +90,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
         _networkInfoOptions = networkInfoOptions;
         _clusterClient = clusterClient;
         _networkAppService = networkAppService;
+        _userAppService = userAppService;
         _contractProvider = contractProvider;
         _withdrawInfoOptions = withdrawInfoOptions;
         _depositInfoOptions = depositInfoOptions;
@@ -111,7 +115,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
             CommonConstant.DefaultConst.PortKeyVersion2.Equals(request.Version),
             "Version is invalid. Please refresh and try again.");
         AssertHelper.IsTrue(VerifyMemo(request.Memo), ErrorResult.MemoInvalidCode);
-        var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
+        var userId = await GetUserIdAsync(request.SourceType, request.FromAddress);
         if (!request.Network.IsNullOrEmpty())
         {
             var networkConfig = _networkInfoOptions.Value.NetworkMap[request.Symbol]
@@ -331,7 +335,8 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
             {
                 AbsoluteExpiration = DateTimeOffset.UtcNow.AddSeconds(_withdrawInfoOptions.Value.ThirdPartCacheFeeExpireSeconds)
             });
-        _logger.LogDebug("Cobo fee set cache: {fee}, {expireSeconds}", fee, _withdrawInfoOptions.Value.ThirdPartCacheFeeExpireSeconds);
+        _logger.LogDebug("Cobo fee set cache: {fee}, {expireSeconds}, {userId}, {network}, {symbol}", 
+            fee, _withdrawInfoOptions.Value.ThirdPartCacheFeeExpireSeconds, userId, network, symbol);
     }
 
     public async Task DoMonitorAsync(string network, decimal estimateFee, string symbol, bool isNotify)
@@ -485,7 +490,8 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
             CacheKey(FeeInfo.FeeName.CoBoFee, userId.ToString(), request.Network, request.Symbol);
         var thirdPartFeeDto = await _coBoCoinCache.GetAsync(coBoCoinCacheKey);
         AssertHelper.IsTrue(thirdPartFeeDto != null, ErrorResult.FeeExpiredCode);
-        _logger.LogDebug("Cobo fee get cache: {fee}", thirdPartFeeDto.AbsEstimateFee);
+        _logger.LogDebug("Cobo fee get cache: {fee}, {userId}, {network}, {symbol}", 
+            thirdPartFeeDto.AbsEstimateFee, userId, request.Network, request.Symbol);
         var inputThirdPartFee = thirdPartFeeDto.AbsEstimateFee.SafeToDecimal(-1);
         AssertHelper.IsTrue(inputThirdPartFee >= 0, ErrorResult.FeeInvalidCode);
         

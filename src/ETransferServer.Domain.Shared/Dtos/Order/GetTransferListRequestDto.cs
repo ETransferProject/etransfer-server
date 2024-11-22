@@ -9,6 +9,8 @@ public class GetTransferListRequestDto : IValidatableObject
     public string? ToNetwork { get; set; }
     [Required] public string Symbol { get; set; }
     public decimal Amount { get; set; }
+    public string? SourceType { get; set; }
+    public string? FromAddress { get; set; }
     public string? ToAddress { get; set; }
     public string? Version { get; set; }
     public string? Memo { get; set; }

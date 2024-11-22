@@ -8,6 +8,8 @@ using ETransferServer.Entities;
 using ETransferServer.Etos.Order;
 using ETransferServer.Grains.Grain.Token;
 using ETransferServer.Options;
+using ETransferServer.User;
+using ETransferServer.User.Dtos;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -40,6 +42,7 @@ public class OrderAppServiceTest : ETransferServerApplicationTestBase
     {
         services.AddSingleton(MockTokenOptions());
         services.AddSingleton(MockCoBoCoinGrain());
+        services.AddSingleton(MockUserAppService());
         base.AfterAddApplication(services);
         _currentUser = Substitute.For<ICurrentUser>();
         services.AddSingleton(_currentUser);
@@ -450,5 +453,15 @@ public class OrderAppServiceTest : ETransferServerApplicationTestBase
             .ReturnsAsync(30);
 
         return coboCoinGrain.Object;
+    }
+    
+    private IUserAppService MockUserAppService()
+    {
+        var user = new Mock<IUserAppService>();
+
+        user.Setup(t => t.GetUserByAddressAsync(It.IsAny<string>())).ReturnsAsync(
+            new UserDto());
+
+        return user.Object;
     }
 }

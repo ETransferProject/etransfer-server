@@ -8,6 +8,8 @@ using ETransferServer.Models;
 using ETransferServer.Network;
 using ETransferServer.Network.Dtos;
 using ETransferServer.Options;
+using ETransferServer.User;
+using ETransferServer.User.Dtos;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -32,6 +34,7 @@ public class OrderWithdrawTest : ETransferServerApplicationTestBase
         services.AddSingleton(MockNetworkOptions());
         services.AddSingleton(MockTokenLimitGrain());
         services.AddSingleton(MockNetworkAppService());
+        services.AddSingleton(MockUserAppService());
         services.AddSingleton(MockUserWithdrawGrain());
         base.AfterAddApplication(services);
     }
@@ -204,5 +207,15 @@ public class OrderWithdrawTest : ETransferServerApplicationTestBase
             });
 
         return network.Object;
+    }
+    
+    private IUserAppService MockUserAppService()
+    {
+        var user = new Mock<IUserAppService>();
+
+        user.Setup(t => t.GetUserByAddressAsync(It.IsAny<string>())).ReturnsAsync(
+            new UserDto());
+
+        return user.Object;
     }
 }
