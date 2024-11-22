@@ -70,5 +70,5 @@ public enum OrderOperationStatusEnum
     RefundConfirmed,
     RefundFailed,
     RefundRejected,
-    UserRejected
+    UserTransferRejected
 }

@@ -66,6 +66,7 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
     private readonly IOptionsSnapshot<ChainOptions> _chainOptions;
     private readonly IOptionsSnapshot<WithdrawOptions> _withdrawOptions;
     private readonly IOptionsSnapshot<WithdrawNetworkOptions> _withdrawNetworkOptions;
+    private readonly IOptionsSnapshot<DepositAddressOptions> _depositAddressOption;
 
     private IUserWithdrawRecordGrain _recordGrain;
     private IOrderStatusFlowGrain _orderStatusFlowGrain;
@@ -99,6 +100,7 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         IOrderStatusFlowProvider orderStatusFlowProvider,
         IUserAddressProvider userAddressProvider,
         IOptionsSnapshot<WithdrawNetworkOptions> withdrawNetworkOptions,
+        IOptionsSnapshot<DepositAddressOptions> depositAddressOption,
         IObjectMapper objectMapper, 
         IBus bus)
     {
@@ -110,6 +112,7 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         _orderStatusFlowProvider = orderStatusFlowProvider;
         _userAddressProvider = userAddressProvider;
         _withdrawNetworkOptions = withdrawNetworkOptions;
+        _depositAddressOption = depositAddressOption;
         _objectMapper = objectMapper;
         _bus = bus;
     }

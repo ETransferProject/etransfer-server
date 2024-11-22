@@ -5,12 +5,14 @@ using System.Threading.Tasks;
 using AElf.ExceptionHandler;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Order;
+using ETransferServer.Dtos.User;
 using ETransferServer.Grains.Grain.Order.Withdraw;
 using ETransferServer.Grains.Grain.TokenLimit;
 using ETransferServer.Grains.Grain.Users;
 using ETransferServer.Models;
 using ETransferServer.Options;
 using ETransferServer.Orders;
+using ETransferServer.Users;
 using ETransferServer.Withdraw.Dtos;
 using ETransferServer.WithdrawOrder.Dtos;
 using Microsoft.Extensions.Logging;
@@ -24,7 +26,6 @@ namespace ETransferServer.Order;
 
 public partial class OrderWithdrawAppService
 {
-
     [ExceptionHandler(typeof(Exception), TargetType = typeof(OrderWithdrawAppService),
         MethodName = nameof(HandleSaveTransferExceptionAsync))]
     public async Task<bool> SaveTransferOrderInfoAsync(string orderId, GetTransferOrderInfoRequestDto request)
@@ -43,9 +44,13 @@ public partial class OrderWithdrawAppService
             || order.ToTransfer.ToAddress != request.ToAddress) return false;
         if (!request.Address.IsNullOrEmpty() && order.FromTransfer.ToAddress != request.Address) return false;
         
-        if (!request.TxId.IsNullOrEmpty()) order.FromTransfer.TxId = request.TxId;
-        if (!request.Status.IsNullOrEmpty() && request.Status.ToLower() == OrderOptions.Rejected) 
-            order.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus, OrderOperationStatusEnum.UserRejected.ToString());
+        if (!request.TxId.IsNullOrEmpty() && order.ThirdPartOrderId.IsNullOrEmpty()) order.FromTransfer.TxId = request.TxId;
+        if (!request.Status.IsNullOrEmpty() && request.Status.ToLower() == OrderOptions.Rejected)
+        {
+            order.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus, OrderOperationStatusEnum.UserTransferRejected.ToString());
+            await RecycleAddressAsync(order);
+        }
+
         await recordGrain.AddOrUpdate(order);
         var orderIndex = await GetOrderIndexAsync(orderId);
         orderIndex = _objectMapper.Map<WithdrawOrderDto, OrderIndex>(order);
@@ -324,4 +329,27 @@ public partial class OrderWithdrawAppService
         QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery));
         return await _withdrawOrderIndexRepository.GetAsync(Filter);
     }
+    
+    private async Task RecycleAddressAsync(WithdrawOrderDto order)
+    {
+        var addressKey = GuidHelper.GenerateId(order.FromTransfer.Network, order.FromTransfer.Symbol);
+        if (!_depositInfoOptions.Value.TransferAddressLists.IsNullOrEmpty() &&
+            _depositInfoOptions.Value.TransferAddressLists.ContainsKey(addressKey) &&
+            _depositInfoOptions.Value.TransferAddressLists[addressKey]
+                .Contains(order.FromTransfer.ToAddress)) return;
+        
+        _logger.LogInformation("Address recycle when rejected: {orderId}, {address}", order.Id, order.FromTransfer.ToAddress);
+        var addressGrain = _clusterClient.GetGrain<IUserTokenDepositAddressGrain>(order.FromTransfer.ToAddress);
+        var userAddressDto = (await addressGrain.Get())?.Value;
+        if (userAddressDto == null) return;
+        
+        var addressLimitGrain = _clusterClient.GetGrain<ITokenAddressLimitGrain>(
+            GuidHelper.UniqGuid(nameof(ITokenAddressLimitGrain)));
+        await addressLimitGrain.Reverse();
+        userAddressDto.IsAssigned = false;
+        userAddressDto.OrderId = string.Empty;
+        userAddressDto.UpdateTime = DateTimeHelper.ToUnixTimeMilliseconds(DateTime.UtcNow);
+        await addressGrain.AddOrUpdate(userAddressDto);
+        await _userAddressIndexRepository.AddOrUpdateAsync(_objectMapper.Map<UserAddressDto, UserAddress>(userAddressDto));
+    } 
 }

@@ -112,6 +112,7 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
         AssertHelper.NotNull(userAddress, "user address empty.");
         if (userAddress.IsAssigned && !userAddress.OrderId.IsNullOrEmpty())
         {
+            _logger.LogInformation("transfer callback start. {id}", coBoTransaction.Id);
             var orderId = !_depositAddressOption.Value.TransferAddressLists.IsNullOrEmpty() &&
                           _depositAddressOption.Value.TransferAddressLists.ContainsKey(coBoTransaction.Coin) &&
                           _depositAddressOption.Value.TransferAddressLists[coBoTransaction.Coin]
@@ -124,7 +125,12 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
             await withdrawGrain.SaveTransferOrder(coBoTransaction);
             return true;
         }
-        
+        if (!userAddress.IsAssigned && userAddress.OrderId == string.Empty)
+        {
+            _logger.LogInformation("transfer callback but address recycled. {id}", coBoTransaction.Id);
+            return true;
+        }
+
         // deposit
         var coBoDepositQueryTimerGrain = GrainFactory.GetGrain<ICoBoDepositQueryTimerGrain>(
             GuidHelper.UniqGuid(nameof(ICoBoDepositQueryTimerGrain)));

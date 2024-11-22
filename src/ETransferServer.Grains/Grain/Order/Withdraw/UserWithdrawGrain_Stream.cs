@@ -294,6 +294,12 @@ public partial class UserWithdrawGrain
             order.ExtensionInfo[ExtensionKey.OrderType] != OrderTypeEnum.Transfer.ToString())
             return;
 
+        var addressKey = GuidHelper.GenerateId(order.FromTransfer.Network, order.FromTransfer.Symbol);
+        if (!_depositAddressOption.Value.TransferAddressLists.IsNullOrEmpty() &&
+            _depositAddressOption.Value.TransferAddressLists.ContainsKey(addressKey) &&
+            _depositAddressOption.Value.TransferAddressLists[addressKey]
+                .Contains(order.FromTransfer.ToAddress)) return;
+        
         _logger.LogInformation("Address recycle: {orderId}, {address}", order.Id, order.FromTransfer.ToAddress);
         var addressGrain = GrainFactory.GetGrain<IUserTokenDepositAddressGrain>(order.FromTransfer.ToAddress);
         var userAddressDto = (await addressGrain.Get())?.Value;

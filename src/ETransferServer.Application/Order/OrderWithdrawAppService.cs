@@ -25,6 +25,7 @@ using ETransferServer.Models;
 using ETransferServer.Network;
 using ETransferServer.Options;
 using ETransferServer.User.Dtos;
+using ETransferServer.Users;
 using ETransferServer.Withdraw.Dtos;
 using ETransferServer.WithdrawOrder.Dtos;
 using Google.Protobuf;
@@ -49,12 +50,14 @@ namespace ETransferServer.Order;
 public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppService
 {
     private readonly INESTRepository<Orders.OrderIndex, Guid> _withdrawOrderIndexRepository;
+    private readonly INESTRepository<UserAddress, Guid> _userAddressIndexRepository;
     private readonly IObjectMapper _objectMapper;
     private readonly ILogger<OrderWithdrawAppService> _logger;
     private readonly IClusterClient _clusterClient;
     private readonly INetworkAppService _networkAppService;
     private readonly IContractProvider _contractProvider;
     private readonly IOptionsSnapshot<WithdrawInfoOptions> _withdrawInfoOptions;
+    private readonly IOptionsSnapshot<DepositInfoOptions> _depositInfoOptions;
     private readonly IOptionsSnapshot<NetworkOptions> _networkInfoOptions;
     private readonly IOptionsSnapshot<ChainOptions> _chainOptions;
     private readonly IOptionsSnapshot<CoBoOptions> _coBoOptions;
@@ -62,6 +65,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
     private readonly IDistributedCache<Tuple<decimal, long>> _minThirdPartFeeCache;
 
     public OrderWithdrawAppService(INESTRepository<Orders.OrderIndex, Guid> withdrawOrderIndexRepository,
+        INESTRepository<UserAddress, Guid> userAddressIndexRepository,
         IObjectMapper objectMapper,
         ILogger<OrderWithdrawAppService> logger, 
         IOptionsSnapshot<NetworkOptions> networkInfoOptions,
@@ -69,6 +73,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
         INetworkAppService networkAppService, 
         IContractProvider contractProvider,
         IOptionsSnapshot<WithdrawInfoOptions> withdrawInfoOptions,
+        IOptionsSnapshot<DepositInfoOptions> depositInfoOptions,
         IOptionsSnapshot<ChainOptions> chainOptions, 
         IOptionsSnapshot<CoBoOptions> coBoOptions,
         IDistributedCache<CoBoCoinDto> coBoCoinCache, 
@@ -76,6 +81,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
         )
     {
         _withdrawOrderIndexRepository = withdrawOrderIndexRepository;
+        _userAddressIndexRepository = userAddressIndexRepository;
         _objectMapper = objectMapper;
         _logger = logger;
         _networkInfoOptions = networkInfoOptions;
@@ -83,6 +89,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
         _networkAppService = networkAppService;
         _contractProvider = contractProvider;
         _withdrawInfoOptions = withdrawInfoOptions;
+        _depositInfoOptions = depositInfoOptions;
         _chainOptions = chainOptions;
         _coBoOptions = coBoOptions;
         _coBoCoinCache = coBoCoinCache;
