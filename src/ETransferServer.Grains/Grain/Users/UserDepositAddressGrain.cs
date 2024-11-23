@@ -152,30 +152,42 @@ public class UserDepositAddressGrain : Grain<UserDepositAddressState>, IUserDepo
             input.ChainId, split[0], split[1], input.ToSymbol));
     }
 
-    private async Task<UserAddressDto> GetNewUserAddressAsync(string network, string symbol)
+    private async Task<UserAddressDto> GetNewUserAddressAsync(string network, string symbol, int retry = 0)
     {
-        UserAddressDto addressDto;
-        var retry = 0;
-        do
+        UserAddressDto addressDto = null;
+        if (retry > _depositAddressOptions.Value.MaxRequestNewAddressRetry)
         {
-            ++retry;
+            _logger.LogError("GetNewUserAddress failed after retry {max}, network:{network}, symbol:{symbol}",
+                _depositAddressOptions.Value.MaxRequestNewAddressRetry, network, symbol);
+            return addressDto;
+        }
+
+        try
+        {
+            _logger.LogInformation("GetNewUserAddress, network:{network}, symbol:{symbol}, retry:{retry}, max:{max}",
+                network, symbol, retry, _depositAddressOptions.Value.MaxRequestNewAddressRetry);
             addressDto = await _userAddressProvider.GetUserUnAssignedAddressAsync(new GetUserDepositAddressInput
             {
                 ChainId = network,
                 NetWork = network,
                 Symbol = symbol
             });
+            AssertHelper.NotNull(addressDto, "New user address empty.");
             var addressGrain = GrainFactory.GetGrain<IUserTokenDepositAddressGrain>(addressDto.UserToken.Address);
             var dto = (await addressGrain.Get())?.Value;
             if (dto == null || (dto != null && !dto.IsAssigned))
             {
                 return addressDto;
             }
-
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Failed to getNewUserAddress: network:{network}, symbol:{symbol}", 
+                network, symbol);
+            retry += 1;
             await Task.Delay(1000);
-            _logger.LogInformation("GetNewUserAddress, network:{orderId}, symbol:{address}, retry:{retry}, max:{max}", 
-                network, symbol, retry, _depositAddressOptions.Value.MaxRequestNewAddressRetry);
-        } while (retry <= _depositAddressOptions.Value.MaxRequestNewAddressRetry);
+            await GetNewUserAddressAsync(network, symbol, retry);
+        }
 
         return addressDto;
     }
