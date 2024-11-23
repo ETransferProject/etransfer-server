@@ -34,12 +34,8 @@ public class ForwardPayload
 
 public class PayloadValue
 {
-    [JsonProperty("value")] public TextCommentValue Value { get; set; }
-}
-
-public class TextCommentValue
-{
-    [JsonProperty("text")] public string Text { get; set; }
+    [JsonProperty("sum_type")] public string SumType { get; set; }
+    [JsonProperty("value")] public string Value { get; set; }
 }
 
 public class TonCenterResponse : TonResponse

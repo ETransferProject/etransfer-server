@@ -162,7 +162,7 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
         {
             _logger.LogError("Get memo failed after retry {maxRetry}, {coin}.",
                 _depositAddressOption.Value.MaxRequestRetryTimes, coBoTransaction.Coin);
-            return memo.ConvertToGuidString();
+            return memo;
         }
         try
         {
@@ -185,7 +185,7 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
             await GetTransferOrderIdAsync(coBoTransaction, retry);
         }
 
-        return memo.ConvertToGuidString();
+        return memo;
     }
 
     private async Task<CoBoHelper.CoinNetwork> GetCoinNetwork(CoBoTransactionDto coBoTransaction)

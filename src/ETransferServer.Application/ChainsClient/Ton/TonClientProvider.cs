@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Text;
 using System.Threading.Tasks;
+using AElf;
 using AElf.ExceptionHandler;
 using ETransferServer.ChainsClient.Ton.Helper;
 using ETransferServer.Common;
@@ -99,7 +101,13 @@ public class TonClientProvider : IBlockchainClientProvider
                             url, param: param);
                         AssertHelper.NotNull(respApi, "Empty tonApi response");
                         AssertHelper.NotEmpty(respApi.OutMsgs, "Empty tonApi outMsgs");
-                        memo = respApi.OutMsgs[0].DecodedBody.ForwardPayload.Value.Value.Text;
+                        _logger.LogInformation("GetMemoAsync ton, sum_type:{sumType}, value:{value}", 
+                            respApi.OutMsgs[0].DecodedBody.ForwardPayload.Value.SumType,
+                            respApi.OutMsgs[0].DecodedBody.ForwardPayload.Value.Value);
+                        var memoHex = respApi.OutMsgs[0].DecodedBody.ForwardPayload.Value.Value;
+                        var memoRaw = Encoding.UTF8.GetString(ByteArrayHelper.HexStringToByteArray(memoHex));
+                        AssertHelper.IsTrue(memoRaw.Length >= 36, "invalid tonApi memo length");
+                        memo = memoRaw[^36..];
                         break;
                     default:
                         throw new NotSupportedException();
