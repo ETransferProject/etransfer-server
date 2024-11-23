@@ -199,14 +199,8 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
     
     public async Task SaveTransferOrder(CoBoTransactionDto coBoTransaction)
     {
-        var coBoDepositGrain = GrainFactory.GetGrain<ICoBoDepositGrain>(coBoTransaction.Id);
-        var coBoDto = await coBoDepositGrain.Get();
-        if (coBoDto != null && coBoDto.Status == CommonConstant.SuccessStatus)
-        {
-            _logger.LogInformation("transfer order already success: {id}", coBoTransaction.Id);
-            return;
-        }
-        await coBoDepositGrain.AddOrUpdate(coBoTransaction);
+        _logger.LogInformation("save transfer record, recordInfo:{recordInfo}",
+            JsonConvert.SerializeObject(coBoTransaction));
         
         var orderDto = (await _recordGrain.Get())?.Value;
         if (orderDto == null)
@@ -214,10 +208,38 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
             _logger.LogInformation("transfer order empty: {id}", this.GetPrimaryKey());
             return;
         }
+
+        if (!orderDto.ExtensionInfo.IsNullOrEmpty() &&
+            orderDto.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus) &&
+            orderDto.ExtensionInfo[ExtensionKey.SubStatus] == OrderOperationStatusEnum.UserTransferRejected.ToString())
+        {
+            _logger.LogInformation("transfer order already rejected: {id}", this.GetPrimaryKey());
+            return;
+        }
+        
+        if (orderDto.FromTransfer.FromAddress.ToLower() != coBoTransaction.SourceAddress.ToLower()
+            || orderDto.FromTransfer.ToAddress.ToLower() != coBoTransaction.Address.ToLower()
+            || orderDto.FromTransfer.Amount != coBoTransaction.AbsAmount.SafeToDecimal()
+            || GuidHelper.GenerateId(orderDto.FromTransfer.Network, orderDto.FromTransfer.Symbol) !=
+            coBoTransaction.Coin
+            || (!orderDto.ThirdPartOrderId.IsNullOrEmpty() && orderDto.ThirdPartOrderId != coBoTransaction.Id))
+        {
+            _logger.LogInformation("transfer order unable to match: {id}", this.GetPrimaryKey());
+            return;
+        }
+        
+        var coBoDepositGrain = GrainFactory.GetGrain<ICoBoDepositGrain>(coBoTransaction.Id);
+        var coBoDto = await coBoDepositGrain.Get();
         if (coBoDto == null)
         {
             await _bus.Publish(_objectMapper.Map<WithdrawOrderDto, OrderChangeEto>(orderDto));
         }
+        if (coBoDto != null && coBoDto.Status == CommonConstant.SuccessStatus)
+        {
+            _logger.LogInformation("transfer order already success: {id}", this.GetPrimaryKey());
+            return;
+        }
+        await coBoDepositGrain.AddOrUpdate(coBoTransaction);
 
         orderDto.ThirdPartOrderId = coBoTransaction.Id;
         orderDto.ThirdPartServiceName = ThirdPartServiceNameEnum.Cobo.ToString();

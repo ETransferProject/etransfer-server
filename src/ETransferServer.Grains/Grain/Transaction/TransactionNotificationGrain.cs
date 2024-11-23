@@ -155,12 +155,12 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
         return Task.FromResult(true);
     }
 
-    private async Task<string> GetTransferOrderIdAsync(CoBoTransactionDto coBoTransaction, int retryTime = 0)
+    private async Task<string> GetTransferOrderIdAsync(CoBoTransactionDto coBoTransaction, int retry = 0)
     {
         var memo = string.Empty;
-        if (retryTime > _depositAddressOption.Value.MaxRequestRetryTimes)
+        if (retry > _depositAddressOption.Value.MaxRequestRetryTimes)
         {
-            _logger.LogError("Get memo failed after retry {times}, {coin}.",
+            _logger.LogError("Get memo failed after retry {maxRetry}, {coin}.",
                 _depositAddressOption.Value.MaxRequestRetryTimes, coBoTransaction.Coin);
             return memo.ConvertToGuidString();
         }
@@ -181,8 +181,8 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
         catch (Exception e)
         {
             _logger.LogError(e, "Failed to get memo: {coin}.", coBoTransaction.Coin);
-            retryTime += 1;
-            await GetTransferOrderIdAsync(coBoTransaction, retryTime);
+            retry += 1;
+            await GetTransferOrderIdAsync(coBoTransaction, retry);
         }
 
         return memo.ConvertToGuidString();
