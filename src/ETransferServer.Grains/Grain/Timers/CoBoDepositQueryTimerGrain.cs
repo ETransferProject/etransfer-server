@@ -151,10 +151,10 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
                     continue;
                 }
 
-                await AddAfter(coBoTransaction);
+                // await AddAfter(coBoTransaction);
                 _logger.LogInformation("create deposit order, orderInfo:{orderInfo}",
                     JsonConvert.SerializeObject(coBoTransaction));
-                await CreateDepositOrder(coBoTransaction);
+                // await CreateDepositOrder(coBoTransaction);
             }
 
             if (list.Count < PageSize) break;
