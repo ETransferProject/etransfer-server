@@ -11,4 +11,5 @@ public class OrderOptions
     public const double ValidOrderMessageThreshold = -1d;
     public const int MaxResultCount = 100;
     public const int DefaultResultCount = 10;
+    public const int SubMilliSeconds = 172800000;
 }

@@ -1,11 +1,13 @@
 using AElf.ExceptionHandler;
 using ETransferServer.Common;
 using ETransferServer.Common.ChainsClient;
+using ETransferServer.Grains.Common;
 using ETransferServer.Grains.Grain.Order.Deposit;
 using ETransferServer.Grains.Grain.Order.Withdraw;
 using ETransferServer.Grains.Grain.Timers;
 using ETransferServer.Grains.Grain.Users;
 using ETransferServer.Grains.Options;
+using ETransferServer.Order;
 using ETransferServer.ThirdPart.CoBo;
 using ETransferServer.ThirdPart.CoBo.Dtos;
 using ETransferServer.User;
@@ -24,6 +26,7 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
     private readonly IOptionsSnapshot<NetworkOptions> _networkOption;
     private readonly IOptionsSnapshot<DepositAddressOptions> _depositAddressOption;
     private readonly IUserAddressService _userAddressService;
+    private readonly IOrderAppService _orderAppService;
     private readonly IBlockchainClientProviderFactory _blockchainClientProvider;
     private readonly ICoBoProvider _coBoProvider;
     private IDepositOrderStatusReminderGrain _depositOrderStatusReminderGrain;
@@ -32,6 +35,7 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
         IOptionsSnapshot<NetworkOptions> networkOption,
         IOptionsSnapshot<DepositAddressOptions> depositAddressOption, 
         IUserAddressService userAddressService,
+        IOrderAppService orderAppService,
         IBlockchainClientProviderFactory blockchainClientProvider,
         ICoBoProvider coBoProvider)
     {
@@ -39,6 +43,7 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
         _networkOption = networkOption;
         _depositAddressOption = depositAddressOption;
         _userAddressService = userAddressService;
+        _orderAppService = orderAppService;
         _blockchainClientProvider = blockchainClientProvider;
         _coBoProvider = coBoProvider;
     }
@@ -100,7 +105,7 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
 
     private async Task<bool> HandleDeposit(CoBoTransactionDto coBoTransaction)
     {
-        await GetCoinNetwork(coBoTransaction);
+        var coinInfo = await GetCoinNetwork(coBoTransaction);
         
         // transfer
         var addressGrain = GrainFactory.GetGrain<IUserTokenDepositAddressGrain>(coBoTransaction.Address);
@@ -129,6 +134,21 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
         {
             _logger.LogInformation("transfer callback but address recycled. {id}", coBoTransaction.Id);
             return true;
+        }
+        if (userAddress.IsAssigned && userAddress.OrderId == string.Empty)
+        {
+            _logger.LogInformation("deposit callback check. {id}", coBoTransaction.Id);
+            var id = OrderIdHelper.DepositOrderId(coinInfo.Network, coinInfo.Symbol, coBoTransaction.TxId);
+            var depositRecordGrain = GrainFactory.GetGrain<IUserDepositRecordGrain>(id);
+            var order = (await depositRecordGrain.GetAsync())?.Value;
+            if (order == null)
+            {
+                if (await _orderAppService.CheckTransferOrderAsync(coBoTransaction, userAddress.UpdateTime))
+                {
+                    _logger.LogInformation("deposit callback hit transfer order. {id}", coBoTransaction.Id);
+                    return true;
+                }
+            }
         }
 
         // deposit

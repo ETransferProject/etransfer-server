@@ -13,6 +13,7 @@ using ETransferServer.Grains.Grain.Users;
 using ETransferServer.Network;
 using ETransferServer.Options;
 using ETransferServer.Orders;
+using ETransferServer.ThirdPart.CoBo.Dtos;
 using ETransferServer.User.Dtos;
 using Microsoft.Extensions.Logging;
 using Nest;
@@ -197,6 +198,60 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
 
         var orderIndex = await _orderIndexRepository.GetAsync(Filter);
         return Tuple.Create(await GetOrderDetailDtoAsync(orderIndex, includeAll), orderIndex);
+    }
+
+    public async Task<bool> CheckTransferOrderAsync(CoBoTransactionDto coBoTransaction, long time)
+    {
+        var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+        mustQuery.Add(q => q.Term(i =>
+            i.Field(f => f.OrderType).Value(OrderTypeEnum.Withdraw.ToString())));
+        mustQuery.Add(q => q.Term(i =>
+            i.Field("extensionInfo.OrderType").Value(OrderTypeEnum.Transfer.ToString())));
+        mustQuery.Add(q => q.Bool(i => i.Should(
+            s => s.Term(w =>
+                w.Field(f => f.ThirdPartOrderId).Value(coBoTransaction.Id)),
+            s => s.Term(w =>
+                w.Field(f => f.FromTransfer.TxId).Value(coBoTransaction.TxId)))));
+
+        QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) =>
+            f.Bool(b => b.Must(mustQuery));
+
+        var count = await _orderIndexRepository.CountAsync(Filter);
+        if (count.Count > 0) return true;
+        if (DateTime.UtcNow.ToUtcMilliSeconds() - time >= OrderOptions.SubMilliSeconds) return false;
+
+        var coin = coBoTransaction.Coin.Split(CommonConstant.Underline);
+        if (coin.Length < 2) return false;
+        mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+        mustQuery.Add(q => q.Term(i =>
+            i.Field(f => f.FromTransfer.FromAddress).Value(coBoTransaction.SourceAddress).CaseInsensitive()));
+        mustQuery.Add(q => q.Term(i =>
+            i.Field(f => f.FromTransfer.ToAddress).Value(coBoTransaction.Address).CaseInsensitive()));
+        mustQuery.Add(q => q.Term(i =>
+            i.Field(f => f.FromTransfer.Amount).Value(coBoTransaction.Amount.SafeToDecimal())));
+        mustQuery.Add(q => q.Term(i =>
+            i.Field(f => f.FromTransfer.Network).Value(coin[0])));
+        mustQuery.Add(q => q.Term(i =>
+            i.Field(f => f.FromTransfer.Symbol).Value(coin[1])));
+        mustQuery.Add(q => q.Term(i =>
+            i.Field(f => f.OrderType).Value(OrderTypeEnum.Withdraw.ToString())));
+        mustQuery.Add(q => q.Term(i =>
+            i.Field("extensionInfo.OrderType").Value(OrderTypeEnum.Transfer.ToString())));
+        mustQuery.Add(q => q.Term(i =>
+            i.Field("extensionInfo.SubStatus").Value(OrderOperationStatusEnum.UserTransferRejected.ToString())));
+        mustQuery.Add(q => q.Range(i =>
+            i.Field(f => f.CreateTime).LessThan(time)));
+        mustQuery.Add(q => q.Range(i =>
+            i.Field(f => f.CreateTime).GreaterThan(time - OrderOptions.SubMilliSeconds)));
+
+        var mustNotQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+        mustNotQuery.Add(q => q.Exists(i => i.Field(t => t.ThirdPartOrderId)));
+
+        QueryContainer Filter2(QueryContainerDescriptor<OrderIndex> f) =>
+            f.Bool(b => b.Must(mustQuery).MustNot(mustNotQuery));
+        
+        count = await _orderIndexRepository.CountAsync(Filter2);
+        return count.Count > 0;
     }
 
     [ExceptionHandler(typeof(Exception), TargetType = typeof(OrderAppService),
