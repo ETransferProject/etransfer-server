@@ -96,24 +96,21 @@ public class OrderController : ETransferController
         return await _withdrawOrderAppService.SaveTransferOrderInfoAsync(orderId, request);
     }
 
-    [Authorize]
     [HttpGet("record/list")]
     public async Task<PagedResultDto<OrderIndexDto>> GetOrderRecordListAsync(GetOrderRecordRequestDto request)
     {
         return await _orderAppService.GetOrderRecordListAsync(request);
     }
     
-    [Authorize]
     [HttpGet("record/{id}")]
     public async Task<OrderDetailDto> GetOrderRecordDetailAsync(string id)
     {
         return await _orderAppService.GetOrderRecordDetailAsync(id);
     }
 
-    [Authorize]
     [HttpGet("record/status")]
-    public async Task<OrderStatusDto> GetOrderRecordStatusAsync()
+    public async Task<OrderStatusDto> GetOrderRecordStatusAsync(GetOrderRecordStatusRequestDto request)
     {
-        return await _orderAppService.GetOrderRecordStatusAsync();
+        return await _orderAppService.GetOrderRecordStatusAsync(request);
     }
 }

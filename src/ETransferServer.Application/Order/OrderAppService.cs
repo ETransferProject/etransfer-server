@@ -58,15 +58,16 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
     public async Task<PagedResultDto<OrderIndexDto>> GetOrderRecordListAsync(GetOrderRecordRequestDto request)
     {
         var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
-        if (!userId.HasValue || userId == Guid.Empty) return new PagedResultDto<OrderIndexDto>();
+        if ((!userId.HasValue || userId == Guid.Empty) && request.AddressList.IsNullOrEmpty())
+            return new PagedResultDto<OrderIndexDto>();
 
         var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
-        if (request.AddressList.IsNullOrEmpty())
+        if (userId.HasValue && request.AddressList.IsNullOrEmpty())
         {
             mustQuery.Add(q => q.Term(i =>
                 i.Field(f => f.UserId).Value(userId.ToString())));
         }
-        else
+        else if (userId.HasValue && !request.AddressList.IsNullOrEmpty())
         {
             mustQuery.Add(q => q.Bool(i => i.Should(
                 s => s.Term(k =>
@@ -74,9 +75,13 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
                 s => s.Terms(k =>
                     k.Field(f => f.FromTransfer.FromAddress).Terms(request.AddressList)),
                 s => s.Terms(k =>
-                    k.Field(f => f.FromTransfer.ToAddress).Terms(request.AddressList)),
+                    k.Field(f => f.ToTransfer.ToAddress).Terms(request.AddressList)))));
+        }
+        else if (!request.AddressList.IsNullOrEmpty())
+        {
+            mustQuery.Add(q => q.Bool(i => i.Should(
                 s => s.Terms(k =>
-                    k.Field(f => f.ToTransfer.FromAddress).Terms(request.AddressList)),
+                    k.Field(f => f.FromTransfer.FromAddress).Terms(request.AddressList)),
                 s => s.Terms(k =>
                     k.Field(f => f.ToTransfer.ToAddress).Terms(request.AddressList)))));
         }
@@ -167,8 +172,19 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
         if (orderIndexDtoPageResult.Items.Any())
         {
             var maxCreateTime = orderIndexDtoPageResult.Items.Max(item => item.CreateTime);
-            var userOrderActionGrain = _clusterClient.GetGrain<IUserOrderActionGrain>(userId.ToString());
-            await userOrderActionGrain.AddOrUpdate(maxCreateTime);
+            if (userId.HasValue)
+            {
+                var userOrderActionGrain = _clusterClient.GetGrain<IUserOrderActionGrain>(userId.ToString());
+                await userOrderActionGrain.AddOrUpdate(maxCreateTime);
+            }
+            if (!request.AddressList.IsNullOrEmpty())
+            {
+                foreach (var address in request.AddressList)
+                {
+                    var userOrderActionGrain = _clusterClient.GetGrain<IUserOrderActionGrain>(address);
+                    await userOrderActionGrain.AddOrUpdate(maxCreateTime);
+                }
+            }
         }
         
         return orderIndexDtoPageResult;
@@ -178,19 +194,13 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
         MethodName = nameof(HandleGetDetailExceptionAsync))]
     public async Task<OrderDetailDto> GetOrderRecordDetailAsync(string id)
     {
-        var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
-        if (id.IsNullOrWhiteSpace() || !userId.HasValue || userId == Guid.Empty) return new OrderDetailDto();
-        return (await GetOrderDetailAsync(id, userId, false)).Item1;
+        if (id.IsNullOrWhiteSpace()) return new OrderDetailDto();
+        return (await GetOrderDetailAsync(id)).Item1;
     }
 
-    public async Task<Tuple<OrderDetailDto, OrderIndex>> GetOrderDetailAsync(string id, Guid? userId, bool includeAll = false)
+    public async Task<Tuple<OrderDetailDto, OrderIndex>> GetOrderDetailAsync(string id, bool includeAll = false)
     {
         var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
-        if (!includeAll)
-        {
-            mustQuery.Add(q => q.Term(i =>
-                i.Field(f => f.UserId).Value(userId.ToString())));
-        }
         mustQuery.Add(q => q.Term(i =>
             i.Field(f => f.Id).Value(id)));
             
@@ -310,24 +320,40 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
 
     [ExceptionHandler(typeof(Exception), TargetType = typeof(OrderAppService),
         MethodName = nameof(HandleGetStatusExceptionAsync))]
-    public async Task<OrderStatusDto> GetOrderRecordStatusAsync()
+    public async Task<OrderStatusDto> GetOrderRecordStatusAsync(GetOrderRecordStatusRequestDto request)
     {
         var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
-        if (!userId.HasValue || userId == Guid.Empty)
+        if ((!userId.HasValue || userId == Guid.Empty) && request.AddressList.IsNullOrEmpty())
         {
             return new OrderStatusDto();
         }
 
-        var userOrderActionGrain = _clusterClient.GetGrain<IUserOrderActionGrain>(userId.ToString());
-        var lastModifyTime = await userOrderActionGrain.Get();
+        var lastModifyTime = 0L;
+        if (userId.HasValue)
+        {
+            var userOrderActionGrain = _clusterClient.GetGrain<IUserOrderActionGrain>(userId.ToString());
+            lastModifyTime = Math.Max(lastModifyTime, await userOrderActionGrain.Get());
+        }
+        if (!request.AddressList.IsNullOrEmpty())
+        {
+            foreach (var address in request.AddressList)
+            {
+                var userOrderActionGrain = _clusterClient.GetGrain<IUserOrderActionGrain>(address);
+                lastModifyTime = Math.Max(lastModifyTime, await userOrderActionGrain.Get());
+            }
+        }
 
         var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>
         {
-            q => q.Term(i => i.Field(f => f.UserId).Value(userId.ToString())),
             q => q.Range(i => i.Field(f => f.CreateTime).GreaterThan(lastModifyTime)),
             q => q.Range(i => i.Field(f => f.CreateTime).GreaterThan(DateTime.UtcNow.AddDays(OrderOptions.ValidOrderThreshold).ToUtcMilliSeconds())),
             q => q.Terms(i => i.Field(f => f.Status).Terms((IEnumerable<string>)OrderStatusHelper.GetProcessingList()))
         };
+        if (userId.HasValue)
+        {
+            mustQuery.Add(q => q.Term(i =>
+                i.Field(f => f.UserId).Value(userId.ToString())));
+        }
 
         QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery));
         

@@ -129,7 +129,7 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
         if (id.IsNullOrWhiteSpace() || !userId.HasValue || userId == Guid.Empty) return new OrderMoreDetailDto();
 
-        var (orderDetailDto, orderIndex) = await _orderService.GetOrderDetailAsync(id, userId, true);
+        var (orderDetailDto, orderIndex) = await _orderService.GetOrderDetailAsync(id, true);
         var result = _objectMapper.Map<OrderDetailDto, OrderMoreDetailDto>(orderDetailDto);
         result.RelatedOrderId = !orderIndex.ExtensionInfo.IsNullOrEmpty() &&
                                 orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.RelatedOrderId)

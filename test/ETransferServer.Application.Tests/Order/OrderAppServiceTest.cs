@@ -65,7 +65,7 @@ public class OrderAppServiceTest : ETransferServerApplicationTestBase
         var result = await _orderAppService.GetOrderRecordListAsync(input);
         result.TotalCount.ShouldBe(0);
 
-        var status = await _orderAppService.GetOrderRecordStatusAsync();
+        var status = await _orderAppService.GetOrderRecordStatusAsync(new GetOrderRecordStatusRequestDto());
         status.Status.ShouldBeFalse();
 
         await _orderDepositAppService.AddOrUpdateAsync(new DepositOrderDto()
@@ -170,7 +170,7 @@ public class OrderAppServiceTest : ETransferServerApplicationTestBase
         result = await _orderAppService.GetOrderRecordListAsync(input);
         result.TotalCount.ShouldBeGreaterThan(0);
 
-        status = await _orderAppService.GetOrderRecordStatusAsync();
+        status = await _orderAppService.GetOrderRecordStatusAsync(new GetOrderRecordStatusRequestDto());
         // status.Status.ShouldBeTrue();
         status.Status.ShouldBeFalse();
 
