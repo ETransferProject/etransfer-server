@@ -5,6 +5,7 @@ namespace ETransferServer.Dtos.Order;
 public class UserOrderDto
 {
     public string Address { get; set; }
+    public List<GetUserAddressDto> AddressList { get; set; }
     public UserOrderRecordDto Processing { get; set; } = new();
     public UserOrderRecordDto Succeed { get; set; } = new();
     public UserOrderRecordDto Failed { get; set; } = new();

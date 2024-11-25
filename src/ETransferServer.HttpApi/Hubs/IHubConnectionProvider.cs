@@ -6,9 +6,9 @@ namespace ETransferServer.Hubs
 {
     public interface IHubConnectionProvider
     {
-        Task AddUserConnection(string address, string connectionId);
-        Task<List<string>> GetUserConnections(string address);
-        Task ClearUserConnection(string address, string connectionId);
+        Task AddUserConnection(List<string> addresses, string connectionId);
+        Task<List<string>> GetUserConnections(List<string> addresses);
+        Task ClearUserConnection(List<string> addresses, string connectionId);
         Task ClearUserConnection(string connectionId);
     }
     
@@ -21,19 +21,19 @@ namespace ETransferServer.Hubs
             _hubAppService = hubAppService;
         }
 
-        public async Task AddUserConnection(string address, string connectionId)
+        public async Task AddUserConnection(List<string> addresses, string connectionId)
         {
-            await _hubAppService.RegisterClientAsync(address, connectionId);
+            await _hubAppService.RegisterClientAsync(addresses, connectionId);
         }
 
-        public async Task<List<string>> GetUserConnections(string address)
+        public async Task<List<string>> GetUserConnections(List<string> addresses)
         {
-            return await _hubAppService.GetConnectionIdsAsync(address);
+            return await _hubAppService.GetConnectionIdsAsync(addresses);
         }
 
-        public async Task ClearUserConnection(string address, string connectionId)
+        public async Task ClearUserConnection(List<string> addresses, string connectionId)
         {
-            await _hubAppService.UnRegisterClientAsync(address, connectionId);
+            await _hubAppService.UnRegisterClientAsync(addresses, connectionId);
         }
         
         public async Task ClearUserConnection(string connectionId)

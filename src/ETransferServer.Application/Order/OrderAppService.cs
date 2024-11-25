@@ -270,22 +270,52 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
     {
         var userOrderDto = new UserOrderDto
         {
-            Address = request.Address
+            Address = request.Address,
+            AddressList = request.AddressList
         };
-        var preQuery = new List<Func<QueryContainerDescriptor<UserIndex>, QueryContainer>>();
-        preQuery.Add(q => q.Term(i => i.Field("addressInfos.address").Value(request.Address)));
-
-        QueryContainer PreFilter(QueryContainerDescriptor<UserIndex> f) => f.Bool(b => b.Must(preQuery));
-        var user = await _userIndexRepository.GetListAsync(PreFilter);
-        var userDto = ObjectMapper.Map<UserIndex, UserDto>(user.Item2.FirstOrDefault());
-        if (userDto == null || userDto.UserId == Guid.Empty)
+        UserDto userDto = null;
+        if (!request.Address.IsNullOrEmpty())
         {
-            return userOrderDto;
-        }
+            var preQuery = new List<Func<QueryContainerDescriptor<UserIndex>, QueryContainer>>();
+            preQuery.Add(q => q.Term(i => i.Field("addressInfos.address").Value(request.Address)));
 
+            QueryContainer PreFilter(QueryContainerDescriptor<UserIndex> f) => f.Bool(b => b.Must(preQuery));
+            var user = await _userIndexRepository.GetListAsync(PreFilter);
+            userDto = ObjectMapper.Map<UserIndex, UserDto>(user.Item2.FirstOrDefault());
+            if ((userDto == null || userDto.UserId == Guid.Empty) && request.AddressList.IsNullOrEmpty())
+            {
+                return userOrderDto;
+            }
+        }
+        
         var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
-        mustQuery.Add(q => q.Term(i =>
-            i.Field(f => f.UserId).Value(userDto.UserId.ToString())));
+        if (userDto != null && request.AddressList.IsNullOrEmpty())
+        {
+            mustQuery.Add(q => q.Term(i =>
+                i.Field(f => f.UserId).Value(userDto.UserId.ToString())));
+        }
+        else if (!request.AddressList.IsNullOrEmpty())
+        {
+            var addressList = request.AddressList.ConvertAll(t => t.Address).ToList();
+            if (userDto != null)
+            {
+                mustQuery.Add(q => q.Bool(i => i.Should(
+                    s => s.Term(k =>
+                        k.Field(f => f.UserId).Value(userDto.UserId.ToString())),
+                    s => s.Terms(k =>
+                        k.Field(f => f.FromTransfer.FromAddress).Terms(addressList)),
+                    s => s.Terms(k =>
+                        k.Field(f => f.ToTransfer.ToAddress).Terms(addressList)))));
+            }
+            else
+            {
+                mustQuery.Add(q => q.Bool(i => i.Should(
+                    s => s.Terms(k =>
+                        k.Field(f => f.FromTransfer.FromAddress).Terms(addressList)),
+                    s => s.Terms(k =>
+                        k.Field(f => f.ToTransfer.ToAddress).Terms(addressList)))));
+            }
+        }
 
         if (request.Time.HasValue && request.Time.Value > 0)
         {
@@ -349,10 +379,28 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
             q => q.Range(i => i.Field(f => f.CreateTime).GreaterThan(DateTime.UtcNow.AddDays(OrderOptions.ValidOrderThreshold).ToUtcMilliSeconds())),
             q => q.Terms(i => i.Field(f => f.Status).Terms((IEnumerable<string>)OrderStatusHelper.GetProcessingList()))
         };
-        if (userId.HasValue)
+        if (userId.HasValue && request.AddressList.IsNullOrEmpty())
         {
             mustQuery.Add(q => q.Term(i =>
                 i.Field(f => f.UserId).Value(userId.ToString())));
+        }
+        else if (userId.HasValue && !request.AddressList.IsNullOrEmpty())
+        {
+            mustQuery.Add(q => q.Bool(i => i.Should(
+                s => s.Term(k =>
+                    k.Field(f => f.UserId).Value(userId.ToString())),
+                s => s.Terms(k =>
+                    k.Field(f => f.FromTransfer.FromAddress).Terms(request.AddressList)),
+                s => s.Terms(k =>
+                    k.Field(f => f.ToTransfer.ToAddress).Terms(request.AddressList)))));
+        }
+        else if (!request.AddressList.IsNullOrEmpty())
+        {
+            mustQuery.Add(q => q.Bool(i => i.Should(
+                s => s.Terms(k =>
+                    k.Field(f => f.FromTransfer.FromAddress).Terms(request.AddressList)),
+                s => s.Terms(k =>
+                    k.Field(f => f.ToTransfer.ToAddress).Terms(request.AddressList)))));
         }
 
         QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery));
