@@ -74,16 +74,16 @@ public partial class OrderWithdrawAppService
         }
         
         AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.Symbol),
-            "Symbol is not exist. Please refresh and try again.");
+            ErrorResult.SymbolInvalidCode, null, request.Symbol);
         AssertHelper.IsTrue(
             _networkInfoOptions.Value.NetworkMap[request.Symbol]
                 .Exists(t => t.NetworkInfo.Network == request.FromNetwork),
-            "FromNetwork is invalid. Please refresh and try again.");
+            ErrorResult.NetworkInvalidCode);
         AssertHelper.IsTrue(
             string.IsNullOrWhiteSpace(request.Version) ||
             CommonConstant.DefaultConst.PortKeyVersion.Equals(request.Version) ||
             CommonConstant.DefaultConst.PortKeyVersion2.Equals(request.Version),
-            "Version is invalid. Please refresh and try again.");
+            ErrorResult.VersionOrWhitelistVerifyFailCode);
         AssertHelper.IsTrue(VerifyMemo(request.Memo), ErrorResult.MemoInvalidCode);
         
         var userId = await GetUserIdAsync(request.SourceType, request.FromAddress);
@@ -194,7 +194,7 @@ public partial class OrderWithdrawAppService
         AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.FromSymbol),
             ErrorResult.SymbolInvalidCode, null, request.FromSymbol);
         AssertHelper.IsTrue(request.FromSymbol == request.ToSymbol, 
-            "Symbol is invalid. Please refresh and try again.");
+            ErrorResult.SymbolInvalidCode, null, request.FromSymbol);
         AssertHelper.IsTrue(await IsAddressSupport(request.FromNetwork, request.FromSymbol, request.ToAddress, version),
             ErrorResult.AddressInvalidCode);
         AssertHelper.IsTrue(IsNetworkOpen(request.ToSymbol, request.ToNetwork, OrderTypeEnum.Transfer.ToString()), 
