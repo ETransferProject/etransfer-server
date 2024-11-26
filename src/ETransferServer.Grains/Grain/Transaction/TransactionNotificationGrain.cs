@@ -79,6 +79,7 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
     {
         var coBoTransaction = JsonConvert.DeserializeObject<CoBoTransactionDto>(body);
         coBoTransaction.Coin = _coBoProvider.GetResponseCoin(coBoTransaction.Coin);
+        _logger.LogInformation("transaction callback coin: {coin}", coBoTransaction.Coin);
         AssertHelper.NotNull(coBoTransaction, "DeserializeObject to CoBoTransactionDto fail, invalid body: {body}",
             body);
         if (coBoTransaction.AbsAmount.SafeToDecimal() <= 0M)
@@ -118,6 +119,12 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
         if (userAddress.IsAssigned && !userAddress.OrderId.IsNullOrEmpty())
         {
             _logger.LogInformation("transfer callback start. {id}", coBoTransaction.Id);
+            if (coBoTransaction.Status == CommonConstant.SuccessStatus)
+            {
+                var verifyResult = await VerifyTransaction(coBoTransaction);
+                AssertHelper.IsTrue(verifyResult, "transfer verify fail.");
+            }
+
             var orderId = !_depositAddressOption.Value.TransferAddressLists.IsNullOrEmpty() &&
                           _depositAddressOption.Value.TransferAddressLists.ContainsKey(coBoTransaction.Coin) &&
                           _depositAddressOption.Value.TransferAddressLists[coBoTransaction.Coin]
