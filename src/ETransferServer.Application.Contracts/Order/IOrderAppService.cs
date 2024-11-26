@@ -13,6 +13,7 @@ public interface IOrderAppService
     Task<PagedResultDto<OrderIndexDto>> GetOrderRecordListAsync(GetOrderRecordRequestDto request);
     Task<OrderDetailDto> GetOrderRecordDetailAsync(string id);
     Task<Tuple<OrderDetailDto, OrderIndex>> GetOrderDetailAsync(string id, bool includeAll = false);
+    Task<OrderIndexDto> GetTransferOrderAsync(CoBoTransactionDto coBoTransaction);
     Task<bool> CheckTransferOrderAsync(CoBoTransactionDto coBoTransaction, long time);
     Task<UserOrderDto> GetUserOrderRecordListAsync(GetUserOrderRecordRequestDto request, OrderChangeEto orderEto = null);
     Task<OrderStatusDto> GetOrderRecordStatusAsync(GetOrderRecordStatusRequestDto request);

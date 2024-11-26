@@ -1,6 +1,7 @@
 using AElf.ExceptionHandler;
 using ETransferServer.Common;
 using ETransferServer.Common.ChainsClient;
+using ETransferServer.Dtos.Order;
 using ETransferServer.Grains.Common;
 using ETransferServer.Grains.Grain.Order.Deposit;
 using ETransferServer.Grains.Grain.Order.Withdraw;
@@ -79,7 +80,6 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
     {
         var coBoTransaction = JsonConvert.DeserializeObject<CoBoTransactionDto>(body);
         coBoTransaction.Coin = _coBoProvider.GetResponseCoin(coBoTransaction.Coin);
-        _logger.LogInformation("transaction callback coin: {coin}", coBoTransaction.Coin);
         AssertHelper.NotNull(coBoTransaction, "DeserializeObject to CoBoTransactionDto fail, invalid body: {body}",
             body);
         if (coBoTransaction.AbsAmount.SafeToDecimal() <= 0M)
@@ -140,6 +140,8 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
         if (!userAddress.IsAssigned && userAddress.OrderId == string.Empty)
         {
             _logger.LogInformation("transfer callback but address recycled. {id}", coBoTransaction.Id);
+            await TransferCallbackAlarmAsync(coBoTransaction, coinInfo,
+                "Received callback, the order may have already been rejected.");
             return true;
         }
         if (userAddress.IsAssigned && userAddress.OrderId == string.Empty)
@@ -267,5 +269,18 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
             "transaction verify fail, transactionDto:{transactionDto}, coBoTransaction:{coBoTransaction}",
             JsonConvert.SerializeObject(transactionDto), JsonConvert.SerializeObject(coBoTransaction));
         return false;
+    }
+
+    private async Task TransferCallbackAlarmAsync(CoBoTransactionDto coBoTransaction, CoBoHelper.CoinNetwork coin,
+        string reason)
+    {
+        var orderDto = await _orderAppService.GetTransferOrderAsync(coBoTransaction) ?? new OrderIndexDto
+            {
+                FromTransfer = new TransferInfoDto
+                    { Network = coin.Network, Symbol = coin.Symbol, Amount = coBoTransaction.AbsAmount }
+            };
+
+        var transferOrderMonitorGrain = GrainFactory.GetGrain<IWithdrawOrderMonitorGrain>(coBoTransaction.Id);
+        await transferOrderMonitorGrain.DoCallbackMonitor(TransferOrderMonitorDto.Create(orderDto, coBoTransaction.Id, reason));
     }
 }

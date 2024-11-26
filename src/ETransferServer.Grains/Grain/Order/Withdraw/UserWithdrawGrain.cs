@@ -214,6 +214,8 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
             orderDto.ExtensionInfo[ExtensionKey.SubStatus] == OrderOperationStatusEnum.UserTransferRejected.ToString())
         {
             _logger.LogInformation("transfer order already rejected: {id}", this.GetPrimaryKey());
+            await TransferCallbackAlarmAsync(orderDto, coBoTransaction.Id, 
+                "Received callback, the order has already been rejected.");
             return;
         }
         
@@ -224,12 +226,6 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
             coBoTransaction.Coin
             || (!orderDto.ThirdPartOrderId.IsNullOrEmpty() && orderDto.ThirdPartOrderId != coBoTransaction.Id))
         {
-            _logger.LogInformation(
-                "transfer order match data: {address1},{address2},{address3},{address4},{amount1},{amount2},{network},{symbol},{coin}",
-                orderDto.FromTransfer.FromAddress.ToLower(), coBoTransaction.SourceAddress.ToLower(),
-                orderDto.FromTransfer.ToAddress.ToLower(), coBoTransaction.Address.ToLower(),
-                orderDto.FromTransfer.Amount, coBoTransaction.AbsAmount.SafeToDecimal(),
-                orderDto.FromTransfer.Network, orderDto.FromTransfer.Symbol, coBoTransaction.Coin);
             _logger.LogInformation("transfer order unable to match: {id}", this.GetPrimaryKey());
             return;
         }
@@ -382,6 +378,27 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         }
 
         return false;
+    }
+    
+    private async Task TransferCallbackAlarmAsync(WithdrawOrderDto orderDto, string id, string reason)
+    {
+        var dto = new OrderIndexDto
+            {
+                Id = orderDto.Id,
+                FromTransfer = new TransferInfoDto
+                {
+                    Network = orderDto.FromTransfer.Network, 
+                    Symbol = orderDto.FromTransfer.Symbol, 
+                    Amount = orderDto.FromTransfer.Amount.ToString()
+                },
+                ToTransfer = new TransferInfoDto
+                {
+                    Network = orderDto.ToTransfer.Network, 
+                }
+            };
+
+        var transferOrderMonitorGrain = GrainFactory.GetGrain<IWithdrawOrderMonitorGrain>(id);
+        await transferOrderMonitorGrain.DoCallbackMonitor(TransferOrderMonitorDto.Create(dto, id, reason));
     }
 
     public async Task AddCheckOrder(WithdrawOrderDto orderDto)

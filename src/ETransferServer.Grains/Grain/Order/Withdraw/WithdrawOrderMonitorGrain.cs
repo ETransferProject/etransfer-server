@@ -16,12 +16,14 @@ public interface IWithdrawOrderMonitorGrain : IGrainWithStringKey
 {
     Task DoMonitor(WithdrawOrderMonitorDto dto);
     Task DoLargeAmountMonitor(WithdrawOrderDto dto);
+    Task DoCallbackMonitor(TransferOrderMonitorDto dto);
 }
 
 public class WithdrawOrderMonitorGrain : Grain<WithdrawOrderMonitorState>, IWithdrawOrderMonitorGrain
 {
     private const string WithdrawOrderFailureAlarm = "WithdrawOrderFailureAlarm";
     private const string WithdrawLargeAmountAlarm = "WithdrawLargeAmountAlarm";
+    private const string TransferCallbackAlarm = "TransferCallbackAlarm";
 
     private readonly ILogger<WithdrawOrderMonitorGrain> _logger;
     private readonly IOptionsSnapshot<WithdrawOptions> _withdrawOptions;
@@ -89,6 +91,37 @@ public class WithdrawOrderMonitorGrain : Grain<WithdrawOrderMonitorState>, IWith
         {
             _logger.LogError(e, "WithdrawOrderMonitor largeAmount failed GrainId={GrainId}",
                 this.GetPrimaryKeyString());
+        }
+    }
+    
+    public async Task DoCallbackMonitor(TransferOrderMonitorDto dto)
+    {
+        try
+        {
+            if (State != null && State.Id == dto.Id)
+            {
+                _logger.LogWarning("TransferCallbackMonitor already handle: {id}", dto.Id);
+                return;
+            }
+            var sendSuccess =
+                await SendNotifyAsync(dto);
+            AssertHelper.IsTrue(sendSuccess, "Send notify failed");
+        }
+        catch (UserFriendlyException e)
+        {
+            _logger.LogWarning(
+                "TransferCallbackMonitor handle failed , Message={Msg}, GrainId={GrainId} dto={dto}",
+                e.Message, this.GetPrimaryKeyString(), JsonConvert.SerializeObject(dto));
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "TransferCallbackMonitor handle failed GrainId={GrainId}, dto={dto}",
+                this.GetPrimaryKeyString(), JsonConvert.SerializeObject(dto));
+        }
+        finally
+        {
+            State.Id = dto.Id;
+            await WriteStateAsync();
         }
     }
 
@@ -160,6 +193,26 @@ public class WithdrawOrderMonitorGrain : Grain<WithdrawOrderMonitorState>, IWith
             }
         });
     }
+    
+    private async Task<bool> SendNotifyAsync(TransferOrderMonitorDto dto)
+    {
+        var providerExists = _notifyProvider.TryGetValue(NotifyTypeEnum.FeiShuGroup.ToString(), out var provider);
+        AssertHelper.IsTrue(providerExists, "Provider not found");
+        return await provider.SendNotifyAsync(new NotifyRequest
+        {
+            Template = TransferCallbackAlarm,
+            Params = new Dictionary<string, string>
+            {
+                [CallbackKeys.OrderType] = dto.OrderType,
+                [CallbackKeys.OrderId] = dto.OrderId ?? dto.Id,
+                [CallbackKeys.FromNetwork] = dto.FromNetwork,
+                [CallbackKeys.ToNetwork] = dto.ToNetwork,
+                [CallbackKeys.Amount] = dto.Amount,
+                [CallbackKeys.Symbol] = dto.Symbol,
+                [CallbackKeys.Reason] = dto.Reason
+            }
+        });
+    }
 
     private static class Keys
     {
@@ -190,5 +243,16 @@ public class WithdrawOrderMonitorGrain : Grain<WithdrawOrderMonitorState>, IWith
         public const string TxId = "txId";
         public const string ToAddress = "toAddress";
         public const string ToNetwork = "toNetwork";
+    }
+    
+    private static class CallbackKeys
+    {
+        public const string OrderType = "orderType";
+        public const string OrderId = "orderId";
+        public const string FromNetwork = "fromNetwork";
+        public const string ToNetwork = "toNetwork";
+        public const string Amount = "amount";
+        public const string Symbol = "symbol";
+        public const string Reason = "reason";
     }
 }
