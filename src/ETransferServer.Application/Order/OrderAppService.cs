@@ -149,6 +149,7 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
             mustNotQuery.Add(q => q.Match(i =>
                 i.Field("extensionInfo.ToConfirmedNum").Query("0")));
         }
+        mustNotQuery.Add(GetFilterCondition());
 
         QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery)
             .MustNot(mustNotQuery));
@@ -384,7 +385,10 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
                     .AddDays(OrderOptions.ValidOrderMessageThreshold).ToUtcMilliSeconds())));
         }
 
-        QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery));
+        var mustNotQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+        mustNotQuery.Add(GetFilterCondition());
+        QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery)
+            .MustNot(mustNotQuery));
 
         var (count, list) = await _orderIndexRepository.GetSortListAsync(Filter,
             sortFunc: s => s.Descending(t => t.CreateTime));
@@ -465,6 +469,33 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
         {
             Status = count.Count > 0
         };
+    }
+
+    private static Func<QueryContainerDescriptor<OrderIndex>, QueryContainer> GetFilterCondition()
+    {
+        QueryContainer query(QueryContainerDescriptor<OrderIndex> q) => q.Bool(i => i.Must(
+            s => s.Term(k =>
+                k.Field("extensionInfo.OrderType").Value(OrderTypeEnum.Transfer.ToString())),
+            p => p.Bool(j => j.Should(
+                s => s.Term(k =>
+                    k.Field("extensionInfo.SubStatus").Value(OrderOperationStatusEnum.UserTransferRejected.ToString())),
+                q => q.Bool(b => b.MustNot(
+                    s => s.Exists(k =>
+                        k.Field(f => f.FromTransfer.TxId)))),
+                q => q.Bool(b => b.Must(
+                    s => s.Range(k =>
+                        k.Field(f => f.CreateTime).LessThan(DateTime.UtcNow.AddHours(-48).ToUtcMilliSeconds())),
+                    s => s.Exists(k =>
+                        k.Field(f => f.FromTransfer.TxId)),
+                    r => r.Bool(d => d.MustNot(
+                        s => s.Exists(k =>
+                            k.Field(f => f.ThirdPartOrderId)))),
+                    r => r.Bool(d => d.MustNot(
+                        s => s.Term(k =>
+                            k.Field("extensionInfo.SubStatus")
+                                .Value(OrderOperationStatusEnum.UserTransferRejected.ToString()))))))))));
+
+        return query;
     }
 
     private static Func<SortDescriptor<OrderIndex>, IPromise<IList<ISort>>> GetSorting(string sorting)
