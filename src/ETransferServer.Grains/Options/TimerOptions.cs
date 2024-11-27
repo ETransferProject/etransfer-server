@@ -13,6 +13,11 @@ public class TimerOptions
         PeriodSeconds = 60,
         DelaySeconds = 60 * 10
     };
+    public TimerOption TransferOrderStatusReminder { get; set; } = new()
+    {
+        PeriodSeconds = 60,
+        DelaySeconds = 60 * 60 * 48
+    };
     public TimerOption DepositTimer { get; set; } = new();
     public TimerOption WithdrawFromTimer { get; set; } = new();
     public TimerOption WithdrawFromFastTimer { get; set; } = new(3);

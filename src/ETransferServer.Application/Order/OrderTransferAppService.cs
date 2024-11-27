@@ -7,6 +7,7 @@ using ETransferServer.Common;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Dtos.User;
 using ETransferServer.Grains.Grain.Order.Withdraw;
+using ETransferServer.Grains.Grain.Timers;
 using ETransferServer.Grains.Grain.TokenLimit;
 using ETransferServer.Grains.Grain.Users;
 using ETransferServer.Models;
@@ -306,6 +307,7 @@ public partial class OrderWithdrawAppService
             }
             
             await transferGrain.CreateTransferOrder(withdrawOrderDto);
+            await AddCheckOrder(orderId.ToString());
             return new CreateTransferOrderDto
             {
                 OrderId = orderId.ToString(),
@@ -320,6 +322,14 @@ public partial class OrderWithdrawAppService
                 request.FromNetwork, request.ToNetwork, request.ToAddress, request.Amount, request.FromSymbol);
             throw;
         }
+    }
+    
+    public async Task AddCheckOrder(string id)
+    {
+        var transferReminderGrain =
+            _clusterClient.GetGrain<ITransferOrderStatusReminderGrain>(
+                GuidHelper.UniqGuid(nameof(ITransferOrderStatusReminderGrain)));
+        await transferReminderGrain.AddReminder(id);
     }
     
     private async Task<OrderIndex> GetOrderIndexAsync(string orderId)
