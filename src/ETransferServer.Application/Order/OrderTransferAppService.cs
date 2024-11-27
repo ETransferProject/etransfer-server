@@ -63,8 +63,7 @@ public partial class OrderWithdrawAppService
         MethodName = nameof(HandleGetTransferInfoExceptionAsync))]
     public async Task<GetTransferInfoDto> GetTransferInfoAsync(GetTransferListRequestDto request, string version = null)
     {
-        if (request.FromNetwork == ChainId.AELF || request.FromNetwork == ChainId.tDVV ||
-            request.FromNetwork == ChainId.tDVW)
+        if (VerifyAElfChain(request.FromNetwork))
         {
             var result = await GetWithdrawInfoAsync(
                 _objectMapper.Map<GetTransferListRequestDto, GetWithdrawListRequestDto>(request), version);
@@ -88,7 +87,7 @@ public partial class OrderWithdrawAppService
         AssertHelper.IsTrue(VerifyMemo(request.Memo), ErrorResult.MemoInvalidCode);
         
         var userId = await GetUserIdAsync(request.SourceType, request.FromAddress);
-        if (!request.ToNetwork.IsNullOrEmpty())
+        if (!request.ToNetwork.IsNullOrEmpty() && !VerifyAElfChain(request.ToNetwork))
         {
             var networkConfig = _networkInfoOptions.Value.NetworkMap[request.Symbol]
                 .FirstOrDefault(t => t.NetworkInfo.Network == request.ToNetwork);
@@ -182,8 +181,7 @@ public partial class OrderWithdrawAppService
         TargetType = typeof(OrderWithdrawAppService), MethodName = nameof(HandleCreateTransferExceptionAsync))]
     public async Task<CreateTransferOrderDto> CreateTransferOrderInfoAsync(GetTransferOrderRequestDto request, string version = null)
     {
-        if (request.FromNetwork == ChainId.AELF || request.FromNetwork == ChainId.tDVV ||
-            request.FromNetwork == ChainId.tDVW)
+        if (VerifyAElfChain(request.FromNetwork))
         {
             var result = await CreateWithdrawOrderInfoAsync(
                 _objectMapper.Map<GetTransferOrderRequestDto, GetWithdrawOrderRequestDto>(request), version);
@@ -198,23 +196,27 @@ public partial class OrderWithdrawAppService
             ErrorResult.SymbolInvalidCode, null, request.FromSymbol);
         AssertHelper.IsTrue(await IsAddressSupport(request.FromNetwork, request.FromSymbol, request.ToAddress, version),
             ErrorResult.AddressInvalidCode);
-        AssertHelper.IsTrue(IsNetworkOpen(request.ToSymbol, request.ToNetwork, OrderTypeEnum.Transfer.ToString()), 
-            ErrorResult.CoinSuspendedTemporarily);
+
+        if (!VerifyAElfChain(request.ToNetwork))
+        {
+            AssertHelper.IsTrue(IsNetworkOpen(request.ToSymbol, request.ToNetwork, OrderTypeEnum.Transfer.ToString()),
+                ErrorResult.CoinSuspendedTemporarily);
+            var toNetworkConfig = _networkInfoOptions.Value.NetworkMap[request.ToSymbol]
+                .FirstOrDefault(t => t.NetworkInfo.Network == request.ToNetwork);
+            AssertHelper.NotNull(toNetworkConfig, ErrorResult.NetworkInvalidCode);
+            AssertHelper.IsTrue(await VerifyByVersionAndWhiteList(toNetworkConfig, userId, version), ErrorResult.VersionOrWhitelistVerifyFailCode);
+        }
+        else
+        {
+            AssertHelper.IsTrue(VerifyHelper.VerifyAelfAddress(request.ToAddress), ErrorResult.AddressFormatWrongCode);
+        }
+
         AssertHelper.IsTrue(VerifyMemo(request.Memo), ErrorResult.MemoInvalidCode);
         
         var networkConfig = _networkInfoOptions.Value.NetworkMap[request.FromSymbol]
             .FirstOrDefault(t => t.NetworkInfo.Network == request.FromNetwork);
         AssertHelper.NotNull(networkConfig, ErrorResult.NetworkInvalidCode);
         AssertHelper.IsTrue(await VerifyByVersionAndWhiteList(networkConfig, userId, version), ErrorResult.VersionOrWhitelistVerifyFailCode);
-        networkConfig = _networkInfoOptions.Value.NetworkMap[request.ToSymbol]
-            .FirstOrDefault(t => t.NetworkInfo.Network == request.ToNetwork);
-        AssertHelper.NotNull(networkConfig, ErrorResult.NetworkInvalidCode);
-        AssertHelper.IsTrue(await VerifyByVersionAndWhiteList(networkConfig, userId, version), ErrorResult.VersionOrWhitelistVerifyFailCode);
-
-        if (VerifyAElfChain(request.ToNetwork))
-        {
-            AssertHelper.IsTrue(VerifyHelper.VerifyAelfAddress(request.ToAddress), ErrorResult.AddressFormatWrongCode);
-        }
 
         var userGrain = _clusterClient.GetGrain<IUserGrain>(userId);
         var userDto = await userGrain.GetUser();
