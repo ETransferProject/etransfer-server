@@ -322,11 +322,11 @@ public partial class InfoAppService : ETransferServerAppService, IInfoAppService
     private static Func<QueryContainerDescriptor<OrderIndex>, QueryContainer> GetFilterCondition()
     {
         QueryContainer query(QueryContainerDescriptor<OrderIndex> q) => q.Bool(i => i.Must(
-            s => s.Term(k =>
-                k.Field("extensionInfo.OrderType").Value(OrderTypeEnum.Transfer.ToString())),
+            s => s.Match(k =>
+                k.Field("extensionInfo.OrderType").Query(OrderTypeEnum.Transfer.ToString())),
             p => p.Bool(j => j.Should(
-                s => s.Term(k =>
-                    k.Field("extensionInfo.SubStatus").Value(OrderOperationStatusEnum.UserTransferRejected.ToString())),
+                s => s.Match(k =>
+                    k.Field("extensionInfo.SubStatus").Query(OrderOperationStatusEnum.UserTransferRejected.ToString())),
                 q => q.Bool(b => b.MustNot(
                     s => s.Exists(k =>
                         k.Field(f => f.FromTransfer.TxId)))),
@@ -339,9 +339,9 @@ public partial class InfoAppService : ETransferServerAppService, IInfoAppService
                         s => s.Exists(k =>
                             k.Field(f => f.ThirdPartOrderId)))),
                     r => r.Bool(d => d.MustNot(
-                        s => s.Term(k =>
+                        s => s.Match(k =>
                             k.Field("extensionInfo.SubStatus")
-                                .Value(OrderOperationStatusEnum.UserTransferRejected.ToString()))))))))));
+                                .Query(OrderOperationStatusEnum.UserTransferRejected.ToString()))))))))));
 
         return query;
     }

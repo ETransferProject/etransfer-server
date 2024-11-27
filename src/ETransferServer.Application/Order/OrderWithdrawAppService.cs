@@ -532,8 +532,9 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
         var expectedAmount = request.Amount * (decimal)Math.Pow(10, tokenDto.Decimals);
         AssertHelper.IsTrue(transferTokenInput.Amount == expectedAmount, ErrorResult.AmountNotEqualCode);
 
+        var userAddress = userDto.Data?.AddressInfos?.FirstOrDefault()?.Address;
         // Do create
-        return await DoCreateOrderAsync(request, transaction, withdrawAmount, inputThirdPartFee.ToString());
+        return await DoCreateOrderAsync(request, transaction, withdrawAmount, userAddress, inputThirdPartFee.ToString());
     }
 
     private bool IsNetworkOpen(string symbol, string network, string orderType)
@@ -544,7 +545,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
     }
 
     private async Task<CreateWithdrawOrderDto> DoCreateOrderAsync(GetWithdrawOrderRequestDto request,
-        Transaction transaction, decimal withdrawAmount, string feeStr)
+        Transaction transaction, decimal withdrawAmount, string userAddress, string feeStr)
     {
         // Replay attacks
         await AssertTxReplayAttacksAsync(transaction);
@@ -570,6 +571,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
                 FromTransfer = new TransferInfo
                 {
                     ChainId = request.FromChainId,
+                    FromAddress = userAddress,
                     Amount = request.Amount,
                     Symbol = request.Symbol,
                     TxId = transaction.GetHash().ToHex()

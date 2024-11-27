@@ -216,10 +216,10 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
         var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
         mustQuery.Add(q => q.Term(i =>
             i.Field(f => f.OrderType).Value(OrderTypeEnum.Withdraw.ToString())));
-        mustQuery.Add(q => q.Term(i =>
-            i.Field("extensionInfo.OrderType").Value(OrderTypeEnum.Transfer.ToString())));
-        mustQuery.Add(q => q.Term(i =>
-            i.Field("extensionInfo.SubStatus").Value(OrderOperationStatusEnum.UserTransferRejected.ToString())));
+        mustQuery.Add(q => q.Match(i =>
+            i.Field("extensionInfo.OrderType").Query(OrderTypeEnum.Transfer.ToString())));
+        mustQuery.Add(q => q.Match(i =>
+            i.Field("extensionInfo.SubStatus").Query(OrderOperationStatusEnum.UserTransferRejected.ToString())));
         mustQuery.Add(q => q.Bool(i => i.Should(
             s => s.Term(w =>
                 w.Field(f => f.ThirdPartOrderId).Value(coBoTransaction.Id)),
@@ -237,16 +237,16 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
         mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
         mustQuery.Add(q => q.Term(i =>
             i.Field(f => f.OrderType).Value(OrderTypeEnum.Withdraw.ToString())));
-        mustQuery.Add(q => q.Term(i =>
-            i.Field("extensionInfo.OrderType").Value(OrderTypeEnum.Transfer.ToString())));
-        mustQuery.Add(q => q.Term(i =>
-            i.Field("extensionInfo.SubStatus").Value(OrderOperationStatusEnum.UserTransferRejected.ToString())));
+        mustQuery.Add(q => q.Match(i =>
+            i.Field("extensionInfo.OrderType").Query(OrderTypeEnum.Transfer.ToString())));
+        mustQuery.Add(q => q.Match(i =>
+            i.Field("extensionInfo.SubStatus").Query(OrderOperationStatusEnum.UserTransferRejected.ToString())));
         mustQuery.Add(q => q.Term(i =>
             i.Field(f => f.FromTransfer.FromAddress).Value(coBoTransaction.SourceAddress).CaseInsensitive()));
         mustQuery.Add(q => q.Term(i =>
             i.Field(f => f.FromTransfer.ToAddress).Value(coBoTransaction.Address).CaseInsensitive()));
         mustQuery.Add(q => q.Term(i =>
-            i.Field(f => f.FromTransfer.Amount).Value(coBoTransaction.Amount.SafeToDecimal())));
+            i.Field(f => f.FromTransfer.Amount).Value(coBoTransaction.AbsAmount.SafeToDecimal())));
         mustQuery.Add(q => q.Term(i =>
             i.Field(f => f.FromTransfer.Network).Value(coin[0])));
         mustQuery.Add(q => q.Term(i =>
@@ -270,8 +270,8 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
         var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
         mustQuery.Add(q => q.Term(i =>
             i.Field(f => f.OrderType).Value(OrderTypeEnum.Withdraw.ToString())));
-        mustQuery.Add(q => q.Term(i =>
-            i.Field("extensionInfo.OrderType").Value(OrderTypeEnum.Transfer.ToString())));
+        mustQuery.Add(q => q.Match(i =>
+            i.Field("extensionInfo.OrderType").Query(OrderTypeEnum.Transfer.ToString())));
         mustQuery.Add(q => q.Bool(i => i.Should(
             s => s.Term(w =>
                 w.Field(f => f.ThirdPartOrderId).Value(coBoTransaction.Id)),
@@ -293,17 +293,17 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
         mustQuery.Add(q => q.Term(i =>
             i.Field(f => f.FromTransfer.ToAddress).Value(coBoTransaction.Address).CaseInsensitive()));
         mustQuery.Add(q => q.Term(i =>
-            i.Field(f => f.FromTransfer.Amount).Value(coBoTransaction.Amount.SafeToDecimal())));
+            i.Field(f => f.FromTransfer.Amount).Value(coBoTransaction.AbsAmount.SafeToDecimal())));
         mustQuery.Add(q => q.Term(i =>
             i.Field(f => f.FromTransfer.Network).Value(coin[0])));
         mustQuery.Add(q => q.Term(i =>
             i.Field(f => f.FromTransfer.Symbol).Value(coin[1])));
         mustQuery.Add(q => q.Term(i =>
             i.Field(f => f.OrderType).Value(OrderTypeEnum.Withdraw.ToString())));
-        mustQuery.Add(q => q.Term(i =>
-            i.Field("extensionInfo.OrderType").Value(OrderTypeEnum.Transfer.ToString())));
-        mustQuery.Add(q => q.Term(i =>
-            i.Field("extensionInfo.SubStatus").Value(OrderOperationStatusEnum.UserTransferRejected.ToString())));
+        mustQuery.Add(q => q.Match(i =>
+            i.Field("extensionInfo.OrderType").Query(OrderTypeEnum.Transfer.ToString())));
+        mustQuery.Add(q => q.Match(i =>
+            i.Field("extensionInfo.SubStatus").Query(OrderOperationStatusEnum.UserTransferRejected.ToString())));
         mustQuery.Add(q => q.Range(i =>
             i.Field(f => f.CreateTime).LessThan(time)));
         mustQuery.Add(q => q.Range(i =>
@@ -474,11 +474,11 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
     private static Func<QueryContainerDescriptor<OrderIndex>, QueryContainer> GetFilterCondition()
     {
         QueryContainer query(QueryContainerDescriptor<OrderIndex> q) => q.Bool(i => i.Must(
-            s => s.Term(k =>
-                k.Field("extensionInfo.OrderType").Value(OrderTypeEnum.Transfer.ToString())),
+            s => s.Match(k =>
+                k.Field("extensionInfo.OrderType").Query(OrderTypeEnum.Transfer.ToString())),
             p => p.Bool(j => j.Should(
-                s => s.Term(k =>
-                    k.Field("extensionInfo.SubStatus").Value(OrderOperationStatusEnum.UserTransferRejected.ToString())),
+                s => s.Match(k =>
+                    k.Field("extensionInfo.SubStatus").Query(OrderOperationStatusEnum.UserTransferRejected.ToString())),
                 q => q.Bool(b => b.MustNot(
                     s => s.Exists(k =>
                         k.Field(f => f.FromTransfer.TxId)))),
@@ -491,9 +491,9 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
                         s => s.Exists(k =>
                             k.Field(f => f.ThirdPartOrderId)))),
                     r => r.Bool(d => d.MustNot(
-                        s => s.Term(k =>
+                        s => s.Match(k =>
                             k.Field("extensionInfo.SubStatus")
-                                .Value(OrderOperationStatusEnum.UserTransferRejected.ToString()))))))))));
+                                .Query(OrderOperationStatusEnum.UserTransferRejected.ToString()))))))))));
 
         return query;
     }
