@@ -23,14 +23,27 @@ public class TokenAddressLimitGrain : Grain<TokenAddressLimitState>, ITokenAddre
         _addressOptions = addressOptions;
         _logger = logger;
     }
+    
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        await ReadStateAsync();
+        await base.OnActivateAsync(cancellationToken);
+    }
+
+    public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
+    {
+        await WriteStateAsync();
+        await base.OnDeactivateAsync(reason, cancellationToken);
+    }
 
     public async Task<bool> Acquire(int count = 1)
     {
-        State.CurrentAssignedCount += count;
-        
+        var currentCount = State.CurrentAssignedCount;
+        currentCount += count;
         _logger.LogInformation("Address assigned acquire, current:{current}, max:{max}",
-            State.CurrentAssignedCount, _addressOptions.Value.MaxAssignedTransferThreshold);
-        if (State.CurrentAssignedCount > _addressOptions.Value.MaxAssignedTransferThreshold) return false;
+            currentCount, _addressOptions.Value.MaxAssignedTransferThreshold);
+        if (currentCount > _addressOptions.Value.MaxAssignedTransferThreshold) return false;
+        State.CurrentAssignedCount += count;
         await WriteStateAsync();
         return true;
     }
