@@ -211,6 +211,8 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
             _logger.LogError(e, "Get withdraw avg exchange failed.");
         }
 
+        AssertHelper.IsTrue(request.Amount >= 0 && request.Amount <= withdrawInfoDto.MaxAmount.SafeToDecimal(), 
+            ErrorResult.AmountNotEqualCode);
         if (request.Address.IsNullOrEmpty())
             return new GetWithdrawInfoDto { WithdrawInfo = withdrawInfoDto };
 

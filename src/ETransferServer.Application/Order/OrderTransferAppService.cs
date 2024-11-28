@@ -63,13 +63,17 @@ public partial class OrderWithdrawAppService
         MethodName = nameof(HandleGetTransferInfoExceptionAsync))]
     public async Task<GetTransferInfoDto> GetTransferInfoAsync(GetTransferListRequestDto request, string version = null)
     {
+        AssertHelper.IsTrue(await CheckNetworkAsync(request), ErrorResult.NetworkInvalidCode);
         if (VerifyAElfChain(request.FromNetwork))
         {
             var result = await GetWithdrawInfoAsync(
                 _objectMapper.Map<GetTransferListRequestDto, GetWithdrawListRequestDto>(request), version);
+            var transferInfo = _objectMapper.Map<WithdrawInfoDto, TransferDetailInfoDto>(result.WithdrawInfo);
+            transferInfo.ContractAddress = _networkInfoOptions.Value.NetworkMap[request.Symbol]
+                .FirstOrDefault(t => t.NetworkInfo.Network == request.FromNetwork).NetworkInfo.ContractAddress;
             return new GetTransferInfoDto
             {
-                TransferInfo = _objectMapper.Map<WithdrawInfoDto, TransferDetailInfoDto>(result.WithdrawInfo)
+                TransferInfo = transferInfo
             };
         }
         
@@ -89,6 +93,7 @@ public partial class OrderWithdrawAppService
         var userId = await GetUserIdAsync(request.SourceType, request.FromAddress);
         if (!request.ToNetwork.IsNullOrEmpty() && !VerifyAElfChain(request.ToNetwork))
         {
+            AssertHelper.IsTrue(request.FromNetwork != request.ToNetwork, ErrorResult.NetworkInvalidCode);
             var networkConfig = _networkInfoOptions.Value.NetworkMap[request.Symbol]
                 .FirstOrDefault(t => t.NetworkInfo.Network == request.ToNetwork);
             AssertHelper.NotNull(networkConfig, ErrorResult.NetworkInvalidCode);
@@ -166,6 +171,8 @@ public partial class OrderWithdrawAppService
             _logger.LogError(e, "Get transfer avg exchange failed.");
         }
 
+        AssertHelper.IsTrue(request.Amount >= 0 && request.Amount <= withdrawInfoDto.MaxAmount.SafeToDecimal(), 
+            ErrorResult.AmountNotEqualCode);
         if (request.ToAddress.IsNullOrEmpty())
             return new GetTransferInfoDto { TransferInfo = withdrawInfoDto };
 
@@ -181,6 +188,7 @@ public partial class OrderWithdrawAppService
         TargetType = typeof(OrderWithdrawAppService), MethodName = nameof(HandleCreateTransferExceptionAsync))]
     public async Task<CreateTransferOrderDto> CreateTransferOrderInfoAsync(GetTransferOrderRequestDto request, string version = null)
     {
+        AssertHelper.IsTrue(await CheckNetworkAsync(request), ErrorResult.NetworkInvalidCode);
         if (VerifyAElfChain(request.FromNetwork))
         {
             var result = await CreateWithdrawOrderInfoAsync(
@@ -201,6 +209,7 @@ public partial class OrderWithdrawAppService
         {
             AssertHelper.IsTrue(IsNetworkOpen(request.ToSymbol, request.ToNetwork, OrderTypeEnum.Transfer.ToString()),
                 ErrorResult.CoinSuspendedTemporarily);
+            AssertHelper.IsTrue(request.FromNetwork != request.ToNetwork, ErrorResult.NetworkInvalidCode);
             var toNetworkConfig = _networkInfoOptions.Value.NetworkMap[request.ToSymbol]
                 .FirstOrDefault(t => t.NetworkInfo.Network == request.ToNetwork);
             AssertHelper.NotNull(toNetworkConfig, ErrorResult.NetworkInvalidCode);
@@ -221,6 +230,9 @@ public partial class OrderWithdrawAppService
         var userGrain = _clusterClient.GetGrain<IUserGrain>(userId);
         var userDto = await userGrain.GetUser();
         AssertHelper.IsTrue(userDto.Success, ErrorResult.JwtInvalidCode);
+        var userAddress = userDto.Data?.AddressInfos?.FirstOrDefault()?.Address;
+        AssertHelper.IsTrue(!userAddress.IsNullOrEmpty() && userAddress.EndsWith(request.FromAddress),
+            ErrorResult.AddressInvalidCode);
 
         var thirdPartFee = 0M;
         var coBoCoinCacheKey =
@@ -364,6 +376,54 @@ public partial class OrderWithdrawAppService
         userAddressDto.UpdateTime = DateTimeHelper.ToUnixTimeMilliseconds(DateTime.UtcNow);
         await addressGrain.AddOrUpdate(userAddressDto);
         await _userAddressIndexRepository.AddOrUpdateAsync(_objectMapper.Map<UserAddressDto, UserAddress>(userAddressDto));
+    }
+    
+    private async Task<bool> CheckNetworkAsync(GetTransferListRequestDto request)
+    {
+        if (!request.FromNetwork.IsNullOrEmpty() && !request.SourceType.IsNullOrEmpty() && !request.FromAddress.IsNullOrEmpty())
+        {
+            WalletEnum walletType;
+            if (!Enum.TryParse<WalletEnum>(request.SourceType, true, out walletType)) return false;
+            if ((int)walletType <= 1 && (!VerifyAElfChain(request.FromNetwork) || !VerifyHelper.VerifyAelfAddress(request.FromAddress)))
+                return false;
+            var networkByAddress = _networkInfoOptions.Value.NetworkPattern
+                .Where(kv => request.FromAddress.Match(kv.Key))
+                .SelectMany(kv => kv.Value)
+                .ToList();
+            AssertHelper.NotEmpty(networkByAddress, ErrorResult.AddressFormatWrongCode);
+            if (!networkByAddress.Exists(t => t == request.FromNetwork)) return false;
+        }
+
+        if (!request.ToNetwork.IsNullOrEmpty() && !request.ToAddress.IsNullOrEmpty())
+        {
+            var networkByAddress = _networkInfoOptions.Value.NetworkPattern
+                .Where(kv => request.ToAddress.Match(kv.Key))
+                .SelectMany(kv => kv.Value)
+                .ToList();
+            AssertHelper.NotEmpty(networkByAddress, ErrorResult.AddressFormatWrongCode);
+            if (!networkByAddress.Exists(t => t == request.ToNetwork)) return false;
+        }
+
+        return true;
+    }
+    
+    private async Task<bool> CheckNetworkAsync(GetTransferOrderRequestDto request)
+    {
+        var networkByAddress = _networkInfoOptions.Value.NetworkPattern
+            .Where(kv => request.FromAddress.Match(kv.Key))
+            .SelectMany(kv => kv.Value)
+            .ToList();
+        AssertHelper.NotEmpty(networkByAddress, ErrorResult.AddressFormatWrongCode);
+        if (!networkByAddress.Exists(t => t == request.FromNetwork)) return false;
+        
+        networkByAddress = _networkInfoOptions.Value.NetworkPattern
+            .Where(kv => request.ToAddress.Match(kv.Key))
+            .SelectMany(kv => kv.Value)
+            .ToList();
+        AssertHelper.NotEmpty(networkByAddress, ErrorResult.AddressFormatWrongCode);
+        if (!networkByAddress.Exists(t => t == request.ToNetwork)) return false;
+
+        return true;
     }
 
     private async Task<Guid?> GetUserIdAsync(string sourceType, string address)
