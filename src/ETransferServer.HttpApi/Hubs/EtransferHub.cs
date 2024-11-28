@@ -8,7 +8,6 @@ using ETransferServer.Order;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
-using Orleans;
 using Volo.Abp.AspNetCore.SignalR;
 
 namespace ETransferServer.Hubs
@@ -17,17 +16,14 @@ namespace ETransferServer.Hubs
     {
         private readonly IOrderAppService _orderAppService;
         private readonly IHubConnectionProvider _hubConnectionProvider;
-        private readonly IClusterClient _clusterClient;
         private readonly ILogger<EtransferHub> _logger;
 
         public EtransferHub(IOrderAppService orderAppService,
             IHubConnectionProvider hubConnectionProvider,
-            IClusterClient clusterClient,
             ILogger<EtransferHub> logger)
         {
             _orderAppService = orderAppService;
             _hubConnectionProvider = hubConnectionProvider;
-            _clusterClient = clusterClient;
             _logger = logger;
         }
 

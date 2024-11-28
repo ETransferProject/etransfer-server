@@ -451,7 +451,8 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
 
     [ExceptionHandler(typeof(UserFriendlyException), typeof(Exception), 
         TargetType = typeof(OrderWithdrawAppService), MethodName = nameof(HandleCreateWithdrawExceptionAsync))]
-    public async Task<CreateWithdrawOrderDto> CreateWithdrawOrderInfoAsync(GetWithdrawOrderRequestDto request, string version = null)
+    public async Task<CreateWithdrawOrderDto> CreateWithdrawOrderInfoAsync(GetWithdrawOrderRequestDto request, 
+        string version = null, bool isTransfer = false)
     {
         _logger.LogDebug("CreateWithdrawOrder: {request}", JsonConvert.SerializeObject(request));
         var userId = CurrentUser.GetId();
@@ -536,7 +537,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
 
         var userAddress = userDto.Data?.AddressInfos?.FirstOrDefault()?.Address;
         // Do create
-        return await DoCreateOrderAsync(request, transaction, withdrawAmount, userAddress, inputThirdPartFee.ToString());
+        return await DoCreateOrderAsync(request, transaction, withdrawAmount, userAddress, inputThirdPartFee.ToString(), isTransfer);
     }
 
     private bool IsNetworkOpen(string symbol, string network, string orderType)
@@ -547,7 +548,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
     }
 
     private async Task<CreateWithdrawOrderDto> DoCreateOrderAsync(GetWithdrawOrderRequestDto request,
-        Transaction transaction, decimal withdrawAmount, string userAddress, string feeStr)
+        Transaction transaction, decimal withdrawAmount, string userAddress, string feeStr, bool isTransfer)
     {
         // Replay attacks
         await AssertTxReplayAttacksAsync(transaction);
@@ -592,9 +593,15 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
                 }
             };
 
-            if (!string.IsNullOrWhiteSpace(request.Memo))
+            if (isTransfer)
             {
                 withdrawOrderDto.ExtensionInfo = new Dictionary<string, string>();
+                withdrawOrderDto.ExtensionInfo.Add(ExtensionKey.OrderType, OrderTypeEnum.Transfer.ToString());
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.Memo))
+            {
+                withdrawOrderDto.ExtensionInfo ??= new Dictionary<string, string>();
                 withdrawOrderDto.ExtensionInfo.Add(ExtensionKey.Memo, request.Memo);
             }
 

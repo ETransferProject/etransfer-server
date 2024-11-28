@@ -192,7 +192,7 @@ public partial class OrderWithdrawAppService
         if (VerifyAElfChain(request.FromNetwork))
         {
             var result = await CreateWithdrawOrderInfoAsync(
-                _objectMapper.Map<GetTransferOrderRequestDto, GetWithdrawOrderRequestDto>(request), version);
+                _objectMapper.Map<GetTransferOrderRequestDto, GetWithdrawOrderRequestDto>(request), version, true);
             return _objectMapper.Map<CreateWithdrawOrderDto, CreateTransferOrderDto>(result);
         }
         
