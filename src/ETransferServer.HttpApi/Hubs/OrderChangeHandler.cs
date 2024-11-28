@@ -49,7 +49,9 @@ namespace ETransferServer.Hubs
             foreach (var connectionId in connectionIds)
             {
                 var addresses = await _hubConnectionProvider.GetUserAddresses(connectionId);
+                if (addresses.IsNullOrEmpty()) continue;
                 var userAddressList = await GetUserAddressListAsync(addresses);
+                if (userAddressList.IsNullOrEmpty()) continue;
                 var result = await _orderAppService.GetUserOrderRecordListAsync(new GetUserOrderRecordRequestDto
                 {
                     AddressList = userAddressList,
@@ -77,6 +79,7 @@ namespace ETransferServer.Hubs
             var userAddressList = new List<GetUserAddressDto>();
             foreach (var address in addressList)
             {
+                if (address.IsNullOrEmpty()) continue;
                 var dto = new GetUserAddressDto();
                 if (address.StartsWith(string.Concat(WalletEnum.EVM.ToString().ToLower(), CommonConstant.Underline)))
                 {
