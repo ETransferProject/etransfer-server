@@ -9,4 +9,5 @@ public interface IHubWithCacheService
     Task UnRegisterClientAsync(string connectionId);
     Task UnRegisterClientAsync(List<string> clientIds, string connectionId);
     Task<List<string>> GetConnectionIdsAsync(List<string> clientIds);
+    Task<List<string>> GetClientIdsAsync(string connectionId);
 }

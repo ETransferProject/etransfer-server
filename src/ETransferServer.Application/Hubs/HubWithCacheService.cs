@@ -78,6 +78,11 @@ public class HubWithCacheService : IHubWithCacheService, ISingletonDependency
         return connectionIds;
     }
     
+    public async Task<List<string>> GetClientIdsAsync(string connectionId)
+    {
+        return (await _cacheProvider.Get<HubDto>(GetKey(connectionId)))?.ClientIds;
+    }
+    
     private string Serialize(object val)
     {
         var serializeSetting = new JsonSerializerSettings

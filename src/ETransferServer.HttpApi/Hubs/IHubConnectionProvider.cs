@@ -8,6 +8,7 @@ namespace ETransferServer.Hubs
     {
         Task AddUserConnection(List<string> addresses, string connectionId);
         Task<List<string>> GetUserConnections(List<string> addresses);
+        Task<List<string>> GetUserAddresses(string connectionId);
         Task ClearUserConnection(List<string> addresses, string connectionId);
         Task ClearUserConnection(string connectionId);
     }
@@ -29,6 +30,11 @@ namespace ETransferServer.Hubs
         public async Task<List<string>> GetUserConnections(List<string> addresses)
         {
             return await _hubAppService.GetConnectionIdsAsync(addresses);
+        }
+
+        public async Task<List<string>> GetUserAddresses(string connectionId)
+        {
+            return await _hubAppService.GetClientIdsAsync(connectionId);
         }
 
         public async Task ClearUserConnection(List<string> addresses, string connectionId)
