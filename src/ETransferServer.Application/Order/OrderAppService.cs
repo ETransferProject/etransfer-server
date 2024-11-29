@@ -16,6 +16,7 @@ using ETransferServer.Orders;
 using ETransferServer.ThirdPart.CoBo.Dtos;
 using ETransferServer.User.Dtos;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Nest;
 using Orleans;
 using Volo.Abp;
@@ -36,6 +37,7 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
     private readonly IClusterClient _clusterClient;
     private readonly IObjectMapper _objectMapper;
     private readonly ILogger<OrderAppService> _logger;
+    private readonly IOptionsSnapshot<DepositInfoOptions> _depositInfoOptions;
     private readonly INetworkAppService _networkAppService;
 
     public OrderAppService(INESTRepository<OrderIndex, Guid> orderIndexRepository,
@@ -43,6 +45,7 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
         IClusterClient clusterClient,
         IObjectMapper objectMapper,
         ILogger<OrderAppService> logger,
+        IOptionsSnapshot<DepositInfoOptions> depositInfoOptions,
         INetworkAppService networkAppService)
     {
         _orderIndexRepository = orderIndexRepository;
@@ -50,6 +53,7 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
         _clusterClient = clusterClient;
         _objectMapper = objectMapper;
         _logger = logger;
+        _depositInfoOptions = depositInfoOptions;
         _networkAppService = networkAppService;
     }
 
@@ -149,7 +153,7 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
             mustNotQuery.Add(q => q.Match(i =>
                 i.Field("extensionInfo.ToConfirmedNum").Query("0")));
         }
-        mustNotQuery.Add(GetFilterCondition());
+        mustNotQuery.Add(GetFilterCondition(_depositInfoOptions.Value.AssignedAddressExpiredHour));
 
         QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery)
             .MustNot(mustNotQuery));
@@ -386,7 +390,7 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
         }
 
         var mustNotQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
-        mustNotQuery.Add(GetFilterCondition());
+        mustNotQuery.Add(GetFilterCondition(_depositInfoOptions.Value.AssignedAddressExpiredHour));
         QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery)
             .MustNot(mustNotQuery));
 
@@ -464,7 +468,7 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
         var mustNotQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
         mustNotQuery.Add(q => q.Match(i =>
             i.Field("extensionInfo.RefundTx").Query(ExtensionKey.RefundTx)));
-        mustNotQuery.Add(GetFilterCondition());
+        mustNotQuery.Add(GetFilterCondition(_depositInfoOptions.Value.AssignedAddressExpiredHour));
         
         QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery)
             .MustNot(mustNotQuery));
@@ -477,7 +481,7 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
         };
     }
 
-    private static Func<QueryContainerDescriptor<OrderIndex>, QueryContainer> GetFilterCondition()
+    private static Func<QueryContainerDescriptor<OrderIndex>, QueryContainer> GetFilterCondition(int expiredHour = 48)
     {
         QueryContainer query(QueryContainerDescriptor<OrderIndex> q) => q.Bool(i => i.Must(
             s => s.Match(k =>
@@ -490,7 +494,8 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
                         k.Field(f => f.FromTransfer.TxId)))),
                 q => q.Bool(b => b.Must(
                     s => s.Range(k =>
-                        k.Field(f => f.CreateTime).LessThan(DateTime.UtcNow.AddHours(-48).ToUtcMilliSeconds())),
+                        k.Field(f => f.CreateTime).LessThan(DateTime.UtcNow.AddHours(
+                            -1 * expiredHour).ToUtcMilliSeconds())),
                     s => s.Exists(k =>
                         k.Field(f => f.FromTransfer.TxId)),
                     r => r.Bool(d => d.MustNot(
