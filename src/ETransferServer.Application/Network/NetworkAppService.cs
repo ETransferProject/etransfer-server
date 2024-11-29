@@ -219,6 +219,14 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
             : CommonConstant.DefaultConst.DefaultMinThirdPartFee);
     }
 
+    public Task<decimal> GetMaxThirdPartFeeAsync(string network, string symbol)
+    {
+        var maxFeeKey = string.Join(CommonConstant.Underline, network, symbol);
+        return Task.FromResult(_withdrawInfoOptions.Value.MaxThirdPartFee.ContainsKey(maxFeeKey)
+            ? _withdrawInfoOptions.Value.MaxThirdPartFee[maxFeeKey]
+            : 0M);
+    }
+
     public Task<int> GetDecimalsAsync(string chainId, string symbol)
     {
         return Task.FromResult((!chainId.IsNullOrEmpty() && _tokenOptions.Value.Withdraw.ContainsKey(chainId)

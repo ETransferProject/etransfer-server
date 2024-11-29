@@ -326,6 +326,32 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
 
         return Tuple.Create(estimateFee, coin.ExpireTime);
     }
+    
+    private async Task<Tuple<decimal, long>> CalculateTotalFeeAsync(Guid? userId, string fromNetwork, string toNetwork,
+        string symbol, long expireAt, decimal feeAmount, bool isNotify = true)
+    {
+        var (estimateFee, coin) = VerifyAElfChain(fromNetwork)
+            ? Tuple.Create(0M, new CoBoCoinDto { ExpireTime = 0L })
+            : await _networkAppService.CalculateNetworkFeeAsync(fromNetwork, symbol);
+        estimateFee = Math.Min(estimateFee, await _networkAppService.GetMaxThirdPartFeeAsync(fromNetwork, symbol));
+        var totalFee = estimateFee + feeAmount;
+
+        await SetFeeCacheAsync(userId, fromNetwork, toNetwork, symbol, totalFee);
+
+        var monitorCacheKey = CacheKey(FeeInfo.FeeName.CoBoFee, fromNetwork);
+        if (!VerifyAElfChain(fromNetwork) && null == await _coBoCoinCache.GetAsync(monitorCacheKey))
+        {
+            // If new data is generated
+            // go through the monitoring logic.
+            await DoMonitorAsync(fromNetwork, coin.AbsEstimateFee.SafeToDecimal(), coin.FeeCoin, isNotify);
+            _coBoCoinCache.GetOrAdd(monitorCacheKey, () => coin, () => new DistributedCacheEntryOptions
+            {
+                AbsoluteExpiration = DateTimeOffset.FromUnixTimeMilliseconds(coin.ExpireTime)
+            });
+        }
+
+        return Tuple.Create(totalFee, coin.ExpireTime > 0 && expireAt > 0 ? Math.Min(coin.ExpireTime, expireAt) : Math.Max(coin.ExpireTime, expireAt));
+    }
 
     private async Task SetFeeCacheAsync(Guid? userId, string network, string symbol, decimal fee)
     {
@@ -339,6 +365,20 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
             });
         _logger.LogDebug("Cobo fee set cache: {fee}, {expireSeconds}, {userId}, {network}, {symbol}", 
             fee, _withdrawInfoOptions.Value.ThirdPartCacheFeeExpireSeconds, userId, network, symbol);
+    }
+    
+    private async Task SetFeeCacheAsync(Guid? userId, string fromNetwork, string toNetwork, string symbol, decimal fee)
+    {
+        if (!userId.HasValue || fromNetwork.IsNullOrEmpty() || toNetwork.IsNullOrEmpty()) return;
+        var coinFeeCacheKey = CacheKey(FeeInfo.FeeName.CoBoFee, userId.ToString(), fromNetwork, toNetwork, symbol);
+        var decimals = await _networkAppService.GetDecimalsAsync(ChainId.AELF, symbol);
+        await _coBoCoinCache.SetAsync(coinFeeCacheKey, new CoBoCoinDto { AbsEstimateFee = fee.ToString(decimals, DecimalHelper.RoundingOption.Ceiling) }, 
+            new DistributedCacheEntryOptions
+            {
+                AbsoluteExpiration = DateTimeOffset.UtcNow.AddSeconds(_withdrawInfoOptions.Value.ThirdPartCacheFeeExpireSeconds)
+            });
+        _logger.LogDebug("Cobo total fee set cache: {fee}, {expireSeconds}, {userId}, {fromNetwork}, {toNetwork}, {symbol}", 
+            fee, _withdrawInfoOptions.Value.ThirdPartCacheFeeExpireSeconds, userId, fromNetwork, toNetwork, symbol);
     }
 
     public async Task DoMonitorAsync(string network, decimal estimateFee, string symbol, bool isNotify)

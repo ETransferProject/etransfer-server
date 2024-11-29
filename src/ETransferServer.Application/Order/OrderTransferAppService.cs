@@ -131,12 +131,13 @@ public partial class OrderWithdrawAppService
         }
 
         feeAmount = await GetTransactionFeeAsync(_objectMapper.Map<GetTransferListRequestDto, GetWithdrawListRequestDto>(request), userId, feeAmount);
-        withdrawInfoDto.TransactionFee = feeAmount.ToString(decimals, DecimalHelper.RoundingOption.Ceiling);
+        var (totalFee, totalExpireAt) = await CalculateTotalFeeAsync(userId, request.FromNetwork, request.ToNetwork, request.Symbol, expireAt, feeAmount);
+        withdrawInfoDto.TransactionFee = totalFee.ToString(decimals, DecimalHelper.RoundingOption.Ceiling);
         withdrawInfoDto.TransactionUnit = request.Symbol;
-        withdrawInfoDto.ExpiredTimestamp = expireAt.ToString();
+        withdrawInfoDto.ExpiredTimestamp = totalExpireAt.ToString();
 
         var receiveAmount = Math.Max(0, request.Amount) - decimal.Parse(withdrawInfoDto.TransactionFee);
-        var minAmount = feeAmount;
+        var minAmount = totalFee;
         withdrawInfoDto.MinAmount = Math.Max(minAmount, _withdrawInfoOptions.Value.MinWithdraw)
             .ToString(2, DecimalHelper.RoundingOption.Ceiling);
         if (withdrawInfoDto.MinAmount.SafeToDecimal() <= withdrawInfoDto.TransactionFee.SafeToDecimal())
@@ -163,7 +164,7 @@ public partial class OrderWithdrawAppService
             withdrawInfoDto.ReceiveAmountUsd =
                 (withdrawInfoDto.ReceiveAmount.SafeToDecimal() * avgExchange).ToString(decimals,
                     DecimalHelper.RoundingOption.Ceiling);
-            var fee = feeAmount * avgExchange;
+            var fee = totalFee * avgExchange;
             withdrawInfoDto.FeeUsd = fee.ToString(decimals, DecimalHelper.RoundingOption.Ceiling);
         }
         catch (Exception e)
@@ -236,11 +237,11 @@ public partial class OrderWithdrawAppService
 
         var thirdPartFee = 0M;
         var coBoCoinCacheKey =
-            CacheKey(FeeInfo.FeeName.CoBoFee, userId.ToString(), request.ToNetwork, request.ToSymbol);
+            CacheKey(FeeInfo.FeeName.CoBoFee, userId.ToString(), request.FromNetwork, request.ToNetwork, request.ToSymbol);
         var thirdPartFeeDto = await _coBoCoinCache.GetAsync(coBoCoinCacheKey);
         AssertHelper.IsTrue(thirdPartFeeDto != null, ErrorResult.FeeExpiredCode);
-        _logger.LogDebug("Cobo fee get transfer cache: {fee}, {userId}, {network}, {symbol}", 
-            thirdPartFeeDto.AbsEstimateFee, userId, request.ToNetwork, request.ToSymbol);
+        _logger.LogDebug("Cobo total fee get transfer cache: {fee}, {userId}, {fromNetwork}, {toNetwork}, {symbol}", 
+            thirdPartFeeDto.AbsEstimateFee, userId, request.FromNetwork, request.ToNetwork, request.ToSymbol);
         var inputThirdPartFee = thirdPartFeeDto.AbsEstimateFee.SafeToDecimal(-1);
         AssertHelper.IsTrue(inputThirdPartFee >= 0, ErrorResult.FeeInvalidCode);
         
