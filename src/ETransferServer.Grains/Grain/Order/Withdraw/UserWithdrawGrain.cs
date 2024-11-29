@@ -232,10 +232,6 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
 
         var coBoDepositGrain = GrainFactory.GetGrain<ICoBoDepositGrain>(coBoTransaction.Id);
         var coBoDto = await coBoDepositGrain.Get();
-        if (coBoDto == null)
-        {
-            await _bus.Publish(_objectMapper.Map<WithdrawOrderDto, OrderChangeEto>(orderDto));
-        }
         if (coBoDto != null && coBoDto.Status == CommonConstant.SuccessStatus)
         {
             _logger.LogInformation("transfer order already success: {id}", this.GetPrimaryKey());
@@ -265,6 +261,10 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
             orderDto.FromTransfer.Status = OrderTransferStatusEnum.Confirmed.ToString();
             orderDto.Status = OrderStatusEnum.FromTransferConfirmed.ToString();
             await AddOrUpdateOrder(orderDto);
+        }
+        if (coBoDto == null)
+        {
+            await _bus.Publish(_objectMapper.Map<WithdrawOrderDto, OrderChangeEto>(orderDto));
         }
     }
     
