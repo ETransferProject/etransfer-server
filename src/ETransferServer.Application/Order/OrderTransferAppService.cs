@@ -248,9 +248,18 @@ public partial class OrderWithdrawAppService
         if (!VerifyAElfChain(request.ToNetwork))
         { 
             // query fees async
+            var toKey =
+                CacheKey(FeeInfo.FeeName.CoBoFee, userId.ToString(), request.ToNetwork, request.ToSymbol);
+            var toFeeDto = await _coBoCoinCache.GetAsync(toKey);
+            AssertHelper.IsTrue(toFeeDto != null, ErrorResult.FeeExpiredCode);
+            _logger.LogDebug("Cobo fee get transfer cache: {fee}, {userId}, {toNetwork}, {symbol}", 
+                toFeeDto.AbsEstimateFee, userId, request.ToNetwork, request.ToSymbol);
+            var toFee = toFeeDto.AbsEstimateFee.SafeToDecimal(-1);
+            AssertHelper.IsTrue(toFee >= 0, ErrorResult.FeeInvalidCode);
+            
             thirdPartFee = (await CalculateThirdPartFeeAsync(userId, request.ToNetwork, request.ToSymbol)).Item1;
             AssertHelper.IsTrue(
-                Math.Abs(inputThirdPartFee - thirdPartFee) / thirdPartFee <=
+                Math.Abs(toFee - thirdPartFee) / thirdPartFee <=
                 _withdrawInfoOptions.Value.FeeFluctuationPercent,
                 ErrorResult.FeeExceedCode, null, request.ToNetwork);
         }
