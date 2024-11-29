@@ -525,6 +525,10 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
                         result = s =>
                             s.Ascending(t => t.ArrivalTime);
                         break;
+                    case OrderOptions.CreateTime:
+                        result = s =>
+                            s.Ascending(t => t.CreateTime);
+                        break;
                 }
                 break;
             case 2:
@@ -535,6 +539,12 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
                             sortingArray[1] == OrderOptions.Asc || sortingArray[1] == OrderOptions.Ascend
                                 ? s.Ascending(t => t.ArrivalTime)
                                 : s.Descending(t => t.ArrivalTime);
+                        break;
+                    case OrderOptions.CreateTime:
+                        result = s =>
+                            sortingArray[1] == OrderOptions.Asc || sortingArray[1] == OrderOptions.Ascend
+                                ? s.Ascending(t => t.CreateTime)
+                                : s.Descending(t => t.CreateTime);
                         break;
                 }
                 break;
