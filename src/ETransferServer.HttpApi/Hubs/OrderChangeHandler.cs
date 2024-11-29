@@ -54,6 +54,7 @@ namespace ETransferServer.Hubs
                 if (userAddressList.IsNullOrEmpty()) continue;
                 var result = await _orderAppService.GetUserOrderRecordListAsync(new GetUserOrderRecordRequestDto
                 {
+                    Address = !addressList.IsNullOrEmpty() ? addressList[0] : null,
                     AddressList = userAddressList,
                     Time = 0
                 }, eventData.Message);
