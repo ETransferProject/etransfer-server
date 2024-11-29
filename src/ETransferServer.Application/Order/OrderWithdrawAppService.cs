@@ -142,7 +142,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
         withdrawInfoDto.TransactionUnit = request.Symbol;
 
         // query async
-        var networkFeeTask = CalculateNetworkFeeAsync(request.ChainId, request.Version);
+        var networkFeeTask = CalculateNetworkFeeAsync(userId, request.ChainId, request.Version);
         var decimals = await _networkAppService.GetDecimalsAsync(request.ChainId, request.Symbol);
         var (feeAmount, expireAt) = (0M,
             DateTime.UtcNow.AddSeconds(_coBoOptions.Value.CoinExpireSeconds).ToUtcMilliSeconds());
@@ -396,10 +396,9 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
     }
 
 
-    private async Task<decimal> CalculateNetworkFeeAsync(string chainId, string version)
+    private async Task<decimal> CalculateNetworkFeeAsync(Guid? userId, string chainId, string version)
     {
-        var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
-        if (userId == null || userId == Guid.Empty) return 0;
+        if (!userId.HasValue || userId == Guid.Empty) return 0;
 
         var userGrain = _clusterClient.GetGrain<IUserGrain>((Guid)userId);
         var userDto = await userGrain.GetUser();

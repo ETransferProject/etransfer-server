@@ -70,7 +70,9 @@ public partial class OrderWithdrawAppService
                 _objectMapper.Map<GetTransferListRequestDto, GetWithdrawListRequestDto>(request), version);
             var transferInfo = _objectMapper.Map<WithdrawInfoDto, TransferDetailInfoDto>(result.WithdrawInfo);
             transferInfo.ContractAddress = _networkInfoOptions.Value.NetworkMap[request.Symbol]
-                .FirstOrDefault(t => t.NetworkInfo.Network == request.FromNetwork).NetworkInfo.ContractAddress;
+                .FirstOrDefault(t => t.NetworkInfo.Network == request.FromNetwork)?.NetworkInfo?.ContractAddress
+                ?? _networkInfoOptions.Value.NetworkMap[CommonConstant.Symbol.USDT]
+                .FirstOrDefault(t => t.NetworkInfo.Network == request.FromNetwork)?.NetworkInfo?.ContractAddress;
             return new GetTransferInfoDto
             {
                 TransferInfo = transferInfo

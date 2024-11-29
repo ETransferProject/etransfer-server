@@ -262,8 +262,9 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
             orderDto.Status = OrderStatusEnum.FromTransferConfirmed.ToString();
             await AddOrUpdateOrder(orderDto);
         }
-        if (coBoDto == null)
+        if (coBoDto == null || coBoDto.Id == null)
         {
+            _logger.LogInformation("transfer order send bus: {id}", this.GetPrimaryKey());
             await _bus.Publish(_objectMapper.Map<WithdrawOrderDto, OrderChangeEto>(orderDto));
         }
     }
