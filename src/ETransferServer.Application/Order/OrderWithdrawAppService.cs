@@ -328,12 +328,15 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
     }
     
     private async Task<Tuple<decimal, long>> CalculateTotalFeeAsync(Guid? userId, string fromNetwork, string toNetwork,
-        string symbol, long expireAt, decimal feeAmount, bool isNotify = true)
+        string symbol, long expireAt, decimal feeAmount, bool isNotify = false)
     {
         var (estimateFee, coin) = VerifyAElfChain(fromNetwork)
             ? Tuple.Create(0M, new CoBoCoinDto { ExpireTime = 0L })
             : await _networkAppService.CalculateNetworkFeeAsync(fromNetwork, symbol);
         estimateFee = Math.Min(estimateFee, await _networkAppService.GetMaxThirdPartFeeAsync(fromNetwork, symbol));
+        _logger.LogDebug("Cobo from network fee: {fromNetwork}, {fromFee}, {expireTime}, to network fee: {toNetwork}, " +
+            "{toFee}, {expireAt}, {userId}, {symbol}", fromNetwork, estimateFee, coin.ExpireTime, toNetwork, feeAmount, 
+            expireAt, userId, symbol);
         var totalFee = estimateFee + feeAmount;
 
         await SetFeeCacheAsync(userId, fromNetwork, toNetwork, symbol, totalFee);

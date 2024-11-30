@@ -30,6 +30,7 @@ public partial class InfoAppService : ETransferServerAppService, IInfoAppService
     private readonly IOptionsSnapshot<NetworkOptions> _networkOptions;
     private readonly IOptionsSnapshot<TokenOptions> _tokenOptions;
     private readonly IOptionsSnapshot<TokenInfoOptions> _tokenInfoOptions;
+    private readonly IOptionsSnapshot<DepositInfoOptions> _depositInfoOptions;
     private readonly IObjectMapper _objectMapper;
     private readonly ILogger<InfoAppService> _logger;
 
@@ -38,6 +39,7 @@ public partial class InfoAppService : ETransferServerAppService, IInfoAppService
         IOptionsSnapshot<NetworkOptions> networkOptions,
         IOptionsSnapshot<TokenOptions> tokenOptions,
         IOptionsSnapshot<TokenInfoOptions> tokenInfoOptions,
+        IOptionsSnapshot<DepositInfoOptions> depositInfoOptions,
         IObjectMapper objectMapper,
         ILogger<InfoAppService> logger)
     {
@@ -46,6 +48,7 @@ public partial class InfoAppService : ETransferServerAppService, IInfoAppService
         _networkOptions = networkOptions;
         _tokenOptions = tokenOptions;
         _tokenInfoOptions = tokenInfoOptions;
+        _depositInfoOptions = depositInfoOptions;
         _objectMapper = objectMapper;
         _logger = logger;
     }
@@ -298,7 +301,7 @@ public partial class InfoAppService : ETransferServerAppService, IInfoAppService
         var mustNotQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
         mustNotQuery.Add(q => q.Match(i =>
             i.Field("extensionInfo.RefundTx").Query(ExtensionKey.RefundTx)));
-        mustNotQuery.Add(GetFilterCondition());
+        mustNotQuery.Add(GetFilterCondition(_depositInfoOptions.Value.AssignedAddressExpiredHour));
         
         QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery)
             .MustNot(mustNotQuery));
@@ -314,12 +317,12 @@ public partial class InfoAppService : ETransferServerAppService, IInfoAppService
         return new PagedResultDto<OrderIndexDto>
         {
             Items = await LoopCollectionItemsAsync(
-                _objectMapper.Map<List<OrderIndex>, List<OrderIndexDto>>(list)),
+                _objectMapper.Map<List<OrderIndex>, List<OrderIndexDto>>(list), list),
             TotalCount = count <= request.Limit ? count : request.Limit
         };
     }
     
-    private static Func<QueryContainerDescriptor<OrderIndex>, QueryContainer> GetFilterCondition()
+    private static Func<QueryContainerDescriptor<OrderIndex>, QueryContainer> GetFilterCondition(int expiredHour = 48)
     {
         QueryContainer query(QueryContainerDescriptor<OrderIndex> q) => q.Bool(i => i.Must(
             s => s.Match(k =>
@@ -332,7 +335,8 @@ public partial class InfoAppService : ETransferServerAppService, IInfoAppService
                         k.Field(f => f.FromTransfer.TxId)))),
                 q => q.Bool(b => b.Must(
                     s => s.Range(k =>
-                        k.Field(f => f.CreateTime).LessThan(DateTime.UtcNow.AddHours(-48).ToUtcMilliSeconds())),
+                        k.Field(f => f.CreateTime).LessThan(DateTime.UtcNow.AddHours(
+                            -1 * expiredHour).ToUtcMilliSeconds())),
                     s => s.Exists(k =>
                         k.Field(f => f.FromTransfer.TxId)),
                     r => r.Bool(d => d.MustNot(
@@ -805,7 +809,7 @@ public partial class InfoAppService : ETransferServerAppService, IInfoAppService
         return dto;
     }
 
-    private async Task<List<OrderIndexDto>> LoopCollectionItemsAsync(List<OrderIndexDto> itemList)
+    private async Task<List<OrderIndexDto>> LoopCollectionItemsAsync(List<OrderIndexDto> itemList, List<OrderIndex> list)
     {
         var fromSymbolList = itemList.Select(i => i.FromTransfer.Symbol).Distinct().ToList();
         var toSymbolList = itemList.Select(i => i.ToTransfer.Symbol).Distinct().ToList();
@@ -840,6 +844,11 @@ public partial class InfoAppService : ETransferServerAppService, IInfoAppService
             item.ToTransfer.AmountUsd =
                 (decimal.Parse(item.ToTransfer.Amount) * exchangeDic[item.ToTransfer.Symbol]).ToString(2,
                     DecimalHelper.RoundingOption.Floor);
+            var orderIndex = list.FirstOrDefault(t => t.Id == item.Id);
+            item.SecondOrderType = orderIndex != null && !orderIndex.ExtensionInfo.IsNullOrEmpty() &&
+                                   orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.OrderType)
+                ? orderIndex.ExtensionInfo[ExtensionKey.OrderType]
+                : string.Empty;
         });
         return itemList;
     }
