@@ -4,11 +4,16 @@ using Orleans.Streams;
 using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
 using ETransferServer.Dtos.Order;
+using ETransferServer.Etos.Order;
+using ETransferServer.Grains.Grain.Order.Deposit;
 using ETransferServer.Grains.Grain.Timers;
+using ETransferServer.Grains.Grain.Token;
 using ETransferServer.Grains.Grain.TokenLimit;
+using ETransferServer.Grains.Grain.Users;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.Provider;
 using ETransferServer.Options;
+using ETransferServer.ThirdPart.CoBo.Dtos;
 using MassTransit;
 using NBitcoin;
 using Newtonsoft.Json;
@@ -25,6 +30,10 @@ public interface IUserWithdrawGrain : IGrainWithGuidKey
     /// <param name="withdrawOrderDto"></param>
     /// <returns></returns>
     Task<WithdrawOrderDto> CreateOrder(WithdrawOrderDto withdrawOrderDto);
+    
+    Task CreateTransferOrder(WithdrawOrderDto withdrawOrderDto);
+
+    Task SaveTransferOrder(CoBoTransactionDto coBoTransaction);
     
     Task<WithdrawOrderDto> CreateRefundOrder(WithdrawOrderDto withdrawOrderDto, string address);
 
@@ -57,6 +66,7 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
     private readonly IOptionsSnapshot<ChainOptions> _chainOptions;
     private readonly IOptionsSnapshot<WithdrawOptions> _withdrawOptions;
     private readonly IOptionsSnapshot<WithdrawNetworkOptions> _withdrawNetworkOptions;
+    private readonly IOptionsSnapshot<DepositAddressOptions> _depositAddressOption;
 
     private IUserWithdrawRecordGrain _recordGrain;
     private IOrderStatusFlowGrain _orderStatusFlowGrain;
@@ -72,6 +82,7 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
     private readonly IContractProvider _contractProvider;
     private readonly IUserWithdrawProvider _userWithdrawProvider;
     private readonly IOrderStatusFlowProvider _orderStatusFlowProvider;
+    private readonly IUserAddressProvider _userAddressProvider;
     private readonly IObjectMapper _objectMapper;
     private readonly IBus _bus;
 
@@ -87,7 +98,9 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         ILogger<UserWithdrawGrain> logger, IOptionsSnapshot<ChainOptions> chainOptions,
         IOptionsSnapshot<WithdrawOptions> withdrawOptions, IContractProvider contractProvider,
         IOrderStatusFlowProvider orderStatusFlowProvider,
+        IUserAddressProvider userAddressProvider,
         IOptionsSnapshot<WithdrawNetworkOptions> withdrawNetworkOptions,
+        IOptionsSnapshot<DepositAddressOptions> depositAddressOption,
         IObjectMapper objectMapper, 
         IBus bus)
     {
@@ -97,7 +110,9 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         _withdrawOptions = withdrawOptions;
         _contractProvider = contractProvider;
         _orderStatusFlowProvider = orderStatusFlowProvider;
+        _userAddressProvider = userAddressProvider;
         _withdrawNetworkOptions = withdrawNetworkOptions;
+        _depositAddressOption = depositAddressOption;
         _objectMapper = objectMapper;
         _bus = bus;
     }
@@ -169,6 +184,91 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         return await AddOrUpdateOrder(withdrawOrderDto);
     }
 
+    public async Task CreateTransferOrder(WithdrawOrderDto withdrawOrderDto)
+    {
+        withdrawOrderDto.Id = this.GetPrimaryKey();
+        withdrawOrderDto.FromTransfer.Status = OrderTransferStatusEnum.Created.ToString();
+        withdrawOrderDto.Status = OrderStatusEnum.Created.ToString();
+        var coBoCoinGrain =
+            GrainFactory.GetGrain<ICoBoCoinGrain>(ICoBoCoinGrain.Id(withdrawOrderDto.FromTransfer.Network,
+                withdrawOrderDto.FromTransfer.Symbol));
+        withdrawOrderDto.ExtensionInfo.AddOrReplace(ExtensionKey.FromConfirmingThreshold, (await coBoCoinGrain.GetConfirmingThreshold()).ToString());
+        var res = await _recordGrain.AddOrUpdate(withdrawOrderDto);
+        await _userWithdrawProvider.AddOrUpdateSync(res.Value);
+    }
+    
+    public async Task SaveTransferOrder(CoBoTransactionDto coBoTransaction)
+    {
+        _logger.LogInformation("save transfer record, recordInfo:{recordInfo}",
+            JsonConvert.SerializeObject(coBoTransaction));
+        
+        var orderDto = (await _recordGrain.Get())?.Value;
+        if (orderDto == null)
+        {
+            _logger.LogInformation("transfer order empty: {id}", this.GetPrimaryKey());
+            return;
+        }
+
+        if (!orderDto.ExtensionInfo.IsNullOrEmpty() &&
+            orderDto.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus) &&
+            orderDto.ExtensionInfo[ExtensionKey.SubStatus] == OrderOperationStatusEnum.UserTransferRejected.ToString())
+        {
+            _logger.LogInformation("transfer order already rejected: {id}", this.GetPrimaryKey());
+            await TransferCallbackAlarmAsync(orderDto, coBoTransaction.Id, 
+                "Received callback, the order has already been rejected.");
+            return;
+        }
+        
+        if (orderDto.FromTransfer.FromAddress.ToLower() != coBoTransaction.SourceAddress.ToLower()
+            || orderDto.FromTransfer.ToAddress.ToLower() != coBoTransaction.Address.ToLower()
+            || orderDto.FromTransfer.Amount != coBoTransaction.AbsAmount.SafeToDecimal()
+            || GuidHelper.GenerateId(orderDto.FromTransfer.Network, orderDto.FromTransfer.Symbol) !=
+            coBoTransaction.Coin
+            || (!orderDto.ThirdPartOrderId.IsNullOrEmpty() && orderDto.ThirdPartOrderId != coBoTransaction.Id))
+        {
+            _logger.LogInformation("transfer order unable to match: {id}", this.GetPrimaryKey());
+            return;
+        }
+
+        var coBoDepositGrain = GrainFactory.GetGrain<ICoBoDepositGrain>(coBoTransaction.Id);
+        var coBoDto = await coBoDepositGrain.Get();
+        if (coBoDto != null && coBoDto.Status == CommonConstant.SuccessStatus)
+        {
+            _logger.LogInformation("transfer order already success: {id}", this.GetPrimaryKey());
+            return;
+        }
+        await coBoDepositGrain.AddOrUpdate(coBoTransaction);
+
+        orderDto.ThirdPartOrderId = coBoTransaction.Id;
+        orderDto.ThirdPartServiceName = ThirdPartServiceNameEnum.Cobo.ToString();
+        orderDto.FromTransfer.TxId = coBoTransaction.TxId;
+        orderDto.FromTransfer.TxTime ??= DateTimeHelper.ToUnixTimeMilliseconds(DateTime.UtcNow);
+        orderDto.ExtensionInfo.AddOrReplace(ExtensionKey.FromConfirmedNum, coBoTransaction.ConfirmedNum.ToString());
+        orderDto.ExtensionInfo.AddOrReplace(ExtensionKey.FromConfirmingThreshold, coBoTransaction.ConfirmingThreshold > 0
+            ? coBoTransaction.ConfirmingThreshold.ToString()
+            : coBoTransaction.TxDetail.ConfirmingThreshold.ToString());
+
+        if (coBoTransaction.Status == CommonConstant.PendingStatus)
+        {
+            orderDto.FromTransfer.Status = OrderTransferStatusEnum.Transferring.ToString();
+            orderDto.Status = OrderStatusEnum.FromTransferring.ToString();
+            var res = await _recordGrain.AddOrUpdate(orderDto);
+            await _userWithdrawProvider.AddOrUpdateSync(res.Value);
+        }
+
+        if (coBoTransaction.Status == CommonConstant.SuccessStatus)
+        {
+            orderDto.FromTransfer.Status = OrderTransferStatusEnum.Confirmed.ToString();
+            orderDto.Status = OrderStatusEnum.FromTransferConfirmed.ToString();
+            await AddOrUpdateOrder(orderDto);
+        }
+        if (coBoDto == null || coBoDto.Id == null)
+        {
+            _logger.LogInformation("transfer order send bus: {id}", this.GetPrimaryKey());
+            await _bus.Publish(_objectMapper.Map<WithdrawOrderDto, OrderChangeEto>(orderDto));
+        }
+    }
+    
     public async Task<WithdrawOrderDto> CreateRefundOrder(WithdrawOrderDto withdrawDto, string address)
     {
         // amount limit
@@ -279,6 +379,27 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         }
 
         return false;
+    }
+    
+    private async Task TransferCallbackAlarmAsync(WithdrawOrderDto orderDto, string id, string reason)
+    {
+        var dto = new OrderIndexDto
+            {
+                Id = orderDto.Id,
+                FromTransfer = new TransferInfoDto
+                {
+                    Network = orderDto.FromTransfer.Network, 
+                    Symbol = orderDto.FromTransfer.Symbol, 
+                    Amount = orderDto.FromTransfer.Amount.ToString()
+                },
+                ToTransfer = new TransferInfoDto
+                {
+                    Network = orderDto.ToTransfer.Network, 
+                }
+            };
+
+        var transferOrderMonitorGrain = GrainFactory.GetGrain<IWithdrawOrderMonitorGrain>(id);
+        await transferOrderMonitorGrain.DoCallbackMonitor(TransferOrderMonitorDto.Create(dto, id, reason));
     }
 
     public async Task AddCheckOrder(WithdrawOrderDto orderDto)

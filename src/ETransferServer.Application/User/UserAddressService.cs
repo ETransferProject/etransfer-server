@@ -50,11 +50,18 @@ public partial class UserAddressService : ApplicationService, IUserAddressServic
         {
             throw new UserFriendlyException("Request invalid. Please refresh and try again.");
         }
+        
+        var userGrain = _clusterClient.GetGrain<IUserGrain>(CurrentUser.GetId());
+        var userDto = await userGrain.GetUser();
+        if (userDto.Success && userDto.Data != null
+                            && Enum.TryParse<WalletEnum>(userDto.Data.AppId, true, out var walletType)
+                            && (int)walletType > 1)
+            throw new UserFriendlyException("Request invalid. Please refresh and try again.");
 
         input.UserId = CurrentUser.GetId().ToString();
-        var userGrain =
+        var userAddressGrain =
             _clusterClient.GetGrain<IUserDepositAddressGrain>(GenerateGrainId(input));
-        var address = await userGrain.GetUserAddress(input);
+        var address = await userAddressGrain.GetUserAddress(input);
         if (string.IsNullOrEmpty(address))
         {
             _logger.LogError("Assign address fail: {userId},{chainId},{netWork},{symbol}", input.UserId, input.ChainId,
@@ -174,6 +181,22 @@ public partial class UserAddressService : ApplicationService, IUserAddressServic
         }
 
         return remainingList;
+    }
+
+    public async Task<List<UserAddressDto>> GetExpiredAddressListAsync(int expiredHour)
+    {
+        var mustQuery = new List<Func<QueryContainerDescriptor<UserAddress>, QueryContainer>>();
+
+        mustQuery.Add(q => q.Term(i => i.Field(f => f.IsAssigned).Value(true)));
+        mustQuery.Add(q => q.Range(i =>
+            i.Field(f => f.UpdateTime).LessThanOrEquals(DateTime.UtcNow.AddHours(-1 * expiredHour).ToUtcMilliSeconds())));
+
+        var mustNotQuery = new List<Func<QueryContainerDescriptor<UserAddress>, QueryContainer>>();
+        mustNotQuery.Add(q => q.Exists(i => i.Field(t => t.UserId)));
+        
+        QueryContainer Filter(QueryContainerDescriptor<UserAddress> f) => f.Bool(b => b.Must(mustQuery).MustNot(mustNotQuery));
+        var result = await _userAddressIndexRepository.GetListAsync(Filter, skip:0, limit: UserAddressOptions.QueryLimit);
+        return _objectMapper.Map<List<UserAddress>, List<UserAddressDto>>(result.Item2);
     }
 
     private async Task<UserAddressDto> GetNewAddressAsync(List<string> chainIdList, string symbol)

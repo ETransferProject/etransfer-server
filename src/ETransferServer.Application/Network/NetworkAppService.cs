@@ -69,9 +69,13 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
 
         try
         {
-            getNetworkListDto.NetworkList = request.Symbol == CommonConstant.Symbol.USDT ?
-                await CalculateNetworkFeeListAsync(getNetworkListDto.NetworkList, request.ChainId, request.Symbol)
-                : await CalculateAvgNetworkFeeListAsync(getNetworkListDto.NetworkList, request.ChainId, request.Symbol);
+            if (!request.Symbol.IsNullOrEmpty())
+            {
+                getNetworkListDto.NetworkList = request.Symbol == CommonConstant.Symbol.USDT
+                    ? await CalculateNetworkFeeListAsync(getNetworkListDto.NetworkList, request.ChainId, request.Symbol)
+                    : await CalculateAvgNetworkFeeListAsync(getNetworkListDto.NetworkList, request.ChainId,
+                        request.Symbol);
+            }
         }
         catch (Exception e)
         {
@@ -107,18 +111,31 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
     public async Task<GetNetworkListDto> GetNetworkListWithLocalFeeAsync(GetNetworkListRequestDto request, string version = null)
     {
         AssertHelper.NotNull(request, "Request empty. Please refresh and try again.");
-        AssertHelper.NotEmpty(request.ChainId, "Invalid chainId. Please refresh and try again.");
         AssertHelper.NotEmpty(request.Type, "Invalid type. Please refresh and try again.");
-        AssertHelper.NotEmpty(request.Symbol, "Invalid symbol. Please refresh and try again.");
+        if (request.Type == OrderTypeEnum.Deposit.ToString() || request.Type == OrderTypeEnum.Withdraw.ToString())
+        {
+            AssertHelper.NotEmpty(request.Symbol, "Invalid symbol. Please refresh and try again.");
+            AssertHelper.NotEmpty(request.ChainId, "Invalid chainId. Please refresh and try again.");
+        }
         AssertHelper.IsTrue(request.Type == OrderTypeEnum.Deposit.ToString()
-                            || request.Type == OrderTypeEnum.Withdraw.ToString(),
+                            || request.Type == OrderTypeEnum.Withdraw.ToString()
+                            || request.Type == OrderTypeEnum.Transfer.ToString(),
             "Invalid type value. Please refresh and try again.");
-        AssertHelper.IsTrue(_networkOptions.Value.NetworkMap.ContainsKey(request.Symbol),
+        AssertHelper.IsTrue(request.Symbol.IsNullOrEmpty() || (!request.Symbol.IsNullOrEmpty() 
+                            && _networkOptions.Value.NetworkMap.ContainsKey(request.Symbol)),
             "Symbol is not exist. Please refresh and try again.");
 
-        var networkConfigs = _networkOptions.Value.NetworkMap[request.Symbol].Where(a =>
-                a.SupportType.Contains(request.Type) && a.SupportChain.Contains(request.ChainId))
-            .ToList();
+        var networkConfigs = request.Symbol.IsNullOrEmpty()
+            ? _networkOptions.Value.NetworkMap.OrderBy(m => 
+                    _tokenOptions.Value.Transfer.Select(t => t.Symbol).ToList().IndexOf(m.Key))
+                .SelectMany(kvp => kvp.Value).Where(a =>
+                    a.SupportType.Contains(request.Type)).GroupBy(g => g.NetworkInfo.Network)
+                .Select(s => s.First()).ToList()
+            : _networkOptions.Value.NetworkMap[request.Symbol].Where(a =>
+                    request.Type == OrderTypeEnum.Transfer.ToString() 
+                        ? a.SupportType.Contains(request.Type) 
+                        : a.SupportType.Contains(request.Type) && a.SupportChain.Contains(request.ChainId))
+                .ToList();
         networkConfigs = await FilterByVersionAndWhiteList(networkConfigs, version);
 
         var networkInfos = networkConfigs.Select(config => config.NetworkInfo).ToList();
@@ -141,16 +158,13 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
             networkDto.SpecialWithdrawFee = withdraw.SpecialWithdrawFee;
         }
 
-        if (request.Address.IsNullOrEmpty()) return getNetworkListDto;
+        if (request.Address.IsNullOrEmpty() || VerifyHelper.VerifyAelfAddress(request.Address)) return getNetworkListDto;
 
         var networkByAddress = _networkOptions.Value.NetworkPattern
             .Where(kv => request.Address.Match(kv.Key))
             .SelectMany(kv => kv.Value)
             .ToList();
-        if (!VerifyHelper.VerifyAelfAddress(request.Address))
-        {
-            networkByAddress.RemoveAll(a => a == ChainId.AELF || a == ChainId.tDVV || a == ChainId.tDVW);
-        }
+        networkByAddress.RemoveAll(a => a == ChainId.AELF || a == ChainId.tDVV || a == ChainId.tDVW);
         AssertHelper.NotEmpty(networkByAddress, ErrorResult.AddressFormatWrongCode);
 
         getNetworkListDto.NetworkList = getNetworkListDto.NetworkList
@@ -205,9 +219,17 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
             : CommonConstant.DefaultConst.DefaultMinThirdPartFee);
     }
 
+    public Task<decimal> GetMaxThirdPartFeeAsync(string network, string symbol)
+    {
+        var maxFeeKey = string.Join(CommonConstant.Underline, network, symbol);
+        return Task.FromResult(_withdrawInfoOptions.Value.MaxThirdPartFee.ContainsKey(maxFeeKey)
+            ? _withdrawInfoOptions.Value.MaxThirdPartFee[maxFeeKey]
+            : 0M);
+    }
+
     public Task<int> GetDecimalsAsync(string chainId, string symbol)
     {
-        return Task.FromResult((_tokenOptions.Value.Withdraw.ContainsKey(chainId)
+        return Task.FromResult((!chainId.IsNullOrEmpty() && _tokenOptions.Value.Withdraw.ContainsKey(chainId)
                 ? _tokenOptions.Value.Withdraw[chainId]
                 : null)
             ?.FirstOrDefault(t => t.Symbol == symbol)
@@ -310,6 +332,7 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
 
     private async Task<string> GetCacheFeeAsync(string network, string symbol)
     {
+        if (symbol.IsNullOrEmpty()) return null;
         var coBoCoinGrain = _clusterClient.GetGrain<ICoBoCoinGrain>(ICoBoCoinGrain.Id(network, symbol));
         var coin = await coBoCoinGrain.GetCache();
         return coin?.AbsEstimateFee;
@@ -357,7 +380,8 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
                 multiConfirmSeconds = config.DepositInfo.MultiConfirmSeconds;
             }
 
-            if (type == OrderTypeEnum.Withdraw.ToString() && config.WithdrawInfo != null)
+            if ((type == OrderTypeEnum.Withdraw.ToString() || type == OrderTypeEnum.Transfer.ToString())
+                && config.WithdrawInfo != null)
             {
                 networkDto.Status = config.WithdrawInfo.IsOpen
                     ? CommonConstant.NetworkStatus.Health

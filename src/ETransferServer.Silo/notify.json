@@ -112,6 +112,19 @@
             "Amount: {amount} Symbol: {symbol}\nToAddress: {toAddress}"
           ]
         }
+      },
+      "TransferCallbackAlarm": {
+        "FeiShuGroup": {
+          "WebhookUrl": "",
+          "Secret": "",
+          "TitleTemplate": "orange",
+          "Title": "❗️ [test3] Transfer callback abnormal alert",
+          "Contents": [
+            "OrderType: {orderType}",
+            "OrderId: {orderId}\nFromNetwork: {fromNetwork}\nToNetwork: {toNetwork}",
+            "Amount: {amount} Symbol: {symbol}\nReason: {reason}"
+          ]
+        }
       }
     }
   }

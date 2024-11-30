@@ -151,10 +151,10 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
                     continue;
                 }
 
-                await AddAfter(coBoTransaction);
+                // await AddAfter(coBoTransaction);
                 _logger.LogInformation("create deposit order, orderInfo:{orderInfo}",
                     JsonConvert.SerializeObject(coBoTransaction));
-                await CreateDepositOrder(coBoTransaction);
+                // await CreateDepositOrder(coBoTransaction);
             }
 
             if (list.Count < PageSize) break;
@@ -300,7 +300,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
             : coBoTransaction.TxDetail.ConfirmingThreshold.ToString());
         if (!coBoTransaction.Memo.IsNullOrWhiteSpace())
         {
-            dto.ExtensionInfo.Add(ExtensionKey.Memo, coBoTransaction.Memo);
+            dto.ExtensionInfo.AddOrReplace(ExtensionKey.Memo, coBoTransaction.Memo);
         }
         
         if (symbol.IsNullOrEmpty() || _depositOption.Value.NoSwapSymbols.Contains(dto.FromTransfer.Symbol))
@@ -312,9 +312,9 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         if (DepositSwapHelper.IsDepositSwap(dto.FromTransfer.Symbol, symbol))
         {
             _logger.LogInformation("SpecialHandle, need swap, set ExtensionInfo");
-            dto.ExtensionInfo.Add(ExtensionKey.IsSwap, Boolean.TrueString);
-            dto.ExtensionInfo.Add(ExtensionKey.NeedSwap, Boolean.TrueString);
-            dto.ExtensionInfo.Add(ExtensionKey.SwapStage, SwapStage.SwapTx);
+            dto.ExtensionInfo.AddOrReplace(ExtensionKey.IsSwap, Boolean.TrueString);
+            dto.ExtensionInfo.AddOrReplace(ExtensionKey.NeedSwap, Boolean.TrueString);
+            dto.ExtensionInfo.AddOrReplace(ExtensionKey.SwapStage, SwapStage.SwapTx);
             dto.ToTransfer.Symbol = symbol;
             return dto;
         }

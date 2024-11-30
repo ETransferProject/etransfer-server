@@ -44,6 +44,7 @@ public static class ExtensionKey
     public const string RefundUser = "RefundUser";
     public const string RefundTime = "RefundTime";
     public const string SubStatus = "SubStatus";
+    public const string OrderType = "OrderType";
     
     public const string IsSwap = "IsSwap";
     public const string NeedSwap = "NeedSwap";

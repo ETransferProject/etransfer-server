@@ -65,6 +65,13 @@ public class OrderController : ETransferController
     {
         return await _withdrawOrderAppService.GetWithdrawInfoAsync(request, version);
     }
+    
+    [HttpGet("transfer/info")]
+    public async Task<GetTransferInfoDto> GetTransferInfoAsync(GetTransferListRequestDto request,
+        [FromHeader(Name = "version")] string version = null)
+    {
+        return await _withdrawOrderAppService.GetTransferInfoAsync(request, version);
+    }
      
     [Authorize]
     [HttpPost("withdraw/order")]
@@ -73,25 +80,37 @@ public class OrderController : ETransferController
     {
         return await _withdrawOrderAppService.CreateWithdrawOrderInfoAsync(request, version);
     }
-
+    
     [Authorize]
+    [HttpPost("transfer/order")]
+    public async Task<CreateTransferOrderDto> CreateTransferOrderInfoAsync(GetTransferOrderRequestDto request, 
+        [FromHeader(Name = "version")] string version = null)
+    {
+        return await _withdrawOrderAppService.CreateTransferOrderInfoAsync(request, version);
+    }
+    
+    [Authorize]
+    [HttpPut("transfer/{orderId}")]
+    public async Task<bool> SaveTransferOrderInfoAsync(string orderId, [FromBody] GetTransferOrderInfoRequestDto request)
+    {
+        return await _withdrawOrderAppService.SaveTransferOrderInfoAsync(orderId, request);
+    }
+
     [HttpGet("record/list")]
     public async Task<PagedResultDto<OrderIndexDto>> GetOrderRecordListAsync(GetOrderRecordRequestDto request)
     {
         return await _orderAppService.GetOrderRecordListAsync(request);
     }
     
-    [Authorize]
     [HttpGet("record/{id}")]
     public async Task<OrderDetailDto> GetOrderRecordDetailAsync(string id)
     {
         return await _orderAppService.GetOrderRecordDetailAsync(id);
     }
 
-    [Authorize]
     [HttpGet("record/status")]
-    public async Task<OrderStatusDto> GetOrderRecordStatusAsync()
+    public async Task<OrderStatusDto> GetOrderRecordStatusAsync(GetOrderRecordStatusRequestDto request)
     {
-        return await _orderAppService.GetOrderRecordStatusAsync();
+        return await _orderAppService.GetOrderRecordStatusAsync(request);
     }
 }

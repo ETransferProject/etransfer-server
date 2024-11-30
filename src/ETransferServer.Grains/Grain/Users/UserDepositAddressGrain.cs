@@ -1,6 +1,7 @@
 using ETransferServer.Common;
 using ETransferServer.Common.Dtos;
 using ETransferServer.Dtos.User;
+using ETransferServer.Grains.Grain.TokenLimit;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.State.Users;
 using ETransferServer.User;
@@ -15,6 +16,7 @@ public interface IUserDepositAddressGrain : IGrainWithStringKey
     Task<string> GetUserAddress(GetUserDepositAddressInput input);
     Task<bool> Exist();
     Task<string> GetAddress();
+    Task<string> GetTransferAddress();
     Task<CommonResponseDto<UserDepositAddressState>> AddOrUpdate(UserAddressDto dto);
 }
 
@@ -88,6 +90,37 @@ public class UserDepositAddressGrain : Grain<UserDepositAddressState>, IUserDepo
         return Task.FromResult(State.UserToken.Address);
     }
 
+    public async Task<string> GetTransferAddress()
+    {
+        var input = this.GetPrimaryKeyString().Split(CommonConstant.Underline);
+        if (input.Length < 3)
+        {
+            return null;
+        }
+
+        if (!_depositAddressOptions.Value.TransferAddressLists.IsNullOrEmpty() &&
+            _depositAddressOptions.Value.TransferAddressLists.ContainsKey(GuidHelper.GenerateId(input[0], input[1])))
+        {
+            return _depositAddressOptions.Value.TransferAddressLists[GuidHelper.GenerateId(input[0], input[1])][0];
+        }
+
+        var addressDto = await GetNewUserAddressAsync(input[0], input[1]);
+        if (addressDto == null) return null;
+        var addressLimitGrain = GrainFactory.GetGrain<ITokenAddressLimitGrain>(
+            GuidHelper.UniqGuid(nameof(ITokenAddressLimitGrain)));
+        if (!await addressLimitGrain.Acquire()) return null;
+
+        addressDto.IsAssigned = true;
+        addressDto.OrderId = input[2];
+        addressDto.UpdateTime = DateTimeHelper.ToUnixTimeMilliseconds(DateTime.UtcNow);
+        var addressGrain = GrainFactory.GetGrain<IUserTokenDepositAddressGrain>(addressDto.UserToken.Address);
+        await addressGrain.AddOrUpdate(addressDto);
+        await _userAddressProvider.UpdateSync(addressDto);
+        _logger.LogInformation("GetTransferAddress, orderId:{orderId}, address:{address}, {network}, {symbol}",
+            input[2], addressDto.UserToken.Address, input[0], input[1]);
+        return addressDto.UserToken.Address;
+    }
+
     public async Task<CommonResponseDto<UserDepositAddressState>> AddOrUpdate(UserAddressDto dto)
     {
         State = _objectMapper.Map<UserAddressDto, UserDepositAddressState>(dto);
@@ -119,9 +152,49 @@ public class UserDepositAddressGrain : Grain<UserDepositAddressState>, IUserDepo
             input.ChainId, split[0], split[1], input.ToSymbol));
     }
 
+    private async Task<UserAddressDto> GetNewUserAddressAsync(string network, string symbol, int retry = 0)
+    {
+        UserAddressDto addressDto = null;
+        if (retry > _depositAddressOptions.Value.MaxRequestNewAddressRetry)
+        {
+            _logger.LogError("GetNewUserAddress failed after retry {max}, network:{network}, symbol:{symbol}",
+                _depositAddressOptions.Value.MaxRequestNewAddressRetry, network, symbol);
+            return addressDto;
+        }
+
+        try
+        {
+            _logger.LogInformation("GetNewUserAddress, network:{network}, symbol:{symbol}, retry:{retry}, max:{max}",
+                network, symbol, retry, _depositAddressOptions.Value.MaxRequestNewAddressRetry);
+            addressDto = await _userAddressProvider.GetUserUnAssignedAddressAsync(new GetUserDepositAddressInput
+            {
+                ChainId = network,
+                NetWork = network,
+                Symbol = symbol
+            });
+            AssertHelper.NotNull(addressDto, "New user address empty.");
+            var addressGrain = GrainFactory.GetGrain<IUserTokenDepositAddressGrain>(addressDto.UserToken.Address);
+            var dto = (await addressGrain.Get())?.Value;
+            if (dto == null || (dto != null && !dto.IsAssigned))
+            {
+                return addressDto;
+            }
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Failed to getNewUserAddress: network:{network}, symbol:{symbol}", 
+                network, symbol);
+            retry += 1;
+            await Task.Delay(1000);
+            await GetNewUserAddressAsync(network, symbol, retry);
+        }
+
+        return addressDto;
+    }
+
     private async Task<string> HandleUpdateAsync(GetUserDepositAddressInput input, IUserDepositAddressGrain grain)
     {
-        var addressDto = await _userAddressProvider.GetUserUnAssignedAddressAsync(input);
+        var addressDto = await GetNewUserAddressAsync(input.NetWork, input.Symbol);
         if (addressDto == null) return null;
         addressDto.UserId = input.UserId;
         addressDto.ChainId = input.ChainId;

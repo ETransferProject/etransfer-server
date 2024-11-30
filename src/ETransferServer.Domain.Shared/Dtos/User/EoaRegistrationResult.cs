@@ -4,3 +4,7 @@ public class EoaRegistrationResult
 {
     public bool Result { get; set; }
 }
+
+public class RegistrationResult : EoaRegistrationResult
+{
+}

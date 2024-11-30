@@ -5,8 +5,9 @@ namespace ETransferServer.Hubs;
 
 public interface IHubWithCacheService
 {
-    Task RegisterClientAsync(string clientId, string connectionId);
+    Task RegisterClientAsync(List<string> clientIds, string connectionId);
     Task UnRegisterClientAsync(string connectionId);
-    Task UnRegisterClientAsync(string clientId, string connectionId);
-    Task<List<string>> GetConnectionIdsAsync(string clientId);
+    Task UnRegisterClientAsync(List<string> clientIds, string connectionId);
+    Task<List<string>> GetConnectionIdsAsync(List<string> clientIds);
+    Task<List<string>> GetClientIdsAsync(string connectionId);
 }

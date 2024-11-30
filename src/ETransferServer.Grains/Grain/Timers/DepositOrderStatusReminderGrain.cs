@@ -154,7 +154,7 @@ public class DepositOrderStatusReminderGrain : Orleans.Grain, IDepositOrderStatu
             Params = new Dictionary<string, string>
             {
                 [Keys.OrderType] = OrderTypeEnum.Deposit.ToString(),
-                [Keys.Message] = coBoTransaction == null
+                [Keys.Message] = coBoTransaction == null || coBoTransaction.Id == null
                     ? string.Empty
                     : JsonConvert.SerializeObject(coBoTransaction)
                         .Replace("\"", string.Empty)

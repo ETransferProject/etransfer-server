@@ -25,4 +25,10 @@ public class UserController
     {
         return await _userAppService.CheckEoaRegistrationAsync(requestDto);
     }
+    
+    [HttpGet("check-registration")]
+    public async Task<RegistrationResult> CheckRegistration(GetRegistrationResultRequestDto requestDto)
+    {
+        return await _userAppService.CheckRegistrationAsync(requestDto);
+    }
 }
