@@ -1,10 +1,17 @@
 using AElf.ExceptionHandler;
 using ETransferServer.Common;
+using ETransferServer.Common.ChainsClient;
+using ETransferServer.Dtos.Order;
+using ETransferServer.Grains.Common;
 using ETransferServer.Grains.Grain.Order.Deposit;
+using ETransferServer.Grains.Grain.Order.Withdraw;
 using ETransferServer.Grains.Grain.Timers;
+using ETransferServer.Grains.Grain.Users;
 using ETransferServer.Grains.Options;
+using ETransferServer.Order;
 using ETransferServer.ThirdPart.CoBo;
 using ETransferServer.ThirdPart.CoBo.Dtos;
+using ETransferServer.User;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
@@ -19,17 +26,26 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
     private readonly ILogger<TransactionNotificationGrain> _logger;
     private readonly IOptionsSnapshot<NetworkOptions> _networkOption;
     private readonly IOptionsSnapshot<DepositAddressOptions> _depositAddressOption;
+    private readonly IUserAddressService _userAddressService;
+    private readonly IOrderAppService _orderAppService;
+    private readonly IBlockchainClientProviderFactory _blockchainClientProvider;
     private readonly ICoBoProvider _coBoProvider;
     private IDepositOrderStatusReminderGrain _depositOrderStatusReminderGrain;
 
     public TransactionNotificationGrain(ILogger<TransactionNotificationGrain> logger,
         IOptionsSnapshot<NetworkOptions> networkOption,
         IOptionsSnapshot<DepositAddressOptions> depositAddressOption, 
+        IUserAddressService userAddressService,
+        IOrderAppService orderAppService,
+        IBlockchainClientProviderFactory blockchainClientProvider,
         ICoBoProvider coBoProvider)
     {
         _logger = logger;
         _networkOption = networkOption;
         _depositAddressOption = depositAddressOption;
+        _userAddressService = userAddressService;
+        _orderAppService = orderAppService;
+        _blockchainClientProvider = blockchainClientProvider;
         _coBoProvider = coBoProvider;
     }
 
@@ -90,7 +106,61 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
 
     private async Task<bool> HandleDeposit(CoBoTransactionDto coBoTransaction)
     {
-        await GetCoinNetwork(coBoTransaction);
+        var coinInfo = await GetCoinNetwork(coBoTransaction);
+        
+        // transfer
+        var addressGrain = GrainFactory.GetGrain<IUserTokenDepositAddressGrain>(coBoTransaction.Address);
+        var res = await addressGrain.Get();
+        var userAddress = !res.Success || res.Data == null
+            ? await _userAddressService.GetAssignedAddressAsync(coBoTransaction.Address)
+            : res.Value;
+
+        AssertHelper.NotNull(userAddress, "user address empty.");
+        if (userAddress.IsAssigned && !userAddress.OrderId.IsNullOrEmpty())
+        {
+            _logger.LogInformation("transfer callback start. {id}", coBoTransaction.Id);
+            if (coBoTransaction.Status == CommonConstant.SuccessStatus)
+            {
+                var verifyResult = await VerifyTransaction(coBoTransaction);
+                AssertHelper.IsTrue(verifyResult, "transfer verify fail.");
+            }
+
+            var orderId = !_depositAddressOption.Value.TransferAddressLists.IsNullOrEmpty() &&
+                          _depositAddressOption.Value.TransferAddressLists.ContainsKey(coBoTransaction.Coin) &&
+                          _depositAddressOption.Value.TransferAddressLists[coBoTransaction.Coin]
+                              .Contains(coBoTransaction.Address)
+                ? await GetTransferOrderIdAsync(coBoTransaction)
+                : userAddress.OrderId;
+
+            AssertHelper.IsTrue(Guid.TryParse(orderId, out _), "transfer orderId invalid.");
+            var withdrawGrain = GrainFactory.GetGrain<IUserWithdrawGrain>(Guid.Parse(orderId));
+            await withdrawGrain.SaveTransferOrder(coBoTransaction);
+            return true;
+        }
+        if (!userAddress.IsAssigned && userAddress.OrderId == string.Empty)
+        {
+            _logger.LogInformation("transfer callback but address recycled. {id}", coBoTransaction.Id);
+            await TransferCallbackAlarmAsync(coBoTransaction, coinInfo,
+                "Received callback, the order may have already been rejected.");
+            return true;
+        }
+        if (userAddress.IsAssigned && userAddress.OrderId == string.Empty)
+        {
+            _logger.LogInformation("deposit callback check. {id}", coBoTransaction.Id);
+            var id = OrderIdHelper.DepositOrderId(coinInfo.Network, coinInfo.Symbol, coBoTransaction.TxId);
+            var depositRecordGrain = GrainFactory.GetGrain<IUserDepositRecordGrain>(id);
+            var order = (await depositRecordGrain.GetAsync())?.Value;
+            if (order == null)
+            {
+                if (await _orderAppService.CheckTransferOrderAsync(coBoTransaction, userAddress.UpdateTime))
+                {
+                    _logger.LogInformation("deposit callback hit transfer order. {id}", coBoTransaction.Id);
+                    return true;
+                }
+            }
+        }
+
+        // deposit
         var coBoDepositQueryTimerGrain = GrainFactory.GetGrain<ICoBoDepositQueryTimerGrain>(
             GuidHelper.UniqGuid(nameof(ICoBoDepositQueryTimerGrain)));
         if (coBoTransaction.Status == CommonConstant.PendingStatus)
@@ -112,6 +182,39 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
     private Task<bool> HandleWithdraw(CoBoTransactionDto coBoTransaction)
     {
         return Task.FromResult(true);
+    }
+
+    private async Task<string> GetTransferOrderIdAsync(CoBoTransactionDto coBoTransaction, int retry = 0)
+    {
+        var memo = string.Empty;
+        if (retry > _depositAddressOption.Value.MaxRequestRetryTimes)
+        {
+            _logger.LogError("Get memo failed after retry {maxRetry}, {coin}.",
+                _depositAddressOption.Value.MaxRequestRetryTimes, coBoTransaction.Coin);
+            return memo;
+        }
+        try
+        {
+            var coin = coBoTransaction.Coin.Split(CommonConstant.Underline);
+            var provider = await _blockchainClientProvider.GetBlockChainClientProviderAsync(coin[0]);
+            switch (provider.ChainType)
+            {
+                case BlockchainType.Ton:
+                    memo = await provider.GetMemoAsync(coin[0], coBoTransaction.TxId);
+                    AssertHelper.IsTrue(!memo.IsNullOrEmpty(), "get memo empty.");
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Failed to get memo: {coin}.", coBoTransaction.Coin);
+            retry += 1;
+            await GetTransferOrderIdAsync(coBoTransaction, retry);
+        }
+
+        return memo;
     }
 
     private async Task<CoBoHelper.CoinNetwork> GetCoinNetwork(CoBoTransactionDto coBoTransaction)
@@ -166,5 +269,18 @@ public class TransactionNotificationGrain : Orleans.Grain, ITransactionNotificat
             "transaction verify fail, transactionDto:{transactionDto}, coBoTransaction:{coBoTransaction}",
             JsonConvert.SerializeObject(transactionDto), JsonConvert.SerializeObject(coBoTransaction));
         return false;
+    }
+
+    private async Task TransferCallbackAlarmAsync(CoBoTransactionDto coBoTransaction, CoBoHelper.CoinNetwork coin,
+        string reason)
+    {
+        var orderDto = await _orderAppService.GetTransferOrderAsync(coBoTransaction) ?? new OrderIndexDto
+            {
+                FromTransfer = new TransferInfoDto
+                    { Network = coin.Network, Symbol = coin.Symbol, Amount = coBoTransaction.AbsAmount }
+            };
+
+        var transferOrderMonitorGrain = GrainFactory.GetGrain<IWithdrawOrderMonitorGrain>(coBoTransaction.Id);
+        await transferOrderMonitorGrain.DoCallbackMonitor(TransferOrderMonitorDto.Create(orderDto, coBoTransaction.Id, reason));
     }
 }

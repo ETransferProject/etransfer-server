@@ -53,6 +53,11 @@ public class SolanaClientProvider : IBlockchainClientProvider
         return result;
     }
     
+    public async Task<string> GetMemoAsync(string chainId, string txId)
+    {
+        return null;
+    }
+    
     public async Task<FlowBehavior> HandleExceptionAsync(Exception ex, string chainId, string blockHash, string txId)
     {
         _logger.LogError(ex, "Failed to get solana transaction info, {blockHash},{txId}", blockHash, txId);

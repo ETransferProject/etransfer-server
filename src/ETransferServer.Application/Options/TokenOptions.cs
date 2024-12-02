@@ -6,6 +6,7 @@ public class TokenOptions
 {
     public Dictionary<string, List<TokenConfig>> Deposit { get; set; }
     public Dictionary<string, List<TokenConfig>> Withdraw { get; set; }
+    public List<TokenConfig> Transfer { get; set; } = new();
     public List<TokenSwapConfig> DepositSwap { get; set; }
 }
 

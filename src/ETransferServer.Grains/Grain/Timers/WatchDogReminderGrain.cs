@@ -75,7 +75,15 @@ public class WatchDogReminderGrain : Orleans.Grain, IWatchDogReminderGrain, IRem
         var tokenAddressTimerGrain = GrainFactory.GetGrain<ITokenAddressTimerGrain>(
                 GuidHelper.UniqGuid(nameof(ITokenAddressTimerGrain)));
         tokenAddressTimerGrain.GetLastCallBackTime();
+        
+        var tokenAddressRecycleTimerGrain = GrainFactory.GetGrain<ITokenAddressRecycleTimerGrain>(
+            GuidHelper.UniqGuid(nameof(ITokenAddressRecycleTimerGrain)));
+        tokenAddressRecycleTimerGrain.GetLastCallBackTime();
 
+        var withdrawCoboTimerGrain = GrainFactory.GetGrain<IWithdrawCoboTimerGrain>(
+            GuidHelper.UniqGuid(nameof(IWithdrawCoboTimerGrain)));
+        withdrawCoboTimerGrain.GetLastCallBackTime();
+        
         var withdrawTimerGrain = GrainFactory.GetGrain<IWithdrawTimerGrain>(
                 GuidHelper.UniqGuid(nameof(IWithdrawTimerGrain)));
         withdrawTimerGrain.GetLastCallBackTime();

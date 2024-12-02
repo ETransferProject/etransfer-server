@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using ETransferServer.Cache;
 using ETransferServer.Dtos.Hub;
@@ -23,43 +24,63 @@ public class HubWithCacheService : IHubWithCacheService, ISingletonDependency
         _options = options.Value;
     }
 
-    public async Task RegisterClientAsync(string clientId, string connectionId)
+    public async Task RegisterClientAsync(List<string> clientIds, string connectionId)
     {
-        await _cacheProvider.Set(GetKey(connectionId), Serialize(new HubDto { ClientId = clientId }),
+        await _cacheProvider.Set(GetKey(connectionId), Serialize(new HubDto { ClientIds = clientIds }),
             TimeSpan.FromDays(_options.ExpireDays));
 
-        var hubDto = await _cacheProvider.Get<HubDto>(GetKey(clientId)) ?? new HubDto();
-        if (!hubDto.ConnectionIds.Contains(connectionId))
-            hubDto.ConnectionIds.Add(connectionId);
-        if (hubDto.ConnectionIds.Count > _options.HubLimit)
-            hubDto.ConnectionIds.RemoveAt(0);
-        hubDto.ExpireTime = DateTimeOffset.UtcNow.AddDays(_options.ExpireDays).ToUnixTimeSeconds();
-        await _cacheProvider.Set(GetKey(clientId), Serialize(hubDto), TimeSpan.FromDays(_options.ExpireDays));
+        foreach (var clientId in clientIds)
+        {
+            var hubDto = await _cacheProvider.Get<HubDto>(GetKey(clientId)) ?? new HubDto();
+            if (!hubDto.ConnectionIds.Contains(connectionId))
+                hubDto.ConnectionIds.Add(connectionId);
+            if (hubDto.ConnectionIds.Count > _options.HubLimit)
+                hubDto.ConnectionIds.RemoveAt(0);
+            hubDto.ExpireTime = DateTimeOffset.UtcNow.AddDays(_options.ExpireDays).ToUnixTimeSeconds();
+            await _cacheProvider.Set(GetKey(clientId), Serialize(hubDto), TimeSpan.FromDays(_options.ExpireDays));
+        }
     }
 
     public async Task UnRegisterClientAsync(string connectionId)
     {
         var hubDto = await _cacheProvider.Get<HubDto>(GetKey(connectionId));
-        if (hubDto == null || hubDto.ClientId.IsNullOrEmpty()) return;
+        if (hubDto == null || hubDto.ClientIds.IsNullOrEmpty()) return;
 
-        await UnRegisterClientAsync(hubDto.ClientId, connectionId);
+        await UnRegisterClientAsync(hubDto.ClientIds, connectionId);
     }
 
-    public async Task UnRegisterClientAsync(string clientId, string connectionId)
+    public async Task UnRegisterClientAsync(List<string> clientIds, string connectionId)
     {
         await _cacheProvider.Delete(GetKey(connectionId));
 
-        var hubDto = await _cacheProvider.Get<HubDto>(GetKey(clientId));
-        if (hubDto == null) return;
-        hubDto.ConnectionIds.Remove(connectionId);
-        if (hubDto.ConnectionIds.Count > 0)
-            await _cacheProvider.Set(GetKey(clientId), Serialize(hubDto), TimeSpan.FromSeconds(hubDto.ExpireTime - DateTimeOffset.UtcNow.ToUnixTimeSeconds()));
-        else await _cacheProvider.Delete(GetKey(clientId));
+        foreach (var clientId in clientIds)
+        {
+            var hubDto = await _cacheProvider.Get<HubDto>(GetKey(clientId));
+            if (hubDto == null) continue;
+            hubDto.ConnectionIds.Remove(connectionId);
+            if (hubDto.ConnectionIds.Count > 0)
+                await _cacheProvider.Set(GetKey(clientId), Serialize(hubDto),
+                    TimeSpan.FromSeconds(hubDto.ExpireTime - DateTimeOffset.UtcNow.ToUnixTimeSeconds()));
+            else await _cacheProvider.Delete(GetKey(clientId));
+        }
     }
 
-    public async Task<List<string>> GetConnectionIdsAsync(string clientId)
+    public async Task<List<string>> GetConnectionIdsAsync(List<string> clientIds)
     {
-        return (await _cacheProvider.Get<HubDto>(GetKey(clientId)))?.ConnectionIds;
+        var connectionIds = new List<string>();
+        foreach (var clientId in clientIds)
+        {
+            var ids = (await _cacheProvider.Get<HubDto>(GetKey(clientId)))?.ConnectionIds;
+            if (ids.IsNullOrEmpty()) continue;
+            connectionIds = connectionIds.Union(ids).ToList();
+        }
+
+        return connectionIds;
+    }
+    
+    public async Task<List<string>> GetClientIdsAsync(string connectionId)
+    {
+        return (await _cacheProvider.Get<HubDto>(GetKey(connectionId)))?.ClientIds;
     }
     
     private string Serialize(object val)

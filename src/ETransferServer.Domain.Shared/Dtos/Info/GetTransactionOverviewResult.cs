@@ -21,4 +21,5 @@ public class OrderTxOverview
     public string Date { get; set; }
     public long DepositTx { get; set; }
     public long WithdrawTx { get; set; }
+    public long TransferTx { get; set; }
 }

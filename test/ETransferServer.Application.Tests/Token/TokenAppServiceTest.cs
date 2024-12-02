@@ -39,6 +39,15 @@ public class TokenAppServiceTest : ETransferServerApplicationTestBase
 
         result.ShouldNotBeNull();
         result.ChainId.ShouldBe("AELF");
+        
+        result = await _tokenAppService.GetTokenListAsync(new GetTokenListRequestDto()
+        {
+            ChainId = "AELF",
+            Type = "Transfer"
+        });
+
+        result.ShouldNotBeNull();
+        result.ChainId.ShouldBe("AELF");
     }
     
     [Fact]
@@ -121,6 +130,15 @@ public class TokenAppServiceTest : ETransferServerApplicationTestBase
                             Name = "USDT",
                             Decimals = 6
                         }
+                    }
+                },
+                Transfer = new List<TokenConfig>()
+                {
+                    new TokenConfig()
+                    {
+                        Symbol = "USDT",
+                        Name = "USDT",
+                        Decimals = 6
                     }
                 },
                 DepositSwap = new List<TokenSwapConfig>()

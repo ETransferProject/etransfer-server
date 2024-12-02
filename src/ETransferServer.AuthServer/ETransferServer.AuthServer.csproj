@@ -42,6 +42,9 @@
         <PackageReference Include="GraphQL.Client.Serializer.Newtonsoft" Version="6.0.0" />
         <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.0.0-preview1" />
         <PackageReference Include="Volo.Abp.EventBus.RabbitMQ" Version="8.2.0" />
+        <PackageReference Include="Nethereum.Util" Version="4.20.0" />
+        <PackageReference Include="Nethereum.Web3" Version="4.20.0" />
+        <PackageReference Include="Solnet.Wallet" Version="6.1.0" />
     </ItemGroup>
 
     <ItemGroup>

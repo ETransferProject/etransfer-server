@@ -5,6 +5,7 @@ namespace ETransferServer.Dtos.Order;
 public class UserOrderDto
 {
     public string Address { get; set; }
+    public List<GetUserAddressDto> AddressList { get; set; }
     public UserOrderRecordDto Processing { get; set; } = new();
     public UserOrderRecordDto Succeed { get; set; } = new();
     public UserOrderRecordDto Failed { get; set; } = new();
@@ -14,8 +15,10 @@ public class UserOrderRecordDto
 {
     public int DepositCount { get; set; }
     public int WithdrawCount { get; set; }
+    public int TransferCount { get; set; }
     public List<UserDepositOrderInfo> Deposit { get; set; }
-    public List<UserWithdrawOrderInfo> Withdraw { get; set; }
+    public List<UserTransferOrderInfo> Withdraw { get; set; }
+    public List<UserTransferOrderInfo> Transfer { get; set; }
 }
 
 public class UserOrderRecordInfo
@@ -31,6 +34,6 @@ public class UserDepositOrderInfo : UserOrderRecordInfo
     public bool IsSwapFail { get; set; }
 }
 
-public class UserWithdrawOrderInfo : UserOrderRecordInfo
+public class UserTransferOrderInfo : UserOrderRecordInfo
 {
 }
