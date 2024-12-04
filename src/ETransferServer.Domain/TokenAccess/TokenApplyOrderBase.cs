@@ -28,4 +28,6 @@ public class ChainTokenInfo
     public int Decimals { get; set; }
     [Keyword] public string Icon { get; set; }
     [Keyword] public string PoolAddress { get; set; }
+    [Keyword] public string ContractAddress { get; set; }
+    [Keyword] public string Status { get; set; }
 }

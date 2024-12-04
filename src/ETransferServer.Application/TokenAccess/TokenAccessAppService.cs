@@ -140,7 +140,7 @@ public class TokenAccessAppService : ApplicationService, ITokenAccessAppService
         return result;
     }
 
-    public async Task<SelectChainDto> SelectChainAsync(SelectChainInput input)
+    public async Task<SelectChainDto> AddChainAsync(SelectChainInput input)
     {
         throw new NotImplementedException();
     }
@@ -172,10 +172,10 @@ public class TokenAccessAppService : ApplicationService, ITokenAccessAppService
         };
     }
 
-    public async Task<TokenApplyOrderDto> GetTokenApplyOrderAsync(string id)
+    public async Task<TokenApplyOrderDto> GetTokenApplyOrderDetailAsync(GetTokenApplyOrderInput input)
     {
-        if (!Guid.TryParse(id, out _)) return new TokenApplyOrderDto();
-        var tokenApplyOrder = await _tokenApplyOrderIndexRepository.GetAsync(Guid.Parse(id));
+        if (!Guid.TryParse(input.Id, out _)) return new TokenApplyOrderDto();
+        var tokenApplyOrder = await _tokenApplyOrderIndexRepository.GetAsync(Guid.Parse(input.Id));
         return _objectMapper.Map<TokenApplyOrderIndex, TokenApplyOrderDto>(tokenApplyOrder);
     }
 

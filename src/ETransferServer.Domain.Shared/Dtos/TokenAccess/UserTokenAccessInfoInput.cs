@@ -9,10 +9,10 @@ public class UserTokenAccessInfoBaseInput
 
 public class UserTokenAccessInfoInput : UserTokenAccessInfoBaseInput
 {
-    public string? OfficialWebsite { get; set; }
-    public string? OfficialTwitter { get; set; }
-    public string? Title { get; set; }
-    public string? PersonName { get; set; }
-    public string? TelegramHandler { get; set; }
-    public string? Email { get; set; }
+    [Required] public string OfficialWebsite { get; set; }
+    [Required] public string OfficialTwitter { get; set; }
+    [Required] public string Title { get; set; }
+    [Required] public string PersonName { get; set; }
+    [Required] public string TelegramHandler { get; set; }
+    [Required] public string Email { get; set; }
 }

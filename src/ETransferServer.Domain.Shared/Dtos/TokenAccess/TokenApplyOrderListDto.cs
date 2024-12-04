@@ -29,4 +29,8 @@ public class ChainTokenInfoDto
     public int Decimals { get; set; }
     public string Icon { get; set; }
     public string PoolAddress { get; set; }
+    public string ContractAddress { get; set; }
+    public string Status { get; set; }
+    public string BalanceAmount { get; set; }
+    public string MinAmount { get; set; }
 }

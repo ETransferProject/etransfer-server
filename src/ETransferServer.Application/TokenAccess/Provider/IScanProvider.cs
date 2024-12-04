@@ -27,7 +27,7 @@ public class ScanProvider : IScanProvider, ISingletonDependency
     private readonly IHttpProvider _httpProvider;
     private readonly IDistributedCache<List<AvailableTokenDto>> _distributedCache;
     private readonly IClusterClient _clusterClient;
-    private const string CachePrefix = "EbridgeServer:OwnerTokenList:";
+    private const string CachePrefix = "ETransferServer:OwnerTokenList:";
     private ApiInfo _tokenListUri => new(HttpMethod.Get, _tokenAccessOptions.ScanTokenListUri);
 
     public ScanProvider(IOptionsSnapshot<TokenAccessOptions> tokenAccessOptions, 

@@ -52,10 +52,10 @@ public class TokenAccessController : ETransferController
     }
     
     [Authorize]
-    [HttpPost("select-chain")]
-    public async Task<SelectChainDto> SelectChainAsync(SelectChainInput input)
+    [HttpPost("add-chain")]
+    public async Task<SelectChainDto> AddChainAsync(SelectChainInput input)
     {
-        return await _tokenAccessAppService.SelectChainAsync(input);
+        return await _tokenAccessAppService.AddChainAsync(input);
     }
     
     [Authorize]
@@ -80,9 +80,9 @@ public class TokenAccessController : ETransferController
     }
     
     [Authorize]
-    [HttpGet("{id}")]
-    public async Task<TokenApplyOrderDto> GetTokenApplyOrderAsync(string id)
+    [HttpGet("detail")]
+    public async Task<TokenApplyOrderDto> GetTokenApplyOrderDetailAsync(GetTokenApplyOrderInput input)
     {
-        return await _tokenAccessAppService.GetTokenApplyOrderAsync(id);
+        return await _tokenAccessAppService.GetTokenApplyOrderDetailAsync(input);
     }
 }
