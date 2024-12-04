@@ -44,6 +44,13 @@ public class OrderController : ETransferController
     {
         return await _networkAppService.GetNetworkListAsync(request, version);
     }
+    
+    [HttpGet("network/tokens")]
+    public async Task<GetNetworkTokenListDto> GetNetworkTokenListAsync(GetNetworkTokenListRequestDto request, 
+        [FromHeader(Name = "version")] string version = null)
+    {
+        return await _networkAppService.GetNetworkTokenListAsync(request, version);
+    }
 
     [Authorize]
     [HttpGet("deposit/info")]

@@ -91,7 +91,13 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
 
         return getNetworkListDto;
     }
-    
+
+    public async Task<GetNetworkTokenListDto> GetNetworkTokenListAsync(GetNetworkTokenListRequestDto request,
+        string version = null)
+    {
+        throw new NotImplementedException();
+    }
+
     private GetNetworkListDto FilterByChainId(GetNetworkListDto networkListDto, string chainId)
     {
         if (networkListDto.NetworkList.Any())
