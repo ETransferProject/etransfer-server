@@ -95,7 +95,43 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
     public async Task<GetNetworkTokenListDto> GetNetworkTokenListAsync(GetNetworkTokenListRequestDto request,
         string version = null)
     {
-        throw new NotImplementedException();
+        var getNetworkTokenListDto = new GetNetworkTokenListDto();
+        var symbolList = _tokenOptions.Value.Transfer.Select(t => t.Symbol).ToList();
+        foreach (var symbol in symbolList)
+        {
+            if (!request.TokenList.IsNullOrEmpty() && !request.TokenList.Contains(symbol)) continue;
+            if (!_networkOptions.Value.NetworkMap.ContainsKey(symbol)) continue;
+            var networkConfigs = request.NetworkList.IsNullOrEmpty()
+                ? _networkOptions.Value.NetworkMap[symbol].Where(a =>
+                    a.SupportType.Contains(OrderTypeEnum.Transfer.ToString())).ToList()
+                : _networkOptions.Value.NetworkMap[symbol].Where(a =>
+                    request.NetworkList.Contains(a.NetworkInfo.Network) &&
+                    a.SupportType.Contains(OrderTypeEnum.Transfer.ToString())).ToList();
+            networkConfigs = await FilterByVersionAndWhiteList(networkConfigs, version, request.SourceType, request.Address);
+            var basicDtos = networkConfigs.ConvertAll(t => new NetworkBasicDto
+            {
+                Network = t.NetworkInfo.Network, Name = t.NetworkInfo.Name
+            });
+            foreach (var item in basicDtos)
+            {
+                if (!getNetworkTokenListDto.ContainsKey(item.Network))
+                    getNetworkTokenListDto.Add(item.Network, new NetworkTokenListDto { [symbol] = basicDtos });
+                else
+                {
+                    var networkTokenListDto = getNetworkTokenListDto[item.Network];
+                    if (!networkTokenListDto.ContainsKey(symbol))
+                        networkTokenListDto.Add(symbol, basicDtos);
+                    else
+                    {
+                        var basicList = networkTokenListDto[symbol] ?? new List<NetworkBasicDto>();
+                        basicList.AddRange(basicDtos);
+                        networkTokenListDto[symbol] = basicList;
+                    }
+                }
+            }
+        }
+        
+        return getNetworkTokenListDto;
     }
 
     private GetNetworkListDto FilterByChainId(GetNetworkListDto networkListDto, string chainId)
@@ -344,7 +380,8 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
         return coin?.AbsEstimateFee;
     }
     
-    private async Task<List<NetworkConfig>> FilterByVersionAndWhiteList(List<NetworkConfig> networkConfigs, string version = null)
+    private async Task<List<NetworkConfig>> FilterByVersionAndWhiteList(List<NetworkConfig> networkConfigs, 
+        string version = null, string sourceType = null, string address = null)
     {
         var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
         if (userId.HasValue)
@@ -362,6 +399,18 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
                                 a.Address.ToLower() == t.ToLower()))))).ToList();
             }
         }
+
+        if (!sourceType.IsNullOrEmpty() && !address.IsNullOrEmpty() &&
+            Enum.TryParse<WalletEnum>(sourceType, true, out _))
+        {
+            var fullAddress = string.Concat(sourceType.ToLower(), CommonConstant.Underline, address);
+            return networkConfigs.Where(config =>
+                config.NetworkInfo.MinShowVersion.IsNullOrEmpty()
+                || (VerifyHelper.VerifyMemoVersion(version, config.NetworkInfo.MinShowVersion)
+                    && (config.SupportWhiteList.IsNullOrEmpty() ||
+                        config.SupportWhiteList.Any(t => fullAddress.ToLower() == t.ToLower())))).ToList();
+        }
+
         return networkConfigs.Where(config =>
             config.NetworkInfo.MinShowVersion.IsNullOrEmpty()
             || (VerifyHelper.VerifyMemoVersion(version, config.NetworkInfo.MinShowVersion)
