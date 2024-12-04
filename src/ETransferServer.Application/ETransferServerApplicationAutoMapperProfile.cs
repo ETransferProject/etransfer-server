@@ -3,6 +3,7 @@ using ETransferServer.Common;
 using ETransferServer.Dtos.Info;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Dtos.Reconciliation;
+using ETransferServer.Dtos.TokenAccess;
 using ETransferServer.Dtos.User;
 using ETransferServer.Entities;
 using ETransferServer.Etos.Order;
@@ -13,6 +14,7 @@ using ETransferServer.Network.Dtos;
 using ETransferServer.Options;
 using ETransferServer.Users;
 using ETransferServer.Token.Dtos;
+using ETransferServer.TokenAccess;
 using ETransferServer.Withdraw.Dtos;
 using ETransferServer.WithdrawOrder.Dtos;
 
@@ -42,6 +44,10 @@ public class ETransferServerApplicationAutoMapperProfile : Profile
         CreateMap<TokenSwapConfig, TokenOptionConfigDto>().ReverseMap();
         CreateMap<ToTokenConfig, ToTokenOptionConfigDto>().ReverseMap();
         CreateMap<ToTokenConfig, TokenConfig>().ReverseMap();
+        
+        CreateMap<UserTokenAccessInfoIndex, UserTokenAccessInfoDto>().ReverseMap();
+        CreateMap<UserTokenAccessInfoInput, UserTokenAccessInfoIndex>().ReverseMap();
+        CreateMap<TokenApplyOrderIndex, TokenApplyOrderDto>().ReverseMap();
         CreateMap<NetworkInfo, NetworkDto>()
             .ForMember(des => des.MultiConfirmTime, opt =>
                 opt.MapFrom(src => TimeHelper.SecondsToMinute((int)src.MultiConfirmSeconds)))
