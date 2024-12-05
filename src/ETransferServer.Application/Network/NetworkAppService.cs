@@ -122,6 +122,40 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
                     ? CommonConstant.NetworkStatus.Health
                     : CommonConstant.NetworkStatus.Offline
             });
+            
+            if (_withdrawInfoOptions.Value.TransferPath.ContainsKey(symbol))
+            {
+                var pathList = _withdrawInfoOptions.Value.TransferPath[symbol];
+                foreach (var path in pathList)
+                {
+                    var split = path.Split(CommonConstant.Comma);
+                    if (!basicDtos.Exists(t => t.Network == split[0] || t.Network == split[1])) continue;
+                    var result = new List<NetworkBasicDto>
+                    {
+                        new()
+                        {
+                            Network = split[1], Name = GetNetworkName(symbol, split[1]),
+                            Status = GetNetworkStatus(symbol, split[1])
+                        }
+                    };
+                    if (!getNetworkTokenListDto.ContainsKey(split[0]))
+                        getNetworkTokenListDto.Add(split[0], new NetworkTokenListDto { [symbol] = result });
+                    else
+                    {
+                        var networkTokenListDto = getNetworkTokenListDto[split[0]];
+                        if (!networkTokenListDto.ContainsKey(symbol))
+                            networkTokenListDto.Add(symbol, result);
+                        else
+                        {
+                            var basicList = networkTokenListDto[symbol] ?? new List<NetworkBasicDto>();
+                            basicList.AddRange(result);
+                            networkTokenListDto[symbol] = basicList;
+                        }
+                    }
+                }
+                continue;
+            }
+            
             foreach (var item in basicDtos)
             {
                 var result = fullBasicDtos.Where(t => t.Network != item.Network).ToList();
@@ -143,6 +177,28 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
         }
         
         return getNetworkTokenListDto;
+    }
+
+    private string GetNetworkName(string symbol, string network)
+    {
+        var name = _networkOptions.Value.NetworkMap[symbol].
+            FirstOrDefault(t => t.NetworkInfo.Network == network)?.NetworkInfo?.Name;
+        if (!name.IsNullOrEmpty()) return name;
+        return _networkOptions.Value.NetworkMap[CommonConstant.Symbol.USDT]
+            .FirstOrDefault(t => t.NetworkInfo.Network == network)
+            ?.NetworkInfo?.Name;
+    }
+    
+    private string GetNetworkStatus(string symbol, string network)
+    {
+        if (network == ChainId.AELF || network == ChainId.tDVV || network == ChainId.tDVW)
+            return CommonConstant.NetworkStatus.Health;
+        var networkConfig = _networkOptions.Value.NetworkMap[symbol]
+            .FirstOrDefault(t => t.NetworkInfo.Network == network);
+        if (networkConfig != null) return networkConfig.WithdrawInfo.IsOpen
+            ? CommonConstant.NetworkStatus.Health
+            : CommonConstant.NetworkStatus.Offline;
+        return CommonConstant.NetworkStatus.Health;
     }
 
     private GetNetworkListDto FilterByChainId(GetNetworkListDto networkListDto, string chainId)
