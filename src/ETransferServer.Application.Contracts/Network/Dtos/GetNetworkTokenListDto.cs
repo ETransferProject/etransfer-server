@@ -14,4 +14,5 @@ public class NetworkBasicDto
 {
     public string Network { get; set; }
     public string Name { get; set; }
+    public string Status { get; set; }
 }

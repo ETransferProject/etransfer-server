@@ -101,30 +101,41 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
         {
             if (!request.TokenList.IsNullOrEmpty() && !request.TokenList.Contains(symbol)) continue;
             if (!_networkOptions.Value.NetworkMap.ContainsKey(symbol)) continue;
+            var fullNetworkConfigs = _networkOptions.Value.NetworkMap[symbol].Where(a =>
+                a.SupportType.Contains(OrderTypeEnum.Transfer.ToString())).ToList();
             var networkConfigs = request.NetworkList.IsNullOrEmpty()
-                ? _networkOptions.Value.NetworkMap[symbol].Where(a =>
-                    a.SupportType.Contains(OrderTypeEnum.Transfer.ToString())).ToList()
+                ? fullNetworkConfigs
                 : _networkOptions.Value.NetworkMap[symbol].Where(a =>
                     request.NetworkList.Contains(a.NetworkInfo.Network) &&
                     a.SupportType.Contains(OrderTypeEnum.Transfer.ToString())).ToList();
+            fullNetworkConfigs = await FilterByVersionAndWhiteList(fullNetworkConfigs, version, request.SourceType, request.Address);
             networkConfigs = await FilterByVersionAndWhiteList(networkConfigs, version, request.SourceType, request.Address);
+            var fullBasicDtos = fullNetworkConfigs.ConvertAll(t => new NetworkBasicDto
+            {
+                Network = t.NetworkInfo.Network, Name = t.NetworkInfo.Name, Status = t.WithdrawInfo.IsOpen
+                    ? CommonConstant.NetworkStatus.Health
+                    : CommonConstant.NetworkStatus.Offline
+            });
             var basicDtos = networkConfigs.ConvertAll(t => new NetworkBasicDto
             {
-                Network = t.NetworkInfo.Network, Name = t.NetworkInfo.Name
+                Network = t.NetworkInfo.Network, Name = t.NetworkInfo.Name, Status = t.WithdrawInfo.IsOpen
+                    ? CommonConstant.NetworkStatus.Health
+                    : CommonConstant.NetworkStatus.Offline
             });
             foreach (var item in basicDtos)
             {
+                var result = fullBasicDtos.Where(t => t.Network != item.Network).ToList();
                 if (!getNetworkTokenListDto.ContainsKey(item.Network))
-                    getNetworkTokenListDto.Add(item.Network, new NetworkTokenListDto { [symbol] = basicDtos });
+                    getNetworkTokenListDto.Add(item.Network, new NetworkTokenListDto { [symbol] = result });
                 else
                 {
                     var networkTokenListDto = getNetworkTokenListDto[item.Network];
                     if (!networkTokenListDto.ContainsKey(symbol))
-                        networkTokenListDto.Add(symbol, basicDtos);
+                        networkTokenListDto.Add(symbol, result);
                     else
                     {
                         var basicList = networkTokenListDto[symbol] ?? new List<NetworkBasicDto>();
-                        basicList.AddRange(basicDtos);
+                        basicList.AddRange(result);
                         networkTokenListDto[symbol] = basicList;
                     }
                 }
