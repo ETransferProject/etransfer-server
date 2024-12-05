@@ -7,7 +7,6 @@ using ETransferServer.Common;
 using ETransferServer.Dtos.TokenAccess;
 using ETransferServer.Grains.Grain.Token;
 using ETransferServer.Options;
-using ETransferServer.TokenAccess.Provider;
 using ETransferServer.User;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -25,26 +24,18 @@ namespace ETransferServer.TokenAccess;
 [DisableAuditing]
 public class TokenAccessAppService : ApplicationService, ITokenAccessAppService
 {
-    private readonly ISymbolMarketProvider _symbolMarketProvider;
-    private readonly ILiquidityDataProvider _liquidityDataProvider;
-    private readonly IScanProvider _scanProvider;
     private readonly INESTRepository<TokenApplyOrderIndex, Guid> _tokenApplyOrderIndexRepository;
     private readonly INESTRepository<UserTokenAccessInfoIndex, Guid> _userTokenInfoIndexRepository;
     private readonly IUserAppService _userAppService;
-    private readonly IOptionsSnapshot<TokenAccessOptions> _tokenAccessOptions;
     private readonly IOptionsSnapshot<NetworkOptions> _networkInfoOptions;
     private readonly IOptionsSnapshot<TokenOptions> _tokenOptions;
     private readonly IObjectMapper _objectMapper;
     private readonly ILogger<TokenAccessAppService> _logger;
     private readonly IClusterClient _clusterClient;
     
-    public TokenAccessAppService(ISymbolMarketProvider symbolMarketProvider,
-        ILiquidityDataProvider liquidityDataProvider,
-        IScanProvider scanProvider,
-        INESTRepository<TokenApplyOrderIndex, Guid> tokenApplyOrderIndexRepository, 
+    public TokenAccessAppService(INESTRepository<TokenApplyOrderIndex, Guid> tokenApplyOrderIndexRepository, 
         INESTRepository<UserTokenAccessInfoIndex, Guid> userTokenInfoIndexRepository,
         IUserAppService userAppService, 
-        IOptionsSnapshot<TokenAccessOptions> tokenAccessOptions,
         IOptionsSnapshot<NetworkOptions> networkInfoOptions,
         IOptionsSnapshot<TokenOptions> tokenOptions,
         IObjectMapper objectMapper,
@@ -52,13 +43,9 @@ public class TokenAccessAppService : ApplicationService, ITokenAccessAppService
         IClusterClient clusterClient
     )
     {
-        _symbolMarketProvider = symbolMarketProvider;
-        _liquidityDataProvider = liquidityDataProvider;
-        _scanProvider = scanProvider;
         _tokenApplyOrderIndexRepository = tokenApplyOrderIndexRepository;
         _userTokenInfoIndexRepository = userTokenInfoIndexRepository;
         _userAppService = userAppService;
-        _tokenAccessOptions = tokenAccessOptions;
         _networkInfoOptions = networkInfoOptions;
         _tokenOptions = tokenOptions;
         _objectMapper = objectMapper;
@@ -70,15 +57,15 @@ public class TokenAccessAppService : ApplicationService, ITokenAccessAppService
     {
         var address = await GetUserAddressAsync();
         if (address.IsNullOrEmpty()) return new AvailableTokensDto();
-        var tokenList = await _scanProvider.GetOwnTokensAsync(address);
-        foreach (var token in tokenList)
-        {
-            token.LiquidityInUsd = await _liquidityDataProvider.GetTokenTvlAsync(token.Symbol);
-        }
+        // var tokenList = await _scanProvider.GetOwnTokensAsync(address);
+        // foreach (var token in tokenList)
+        // {
+        //     token.LiquidityInUsd = await _liquidityDataProvider.GetTokenTvlAsync(token.Symbol);
+        // }
 
         return new AvailableTokensDto
         {
-            TokenList = tokenList
+            // TokenList = tokenList
         };
     }
 
