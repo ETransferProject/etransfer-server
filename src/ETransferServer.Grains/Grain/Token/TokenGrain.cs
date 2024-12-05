@@ -54,7 +54,7 @@ public class TokenGrain : Grain<TokenState>, ITokenGrain
         if (tokenInfo == null) return null;
 
         _objectMapper.Map(tokenInfo, State);
-        State.Owner = tokenInfo.Owner.ToBase58();
+        State.Owner = tokenInfo.Owner?.ToBase58();
         await WriteStateAsync();
         _logger.LogInformation("Get token Info {Token}", JsonConvert.SerializeObject(State));
 

@@ -3,6 +3,7 @@ using AutoMapper;
 using ETransferServer.Dtos.GraphQL;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Dtos.Token;
+using ETransferServer.Dtos.TokenAccess;
 using ETransferServer.Dtos.User;
 using ETransferServer.Etos.Order;
 using ETransferServer.Grains.Grain.Users;
@@ -35,6 +36,7 @@ public class ETransferServerGrainsAutoMapperProfile : Profile
 
         CreateMap<TokenState, TokenDto>().ReverseMap();
         CreateMap<TokenState, TokenInfo>().ReverseMap();
+        CreateMap<TokenOwnerRecordState, TokenOwnerListDto>().ReverseMap();
 
         CreateMap<UserAddressDto, TokenDepositAddressState>().ReverseMap();
         CreateMap<UserAddressDto, UserDepositAddressState>().ReverseMap();
