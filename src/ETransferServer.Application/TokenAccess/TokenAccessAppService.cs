@@ -2,10 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using AElf.ExceptionHandler;
 using AElf.Indexing.Elasticsearch;
 using ETransferServer.Common;
 using ETransferServer.Dtos.TokenAccess;
 using ETransferServer.Grains.Grain.Token;
+using ETransferServer.Grains.Grain.Users;
 using ETransferServer.Options;
 using ETransferServer.User;
 using Microsoft.Extensions.Logging;
@@ -22,7 +24,7 @@ namespace ETransferServer.TokenAccess;
 
 [RemoteService(IsEnabled = false)]
 [DisableAuditing]
-public class TokenAccessAppService : ApplicationService, ITokenAccessAppService
+public partial class TokenAccessAppService : ApplicationService, ITokenAccessAppService
 {
     private readonly INESTRepository<TokenApplyOrderIndex, Guid> _tokenApplyOrderIndexRepository;
     private readonly INESTRepository<UserTokenAccessInfoIndex, Guid> _userTokenInfoIndexRepository;
@@ -81,21 +83,28 @@ public class TokenAccessAppService : ApplicationService, ITokenAccessAppService
     {
         var address = await GetUserAddressAsync();
         if (address.IsNullOrEmpty()) return false;
-        var tokenGrain =
-            _clusterClient.GetGrain<ITokenGrain>(ITokenGrain.GenGrainId(input.Symbol, ChainId.AELF));
-        var tokenInfo = await tokenGrain.GetToken();
-        if (tokenInfo.Owner != address)
+        var tokenOwnerGrain = _clusterClient.GetGrain<ITokenOwnerRecordGrain>(address);
+        var listDto = await tokenOwnerGrain.Get();
+        if (listDto == null || listDto.TokenOwnerList.IsNullOrEmpty() ||
+            !listDto.TokenOwnerList.Exists(t => t.Symbol == input.Symbol))
         {
             _logger.LogInformation("CommitTokenAccessInfoAsync no permission.");
             return false;
         }
 
-        var userTokenAccessInfoIndex = await GetUserTokenAccessInfoIndexAsync(input.Symbol);
-        var index = _objectMapper.Map<UserTokenAccessInfoInput, UserTokenAccessInfoIndex>(input);
-        index.Id = userTokenAccessInfoIndex?.Id ?? Guid.NewGuid();
-        index.UserAddress = address;
-        _userTokenInfoIndexRepository.AddOrUpdateAsync(index);
+        var userTokenAccessInfoGrain = _clusterClient.GetGrain<IUserTokenAccessInfoGrain>(input.Symbol);
+        var dto = _objectMapper.Map<UserTokenAccessInfoInput, UserTokenAccessInfoDto>(input);
+        dto.UserAddress = address;
+        await userTokenAccessInfoGrain.AddOrUpdate(dto);
         return true;
+    }
+
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(TokenAccessAppService),
+        MethodName = nameof(HandleAddOrUpdateUserTokenAccessInfoExceptionAsync))]
+    public async Task AddOrUpdateUserTokenAccessInfoAsync(UserTokenAccessInfoDto dto)
+    {
+        await _userTokenInfoIndexRepository.AddOrUpdateAsync(ObjectMapper.Map<UserTokenAccessInfoDto, UserTokenAccessInfoIndex>(dto));
+        Logger.LogInformation("Save token access info success, symbol:{symbol}", dto.Symbol);
     }
 
     public async Task<UserTokenAccessInfoDto> GetUserTokenAccessInfoAsync(UserTokenAccessInfoBaseInput input)

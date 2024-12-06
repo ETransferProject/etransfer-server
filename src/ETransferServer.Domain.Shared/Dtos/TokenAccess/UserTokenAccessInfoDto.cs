@@ -1,13 +1,18 @@
+using System;
+using Orleans;
+
 namespace ETransferServer.Dtos.TokenAccess;
 
+[GenerateSerializer]
 public class UserTokenAccessInfoDto
 {
-    public string Symbol { get; set; }
-    public string UserAddress { get; set; }
-    public string OfficialWebsite { get; set; }
-    public string OfficialTwitter { get; set; }
-    public string Title { get; set; }
-    public string PersonName { get; set; }
-    public string TelegramHandler { get; set; }
-    public string Email { get; set; }
+    [Id(0)] public Guid Id { get; set; }
+    [Id(1)] public string Symbol { get; set; }
+    [Id(2)] public string UserAddress { get; set; }
+    [Id(3)] public string OfficialWebsite { get; set; }
+    [Id(4)] public string OfficialTwitter { get; set; }
+    [Id(5)] public string Title { get; set; }
+    [Id(6)] public string PersonName { get; set; }
+    [Id(7)] public string TelegramHandler { get; set; }
+    [Id(8)] public string Email { get; set; }
 }
