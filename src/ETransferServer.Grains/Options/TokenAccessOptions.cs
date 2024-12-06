@@ -11,4 +11,5 @@ public class TokenAccessOptions
     public string SymbolMarketBindingUri { get; set; }
     public string AwakenBaseUrl { get; set; }
     public string AwakenGetTokenLiquidityUri { get; set; }
+    public int DataExpireSeconds { get; set; } = 180;
 }

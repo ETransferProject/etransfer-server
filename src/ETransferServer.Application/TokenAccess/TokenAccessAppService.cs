@@ -55,18 +55,26 @@ public class TokenAccessAppService : ApplicationService, ITokenAccessAppService
     
     public async Task<AvailableTokensDto> GetAvailableTokensAsync()
     {
+        var result = new AvailableTokensDto();
         var address = await GetUserAddressAsync();
-        if (address.IsNullOrEmpty()) return new AvailableTokensDto();
-        // var tokenList = await _scanProvider.GetOwnTokensAsync(address);
-        // foreach (var token in tokenList)
-        // {
-        //     token.LiquidityInUsd = await _liquidityDataProvider.GetTokenTvlAsync(token.Symbol);
-        // }
-
-        return new AvailableTokensDto
+        if (address.IsNullOrEmpty()) return result;
+        var tokenOwnerGrain = _clusterClient.GetGrain<ITokenOwnerRecordGrain>(address);
+        var listDto = await tokenOwnerGrain.Get();
+        if (listDto == null || listDto.TokenOwnerList.IsNullOrEmpty()) return result;
+        foreach (var token in listDto.TokenOwnerList)
         {
-            // TokenList = tokenList
-        };
+            var tokenInvokeGrain = _clusterClient.GetGrain<ITokenInvokeGrain>(token.Symbol);
+            result.TokenList.Add(new()
+            {
+                TokenName = token.TokenName,
+                Symbol = token.Symbol,
+                TokenImage = token.Icon,
+                Holders = token.Holders,
+                LiquidityInUsd = await tokenInvokeGrain.GetLiquidityInUsd()
+            });
+        }
+
+        return result;
     }
 
     public async Task<bool> CommitTokenAccessInfoAsync(UserTokenAccessInfoInput input)
