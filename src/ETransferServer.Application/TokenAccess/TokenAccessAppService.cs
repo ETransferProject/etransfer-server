@@ -109,6 +109,17 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
 
     public async Task<UserTokenAccessInfoDto> GetUserTokenAccessInfoAsync(UserTokenAccessInfoBaseInput input)
     {
+        var address = await GetUserAddressAsync();
+        if (address.IsNullOrEmpty()) return new UserTokenAccessInfoDto();
+        var tokenOwnerGrain = _clusterClient.GetGrain<ITokenOwnerRecordGrain>(address);
+        var listDto = await tokenOwnerGrain.Get();
+        if (listDto == null || listDto.TokenOwnerList.IsNullOrEmpty() ||
+            !listDto.TokenOwnerList.Exists(t => t.Symbol == input.Symbol))
+        {
+            _logger.LogInformation("GetUserTokenAccessInfoAsync no permission.");
+            return new UserTokenAccessInfoDto();
+        }
+        
         return _objectMapper.Map<UserTokenAccessInfoIndex, UserTokenAccessInfoDto>(await GetUserTokenAccessInfoIndexAsync(input.Symbol));
     }
 
