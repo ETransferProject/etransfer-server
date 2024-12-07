@@ -27,7 +27,7 @@ public class ChainTokenInfo
     [Keyword] public string Symbol { get; set; }
     public decimal TotalSupply { get; set; }
     public int Decimals { get; set; }
-    [Keyword] public string Icon { get; set; }
+    [Text(Index = false)] public string Icon { get; set; }
     [Keyword] public string PoolAddress { get; set; }
     [Keyword] public string ContractAddress { get; set; }
     [Keyword] public string Status { get; set; }

@@ -12,9 +12,11 @@ using ETransferServer.Options;
 using ETransferServer.User;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using NBitcoin;
 using Nest;
 using Orleans;
 using Volo.Abp;
+using Volo.Abp.Application.Dtos;
 using Volo.Abp.Application.Services;
 using Volo.Abp.Auditing;
 using Volo.Abp.ObjectMapping;
@@ -109,6 +111,14 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         await _userTokenInfoIndexRepository.AddOrUpdateAsync(ObjectMapper.Map<UserTokenAccessInfoDto, UserTokenAccessInfoIndex>(dto));
         Logger.LogInformation("Save token access info success, symbol:{symbol}", dto.Symbol);
     }
+    
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(TokenAccessAppService),
+        MethodName = nameof(HandleAddOrUpdateUserTokenApplyOrderExceptionAsync))]
+    public async Task AddOrUpdateUserTokenApplyOrderAsync(TokenApplyOrderDto dto)
+    {
+        await _tokenApplyOrderIndexRepository.AddOrUpdateAsync(_objectMapper.Map<TokenApplyOrderDto, TokenApplyOrderIndex>(dto));
+        Logger.LogInformation("Save token apply order success, symbol:{symbol}", dto.Symbol);
+    }
 
     public async Task<UserTokenAccessInfoDto> GetUserTokenAccessInfoAsync(UserTokenAccessInfoBaseInput input)
     {
@@ -130,16 +140,12 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
     {
         var result = new CheckChainAccessStatusResultDto();
         var address = await GetUserAddressAsync();
-        if (address.IsNullOrEmpty()) return result;
+        AssertHelper.IsTrue(!address.IsNullOrEmpty(), "No permission."); 
         var tokenOwnerGrain = _clusterClient.GetGrain<ITokenOwnerRecordGrain>(address);
         var listDto = await tokenOwnerGrain.Get();
-        if (listDto == null || listDto.TokenOwnerList.IsNullOrEmpty() ||
-            !listDto.TokenOwnerList.Exists(t => t.Symbol == input.Symbol))
-        {
-            _logger.LogInformation("CheckChainAccessStatusAsync no permission.");
-            return result;
-        }
-        
+        AssertHelper.IsTrue(listDto != null && !listDto.TokenOwnerList.IsNullOrEmpty() &&
+            listDto.TokenOwnerList.Exists(t => t.Symbol == input.Symbol), "Symbol invalid.");
+
         var networkList = _networkInfoOptions.Value.NetworkMap.OrderBy(m =>
                 _tokenOptions.Value.Transfer.Select(t => t.Symbol).ToList().IndexOf(m.Key))
             .SelectMany(kvp => kvp.Value).Where(a =>
@@ -152,6 +158,7 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         result.OtherChainList.AddRange(networkList.Where(
             t => t.Network != ChainId.AELF && t.Network != ChainId.tDVV && t.Network != ChainId.tDVW).Select(
             t => new ChainAccessInfo { ChainId = t.Network, ChainName = t.Name, Symbol = input.Symbol }));
+
         
         var applyOrderList = await GetTokenApplyOrderIndexListAsync(address, input.Symbol);
         foreach (var item in result.ChainList)
@@ -170,7 +177,7 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
                     ? TokenApplyOrderStatus.Complete.ToString()
                     : TokenApplyOrderStatus.Issued.ToString();
             item.Checked = isCompleted ||
-                           applyOrderList.Exists(t => t.ChainTokenInfo.Count > 0 &&
+                           applyOrderList.Exists(t => !t.ChainTokenInfo.IsNullOrEmpty() &&
                                t.ChainTokenInfo.Exists(c => c.ChainId == item.ChainId));
         }
 
@@ -197,9 +204,83 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         return result;
     }
 
-    public async Task<SelectChainDto> AddChainAsync(SelectChainInput input)
+    public async Task<AddChainResultDto> AddChainAsync(AddChainInput input)
     {
-        throw new NotImplementedException();
+        AssertHelper.IsTrue(!input.ChainIds.IsNullOrEmpty() || !input.OtherChainIds.IsNullOrEmpty(), 
+            "Param invalid.");
+        var chainStatus = await CheckChainAccessStatusAsync(new CheckChainAccessStatusInput { Symbol = input.Symbol });
+        AssertHelper.IsTrue(input.ChainIds.IsNullOrEmpty() || !input.ChainIds.Any(t => 
+            !chainStatus.ChainList.Exists(c => c.ChainId == t)), "Param invalid.");
+        AssertHelper.IsTrue(input.OtherChainIds.IsNullOrEmpty() || !input.OtherChainIds.Any(t => 
+            !chainStatus.OtherChainList.Exists(c => c.ChainId == t)), "Param invalid.");
+        
+        var result = new AddChainResultDto();
+        var address = await GetUserAddressAsync();
+        if (!input.OtherChainIds.IsNullOrEmpty())
+        {
+            foreach (var item in input.OtherChainIds)
+            {
+                var chain = chainStatus.OtherChainList.FirstOrDefault(t => t.ChainId == item);
+                if (chain.Status != TokenApplyOrderStatus.Issued.ToString() &&
+                    chain.Status != TokenApplyOrderStatus.Rejected.ToString()) continue;
+                var orderId = GuidHelper.UniqGuid(input.Symbol, address, item);
+                var tokenApplyOrderGrain = _clusterClient.GetGrain<IUserTokenApplyOrderGrain>(orderId);
+                if (await tokenApplyOrderGrain.Get() != null ||
+                    await GetTokenApplyOrderIndexAsync(orderId.ToString()) != null) continue;
+                chain.Status = TokenApplyOrderStatus.Reviewing.ToString();
+                var dto = new TokenApplyOrderDto
+                {
+                    Id = orderId,
+                    Symbol = input.Symbol,
+                    UserAddress = address,
+                    Status = TokenApplyOrderStatus.Reviewing.ToString(),
+                    ChainTokenInfo = chainStatus.ChainList.Where(t => input.ChainIds.Exists(c => c == t.ChainId))
+                         .ToList().ConvertAll(t => _objectMapper.Map<ChainAccessInfo, ChainTokenInfoDto>(t)),
+                    OtherChainTokenInfo = _objectMapper.Map<ChainAccessInfo, ChainTokenInfoDto>(chain)
+                };
+                dto.StatusChangedRecord ??= new Dictionary<string, string>();
+                dto.StatusChangedRecord.AddOrReplace(TokenApplyOrderStatus.Reviewing.ToString(),
+                    DateTime.UtcNow.ToUtcMilliSeconds().ToString());
+                await tokenApplyOrderGrain.AddOrUpdate(dto);
+                result.OtherChainList ??= new List<AddChainDto>();
+                result.OtherChainList.Add(new()
+                {
+                    Id = orderId.ToString(),
+                    ChainId = item
+                });
+            }
+        }
+
+        if (input.OtherChainIds.IsNullOrEmpty() && !input.ChainIds.IsNullOrEmpty() && input.ChainIds.Count == 1)
+        {
+            var chain = chainStatus.ChainList.FirstOrDefault(t => t.ChainId == input.ChainIds[0]);
+            if (chain.Status != TokenApplyOrderStatus.Issued.ToString() &&
+                chain.Status != TokenApplyOrderStatus.Rejected.ToString()) return result;
+            var orderId = GuidHelper.UniqGuid(input.Symbol, address, input.ChainIds[0]);
+            var tokenApplyOrderGrain = _clusterClient.GetGrain<IUserTokenApplyOrderGrain>(orderId);
+            if (await tokenApplyOrderGrain.Get() != null ||
+                await GetTokenApplyOrderIndexAsync(orderId.ToString()) != null) return result;
+            chain.Status = TokenApplyOrderStatus.Reviewing.ToString();
+            var dto = new TokenApplyOrderDto
+            {
+                Id = orderId,
+                Symbol = input.Symbol,
+                UserAddress = address,
+                Status = TokenApplyOrderStatus.Reviewing.ToString(),
+                ChainTokenInfo = new List<ChainTokenInfoDto> { _objectMapper.Map<ChainAccessInfo, ChainTokenInfoDto>(chain) }
+            };
+            dto.StatusChangedRecord ??= new Dictionary<string, string>();
+            dto.StatusChangedRecord.AddOrReplace(TokenApplyOrderStatus.Reviewing.ToString(),
+                DateTime.UtcNow.ToUtcMilliSeconds().ToString());
+            await tokenApplyOrderGrain.AddOrUpdate(dto);
+            result.ChainList ??= new List<AddChainDto>();
+            result.ChainList.Add(new()
+            {
+                Id = orderId.ToString(),
+                ChainId = input.ChainIds[0]
+            });
+        }
+        return result;
     }
 
     public async Task<string> PrepareBindingIssueAsync(PrepareBindIssueInput input)
@@ -212,17 +293,17 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         throw new NotImplementedException();
     }
 
-    public async Task<TokenApplyOrderListDto> GetTokenApplyOrderListAsync(GetTokenApplyOrderListInput input)
+    public async Task<PagedResultDto<TokenApplyOrderDto>> GetTokenApplyOrderListAsync(GetTokenApplyOrderListInput input)
     {
         var address = await GetUserAddressAsync();
-        if (address.IsNullOrEmpty()) return new TokenApplyOrderListDto();
+        if (address.IsNullOrEmpty()) return new PagedResultDto<TokenApplyOrderDto>();
         var mustQuery = new List<Func<QueryContainerDescriptor<TokenApplyOrderIndex>, QueryContainer>>();
         mustQuery.Add(q => q.Term(i => i.Field(f => f.UserAddress).Value(address)));
         QueryContainer Filter(QueryContainerDescriptor<TokenApplyOrderIndex> f) => f.Bool(b => b.Must(mustQuery));
         var (count, list) = await _tokenApplyOrderIndexRepository.GetSortListAsync(Filter,
             sortFunc: s => s.Ascending(a => a.UpdateTime), 
             skip: input.SkipCount, limit: input.MaxResultCount);
-        return new TokenApplyOrderListDto
+        return new PagedResultDto<TokenApplyOrderDto>
         {
             Items = _objectMapper.Map<List<TokenApplyOrderIndex>, List<TokenApplyOrderDto>>(list),
             TotalCount = count
@@ -250,6 +331,14 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         mustQuery.Add(q => q.Term(i => i.Field(f => f.Symbol).Value(symbol)));
         QueryContainer Filter(QueryContainerDescriptor<UserTokenAccessInfoIndex> f) => f.Bool(b => b.Must(mustQuery));
         return await _userTokenInfoIndexRepository.GetAsync(Filter);
+    }
+    
+    private async Task<TokenApplyOrderIndex> GetTokenApplyOrderIndexAsync(string id)
+    {
+        var mustQuery = new List<Func<QueryContainerDescriptor<TokenApplyOrderIndex>, QueryContainer>>();
+        mustQuery.Add(q => q.Term(i => i.Field(f => f.Id).Value(id)));
+        QueryContainer Filter(QueryContainerDescriptor<TokenApplyOrderIndex> f) => f.Bool(b => b.Must(mustQuery));
+        return await _tokenApplyOrderIndexRepository.GetAsync(Filter);
     }
     
     private async Task<List<TokenApplyOrderIndex>> GetTokenApplyOrderIndexListAsync(string address, string symbol = null)

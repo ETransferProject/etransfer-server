@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using ETransferServer.Dtos.TokenAccess;
 using ETransferServer.TokenAccess;
 using Volo.Abp;
+using Volo.Abp.Application.Dtos;
 
 namespace ETransferServer.Controllers;
 
@@ -53,7 +54,7 @@ public class TokenAccessController : ETransferController
     
     [Authorize]
     [HttpPost("add-chain")]
-    public async Task<SelectChainDto> AddChainAsync(SelectChainInput input)
+    public async Task<AddChainResultDto> AddChainAsync(AddChainInput input)
     {
         return await _tokenAccessAppService.AddChainAsync(input);
     }
@@ -74,7 +75,7 @@ public class TokenAccessController : ETransferController
     
     [Authorize]
     [HttpGet("list")]
-    public async Task<TokenApplyOrderListDto> GetTokenApplyOrderListAsync(GetTokenApplyOrderListInput input)
+    public async Task<PagedResultDto<TokenApplyOrderDto>> GetTokenApplyOrderListAsync(GetTokenApplyOrderListInput input)
     {
         return await _tokenAccessAppService.GetTokenApplyOrderListAsync(input);
     }
