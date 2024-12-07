@@ -31,6 +31,7 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
     private readonly IUserAppService _userAppService;
     private readonly IOptionsSnapshot<NetworkOptions> _networkInfoOptions;
     private readonly IOptionsSnapshot<TokenOptions> _tokenOptions;
+    private readonly IOptionsSnapshot<TokenInfoOptions> _tokenInfoOptions;
     private readonly IObjectMapper _objectMapper;
     private readonly ILogger<TokenAccessAppService> _logger;
     private readonly IClusterClient _clusterClient;
@@ -40,6 +41,7 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         IUserAppService userAppService, 
         IOptionsSnapshot<NetworkOptions> networkInfoOptions,
         IOptionsSnapshot<TokenOptions> tokenOptions,
+        IOptionsSnapshot<TokenInfoOptions> tokenInfoOptions,
         IObjectMapper objectMapper,
         ILogger<TokenAccessAppService> logger,
         IClusterClient clusterClient
@@ -50,6 +52,7 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         _userAppService = userAppService;
         _networkInfoOptions = networkInfoOptions;
         _tokenOptions = tokenOptions;
+        _tokenInfoOptions = tokenInfoOptions;
         _objectMapper = objectMapper;
         _logger = logger;
         _clusterClient = clusterClient;
@@ -126,32 +129,71 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
     public async Task<CheckChainAccessStatusResultDto> CheckChainAccessStatusAsync(CheckChainAccessStatusInput input)
     {
         var result = new CheckChainAccessStatusResultDto();
-
+        var address = await GetUserAddressAsync();
+        if (address.IsNullOrEmpty()) return result;
+        var tokenOwnerGrain = _clusterClient.GetGrain<ITokenOwnerRecordGrain>(address);
+        var listDto = await tokenOwnerGrain.Get();
+        if (listDto == null || listDto.TokenOwnerList.IsNullOrEmpty() ||
+            !listDto.TokenOwnerList.Exists(t => t.Symbol == input.Symbol))
+        {
+            _logger.LogInformation("CheckChainAccessStatusAsync no permission.");
+            return result;
+        }
+        
         var networkList = _networkInfoOptions.Value.NetworkMap.OrderBy(m =>
                 _tokenOptions.Value.Transfer.Select(t => t.Symbol).ToList().IndexOf(m.Key))
             .SelectMany(kvp => kvp.Value).Where(a =>
                 a.SupportType.Contains(OrderTypeEnum.Transfer.ToString())).GroupBy(g => g.NetworkInfo.Network)
-            .Select(s => s.First().NetworkInfo.Network).ToList();
+            .Select(s => s.First().NetworkInfo).ToList();
         
-        AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(input.Symbol),
-            ErrorResult.SymbolInvalidCode, null, input.Symbol);
         result.ChainList.AddRange(networkList.Where(
-            t => t == ChainId.AELF || t == ChainId.tDVV || t == ChainId.tDVW).Select(
-            t => new ChainAccessInfo { ChainId = t, Status = TokenApplyOrderStatus.Complete.ToString()}));
+            t => t.Network == ChainId.AELF || t.Network == ChainId.tDVV || t.Network == ChainId.tDVW).Select(
+            t => new ChainAccessInfo { ChainId = t.Network, ChainName = t.Name, Symbol = input.Symbol}));
         result.OtherChainList.AddRange(networkList.Where(
-            t => t != ChainId.AELF && t != ChainId.tDVV && t != ChainId.tDVW).Select(
-            t => new ChainAccessInfo { ChainId = t }));
-
-        var address = await GetUserAddressAsync();
-        if (address.IsNullOrEmpty()) return result;
+            t => t.Network != ChainId.AELF && t.Network != ChainId.tDVV && t.Network != ChainId.tDVW).Select(
+            t => new ChainAccessInfo { ChainId = t.Network, ChainName = t.Name, Symbol = input.Symbol }));
         
         var applyOrderList = await GetTokenApplyOrderIndexListAsync(address, input.Symbol);
-        foreach (var applyOrderIndex in applyOrderList)
+        foreach (var item in result.ChainList)
         {
-            var otherChain = result.OtherChainList.FirstOrDefault(t => t.ChainId == applyOrderIndex.OtherChainTokenInfo.ChainId);
-            if (otherChain != null) otherChain.Status = applyOrderIndex.Status;
+            var isCompleted = _tokenInfoOptions.Value.ContainsKey(item.Symbol) &&
+                              _tokenInfoOptions.Value[item.Symbol].Transfer.Contains(item.ChainId);
+            var tokenOwner = listDto.TokenOwnerList.LastOrDefault(t => t.Symbol == input.Symbol &&
+                                                                        t.ChainIds.Contains(item.ChainId));
+            item.TotalSupply = tokenOwner?.TotalSupply ?? 0;
+            item.Decimals = tokenOwner?.Decimals ?? 0;
+            item.TokenName = tokenOwner?.TokenName;
+            item.Icon = tokenOwner?.Icon;
+            item.Status = tokenOwner == null
+                ? TokenApplyOrderStatus.Unissued.ToString()
+                : isCompleted
+                    ? TokenApplyOrderStatus.Complete.ToString()
+                    : TokenApplyOrderStatus.Issued.ToString();
+            item.Checked = isCompleted ||
+                           applyOrderList.Exists(t => t.ChainTokenInfo.Count > 0 &&
+                               t.ChainTokenInfo.Exists(c => c.ChainId == item.ChainId));
         }
-        
+
+        foreach (var item in result.OtherChainList)
+        {
+            var isCompleted = _tokenInfoOptions.Value.ContainsKey(item.Symbol) &&
+                              _tokenInfoOptions.Value[item.Symbol].Transfer.Contains(item.ChainId);
+            var tokenOwner = listDto.TokenOwnerList.FirstOrDefault(t => t.Symbol == input.Symbol &&
+                                                                    t.ChainIds.Contains(item.ChainId));
+            item.TotalSupply = tokenOwner?.TotalSupply ?? 0;
+            item.Decimals = tokenOwner?.Decimals ?? 0;
+            item.TokenName = tokenOwner?.TokenName;
+            item.Icon = tokenOwner?.Icon;
+            item.Status = tokenOwner == null
+                ? TokenApplyOrderStatus.Unissued.ToString()
+                : isCompleted
+                    ? TokenApplyOrderStatus.Complete.ToString()
+                    : TokenApplyOrderStatus.Issued.ToString();
+            item.Checked = isCompleted ||
+                           applyOrderList.Exists(t => t.OtherChainTokenInfo != null &&
+                                                      t.OtherChainTokenInfo.ChainId == item.ChainId);
+        }
+
         return result;
     }
 
@@ -214,10 +256,7 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
     {
         var mustQuery = new List<Func<QueryContainerDescriptor<TokenApplyOrderIndex>, QueryContainer>>();
         mustQuery.Add(q => q.Term(i => i.Field(f => f.UserAddress).Value(address)));
-        if (String.IsNullOrWhiteSpace(symbol))
-        {
-            mustQuery.Add(q => q.Term(i => i.Field(f => f.Symbol).Value(symbol)));
-        }
+        mustQuery.Add(q => q.Term(i => i.Field(f => f.Symbol).Value(symbol)));
         QueryContainer Filter(QueryContainerDescriptor<TokenApplyOrderIndex> f) => f.Bool(b => b.Must(mustQuery));
         var result = await _tokenApplyOrderIndexRepository.GetListAsync(Filter);
         return result.Item2;

@@ -22,6 +22,7 @@ public class TokenApplyOrderBase : AbstractEntity<Guid>
 public class ChainTokenInfo
 {
     [Keyword] public string ChainId { get; set; }
+    [Keyword] public string ChainName { get; set; }
     [Keyword] public string TokenName { get; set; }
     [Keyword] public string Symbol { get; set; }
     public decimal TotalSupply { get; set; }

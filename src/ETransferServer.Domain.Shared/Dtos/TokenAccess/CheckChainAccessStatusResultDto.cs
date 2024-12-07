@@ -11,6 +11,7 @@ public class CheckChainAccessStatusResultDto
 public class ChainAccessInfo
 {
     public string ChainId { get; set; }
+    public string ChainName { get; set; }
     public string Status { get; set; }
     public bool Checked { get; set; }
     public string TokenName { get; set; }

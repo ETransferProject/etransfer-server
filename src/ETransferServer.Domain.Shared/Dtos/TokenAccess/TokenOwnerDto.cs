@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Orleans;
 
 namespace ETransferServer.Dtos.TokenAccess;
@@ -28,13 +29,14 @@ public class TokenOwnerDto
     {
         if (obj is TokenOwnerDto t)
         {
-            return Symbol == t.Symbol;
+            return Symbol == t.Symbol && new HashSet<string>(ChainIds).SetEquals(t.ChainIds);
         }
         return false;
     }
 
     public override int GetHashCode()
     {
-        return Symbol.GetHashCode();
+        return Symbol.GetHashCode() ^
+               new HashSet<string>(ChainIds).Aggregate(0, (acc, chainId) => acc ^ chainId.GetHashCode());
     }
 }

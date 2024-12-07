@@ -23,6 +23,7 @@ public class TokenApplyOrderDto
 public class ChainTokenInfoDto
 {
     public string ChainId { get; set; }
+    public string ChainName { get; set; }
     public string TokenName { get; set; }
     public string Symbol { get; set; }
     public decimal TotalSupply { get; set; }
