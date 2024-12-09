@@ -7,6 +7,7 @@ namespace ETransferServer.TokenAccess;
 
 public interface ITokenAccessAppService
 {
+    Task<TokenConfigDto> GetTokenConfigAsync(GetTokenConfigInput input);
     Task<AvailableTokensDto> GetAvailableTokensAsync();
     Task<bool> CommitTokenAccessInfoAsync(UserTokenAccessInfoInput input);
     Task AddOrUpdateUserTokenAccessInfoAsync(UserTokenAccessInfoDto dto);

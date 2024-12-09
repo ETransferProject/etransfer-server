@@ -17,6 +17,7 @@ using ETransferServer.Token.Dtos;
 using ETransferServer.TokenAccess;
 using ETransferServer.Withdraw.Dtos;
 using ETransferServer.WithdrawOrder.Dtos;
+using TokenConfigDto = ETransferServer.Token.Dtos.TokenConfigDto;
 
 namespace ETransferServer;
 

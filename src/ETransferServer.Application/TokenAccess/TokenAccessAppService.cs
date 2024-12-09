@@ -33,6 +33,7 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
     private readonly IUserAppService _userAppService;
     private readonly IOptionsSnapshot<NetworkOptions> _networkInfoOptions;
     private readonly IOptionsSnapshot<TokenOptions> _tokenOptions;
+    private readonly IOptionsSnapshot<TokenAccessOptions> _tokenAccessOptions;
     private readonly IOptionsSnapshot<TokenInfoOptions> _tokenInfoOptions;
     private readonly IObjectMapper _objectMapper;
     private readonly ILogger<TokenAccessAppService> _logger;
@@ -43,6 +44,7 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         IUserAppService userAppService, 
         IOptionsSnapshot<NetworkOptions> networkInfoOptions,
         IOptionsSnapshot<TokenOptions> tokenOptions,
+        IOptionsSnapshot<TokenAccessOptions> tokenAccessOptions,
         IOptionsSnapshot<TokenInfoOptions> tokenInfoOptions,
         IObjectMapper objectMapper,
         ILogger<TokenAccessAppService> logger,
@@ -54,12 +56,26 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         _userAppService = userAppService;
         _networkInfoOptions = networkInfoOptions;
         _tokenOptions = tokenOptions;
+        _tokenAccessOptions = tokenAccessOptions;
         _tokenInfoOptions = tokenInfoOptions;
         _objectMapper = objectMapper;
         _logger = logger;
         _clusterClient = clusterClient;
     }
-    
+
+    public async Task<TokenConfigDto> GetTokenConfigAsync(GetTokenConfigInput input)
+    {
+        return new TokenConfigDto
+        {
+            LiquidityInUsd = !_tokenAccessOptions.Value.TokenConfig.ContainsKey(input.Symbol)
+                ? _tokenAccessOptions.Value.DefaultConfig.Liquidity
+                : _tokenAccessOptions.Value.TokenConfig[input.Symbol].Liquidity,
+            Holders = !_tokenAccessOptions.Value.TokenConfig.ContainsKey(input.Symbol)
+                ? _tokenAccessOptions.Value.DefaultConfig.Holders
+                : _tokenAccessOptions.Value.TokenConfig[input.Symbol].Holders
+        };
+    }
+
     public async Task<AvailableTokensDto> GetAvailableTokensAsync()
     {
         var result = new AvailableTokensDto();

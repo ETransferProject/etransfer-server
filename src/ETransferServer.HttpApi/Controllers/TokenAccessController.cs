@@ -24,6 +24,12 @@ public class TokenAccessController : ETransferController
     {
         _tokenAccessAppService = tokenAccessAppService;
     }
+    
+    [HttpGet("token/config")]
+    public async Task<TokenConfigDto> GetTokenConfigAsync(GetTokenConfigInput input)
+    {
+        return await _tokenAccessAppService.GetTokenConfigAsync(input);
+    }
 
     [Authorize]
     [HttpGet("tokens")]
