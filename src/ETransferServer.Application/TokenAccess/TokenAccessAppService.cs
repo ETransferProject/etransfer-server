@@ -87,17 +87,14 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
     public async Task<bool> CommitTokenAccessInfoAsync(UserTokenAccessInfoInput input)
     {
         var address = await GetUserAddressAsync();
-        if (address.IsNullOrEmpty()) return false;
+        AssertHelper.IsTrue(!address.IsNullOrEmpty(), "No permission."); 
         var tokenOwnerGrain = _clusterClient.GetGrain<ITokenOwnerRecordGrain>(address);
         var listDto = await tokenOwnerGrain.Get();
-        if (listDto == null || listDto.TokenOwnerList.IsNullOrEmpty() ||
-            !listDto.TokenOwnerList.Exists(t => t.Symbol == input.Symbol))
-        {
-            _logger.LogInformation("CommitTokenAccessInfoAsync no permission.");
-            return false;
-        }
-
-        var userTokenAccessInfoGrain = _clusterClient.GetGrain<IUserTokenAccessInfoGrain>(input.Symbol);
+        AssertHelper.IsTrue(listDto != null && !listDto.TokenOwnerList.IsNullOrEmpty() &&
+            listDto.TokenOwnerList.Exists(t => t.Symbol == input.Symbol), "Symbol invalid.");
+        
+        var userTokenAccessInfoGrain = _clusterClient.GetGrain<IUserTokenAccessInfoGrain>(
+            string.Join(CommonConstant.Underline, input.Symbol, address));
         var dto = _objectMapper.Map<UserTokenAccessInfoInput, UserTokenAccessInfoDto>(input);
         dto.UserAddress = address;
         await userTokenAccessInfoGrain.AddOrUpdate(dto);
@@ -123,17 +120,13 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
     public async Task<UserTokenAccessInfoDto> GetUserTokenAccessInfoAsync(UserTokenAccessInfoBaseInput input)
     {
         var address = await GetUserAddressAsync();
-        if (address.IsNullOrEmpty()) return new UserTokenAccessInfoDto();
+        AssertHelper.IsTrue(!address.IsNullOrEmpty(), "No permission."); 
         var tokenOwnerGrain = _clusterClient.GetGrain<ITokenOwnerRecordGrain>(address);
         var listDto = await tokenOwnerGrain.Get();
-        if (listDto == null || listDto.TokenOwnerList.IsNullOrEmpty() ||
-            !listDto.TokenOwnerList.Exists(t => t.Symbol == input.Symbol))
-        {
-            _logger.LogInformation("GetUserTokenAccessInfoAsync no permission.");
-            return new UserTokenAccessInfoDto();
-        }
+        AssertHelper.IsTrue(listDto != null && !listDto.TokenOwnerList.IsNullOrEmpty() &&
+            listDto.TokenOwnerList.Exists(t => t.Symbol == input.Symbol), "Symbol invalid.");
         
-        return _objectMapper.Map<UserTokenAccessInfoIndex, UserTokenAccessInfoDto>(await GetUserTokenAccessInfoIndexAsync(input.Symbol));
+        return _objectMapper.Map<UserTokenAccessInfoIndex, UserTokenAccessInfoDto>(await GetUserTokenAccessInfoIndexAsync(input.Symbol, address));
     }
 
     public async Task<CheckChainAccessStatusResultDto> CheckChainAccessStatusAsync(CheckChainAccessStatusInput input)
@@ -285,12 +278,39 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
 
     public async Task<string> PrepareBindingIssueAsync(PrepareBindIssueInput input)
     {
-        throw new NotImplementedException();
+        AssertHelper.IsTrue(!input.ChainId.IsNullOrEmpty() || !input.OtherChainId.IsNullOrEmpty(), 
+            "Param invalid.");
+        var chainStatus = await CheckChainAccessStatusAsync(new CheckChainAccessStatusInput { Symbol = input.Symbol });
+        AssertHelper.IsTrue(input.ChainId.IsNullOrEmpty() || chainStatus.ChainList.Exists(
+            c => c.ChainId == input.ChainId), "Param invalid.");
+        AssertHelper.IsTrue(input.OtherChainId.IsNullOrEmpty() || chainStatus.OtherChainList.Exists(
+            c => c.ChainId == input.OtherChainId), "Param invalid.");
+
+        var key = string.Join(CommonConstant.Underline, input.Symbol, input.Address, input.OtherChainId);
+        var tokenInvokeGrain = _clusterClient.GetGrain<ITokenInvokeGrain>(key);
+        var dto = new UserTokenIssueDto
+        {
+            Id = GuidHelper.UniqGuid(input.Symbol, input.Address, input.OtherChainId),
+            Address = await GetUserAddressAsync(),
+            WalletAddress = input.Address,
+            Symbol = input.Symbol,
+            ChainId = input.ChainId,
+            TokenName = chainStatus.OtherChainList.FirstOrDefault(t => t.ChainId == input.OtherChainId).TokenName,
+            TokenImage = chainStatus.OtherChainList.FirstOrDefault(t => t.ChainId == input.OtherChainId).Icon,
+            OtherChainId = input.OtherChainId,
+            TotalSupply = input.Supply
+        };
+        return await tokenInvokeGrain.PrepareBinding(dto);
     }
     
     public async Task<bool> GetBindingIssueAsync(string id)
     {
-        throw new NotImplementedException();
+        AssertHelper.IsTrue(!id.IsNullOrEmpty(), "Param invalid."); 
+        var address = await GetUserAddressAsync();
+        AssertHelper.IsTrue(!address.IsNullOrEmpty(), "No permission."); 
+        
+        var tokenInvokeGrain = _clusterClient.GetGrain<ITokenInvokeGrain>(id);
+        return await tokenInvokeGrain.Binding(id);
     }
 
     public async Task<PagedResultDto<TokenApplyOrderResultDto>> GetTokenApplyOrderListAsync(GetTokenApplyOrderListInput input)
@@ -362,10 +382,11 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         return userDto?.AddressInfos?.FirstOrDefault()?.Address;
     }
     
-    private async Task<UserTokenAccessInfoIndex> GetUserTokenAccessInfoIndexAsync(string symbol)
+    private async Task<UserTokenAccessInfoIndex> GetUserTokenAccessInfoIndexAsync(string symbol, string address)
     {
         var mustQuery = new List<Func<QueryContainerDescriptor<UserTokenAccessInfoIndex>, QueryContainer>>();
         mustQuery.Add(q => q.Term(i => i.Field(f => f.Symbol).Value(symbol)));
+        mustQuery.Add(q => q.Term(i => i.Field(f => f.UserAddress).Value(address)));
         QueryContainer Filter(QueryContainerDescriptor<UserTokenAccessInfoIndex> f) => f.Bool(b => b.Must(mustQuery));
         return await _userTokenInfoIndexRepository.GetAsync(Filter);
     }
