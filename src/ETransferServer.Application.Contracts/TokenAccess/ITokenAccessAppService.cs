@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using ETransferServer.Dtos.TokenAccess;
 using Volo.Abp.Application.Dtos;
@@ -15,6 +16,6 @@ public interface ITokenAccessAppService
     Task<AddChainResultDto> AddChainAsync(AddChainInput input);
     Task<string> PrepareBindingIssueAsync(PrepareBindIssueInput input);
     Task<bool> GetBindingIssueAsync(string id);
-    Task<PagedResultDto<TokenApplyOrderDto>> GetTokenApplyOrderListAsync(GetTokenApplyOrderListInput input);
-    Task<TokenApplyOrderDto> GetTokenApplyOrderDetailAsync(GetTokenApplyOrderInput input);
+    Task<PagedResultDto<TokenApplyOrderResultDto>> GetTokenApplyOrderListAsync(GetTokenApplyOrderListInput input);
+    Task<List<TokenApplyOrderResultDto>> GetTokenApplyOrderDetailAsync(GetTokenApplyOrderInput input);
 }

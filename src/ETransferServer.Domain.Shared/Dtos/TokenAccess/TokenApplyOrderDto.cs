@@ -34,3 +34,9 @@ public class ChainTokenInfoDto
     [Id(10)] public string BalanceAmount { get; set; }
     [Id(11)] public string MinAmount { get; set; }
 }
+
+public static class ExtensionKey
+{
+    public const string RejectedReason = "RejectedReason";
+    public const string FailedReason = "FailedReason";
+}

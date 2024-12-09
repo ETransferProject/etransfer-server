@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using AElf.OpenTelemetry.ExecutionTime;
 using Asp.Versioning;
@@ -75,14 +76,14 @@ public class TokenAccessController : ETransferController
     
     [Authorize]
     [HttpGet("list")]
-    public async Task<PagedResultDto<TokenApplyOrderDto>> GetTokenApplyOrderListAsync(GetTokenApplyOrderListInput input)
+    public async Task<PagedResultDto<TokenApplyOrderResultDto>> GetTokenApplyOrderListAsync(GetTokenApplyOrderListInput input)
     {
         return await _tokenAccessAppService.GetTokenApplyOrderListAsync(input);
     }
     
     [Authorize]
     [HttpGet("detail")]
-    public async Task<TokenApplyOrderDto> GetTokenApplyOrderDetailAsync(GetTokenApplyOrderInput input)
+    public async Task<List<TokenApplyOrderResultDto>> GetTokenApplyOrderDetailAsync(GetTokenApplyOrderInput input)
     {
         return await _tokenAccessAppService.GetTokenApplyOrderDetailAsync(input);
     }

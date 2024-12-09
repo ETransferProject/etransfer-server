@@ -293,28 +293,65 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         throw new NotImplementedException();
     }
 
-    public async Task<PagedResultDto<TokenApplyOrderDto>> GetTokenApplyOrderListAsync(GetTokenApplyOrderListInput input)
+    public async Task<PagedResultDto<TokenApplyOrderResultDto>> GetTokenApplyOrderListAsync(GetTokenApplyOrderListInput input)
     {
         var address = await GetUserAddressAsync();
-        if (address.IsNullOrEmpty()) return new PagedResultDto<TokenApplyOrderDto>();
+        if (address.IsNullOrEmpty()) return new PagedResultDto<TokenApplyOrderResultDto>();
         var mustQuery = new List<Func<QueryContainerDescriptor<TokenApplyOrderIndex>, QueryContainer>>();
         mustQuery.Add(q => q.Term(i => i.Field(f => f.UserAddress).Value(address)));
         QueryContainer Filter(QueryContainerDescriptor<TokenApplyOrderIndex> f) => f.Bool(b => b.Must(mustQuery));
         var (count, list) = await _tokenApplyOrderIndexRepository.GetSortListAsync(Filter,
             sortFunc: s => s.Ascending(a => a.UpdateTime), 
             skip: input.SkipCount, limit: input.MaxResultCount);
-        return new PagedResultDto<TokenApplyOrderDto>
+        return new PagedResultDto<TokenApplyOrderResultDto>
         {
-            Items = _objectMapper.Map<List<TokenApplyOrderIndex>, List<TokenApplyOrderDto>>(list),
+            Items = await LoopCollectionItemsAsync(
+                _objectMapper.Map<List<TokenApplyOrderIndex>, List<TokenApplyOrderResultDto>>(list), list),
             TotalCount = count
         };
     }
 
-    public async Task<TokenApplyOrderDto> GetTokenApplyOrderDetailAsync(GetTokenApplyOrderInput input)
+     public async Task<List<TokenApplyOrderResultDto>> GetTokenApplyOrderDetailAsync(GetTokenApplyOrderInput input)
     {
-        if (!Guid.TryParse(input.Id, out _)) return new TokenApplyOrderDto();
-        var tokenApplyOrder = await _tokenApplyOrderIndexRepository.GetAsync(Guid.Parse(input.Id));
-        return _objectMapper.Map<TokenApplyOrderIndex, TokenApplyOrderDto>(tokenApplyOrder);
+        var address = await GetUserAddressAsync();
+        if (address.IsNullOrEmpty()) return new List<TokenApplyOrderResultDto>();
+        var list = await GetTokenApplyOrderIndexListAsync(address, input.Symbol, input.Id, input.ChainId);
+        return await LoopCollectionItemsAsync(
+            _objectMapper.Map<List<TokenApplyOrderIndex>, List<TokenApplyOrderResultDto>>(list), list);
+    }
+    
+    private async Task<List<TokenApplyOrderResultDto>> LoopCollectionItemsAsync(List<TokenApplyOrderResultDto> itemList,
+        List<TokenApplyOrderIndex> indexList)
+    {
+        foreach (var item in itemList)
+        {
+            item.StatusChangedRecord = null;
+            var index = indexList.FirstOrDefault(i => i.Id == item.Id);
+            if (item.Status == TokenApplyOrderStatus.Rejected.ToString())
+            {
+                item.RejectedTime = index != null && index.StatusChangedRecord != null &&
+                                    index.StatusChangedRecord.ContainsKey(TokenApplyOrderStatus.Rejected.ToString())
+                    ? index.StatusChangedRecord[TokenApplyOrderStatus.Rejected.ToString()].SafeToLong()
+                    : 0L;
+                item.RejectedReason = index != null && index.ExtensionInfo != null &&
+                                      index.ExtensionInfo.ContainsKey(ExtensionKey.RejectedReason)
+                    ? index.ExtensionInfo[ExtensionKey.RejectedReason]
+                    : null;
+            }
+            else if (item.Status == TokenApplyOrderStatus.Failed.ToString())
+            {
+                item.FailedTime = index != null && index.StatusChangedRecord != null &&
+                                  index.StatusChangedRecord.ContainsKey(TokenApplyOrderStatus.Failed.ToString())
+                    ? index.StatusChangedRecord[TokenApplyOrderStatus.Failed.ToString()].SafeToLong()
+                    : 0L;
+                item.FailedReason = index != null && index.ExtensionInfo != null &&
+                                    index.ExtensionInfo.ContainsKey(ExtensionKey.FailedReason)
+                    ? index.ExtensionInfo[ExtensionKey.FailedReason]
+                    : null;
+            }
+        }
+
+        return itemList;
     }
 
     private async Task<string> GetUserAddressAsync()
@@ -341,11 +378,24 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         return await _tokenApplyOrderIndexRepository.GetAsync(Filter);
     }
     
-    private async Task<List<TokenApplyOrderIndex>> GetTokenApplyOrderIndexListAsync(string address, string symbol = null)
+    private async Task<List<TokenApplyOrderIndex>> GetTokenApplyOrderIndexListAsync(string address, string symbol, 
+        string id = null, string chainId = null)
     {
         var mustQuery = new List<Func<QueryContainerDescriptor<TokenApplyOrderIndex>, QueryContainer>>();
         mustQuery.Add(q => q.Term(i => i.Field(f => f.UserAddress).Value(address)));
         mustQuery.Add(q => q.Term(i => i.Field(f => f.Symbol).Value(symbol)));
+        if (!id.IsNullOrEmpty())
+        {
+            mustQuery.Add(q => q.Term(i => i.Field(f => f.Id).Value(id)));
+        }
+        if (!chainId.IsNullOrEmpty())
+        {
+            mustQuery.Add(q => q.Bool(i => i.Should(
+                s => s.Match(k =>
+                    k.Field("chainTokenInfo.chainId").Query(chainId)),
+                s => s.Term(k =>
+                    k.Field(f => f.OtherChainTokenInfo.ChainId).Value(chainId)))));
+        }
         QueryContainer Filter(QueryContainerDescriptor<TokenApplyOrderIndex> f) => f.Bool(b => b.Must(mustQuery));
         var result = await _tokenApplyOrderIndexRepository.GetListAsync(Filter);
         return result.Item2;
