@@ -16,6 +16,7 @@ namespace ETransferServer.Grains.Grain.Token;
 
 public interface ITokenInvokeGrain : IGrainWithStringKey
 {
+    Task<TokenOwnerListDto> GetUserTokenOwnerList();
     Task<string> GetLiquidityInUsd();
     Task<UserTokenBindingDto> PrepareBinding(UserTokenIssueDto dto);
     Task<bool> Binding(UserTokenBindingDto dto);
@@ -27,9 +28,9 @@ public class TokenInvokeGrain : Grain<TokenInvokeState>, ITokenInvokeGrain
     private readonly ILogger<TokenGrain> _logger;
     private readonly IHttpProvider _httpProvider;
     private readonly IOptionsSnapshot<TokenAccessOptions> _tokenAccessOptions;
+    private ApiInfo _scanTokenDetailUri => new(HttpMethod.Get, _tokenAccessOptions.Value.ScanTokenDetailUri);
     private ApiInfo _tokenLiquidityUri => new(HttpMethod.Get, _tokenAccessOptions.Value.AwakenGetTokenLiquidityUri);
-    private ApiInfo _prepareBindingUri => new(HttpMethod.Get, _tokenAccessOptions.Value.SymbolMarketPrepareBindingUri);
-    private ApiInfo _bindingUri => new(HttpMethod.Get, _tokenAccessOptions.Value.SymbolMarketBindingUri);
+    private const int PageSize = 50;
 
     public TokenInvokeGrain(ILogger<TokenGrain> logger, 
         IHttpProvider httpProvider,
@@ -38,6 +39,63 @@ public class TokenInvokeGrain : Grain<TokenInvokeState>, ITokenInvokeGrain
         _logger = logger;
         _httpProvider = httpProvider;
         _tokenAccessOptions = tokenAccessOptions;
+    }
+    
+    public async Task<TokenOwnerListDto> GetUserTokenOwnerList()
+    {
+        _logger.LogDebug("UserTokenList start query, {address}", this.GetPrimaryKeyString());
+        var skipCount = 0;
+        var tokenOwnerList = new TokenOwnerListDto();
+        
+        var userTokenListUri = $"{_tokenAccessOptions.Value.SymbolMarketUserTokenListUri}?addressList={string.Join(CommonConstant.Underline, TokenSymbol.ELF, this.GetPrimaryKeyString(), ChainId.AELF)}" +
+                               $"&addressList={string.Join(CommonConstant.Underline, TokenSymbol.ELF, this.GetPrimaryKeyString(), ChainId.tDVV)}" +
+                               $"&addressList={string.Join(CommonConstant.Underline, TokenSymbol.ELF, this.GetPrimaryKeyString(), ChainId.tDVW)}";
+        var uri = new ApiInfo(HttpMethod.Get, userTokenListUri);
+        while (true)
+        {
+            var resultDto = new UserTokenListResultDto();
+            try
+            {
+                var tokenParams = new Dictionary<string, string>();
+                tokenParams["skipCount"] = skipCount.ToString();
+                tokenParams["maxResultCount"] = PageSize.ToString();
+                resultDto = await _httpProvider.InvokeAsync<UserTokenListResultDto>(_tokenAccessOptions.Value.SymbolMarketBaseUrl, uri, param: tokenParams);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "get user tokens error.");
+            }
+        
+            if (resultDto == null || resultDto.Code != "20000" || resultDto.Data == null || resultDto.Data.Items.IsNullOrEmpty())
+            {
+                break;
+            }
+
+            skipCount += resultDto.Data.Items.Count;
+            foreach (var item in resultDto.Data.Items)
+            {
+                var detailDto = await _httpProvider.InvokeAsync<TokenDetailResultDto>(
+                    _tokenAccessOptions.Value.ScanBaseUrl, _scanTokenDetailUri,
+                    param: new Dictionary<string, string> { ["symbol"] = item.Symbol });
+                tokenOwnerList.TokenOwnerList.Add(new TokenOwnerDto {
+                    TokenName = item.TokenName,
+                    Symbol = item.Symbol,
+                    Decimals = item.Decimals,
+                    Icon = item.TokenImage,
+                    Owner = item.Owner,
+                    ChainIds = detailDto?.Data?.ChainIds ?? new List<string> { item.OriginIssueChain },
+                    TotalSupply = item.TotalSupply,
+                    Holders = detailDto?.Data?.Holders ?? 0,
+                    ContractAddress = detailDto?.Data?.TokenContractAddress,
+                    Status = TokenApplyOrderStatus.Issued.ToString()
+                });
+            }
+            
+            if (resultDto.Data.Items.Count < PageSize) break;
+        }
+        var tokenOwnerGrain = GrainFactory.GetGrain<IUserTokenOwnerGrain>(this.GetPrimaryKeyString());
+        await tokenOwnerGrain.AddOrUpdate(tokenOwnerList);
+        return tokenOwnerList;
     }
 
     [ExceptionHandler(typeof(Exception), TargetType = typeof(TokenInvokeGrain), 
@@ -200,6 +258,45 @@ public class TokenInvokeGrain : Grain<TokenInvokeState>, ITokenInvokeGrain
         var requestHash = HashHelper.ComputeFrom(string.Concat(request, hashVerifyKey));
         return requestHash.ToHex();
     }
+}
+
+public class UserTokenListResultDto
+{
+    public string Code { get; set; }
+    public UserTokenDataDto Data { get; set; }
+}
+
+public class UserTokenDataDto {
+    public int TotalCount { get; set; }
+    public List<UserTokenItemDto> Items { get; set; }
+}
+
+public class UserTokenItemDto
+{
+    public string TokenName { get; set; }
+    public string Symbol { get; set; }
+    public string TokenImage { get; set; }
+    public string Issuer { get; set; }
+    public string Owner { get; set; }
+    public int Decimals { get; set; }
+    public long TotalSupply { get; set; }
+    public long CurrentSupply { get; set; }
+    public string IssueChain { get; set; }
+    public long IssueChainId { get; set; }
+    public string OriginIssueChain { get; set; }
+    public string TokenAction { get; set; }
+}
+
+public class TokenDetailResultDto
+{
+    public string Code { get; set; }
+    public TokenDetailDto Data { get; set; }
+}
+
+public class TokenDetailDto {
+    public string TokenContractAddress { get; set; }
+    public int Holders { get; set; }
+    public List<string> ChainIds { get; set; }
 }
 
 public class PrepareBindingInput

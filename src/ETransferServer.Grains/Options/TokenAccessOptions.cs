@@ -4,6 +4,7 @@ public class TokenAccessOptions
 {
     public string ScanBaseUrl { get; set; }
     public string ScanTokenListUri { get; set; }
+    public string ScanTokenDetailUri { get; set; }
     public string SymbolMarketBaseUrl { get; set; }
     public string SymbolMarketUserTokenListUri { get; set; }
     public string SymbolMarketUserThirdTokenListUri { get; set; }

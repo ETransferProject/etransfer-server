@@ -81,12 +81,12 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         var result = new AvailableTokensDto();
         var address = await GetUserAddressAsync();
         if (address.IsNullOrEmpty()) return result;
-        var tokenOwnerGrain = _clusterClient.GetGrain<ITokenOwnerRecordGrain>(address);
-        var listDto = await tokenOwnerGrain.Get();
+        var tokenInvokeGrain = _clusterClient.GetGrain<ITokenInvokeGrain>(address);
+        var listDto = await tokenInvokeGrain.GetUserTokenOwnerList();
         if (listDto == null || listDto.TokenOwnerList.IsNullOrEmpty()) return result;
         foreach (var token in listDto.TokenOwnerList)
         {
-            var tokenInvokeGrain = _clusterClient.GetGrain<ITokenInvokeGrain>(token.Symbol);
+            tokenInvokeGrain = _clusterClient.GetGrain<ITokenInvokeGrain>(token.Symbol);
             result.TokenList.Add(new()
             {
                 TokenName = token.TokenName,
@@ -104,7 +104,7 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
     {
         var address = await GetUserAddressAsync();
         AssertHelper.IsTrue(!address.IsNullOrEmpty(), "No permission."); 
-        var tokenOwnerGrain = _clusterClient.GetGrain<ITokenOwnerRecordGrain>(address);
+        var tokenOwnerGrain = _clusterClient.GetGrain<IUserTokenOwnerGrain>(address);
         var listDto = await tokenOwnerGrain.Get();
         AssertHelper.IsTrue(listDto != null && !listDto.TokenOwnerList.IsNullOrEmpty() &&
             listDto.TokenOwnerList.Exists(t => t.Symbol == input.Symbol), "Symbol invalid.");
@@ -137,7 +137,7 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
     {
         var address = await GetUserAddressAsync();
         AssertHelper.IsTrue(!address.IsNullOrEmpty(), "No permission."); 
-        var tokenOwnerGrain = _clusterClient.GetGrain<ITokenOwnerRecordGrain>(address);
+        var tokenOwnerGrain = _clusterClient.GetGrain<IUserTokenOwnerGrain>(address);
         var listDto = await tokenOwnerGrain.Get();
         AssertHelper.IsTrue(listDto != null && !listDto.TokenOwnerList.IsNullOrEmpty() &&
             listDto.TokenOwnerList.Exists(t => t.Symbol == input.Symbol), "Symbol invalid.");
@@ -150,7 +150,7 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         var result = new CheckChainAccessStatusResultDto();
         var address = await GetUserAddressAsync();
         AssertHelper.IsTrue(!address.IsNullOrEmpty(), "No permission."); 
-        var tokenOwnerGrain = _clusterClient.GetGrain<ITokenOwnerRecordGrain>(address);
+        var tokenOwnerGrain = _clusterClient.GetGrain<IUserTokenOwnerGrain>(address);
         var listDto = await tokenOwnerGrain.Get();
         AssertHelper.IsTrue(listDto != null && !listDto.TokenOwnerList.IsNullOrEmpty() &&
             listDto.TokenOwnerList.Exists(t => t.Symbol == input.Symbol), "Symbol invalid.");

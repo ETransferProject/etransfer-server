@@ -81,11 +81,12 @@ public class TokenOwnerTimerGrain : Grain<TokenOwnerState>, ITokenOwnerTimerGrai
                 _logger.LogError(e, "get aelfscan tokens error.");
             }
         
-            if (resultDto.Code != "20000" && resultDto.Data.List.Count < 0)
+            if (resultDto == null || resultDto.Code != "20000" || resultDto.Data == null || resultDto.Data.List.IsNullOrEmpty())
             {
                 break;
             }
 
+            _logger.LogDebug("TokenOwnerTimerGrain call, {skipCount}", skipCount);
             skipCount += resultDto.Data.List.Count;
             foreach (var item in resultDto.Data.List)
             {
