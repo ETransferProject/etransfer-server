@@ -188,6 +188,14 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
             item.Checked = isCompleted ||
                            applyOrderList.Exists(t => !t.ChainTokenInfo.IsNullOrEmpty() &&
                                t.ChainTokenInfo.Exists(c => c.ChainId == item.ChainId));
+            var userTokenIssueGrain = _clusterClient.GetGrain<IUserTokenIssueGrain>(
+                GuidHelper.UniqGuid(input.Symbol, address, item.ChainId));
+            var res = await userTokenIssueGrain.Get();
+            if (res != null && !res.BindingId.IsNullOrEmpty() && !res.ThirdTokenId.IsNullOrEmpty())
+            {
+                item.BindingId = res.BindingId;
+                item.ThirdTokenId = res.ThirdTokenId;
+            }
         }
 
         foreach (var item in result.OtherChainList)
@@ -208,6 +216,14 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
             item.Checked = isCompleted ||
                            applyOrderList.Exists(t => t.OtherChainTokenInfo != null &&
                                                       t.OtherChainTokenInfo.ChainId == item.ChainId);
+            var userTokenIssueGrain = _clusterClient.GetGrain<IUserTokenIssueGrain>(
+                GuidHelper.UniqGuid(input.Symbol, address, item.ChainId));
+            var res = await userTokenIssueGrain.Get();
+            if (res != null && !res.BindingId.IsNullOrEmpty() && !res.ThirdTokenId.IsNullOrEmpty())
+            {
+                item.BindingId = res.BindingId;
+                item.ThirdTokenId = res.ThirdTokenId;
+            }
         }
 
         return result;
@@ -292,7 +308,7 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         return result;
     }
 
-    public async Task<string> PrepareBindingIssueAsync(PrepareBindIssueInput input)
+    public async Task<UserTokenBindingDto> PrepareBindingIssueAsync(PrepareBindIssueInput input)
     {
         AssertHelper.IsTrue(!input.ChainId.IsNullOrEmpty() || !input.OtherChainId.IsNullOrEmpty(), 
             "Param invalid.");
@@ -302,11 +318,12 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         AssertHelper.IsTrue(input.OtherChainId.IsNullOrEmpty() || chainStatus.OtherChainList.Exists(
             c => c.ChainId == input.OtherChainId), "Param invalid.");
 
-        var key = string.Join(CommonConstant.Underline, input.Symbol, input.Address, input.OtherChainId);
-        var tokenInvokeGrain = _clusterClient.GetGrain<ITokenInvokeGrain>(key);
+        var address = await GetUserAddressAsync();
+        var tokenInvokeGrain = _clusterClient.GetGrain<ITokenInvokeGrain>(
+            string.Join(CommonConstant.Underline, input.Symbol, address, input.OtherChainId));
         var dto = new UserTokenIssueDto
         {
-            Id = GuidHelper.UniqGuid(input.Symbol, input.Address, input.OtherChainId),
+            Id = GuidHelper.UniqGuid(input.Symbol, address, input.OtherChainId),
             Address = await GetUserAddressAsync(),
             WalletAddress = input.Address,
             Symbol = input.Symbol,
@@ -314,19 +331,20 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
             TokenName = chainStatus.OtherChainList.FirstOrDefault(t => t.ChainId == input.OtherChainId).TokenName,
             TokenImage = chainStatus.OtherChainList.FirstOrDefault(t => t.ChainId == input.OtherChainId).Icon,
             OtherChainId = input.OtherChainId,
+            ContractAddress = input.ContractAddress,
             TotalSupply = input.Supply
         };
         return await tokenInvokeGrain.PrepareBinding(dto);
     }
     
-    public async Task<bool> GetBindingIssueAsync(string id)
+    public async Task<bool> GetBindingIssueAsync(UserTokenBindingDto input)
     {
-        AssertHelper.IsTrue(!id.IsNullOrEmpty(), "Param invalid."); 
         var address = await GetUserAddressAsync();
         AssertHelper.IsTrue(!address.IsNullOrEmpty(), "No permission."); 
         
-        var tokenInvokeGrain = _clusterClient.GetGrain<ITokenInvokeGrain>(id);
-        return await tokenInvokeGrain.Binding(id);
+        var tokenInvokeGrain = _clusterClient.GetGrain<ITokenInvokeGrain>(
+            string.Join(CommonConstant.Underline, input.BindingId, input.ThirdTokenId));
+        return await tokenInvokeGrain.Binding(input);
     }
 
     public async Task<PagedResultDto<TokenApplyOrderResultDto>> GetTokenApplyOrderListAsync(GetTokenApplyOrderListInput input)

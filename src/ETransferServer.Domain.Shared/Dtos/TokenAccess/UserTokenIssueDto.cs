@@ -17,5 +17,8 @@ public class UserTokenIssueDto
     [Id(8)] public string TokenImage { get; set; }
     [Id(9)] public string OtherChainId { get; set; }
     [Id(10)] public string TotalSupply { get; set; }
-    [Id(11)] public string BindingId { get; set; }
+    [Id(11)] public string ContractAddress { get; set; }
+    [Id(12)] public string BindingId { get; set; }
+    [Id(13)] public string ThirdTokenId { get; set; }
+    [Id(14)] public string Status { get; set; }
 }

@@ -21,4 +21,6 @@ public class ChainAccessInfo
     public string Icon { get; set; }
     public string PoolAddress { get; set; }
     public string ContractAddress { get; set; }
+    public string BindingId { get; set; }
+    public string ThirdTokenId { get; set; }
 }

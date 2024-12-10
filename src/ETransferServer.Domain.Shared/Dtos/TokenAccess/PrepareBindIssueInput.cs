@@ -8,5 +8,6 @@ public class PrepareBindIssueInput
     [Required] public string Symbol { get; set; }
     public string? ChainId { get; set; }
     public string? OtherChainId { get; set; }
+    [Required] public string ContractAddress { get; set; }
     [Required] public string Supply { get; set; }
 }

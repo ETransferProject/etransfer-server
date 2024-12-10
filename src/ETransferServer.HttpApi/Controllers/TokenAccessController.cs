@@ -68,16 +68,16 @@ public class TokenAccessController : ETransferController
     
     [Authorize]
     [HttpPost("prepare-binding-issue")]
-    public async Task<string> PrepareBindingIssueAsync(PrepareBindIssueInput input)
+    public async Task<UserTokenBindingDto> PrepareBindingIssueAsync(PrepareBindIssueInput input)
     {
         return await _tokenAccessAppService.PrepareBindingIssueAsync(input);
     }
     
     [Authorize]
-    [HttpGet("issue/{id}")]
-    public async Task<bool> GetBindingIssueAsync(string id)
+    [HttpGet("issue-binding")]
+    public async Task<bool> GetBindingIssueAsync(UserTokenBindingDto input)
     {
-        return await _tokenAccessAppService.GetBindingIssueAsync(id);
+        return await _tokenAccessAppService.GetBindingIssueAsync(input);
     }
     
     [Authorize]

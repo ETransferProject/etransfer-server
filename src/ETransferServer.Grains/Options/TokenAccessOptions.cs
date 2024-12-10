@@ -12,4 +12,5 @@ public class TokenAccessOptions
     public string AwakenBaseUrl { get; set; }
     public string AwakenGetTokenLiquidityUri { get; set; }
     public int DataExpireSeconds { get; set; } = 180;
+    public string HashVerifyKey { get; set; }
 }
