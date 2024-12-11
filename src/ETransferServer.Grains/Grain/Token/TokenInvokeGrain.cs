@@ -17,6 +17,7 @@ namespace ETransferServer.Grains.Grain.Token;
 public interface ITokenInvokeGrain : IGrainWithStringKey
 {
     Task<TokenOwnerListDto> GetUserTokenOwnerList();
+    Task<bool> GetThirdTokenList(string address, string symbol);
     Task<UserTokenBindingDto> PrepareBinding(UserTokenIssueDto dto);
     Task<bool> Binding(UserTokenBindingDto dto);
     Task<bool> AddOrUpdateTokenIssue(Guid issueId);
@@ -29,6 +30,7 @@ public class TokenInvokeGrain : Grain<TokenInvokeState>, ITokenInvokeGrain
     private readonly IOptionsSnapshot<TokenAccessOptions> _tokenAccessOptions;
     private ApiInfo _scanTokenDetailUri => new(HttpMethod.Get, _tokenAccessOptions.Value.ScanTokenDetailUri);
     private ApiInfo _tokenLiquidityUri => new(HttpMethod.Get, _tokenAccessOptions.Value.AwakenGetTokenLiquidityUri);
+    private ApiInfo _userThirdTokenListUri => new(HttpMethod.Get, _tokenAccessOptions.Value.SymbolMarketUserThirdTokenListUri);
     private const int PageSize = 50;
 
     public TokenInvokeGrain(ILogger<TokenGrain> logger, 
@@ -107,6 +109,41 @@ public class TokenInvokeGrain : Grain<TokenInvokeState>, ITokenInvokeGrain
         var resultDto = await _httpProvider.InvokeAsync<CommonResponseDto<string>>(_tokenAccessOptions.Value.AwakenBaseUrl, _tokenLiquidityUri, param: tokenParams);
         return resultDto.Code == "20000" ? resultDto.Value : "0";
     }
+    
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(TokenInvokeGrain), 
+        MethodName = nameof(HandleGetThirdTokenListExceptionAsync))]
+    public async Task<bool> GetThirdTokenList(string address, string symbol)
+    {
+        var tokenParams = new Dictionary<string, string>();
+        tokenParams["address"] = address;
+        tokenParams["aelfToken"] = symbol;
+        var resultDto = await _httpProvider.InvokeAsync<CommonResponseDto<ThirdTokenListDto>>(_tokenAccessOptions.Value.SymbolMarketBaseUrl, _userThirdTokenListUri, param: tokenParams);
+        if (resultDto.Code == "20000" && resultDto.Value != null && resultDto.Value.TotalCount > 0)
+        {
+            foreach (var item in resultDto.Value.Items)
+            {
+                var userTokenIssueGrain = GrainFactory.GetGrain<IUserTokenIssueGrain>(
+                    GuidHelper.UniqGuid(symbol, address, item.ThirdChain));
+                var res = await userTokenIssueGrain.Get();
+                res ??= new UserTokenIssueDto
+                {
+                    Id = GuidHelper.UniqGuid(symbol, address, item.ThirdChain),
+                    Address = address,
+                    Symbol = item.ThirdSymbol,
+                    ChainId = item.AelfChain,
+                    TokenName = item.ThirdTokenName,
+                    TokenImage = item.ThirdTokenImage,
+                    OtherChainId = item.ThirdChain,
+                    ContractAddress = item.ThirdContractAddress,
+                    TotalSupply = item.ThirdTotalSupply
+                };
+                res.Status = TokenApplyOrderStatus.Issued.ToString();
+                await userTokenIssueGrain.AddOrUpdate(res);
+            }
+        }
+
+        return false;
+    }
 
     [ExceptionHandler(typeof(Exception), TargetType = typeof(TokenInvokeGrain), 
         MethodName = nameof(HandlePrepareBindingExceptionAsync))]
@@ -143,6 +180,7 @@ public class TokenInvokeGrain : Grain<TokenInvokeState>, ITokenInvokeGrain
         {
             dto.BindingId = resultDto.Value?.BindingId;
             dto.ThirdTokenId = resultDto.Value?.ThirdTokenId;
+            dto.Status = TokenApplyOrderStatus.Issuing.ToString();
             await userTokenIssueGrain.AddOrUpdate(dto);
             var tokenInvokeGrain = GrainFactory.GetGrain<ITokenInvokeGrain>(
                 string.Join(CommonConstant.Underline, dto.BindingId, dto.ThirdTokenId));
@@ -157,7 +195,6 @@ public class TokenInvokeGrain : Grain<TokenInvokeState>, ITokenInvokeGrain
         MethodName = nameof(HandleBindingExceptionAsync))]
     public async Task<bool> Binding(UserTokenBindingDto dto)
     {
-        var now = DateTime.UtcNow.ToUtcMilliSeconds();
         if (State != null && State.UserTokenIssueId != Guid.Empty)
         {
             var userTokenIssueGrain = GrainFactory.GetGrain<IUserTokenIssueGrain>(State.UserTokenIssueId);
@@ -207,7 +244,17 @@ public class TokenInvokeGrain : Grain<TokenInvokeState>, ITokenInvokeGrain
             ReturnValue = "0"
         };
     }
-    
+
+    public async Task<FlowBehavior> HandleGetThirdTokenListExceptionAsync(Exception ex, string address, string symbol)
+    {
+        _logger.LogError(ex, "Get third token failed. {address},{symbol}", address, symbol);
+        return new FlowBehavior
+        {
+            ExceptionHandlingStrategy = ExceptionHandlingStrategy.Return,
+            ReturnValue = false
+        };
+    }
+
     public async Task<FlowBehavior> HandlePrepareBindingExceptionAsync(Exception ex, UserTokenIssueDto dto)
     {
         _logger.LogError(ex, "Post prepare binding failed. {dto}", JsonConvert.SerializeObject(dto));
@@ -283,6 +330,24 @@ public class TokenDetailDto {
     public string TokenContractAddress { get; set; }
     public int Holders { get; set; }
     public List<string> ChainIds { get; set; }
+}
+
+public class ThirdTokenListDto
+{
+    public int TotalCount { get; set; }
+    public List<ThirdTokenItemDto> Items { get; set; }
+}
+
+public class ThirdTokenItemDto
+{
+    public string AelfChain { get; set; }
+    public string AelfToken { get; set; }
+    public string ThirdChain { get; set; }
+    public string ThirdTokenName { get; set; }
+    public string ThirdSymbol { get; set; }
+    public string ThirdTokenImage { get; set; }
+    public string ThirdContractAddress { get; set; }      
+    public string ThirdTotalSupply { get; set; }
 }
 
 public class PrepareBindingInput
