@@ -17,7 +17,6 @@ namespace ETransferServer.Grains.Grain.Token;
 public interface ITokenInvokeGrain : IGrainWithStringKey
 {
     Task<TokenOwnerListDto> GetUserTokenOwnerList();
-    Task<string> GetLiquidityInUsd();
     Task<UserTokenBindingDto> PrepareBinding(UserTokenIssueDto dto);
     Task<bool> Binding(UserTokenBindingDto dto);
     Task<bool> AddOrUpdateTokenIssue(Guid issueId);
@@ -85,6 +84,7 @@ public class TokenInvokeGrain : Grain<TokenInvokeState>, ITokenInvokeGrain
                     Owner = item.Owner,
                     ChainIds = detailDto?.Data?.ChainIds ?? new List<string> { item.OriginIssueChain },
                     TotalSupply = item.TotalSupply,
+                    LiquidityInUsd = await GetLiquidityInUsd(item.Symbol),
                     Holders = detailDto?.Data?.Holders ?? 0,
                     ContractAddress = detailDto?.Data?.TokenContractAddress,
                     Status = TokenApplyOrderStatus.Issued.ToString()
@@ -100,26 +100,12 @@ public class TokenInvokeGrain : Grain<TokenInvokeState>, ITokenInvokeGrain
 
     [ExceptionHandler(typeof(Exception), TargetType = typeof(TokenInvokeGrain), 
         MethodName = nameof(HandleGetLiquidityExceptionAsync))]
-    public async Task<string> GetLiquidityInUsd()
+    public async Task<string> GetLiquidityInUsd(string symbol)
     {
-        var now = DateTime.UtcNow.ToUtcMilliSeconds();
-        if (State.LastModifyTime > 0 && State.ExpireTime > now)
-        {
-            return State.LiquidityInUsd;
-        }
-
         var tokenParams = new Dictionary<string, string>();
-        tokenParams["symbol"] = this.GetPrimaryKeyString();
+        tokenParams["symbol"] = symbol;
         var resultDto = await _httpProvider.InvokeAsync<CommonResponseDto<string>>(_tokenAccessOptions.Value.AwakenBaseUrl, _tokenLiquidityUri, param: tokenParams);
-        if (resultDto.Code == "20000")
-        {
-            State.LiquidityInUsd = resultDto.Value;
-        }
-        
-        State.LastModifyTime = now;
-        State.ExpireTime = now + _tokenAccessOptions.Value.DataExpireSeconds * 1000;
-        await WriteStateAsync();
-        return State.LiquidityInUsd;
+        return resultDto.Code == "20000" ? resultDto.Value : "0";
     }
 
     [ExceptionHandler(typeof(Exception), TargetType = typeof(TokenInvokeGrain), 
@@ -218,7 +204,7 @@ public class TokenInvokeGrain : Grain<TokenInvokeState>, ITokenInvokeGrain
         return new FlowBehavior
         {
             ExceptionHandlingStrategy = ExceptionHandlingStrategy.Return,
-            ReturnValue = State.LiquidityInUsd
+            ReturnValue = "0"
         };
     }
     

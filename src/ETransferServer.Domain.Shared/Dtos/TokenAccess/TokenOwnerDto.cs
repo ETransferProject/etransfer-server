@@ -20,10 +20,11 @@ public class TokenOwnerDto
     [Id(4)] public string Owner { get; set; }
     [Id(5)] public List<string> ChainIds { get; set; } = new();
     [Id(6)] public decimal TotalSupply { get; set; }
-    [Id(7)] public int Holders { get; set; }
-    [Id(8)] public string PoolAddress { get; set; }
-    [Id(9)] public string ContractAddress { get; set; }
-    [Id(10)] public string Status { get; set; }
+    [Id(7)] public string LiquidityInUsd { get; set; }
+    [Id(8)] public int Holders { get; set; }
+    [Id(9)] public string PoolAddress { get; set; }
+    [Id(10)] public string ContractAddress { get; set; }
+    [Id(11)] public string Status { get; set; }
     
     public override bool Equals(object obj)
     {

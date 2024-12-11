@@ -86,14 +86,13 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         if (listDto == null || listDto.TokenOwnerList.IsNullOrEmpty()) return result;
         foreach (var token in listDto.TokenOwnerList)
         {
-            tokenInvokeGrain = _clusterClient.GetGrain<ITokenInvokeGrain>(token.Symbol);
             result.TokenList.Add(new()
             {
                 TokenName = token.TokenName,
                 Symbol = token.Symbol,
                 TokenImage = token.Icon,
                 Holders = token.Holders,
-                LiquidityInUsd = await tokenInvokeGrain.GetLiquidityInUsd()
+                LiquidityInUsd = token.LiquidityInUsd
             });
         }
 
