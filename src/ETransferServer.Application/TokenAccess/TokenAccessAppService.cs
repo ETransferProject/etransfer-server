@@ -106,7 +106,8 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         var tokenOwnerGrain = _clusterClient.GetGrain<IUserTokenOwnerGrain>(address);
         var listDto = await tokenOwnerGrain.Get();
         AssertHelper.IsTrue(listDto != null && !listDto.TokenOwnerList.IsNullOrEmpty() &&
-            listDto.TokenOwnerList.Exists(t => t.Symbol == input.Symbol), "Symbol invalid.");
+            listDto.TokenOwnerList.Exists(t => t.Symbol == input.Symbol) &&
+            CheckLiquidityAndHolderAvailable(listDto.TokenOwnerList, input.Symbol), "Symbol invalid.");
         
         var userTokenAccessInfoGrain = _clusterClient.GetGrain<IUserTokenAccessInfoGrain>(
             string.Join(CommonConstant.Underline, input.Symbol, address));
@@ -139,7 +140,8 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         var tokenOwnerGrain = _clusterClient.GetGrain<IUserTokenOwnerGrain>(address);
         var listDto = await tokenOwnerGrain.Get();
         AssertHelper.IsTrue(listDto != null && !listDto.TokenOwnerList.IsNullOrEmpty() &&
-            listDto.TokenOwnerList.Exists(t => t.Symbol == input.Symbol), "Symbol invalid.");
+            listDto.TokenOwnerList.Exists(t => t.Symbol == input.Symbol) &&
+            CheckLiquidityAndHolderAvailable(listDto.TokenOwnerList, input.Symbol), "Symbol invalid.");
         
         return _objectMapper.Map<UserTokenAccessInfoIndex, UserTokenAccessInfoDto>(await GetUserTokenAccessInfoIndexAsync(input.Symbol, address));
     }
@@ -152,7 +154,8 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         var tokenOwnerGrain = _clusterClient.GetGrain<IUserTokenOwnerGrain>(address);
         var listDto = await tokenOwnerGrain.Get();
         AssertHelper.IsTrue(listDto != null && !listDto.TokenOwnerList.IsNullOrEmpty() &&
-            listDto.TokenOwnerList.Exists(t => t.Symbol == input.Symbol), "Symbol invalid.");
+            listDto.TokenOwnerList.Exists(t => t.Symbol == input.Symbol) &&
+            CheckLiquidityAndHolderAvailable(listDto.TokenOwnerList, input.Symbol), "Symbol invalid.");
 
         var networkList = _networkInfoOptions.Value.NetworkMap.OrderBy(m =>
                 _tokenOptions.Value.Transfer.Select(t => t.Symbol).ToList().IndexOf(m.Key))
@@ -323,7 +326,7 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         var dto = new UserTokenIssueDto
         {
             Id = GuidHelper.UniqGuid(input.Symbol, address, input.OtherChainId),
-            Address = await GetUserAddressAsync(),
+            Address = address,
             WalletAddress = input.Address,
             Symbol = input.Symbol,
             ChainId = input.ChainId,
@@ -413,6 +416,19 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         if (!userId.HasValue) return null;
         var userDto = await _userAppService.GetUserByIdAsync(userId.Value.ToString());
         return userDto?.AddressInfos?.FirstOrDefault()?.Address;
+    }
+    
+    private bool CheckLiquidityAndHolderAvailable(List<TokenOwnerDto> TokenOwnerList, string symbol)
+    {
+        var tokenOwnerDto = TokenOwnerList.FirstOrDefault(t => t.Symbol == symbol);
+        var liquidityInUsd = !_tokenAccessOptions.Value.TokenConfig.ContainsKey(symbol)
+            ? _tokenAccessOptions.Value.DefaultConfig.Liquidity
+            : _tokenAccessOptions.Value.TokenConfig[symbol].Liquidity;
+        var holders = !_tokenAccessOptions.Value.TokenConfig.ContainsKey(symbol)
+            ? _tokenAccessOptions.Value.DefaultConfig.Holders
+            : _tokenAccessOptions.Value.TokenConfig[symbol].Holders;
+        return tokenOwnerDto.LiquidityInUsd.SafeToDecimal() > liquidityInUsd.SafeToDecimal()
+               && tokenOwnerDto.Holders > holders;
     }
     
     private async Task<UserTokenAccessInfoIndex> GetUserTokenAccessInfoIndexAsync(string symbol, string address)
