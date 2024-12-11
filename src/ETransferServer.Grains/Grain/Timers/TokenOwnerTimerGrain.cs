@@ -63,74 +63,74 @@ public class TokenOwnerTimerGrain : Grain<TokenOwnerState>, ITokenOwnerTimerGrai
         _lastCallBackTime = DateTime.UtcNow;
         var skipCount = 0;
 
-        while (true)
-        {
-            var resultDto = new ScanTokenListResultDto();
-            var tokenDic = new Dictionary<string, TokenOwnerListDto>();
-            try
-            {
-                var tokenParams = new Dictionary<string, string>();
-                tokenParams["skipCount"] = skipCount.ToString();
-                tokenParams["maxResultCount"] = PageSize.ToString();
-                tokenParams["sort"] = "Desc";
-                tokenParams["orderBy"] = "HolderCount";
-                resultDto = await _httpProvider.InvokeAsync<ScanTokenListResultDto>(_tokenAccessOptions.Value.ScanBaseUrl, _tokenListUri, param: tokenParams);
-            }
-            catch (Exception e)
-            {
-                _logger.LogError(e, "get aelfscan tokens error.");
-            }
-        
-            if (resultDto == null || resultDto.Code != "20000" || resultDto.Data == null || resultDto.Data.List.IsNullOrEmpty())
-            {
-                break;
-            }
-
-            _logger.LogDebug("TokenOwnerTimerGrain call, {skipCount}", skipCount);
-            skipCount += resultDto.Data.List.Count;
-            foreach (var item in resultDto.Data.List)
-            {
-                var tokenGrain =
-                    GrainFactory.GetGrain<ITokenGrain>(ITokenGrain.GenGrainId(item.Token.Symbol, 
-                        item.ChainIds.IsNullOrEmpty() ? ChainId.AELF : item.ChainIds[0]));
-                var tokenInfo = await tokenGrain.GetToken();
-                if (tokenInfo == null || tokenInfo.Owner.IsNullOrEmpty()) continue;
-
-                var tokenOwnerList = tokenDic.GetOrAdd(tokenInfo.Owner, _ => new TokenOwnerListDto());
-                if (tokenOwnerList.TokenOwnerList.Any(t => t.Symbol == item.Token.Symbol)) continue;
-                tokenOwnerList.TokenOwnerList.Add(new TokenOwnerDto {
-                    TokenName = item.Token.Name,
-                    Symbol = item.Token.Symbol,
-                    Decimals = item.Token.Decimals.SafeToInt(),
-                    Icon = item.Token.ImageUrl,
-                    Owner = tokenInfo.Owner,
-                    ChainIds = item.ChainIds,
-                    TotalSupply = item.TotalSupply,
-                    Holders = item.Holders,
-                    Status = TokenApplyOrderStatus.Issued.ToString()
-                });
-            }
-            foreach (var kv in tokenDic)
-            {
-                var tokenOwnerRecordGrain = GrainFactory.GetGrain<ITokenOwnerRecordGrain>(kv.Key);
-                var listDto = await tokenOwnerRecordGrain.Get();
-                if (listDto != null && !listDto.TokenOwnerList.IsNullOrEmpty())
-                {
-                    var toAdd = kv.Value.TokenOwnerList.Except(listDto.TokenOwnerList);
-                    if (!toAdd.Any()) continue;
-                    await tokenOwnerRecordGrain.AddOrUpdate(new TokenOwnerListDto
-                    {
-                        TokenOwnerList = toAdd.ToList()
-                    });
-                }
-                else
-                {
-                    await tokenOwnerRecordGrain.AddOrUpdate(kv.Value);
-                }
-            }
-        
-            if (resultDto.Data.List.Count < PageSize) break;
-        }
+        // while (true)
+        // {
+        //     var resultDto = new ScanTokenListResultDto();
+        //     var tokenDic = new Dictionary<string, TokenOwnerListDto>();
+        //     try
+        //     {
+        //         var tokenParams = new Dictionary<string, string>();
+        //         tokenParams["skipCount"] = skipCount.ToString();
+        //         tokenParams["maxResultCount"] = PageSize.ToString();
+        //         tokenParams["sort"] = "Desc";
+        //         tokenParams["orderBy"] = "HolderCount";
+        //         resultDto = await _httpProvider.InvokeAsync<ScanTokenListResultDto>(_tokenAccessOptions.Value.ScanBaseUrl, _tokenListUri, param: tokenParams);
+        //     }
+        //     catch (Exception e)
+        //     {
+        //         _logger.LogError(e, "get aelfscan tokens error.");
+        //     }
+        //
+        //     if (resultDto == null || resultDto.Code != "20000" || resultDto.Data == null || resultDto.Data.List.IsNullOrEmpty())
+        //     {
+        //         break;
+        //     }
+        //
+        //     _logger.LogDebug("TokenOwnerTimerGrain call, {skipCount}", skipCount);
+        //     skipCount += resultDto.Data.List.Count;
+        //     foreach (var item in resultDto.Data.List)
+        //     {
+        //         var tokenGrain =
+        //             GrainFactory.GetGrain<ITokenGrain>(ITokenGrain.GenGrainId(item.Token.Symbol, 
+        //                 item.ChainIds.IsNullOrEmpty() ? ChainId.AELF : item.ChainIds[0]));
+        //         var tokenInfo = await tokenGrain.GetToken();
+        //         if (tokenInfo == null || tokenInfo.Owner.IsNullOrEmpty()) continue;
+        //
+        //         var tokenOwnerList = tokenDic.GetOrAdd(tokenInfo.Owner, _ => new TokenOwnerListDto());
+        //         if (tokenOwnerList.TokenOwnerList.Any(t => t.Symbol == item.Token.Symbol)) continue;
+        //         tokenOwnerList.TokenOwnerList.Add(new TokenOwnerDto {
+        //             TokenName = item.Token.Name,
+        //             Symbol = item.Token.Symbol,
+        //             Decimals = item.Token.Decimals.SafeToInt(),
+        //             Icon = item.Token.ImageUrl,
+        //             Owner = tokenInfo.Owner,
+        //             ChainIds = item.ChainIds,
+        //             TotalSupply = item.TotalSupply,
+        //             Holders = item.Holders,
+        //             Status = TokenApplyOrderStatus.Issued.ToString()
+        //         });
+        //     }
+        //     foreach (var kv in tokenDic)
+        //     {
+        //         var tokenOwnerRecordGrain = GrainFactory.GetGrain<ITokenOwnerRecordGrain>(kv.Key);
+        //         var listDto = await tokenOwnerRecordGrain.Get();
+        //         if (listDto != null && !listDto.TokenOwnerList.IsNullOrEmpty())
+        //         {
+        //             var toAdd = kv.Value.TokenOwnerList.Except(listDto.TokenOwnerList);
+        //             if (!toAdd.Any()) continue;
+        //             await tokenOwnerRecordGrain.AddOrUpdate(new TokenOwnerListDto
+        //             {
+        //                 TokenOwnerList = toAdd.ToList()
+        //             });
+        //         }
+        //         else
+        //         {
+        //             await tokenOwnerRecordGrain.AddOrUpdate(kv.Value);
+        //         }
+        //     }
+        //
+        //     if (resultDto.Data.List.Count < PageSize) break;
+        // }
     }
 
     public Task<DateTime> GetLastCallBackTime()

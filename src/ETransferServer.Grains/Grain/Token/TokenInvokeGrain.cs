@@ -198,9 +198,9 @@ public class TokenInvokeGrain : Grain<TokenInvokeState>, ITokenInvokeGrain
         return true;
     }
 
-    public async Task<FlowBehavior> HandleGetLiquidityExceptionAsync(Exception ex)
+    public async Task<FlowBehavior> HandleGetLiquidityExceptionAsync(Exception ex, string symbol)
     {
-        _logger.LogError(ex, "Get token liquidity failed. {symbol}", this.GetPrimaryKeyString());
+        _logger.LogError(ex, "Get token liquidity failed. {symbol}", symbol);
         return new FlowBehavior
         {
             ExceptionHandlingStrategy = ExceptionHandlingStrategy.Return,
@@ -214,7 +214,7 @@ public class TokenInvokeGrain : Grain<TokenInvokeState>, ITokenInvokeGrain
         return new FlowBehavior
         {
             ExceptionHandlingStrategy = ExceptionHandlingStrategy.Return,
-            ReturnValue = string.Empty
+            ReturnValue = new UserTokenBindingDto()
         };
     }
     

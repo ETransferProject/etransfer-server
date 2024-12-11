@@ -165,34 +165,39 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         
         result.ChainList.AddRange(networkList.Where(
             t => t.Network == ChainId.AELF || t.Network == ChainId.tDVV || t.Network == ChainId.tDVW).Select(
-            t => new ChainAccessInfo { ChainId = t.Network, ChainName = t.Name, Symbol = input.Symbol}));
+            t => new ChainAccessInfo { ChainId = t.Network, ChainName = t.Name, Symbol = input.Symbol }));
         result.OtherChainList.AddRange(networkList.Where(
             t => t.Network != ChainId.AELF && t.Network != ChainId.tDVV && t.Network != ChainId.tDVW).Select(
             t => new ChainAccessInfo { ChainId = t.Network, ChainName = t.Name, Symbol = input.Symbol }));
 
-        
         var applyOrderList = await GetTokenApplyOrderIndexListAsync(address, input.Symbol);
         foreach (var item in result.ChainList)
         {
             var isCompleted = _tokenInfoOptions.Value.ContainsKey(item.Symbol) &&
                               _tokenInfoOptions.Value[item.Symbol].Transfer.Contains(item.ChainId);
-            var tokenOwner = listDto.TokenOwnerList.LastOrDefault(t => t.Symbol == input.Symbol &&
+            var tokenOwner = listDto.TokenOwnerList.FirstOrDefault(t => t.Symbol == input.Symbol &&
                                                                         t.ChainIds.Contains(item.ChainId));
-            item.TotalSupply = tokenOwner?.TotalSupply ?? 0;
-            item.Decimals = tokenOwner?.Decimals ?? 0;
-            item.TokenName = tokenOwner?.TokenName;
-            item.Icon = tokenOwner?.Icon;
-            item.Status = tokenOwner == null
-                ? TokenApplyOrderStatus.Unissued.ToString()
-                : isCompleted
-                    ? TokenApplyOrderStatus.Complete.ToString()
-                    : TokenApplyOrderStatus.Issued.ToString();
-            item.Checked = isCompleted ||
-                           applyOrderList.Exists(t => !t.ChainTokenInfo.IsNullOrEmpty() &&
-                               t.ChainTokenInfo.Exists(c => c.ChainId == item.ChainId));
+            var applyStatus = applyOrderList.FirstOrDefault(t => t.OtherChainTokenInfo == null &&
+                t.ChainTokenInfo.Exists(c => c.ChainId == item.ChainId))?
+                .ChainTokenInfo?.FirstOrDefault(c => c.ChainId == item.ChainId)?.Status;
             var userTokenIssueGrain = _clusterClient.GetGrain<IUserTokenIssueGrain>(
                 GuidHelper.UniqGuid(input.Symbol, address, item.ChainId));
             var res = await userTokenIssueGrain.Get();
+            item.TotalSupply = tokenOwner?.TotalSupply ?? 0;
+            item.Decimals = tokenOwner?.Decimals ?? 0;
+            item.TokenName = tokenOwner?.TokenName;
+            item.ContractAddress = tokenOwner?.ContractAddress;
+            item.Icon = tokenOwner?.Icon;
+            item.Status = isCompleted
+                ? TokenApplyOrderStatus.Complete.ToString()
+                : !applyStatus.IsNullOrEmpty() 
+                    ? applyStatus 
+                    : res != null && !res.Status.IsNullOrEmpty()
+                        ? res.Status 
+                        : tokenOwner?.Status ?? TokenApplyOrderStatus.Unissued.ToString();
+            item.Checked = isCompleted ||
+                           applyOrderList.Exists(t => !t.ChainTokenInfo.IsNullOrEmpty() &&
+                               t.ChainTokenInfo.Exists(c => c.ChainId == item.ChainId));
             if (res != null && !res.BindingId.IsNullOrEmpty() && !res.ThirdTokenId.IsNullOrEmpty())
             {
                 item.BindingId = res.BindingId;
@@ -206,21 +211,26 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
                               _tokenInfoOptions.Value[item.Symbol].Transfer.Contains(item.ChainId);
             var tokenOwner = listDto.TokenOwnerList.FirstOrDefault(t => t.Symbol == input.Symbol &&
                                                                     t.ChainIds.Contains(item.ChainId));
-            item.TotalSupply = tokenOwner?.TotalSupply ?? 0;
-            item.Decimals = tokenOwner?.Decimals ?? 0;
-            item.TokenName = tokenOwner?.TokenName;
-            item.Icon = tokenOwner?.Icon;
-            item.Status = tokenOwner == null
-                ? TokenApplyOrderStatus.Unissued.ToString()
-                : isCompleted
-                    ? TokenApplyOrderStatus.Complete.ToString()
-                    : TokenApplyOrderStatus.Issued.ToString();
-            item.Checked = isCompleted ||
-                           applyOrderList.Exists(t => t.OtherChainTokenInfo != null &&
-                                                      t.OtherChainTokenInfo.ChainId == item.ChainId);
+            var applyStatus = applyOrderList.FirstOrDefault(t => t.OtherChainTokenInfo != null &&
+                t.OtherChainTokenInfo.ChainId == item.ChainId)?.Status;
             var userTokenIssueGrain = _clusterClient.GetGrain<IUserTokenIssueGrain>(
                 GuidHelper.UniqGuid(input.Symbol, address, item.ChainId));
             var res = await userTokenIssueGrain.Get();
+            item.TotalSupply = tokenOwner?.TotalSupply ?? 0;
+            item.Decimals = tokenOwner?.Decimals ?? 0;
+            item.TokenName = tokenOwner?.TokenName;
+            item.ContractAddress = tokenOwner?.ContractAddress;
+            item.Icon = tokenOwner?.Icon;
+            item.Status = isCompleted
+                ? TokenApplyOrderStatus.Complete.ToString()
+                : !applyStatus.IsNullOrEmpty() 
+                    ? applyStatus 
+                    : res != null && !res.Status.IsNullOrEmpty()
+                        ? res.Status 
+                        : tokenOwner?.Status ?? TokenApplyOrderStatus.Unissued.ToString();
+            item.Checked = isCompleted ||
+                           applyOrderList.Exists(t => t.OtherChainTokenInfo != null &&
+                                                      t.OtherChainTokenInfo.ChainId == item.ChainId);
             if (res != null && !res.BindingId.IsNullOrEmpty() && !res.ThirdTokenId.IsNullOrEmpty())
             {
                 item.BindingId = res.BindingId;
