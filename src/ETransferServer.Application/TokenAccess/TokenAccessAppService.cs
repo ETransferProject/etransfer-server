@@ -337,6 +337,11 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
                 ChainId = input.ChainIds[0]
             });
         }
+        if (!result.ChainList.IsNullOrEmpty() || !result.OtherChainList.IsNullOrEmpty())
+        {
+            var monitorGrain = _clusterClient.GetGrain<IUserTokenAccessMonitorGrain>(Guid.NewGuid().ToString());
+            await monitorGrain.DoTokenListingMonitor(result);
+        }
         return result;
     }
 

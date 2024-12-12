@@ -1,15 +1,18 @@
 using System.Collections.Generic;
+using Orleans;
 
 namespace ETransferServer.Dtos.TokenAccess;
 
+[GenerateSerializer]
 public class AddChainResultDto
 {
-    public List<AddChainDto> ChainList { get; set; }
-    public List<AddChainDto> OtherChainList { get; set; }
+    [Id(0)] public List<AddChainDto> ChainList { get; set; }
+    [Id(1)] public List<AddChainDto> OtherChainList { get; set; }
 }
 
+[GenerateSerializer]
 public class AddChainDto
 {
-    public string Id { get; set; }
-    public string ChainId { get; set; }
+    [Id(0)] public string Id { get; set; }
+    [Id(1)] public string ChainId { get; set; }
 }

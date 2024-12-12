@@ -125,6 +125,17 @@
             "Amount: {amount} Symbol: {symbol}\nReason: {reason}"
           ]
         }
+      },
+      "TokenListingAlarm": {
+        "FeiShuGroup": {
+          "WebhookUrl": "",
+          "Secret": "",
+          "TitleTemplate": "orange",
+          "Title": "❗️ [test3] New Listing alert",
+          "Contents": [
+            "Token: {token}\nTokenContract: {tokenContract}\nChain: {chain}\nWebsite: {website}"
+          ]
+        }
       }
     }
   }
