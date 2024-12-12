@@ -117,10 +117,10 @@ public class TokenInvokeGrain : Grain<TokenInvokeState>, ITokenInvokeGrain
         var tokenParams = new Dictionary<string, string>();
         tokenParams["address"] = address;
         tokenParams["aelfToken"] = symbol;
-        var resultDto = await _httpProvider.InvokeAsync<CommonResponseDto<ThirdTokenListDto>>(_tokenAccessOptions.Value.SymbolMarketBaseUrl, _userThirdTokenListUri, param: tokenParams);
-        if (resultDto.Code == "20000" && resultDto.Value != null && resultDto.Value.TotalCount > 0)
+        var resultDto = await _httpProvider.InvokeAsync<ThirdTokenResultDto>(_tokenAccessOptions.Value.SymbolMarketBaseUrl, _userThirdTokenListUri, param: tokenParams);
+        if (resultDto.Code == "20000" && resultDto.Data != null && resultDto.Data.TotalCount > 0)
         {
-            foreach (var item in resultDto.Value.Items)
+            foreach (var item in resultDto.Data.Items)
             {
                 var userTokenIssueGrain = GrainFactory.GetGrain<IUserTokenIssueGrain>(
                     GuidHelper.UniqGuid(symbol, address, item.ThirdChain));
@@ -156,7 +156,7 @@ public class TokenInvokeGrain : Grain<TokenInvokeState>, ITokenInvokeGrain
 
         var url =
             $"{_tokenAccessOptions.Value.SymbolMarketBaseUrl}{_tokenAccessOptions.Value.SymbolMarketPrepareBindingUri}";
-        var resultDto = await _httpProvider.InvokeAsync<CommonResponseDto<UserTokenBindingDto>>(HttpMethod.Post, url,
+        var resultDto = await _httpProvider.InvokeAsync<PrepareBindingResultDto>(HttpMethod.Post, url,
             body: JsonConvert.SerializeObject(new PrepareBindingInput
             {
                 Address = dto.Address,
@@ -178,8 +178,8 @@ public class TokenInvokeGrain : Grain<TokenInvokeState>, ITokenInvokeGrain
             }, HttpProvider.DefaultJsonSettings));
         if (resultDto.Code == "20000")
         {
-            dto.BindingId = resultDto.Value?.BindingId;
-            dto.ThirdTokenId = resultDto.Value?.ThirdTokenId;
+            dto.BindingId = resultDto.Data?.BindingId;
+            dto.ThirdTokenId = resultDto.Data?.ThirdTokenId;
             dto.Status = TokenApplyOrderStatus.Issuing.ToString();
             await userTokenIssueGrain.AddOrUpdate(dto);
             var tokenInvokeGrain = GrainFactory.GetGrain<ITokenInvokeGrain>(
@@ -332,6 +332,13 @@ public class TokenDetailDto {
     public List<string> ChainIds { get; set; }
 }
 
+public class ThirdTokenResultDto
+{
+    public string Code { get; set; }
+    public string Message { get; set; }
+    public ThirdTokenListDto Data { get; set; }
+}
+
 public class ThirdTokenListDto
 {
     public int TotalCount { get; set; }
@@ -348,6 +355,13 @@ public class ThirdTokenItemDto
     public string ThirdTokenImage { get; set; }
     public string ThirdContractAddress { get; set; }      
     public string ThirdTotalSupply { get; set; }
+}
+
+public class PrepareBindingResultDto
+{
+    public string Code { get; set; }
+    public string Message { get; set; }
+    public UserTokenBindingDto Data { get; set; }
 }
 
 public class PrepareBindingInput
