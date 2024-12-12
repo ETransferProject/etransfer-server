@@ -4,6 +4,7 @@ namespace ETransferServer.Options;
 
 public class TokenAccessOptions
 {
+    public int ReApplyHours { get; set; } = 48;
     public AvailableTokenConfigDto DefaultConfig { get; set; } = new();
     public Dictionary<string, AvailableTokenConfigDto> TokenConfig { get; set; } = new();
 }

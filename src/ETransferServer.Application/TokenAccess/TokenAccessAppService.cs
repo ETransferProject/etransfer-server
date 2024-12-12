@@ -103,6 +103,7 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
     {
         var address = await GetUserAddressAsync();
         AssertHelper.IsTrue(!address.IsNullOrEmpty(), "No permission."); 
+        AssertHelper.IsTrue(input.Email.Contains(CommonConstant.At), "Please enter a valid email address"); 
         var tokenOwnerGrain = _clusterClient.GetGrain<IUserTokenOwnerGrain>(address);
         var listDto = await tokenOwnerGrain.Get();
         AssertHelper.IsTrue(listDto != null && !listDto.TokenOwnerList.IsNullOrEmpty() &&
@@ -263,8 +264,17 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
                     chain.Status != TokenApplyOrderStatus.Rejected.ToString()) continue;
                 var orderId = GuidHelper.UniqGuid(input.Symbol, address, item);
                 var tokenApplyOrderGrain = _clusterClient.GetGrain<IUserTokenApplyOrderGrain>(orderId);
-                if (await tokenApplyOrderGrain.Get() != null ||
-                    await GetTokenApplyOrderIndexAsync(orderId.ToString()) != null) continue;
+                var applyOrder = await GetTokenApplyOrderIndexAsync(orderId.ToString());
+                if (applyOrder != null && applyOrder.Status == TokenApplyOrderStatus.Rejected.ToString() &&
+                    applyOrder.StatusChangedRecord != null &&
+                    applyOrder.StatusChangedRecord.ContainsKey(TokenApplyOrderStatus.Rejected.ToString()))
+                {
+                    var time = applyOrder.StatusChangedRecord[TokenApplyOrderStatus.Rejected.ToString()].SafeToLong();
+                    if (DateTime.UtcNow.ToUtcMilliSeconds() - time <= _tokenAccessOptions.Value.ReApplyHours * 3600000)
+                        continue;
+                }
+                else if (await tokenApplyOrderGrain.Get() != null || applyOrder != null) continue;
+                
                 chain.Status = TokenApplyOrderStatus.Reviewing.ToString();
                 var dto = new TokenApplyOrderDto
                 {
@@ -296,8 +306,17 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
                 chain.Status != TokenApplyOrderStatus.Rejected.ToString()) return result;
             var orderId = GuidHelper.UniqGuid(input.Symbol, address, input.ChainIds[0]);
             var tokenApplyOrderGrain = _clusterClient.GetGrain<IUserTokenApplyOrderGrain>(orderId);
-            if (await tokenApplyOrderGrain.Get() != null ||
-                await GetTokenApplyOrderIndexAsync(orderId.ToString()) != null) return result;
+            var applyOrder = await GetTokenApplyOrderIndexAsync(orderId.ToString());
+            if (applyOrder != null && applyOrder.Status == TokenApplyOrderStatus.Rejected.ToString() &&
+                applyOrder.StatusChangedRecord != null &&
+                applyOrder.StatusChangedRecord.ContainsKey(TokenApplyOrderStatus.Rejected.ToString()))
+            {
+                var time = applyOrder.StatusChangedRecord[TokenApplyOrderStatus.Rejected.ToString()].SafeToLong();
+                if (DateTime.UtcNow.ToUtcMilliSeconds() - time <= _tokenAccessOptions.Value.ReApplyHours * 3600000)
+                    return result;
+            }
+            else if (await tokenApplyOrderGrain.Get() != null || applyOrder != null) return result;
+            
             chain.Status = TokenApplyOrderStatus.Reviewing.ToString();
             var dto = new TokenApplyOrderDto
             {

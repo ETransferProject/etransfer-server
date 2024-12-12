@@ -9,6 +9,7 @@ public enum TokenApplyOrderStatus
     Rejected,
     Reviewed,
     PoolInitializing,
+    PoolInitialized,
     Integrating,
     Complete,
     Failed
