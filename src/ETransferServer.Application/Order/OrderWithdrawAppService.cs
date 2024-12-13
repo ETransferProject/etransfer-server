@@ -486,7 +486,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
                 ChainId = chainId,
                 Symbol = symbol,
                 Address = address
-            }, version);
+            }, version, true);
             return network != null && !network.NetworkList.IsNullOrEmpty();
         }
         catch (Exception e)
