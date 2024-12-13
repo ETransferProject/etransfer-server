@@ -14,12 +14,11 @@ public class TokenAccessOptions
     public string AwakenGetTokenLiquidityUri { get; set; }
     public int DataExpireSeconds { get; set; } = 180;
     public string HashVerifyKey { get; set; }
-    public AvailableTokenConfigDto DefaultConfig { get; set; } = new();
-    public Dictionary<string, AvailableTokenConfigDto> TokenConfig { get; set; } = new();
+    public AvailablePoolConfigDto DefaultPoolConfig { get; set; } = new();
+    public Dictionary<string, AvailablePoolConfigDto> PoolConfig { get; set; } = new();
 }
 
-public class AvailableTokenConfigDto
+public class AvailablePoolConfigDto
 {
     public string Liquidity { get; set; } = "1000";
-    public int Holders { get; set; } = 1000;
 }

@@ -18,6 +18,6 @@ public interface ITokenAccessAppService
     Task<UserTokenBindingDto> PrepareBindingIssueAsync(PrepareBindIssueInput input);
     Task<bool> GetBindingIssueAsync(UserTokenBindingDto input);
     Task<PagedResultDto<TokenApplyOrderResultDto>> GetTokenApplyOrderListAsync(GetTokenApplyOrderListInput input);
-    Task<PagedResultDto<TokenApplyOrderResultDto>> GetTokenApplyOrderPagedListAsync(GetTokenApplyOrderListInput input);
+    Task<PagedResultDto<TokenApplyOrderResultDto>> GetCompleteTokenApplyListAsync(GetTokenApplyOrderListInput input);
     Task<List<TokenApplyOrderResultDto>> GetTokenApplyOrderDetailAsync(GetTokenApplyOrderInput input);
 }

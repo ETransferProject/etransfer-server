@@ -40,3 +40,13 @@ public static class ExtensionKey
     public const string RejectedReason = "RejectedReason";
     public const string FailedReason = "FailedReason";
 }
+
+[GenerateSerializer]
+public class TokenApplyDto
+{
+    [Id(0)] public string Symbol { get; set; }
+    [Id(1)] public string Address { get; set; }
+    [Id(2)] public string ChainId { get; set; }
+    [Id(3)] public string Coin { get; set; }
+    [Id(4)] public string Amount { get; set; }
+}

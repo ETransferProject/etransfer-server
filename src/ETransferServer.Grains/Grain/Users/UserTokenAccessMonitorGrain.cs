@@ -13,7 +13,7 @@ namespace ETransferServer.Grains.Grain.Users;
 public interface IUserTokenAccessMonitorGrain : IGrainWithStringKey
 {
     Task DoTokenListingMonitor(AddChainResultDto dto);
-    Task DoLiquidityMonitor(string symbol, string address, string liquidityInUsd);
+    Task DoLiquidityMonitor(TokenApplyDto dto);
 }
 
 public class UserTokenAccessMonitorGrain : Grain<UserTokenAccessMonitorState>, IUserTokenAccessMonitorGrain
@@ -93,19 +93,19 @@ public class UserTokenAccessMonitorGrain : Grain<UserTokenAccessMonitorState>, I
         }
     }
 
-    public async Task DoLiquidityMonitor(string symbol, string address, string liquidityInUsd)
+    public async Task DoLiquidityMonitor(TokenApplyDto dto)
     {
         try
         {
             var userTokenAccessInfoGrain = GrainFactory.GetGrain<IUserTokenAccessInfoGrain>(
-                string.Join(CommonConstant.Underline, symbol, address));
+                string.Join(CommonConstant.Underline, dto.Symbol, dto.Address));
             var userTokenAccessInfo = await userTokenAccessInfoGrain.Get();
                     
             var liquidityDto = new LiquidityDto
             {
-                Token = symbol,
-                LiquidityInUsd = liquidityInUsd,
-                Chain = ChainId.AELF,
+                Token = dto.Symbol,
+                LiquidityInUsd = dto.Amount,
+                Chain = dto.ChainId,
                 PersonName = userTokenAccessInfo?.PersonName,
                 TelegramHandler = userTokenAccessInfo?.TelegramHandler,
                 Email = userTokenAccessInfo?.Email
@@ -116,12 +116,12 @@ public class UserTokenAccessMonitorGrain : Grain<UserTokenAccessMonitorState>, I
         {
             _logger.LogWarning(
                 "LiquidityInsufficientMonitor handle failed , Message={Msg}, GrainId={GrainId} liquidityInUsd={usd}",
-                e.Message, this.GetPrimaryKeyString(), liquidityInUsd);
+                e.Message, this.GetPrimaryKeyString(), dto.Amount);
         }
         catch (Exception e)
         {
             _logger.LogError(e, "LiquidityInsufficientMonitor handle failed GrainId={GrainId}, " +
-                "liquidityInUsd={usd}", this.GetPrimaryKeyString(), liquidityInUsd);
+                "liquidityInUsd={usd}", this.GetPrimaryKeyString(), dto.Amount);
         }
     }
 
