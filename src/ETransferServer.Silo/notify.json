@@ -136,6 +136,18 @@
             "Token: {token}\nTokenContract: {tokenContract}\nChain: {chain}\nWebsite: {website}"
           ]
         }
+      },
+      "LiquidityInsufficientAlarm": {
+        "FeiShuGroup": {
+          "WebhookUrl": "",
+          "Secret": "",
+          "TitleTemplate": "orange",
+          "Title": "❗️ [test3] Liquidity Insufficient alert",
+          "Contents": [
+            "Token: {token}\nLiquidityInUsd: {liquidityInUsd}\nChain: {chain}",
+            "PersonName: {personName}\nTelegramHandler: {telegramHandler}\nEmail: {email}"
+          ]
+        }
       }
     }
   }

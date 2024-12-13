@@ -25,6 +25,7 @@ public class TimerOptions
     public TimerOption TokenAddressTimer { get; set; } = new();
     public TimerOption TokenAddressRecycleTimer { get; set; } = new(60);
     public TimerOption TokenOwnerTimer { get; set; } = new(10, 3600);
+    public TimerOption TokenLiquidityTimer { get; set; } = new(10, 14400);
     public TimerOption WithdrawTimer { get; set; } = new();
     public TimerOption DepositRetryTimer { get; set; } = new();
     public TimerOption WithdrawRetryTimer { get; set; } = new();

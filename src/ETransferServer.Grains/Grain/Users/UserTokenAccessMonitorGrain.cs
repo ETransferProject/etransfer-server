@@ -13,11 +13,13 @@ namespace ETransferServer.Grains.Grain.Users;
 public interface IUserTokenAccessMonitorGrain : IGrainWithStringKey
 {
     Task DoTokenListingMonitor(AddChainResultDto dto);
+    Task DoLiquidityMonitor(string symbol, string address, string liquidityInUsd);
 }
 
 public class UserTokenAccessMonitorGrain : Grain<UserTokenAccessMonitorState>, IUserTokenAccessMonitorGrain
 {
     private const string TokenListingAlarm = "TokenListingAlarm";
+    private const string LiquidityInsufficientAlarm = "LiquidityInsufficientAlarm";
     private readonly ILogger<WithdrawOrderMonitorGrain> _logger;
     private readonly Dictionary<string, INotifyProvider> _notifyProvider;
 
@@ -90,7 +92,39 @@ public class UserTokenAccessMonitorGrain : Grain<UserTokenAccessMonitorState>, I
                 this.GetPrimaryKeyString(), JsonConvert.SerializeObject(dto));
         }
     }
-    
+
+    public async Task DoLiquidityMonitor(string symbol, string address, string liquidityInUsd)
+    {
+        try
+        {
+            var userTokenAccessInfoGrain = GrainFactory.GetGrain<IUserTokenAccessInfoGrain>(
+                string.Join(CommonConstant.Underline, symbol, address));
+            var userTokenAccessInfo = await userTokenAccessInfoGrain.Get();
+                    
+            var liquidityDto = new LiquidityDto
+            {
+                Token = symbol,
+                LiquidityInUsd = liquidityInUsd,
+                Chain = ChainId.AELF,
+                PersonName = userTokenAccessInfo?.PersonName,
+                TelegramHandler = userTokenAccessInfo?.TelegramHandler,
+                Email = userTokenAccessInfo?.Email
+            };
+            await SendNotifyAsync(liquidityDto);
+        }
+        catch (UserFriendlyException e)
+        {
+            _logger.LogWarning(
+                "LiquidityInsufficientMonitor handle failed , Message={Msg}, GrainId={GrainId} liquidityInUsd={usd}",
+                e.Message, this.GetPrimaryKeyString(), liquidityInUsd);
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "LiquidityInsufficientMonitor handle failed GrainId={GrainId}, " +
+                "liquidityInUsd={usd}", this.GetPrimaryKeyString(), liquidityInUsd);
+        }
+    }
+
     private async Task<bool> SendNotifyAsync(TokenListingDto dto)
     {
         var providerExists = _notifyProvider.TryGetValue(NotifyTypeEnum.FeiShuGroup.ToString(), out var provider);
@@ -107,6 +141,25 @@ public class UserTokenAccessMonitorGrain : Grain<UserTokenAccessMonitorState>, I
             }
         });
     }
+    
+    private async Task<bool> SendNotifyAsync(LiquidityDto dto)
+    {
+        var providerExists = _notifyProvider.TryGetValue(NotifyTypeEnum.FeiShuGroup.ToString(), out var provider);
+        AssertHelper.IsTrue(providerExists, "Provider not found");
+        return await provider.SendNotifyAsync(new NotifyRequest
+        {
+            Template = LiquidityInsufficientAlarm,
+            Params = new Dictionary<string, string>
+            {
+                [LiquidityKeys.Token] = dto.Token,
+                [LiquidityKeys.LiquidityInUsd] = dto.LiquidityInUsd,
+                [LiquidityKeys.Chain] = dto.Chain,
+                [LiquidityKeys.PersonName] = dto.PersonName,
+                [LiquidityKeys.TelegramHandler] = dto.TelegramHandler,
+                [LiquidityKeys.Email] = dto.Email
+            }
+        });
+    }
 
     public class TokenListingDto
     {
@@ -115,6 +168,16 @@ public class UserTokenAccessMonitorGrain : Grain<UserTokenAccessMonitorState>, I
         public string Chain { get; set; }
         public string Website { get; set; }
     }
+    
+    public class LiquidityDto
+    {
+        public string Token { get; set; }
+        public string LiquidityInUsd { get; set; }
+        public string Chain { get; set; }
+        public string PersonName { get; set; }
+        public string TelegramHandler { get; set; }
+        public string Email { get; set; }
+    }
 
     private static class TokenListingKeys
     {
@@ -122,5 +185,15 @@ public class UserTokenAccessMonitorGrain : Grain<UserTokenAccessMonitorState>, I
         public const string TokenContract = "tokenContract";
         public const string Chain = "chain";
         public const string Website = "website";
+    }
+    
+    private static class LiquidityKeys
+    {
+        public const string Token = "token";
+        public const string LiquidityInUsd = "liquidityInUsd";
+        public const string Chain = "chain";
+        public const string PersonName = "personName";
+        public const string TelegramHandler = "telegramHandler";
+        public const string Email = "email";
     }
 }

@@ -17,6 +17,7 @@ namespace ETransferServer.Grains.Grain.Token;
 public interface ITokenInvokeGrain : IGrainWithStringKey
 {
     Task<TokenOwnerListDto> GetUserTokenOwnerList();
+    Task<string> GetLiquidityInUsd(string symbol);
     Task<bool> GetThirdTokenList(string address, string symbol);
     Task<UserTokenBindingDto> PrepareBinding(UserTokenIssueDto dto);
     Task<bool> Binding(UserTokenBindingDto dto);
