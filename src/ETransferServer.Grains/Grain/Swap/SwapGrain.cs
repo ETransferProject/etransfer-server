@@ -71,11 +71,10 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
                 DepositOrder = dto
             }
         };
-
+        var toTransfer = dto.ToTransfer;
+        var fromTransfer = dto.FromTransfer;
         try
         {
-            var toTransfer = dto.ToTransfer;
-            var fromTransfer = dto.FromTransfer;
             var pairSymbol = GeneratePairSymbol(fromTransfer.Symbol, toTransfer.Symbol);
             _logger.LogInformation("Start to swap {pairSymbol}", pairSymbol);
             var res = _swapInfosOptions.PairInfos.TryGetValue(pairSymbol, out var swapInfo);
@@ -194,6 +193,12 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
                 case CommonConstant.TransactionState.NodeValidationFailed:
                     toTransfer.Status = OrderTransferStatusEnum.Failed.ToString();
                     dto.Status = OrderStatusEnum.ToTransferFailed.ToString();
+                    await txFlowGrain.AddOrUpdate(new OrderTxData
+                    {
+                        TxId = toTransfer.TxId,
+                        ChainId = toTransfer.ChainId,
+                        Status = ThirdPartOrderStatusEnum.Fail.ToString()
+                    });
                     result.Success = false;
                     break;
                 default:
@@ -219,6 +224,13 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
 
             dto.ToTransfer.Status = OrderTransferStatusEnum.Failed.ToString();
             dto.Status = OrderStatusEnum.ToTransferFailed.ToString();
+            var txFlowGrain = GrainFactory.GetGrain<IOrderTxFlowGrain>(dto.Id);
+            await txFlowGrain.AddOrUpdate(new OrderTxData
+            {
+                TxId = toTransfer.TxId,
+                ChainId = toTransfer.ChainId,
+                Status = ThirdPartOrderStatusEnum.Fail.ToString()
+            });
             result.Data = new DepositOrderChangeDto
             {
                 DepositOrder = dto,
