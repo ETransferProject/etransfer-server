@@ -217,7 +217,8 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
         return networkListDto;
     }
 
-    public async Task<GetNetworkListDto> GetNetworkListWithLocalFeeAsync(GetNetworkListRequestDto request, string version = null)
+    public async Task<GetNetworkListDto> GetNetworkListWithLocalFeeAsync(GetNetworkListRequestDto request, 
+        string version = null, bool isAddressSupport = false)
     {
         AssertHelper.NotNull(request, "Request empty. Please refresh and try again.");
         AssertHelper.NotEmpty(request.Type, "Invalid type. Please refresh and try again.");
@@ -267,13 +268,15 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
             networkDto.SpecialWithdrawFee = withdraw.SpecialWithdrawFee;
         }
 
-        if (request.Address.IsNullOrEmpty() || VerifyHelper.VerifyAelfAddress(request.Address)) return getNetworkListDto;
+        if (request.Address.IsNullOrEmpty() || (isAddressSupport && VerifyHelper.VerifyAelfAddress(request.Address))) 
+            return getNetworkListDto;
 
         var networkByAddress = _networkOptions.Value.NetworkPattern
             .Where(kv => request.Address.Match(kv.Key))
             .SelectMany(kv => kv.Value)
             .ToList();
-        networkByAddress.RemoveAll(a => a == ChainId.AELF || a == ChainId.tDVV || a == ChainId.tDVW);
+        if (!VerifyHelper.VerifyAelfAddress(request.Address))
+            networkByAddress.RemoveAll(a => a == ChainId.AELF || a == ChainId.tDVV || a == ChainId.tDVW);
         AssertHelper.NotEmpty(networkByAddress, ErrorResult.AddressFormatWrongCode);
 
         getNetworkListDto.NetworkList = getNetworkListDto.NetworkList
