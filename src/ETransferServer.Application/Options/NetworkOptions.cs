@@ -33,6 +33,8 @@ public class NetworkInfo
     public string MinShowVersion { get; set; }
     public string ExplorerUrl { get; set; }
     public string Status { get; set; }
+    public string MinAmount { get; set; }
+    public string PoolAddress { get; set; }
 }
 
 public class DepositInfo

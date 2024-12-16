@@ -74,7 +74,7 @@ public class TokenAccessController : ETransferController
     }
     
     [Authorize]
-    [HttpGet("issue-binding")]
+    [HttpPost("issue-binding")]
     public async Task<bool> GetBindingIssueAsync(UserTokenBindingDto input)
     {
         return await _tokenAccessAppService.GetBindingIssueAsync(input);

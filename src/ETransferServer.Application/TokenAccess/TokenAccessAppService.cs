@@ -2,9 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using AElf.Contracts.MultiToken;
 using AElf.ExceptionHandler;
 using AElf.Indexing.Elasticsearch;
+using AElf.Types;
 using ETransferServer.Common;
+using ETransferServer.Common.AElfSdk;
+using ETransferServer.Common.AElfSdk.Dtos;
 using ETransferServer.Dtos.TokenAccess;
 using ETransferServer.Grains.Grain.Token;
 using ETransferServer.Grains.Grain.Users;
@@ -31,6 +35,7 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
     private readonly INESTRepository<TokenApplyOrderIndex, Guid> _tokenApplyOrderIndexRepository;
     private readonly INESTRepository<UserTokenAccessInfoIndex, Guid> _userTokenInfoIndexRepository;
     private readonly IUserAppService _userAppService;
+    private readonly IContractProvider _contractProvider;
     private readonly IOptionsSnapshot<NetworkOptions> _networkInfoOptions;
     private readonly IOptionsSnapshot<TokenOptions> _tokenOptions;
     private readonly IOptionsSnapshot<TokenAccessOptions> _tokenAccessOptions;
@@ -42,6 +47,7 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
     public TokenAccessAppService(INESTRepository<TokenApplyOrderIndex, Guid> tokenApplyOrderIndexRepository, 
         INESTRepository<UserTokenAccessInfoIndex, Guid> userTokenInfoIndexRepository,
         IUserAppService userAppService, 
+        IContractProvider contractProvider,
         IOptionsSnapshot<NetworkOptions> networkInfoOptions,
         IOptionsSnapshot<TokenOptions> tokenOptions,
         IOptionsSnapshot<TokenAccessOptions> tokenAccessOptions,
@@ -54,6 +60,7 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         _tokenApplyOrderIndexRepository = tokenApplyOrderIndexRepository;
         _userTokenInfoIndexRepository = userTokenInfoIndexRepository;
         _userAppService = userAppService;
+        _contractProvider = contractProvider;
         _networkInfoOptions = networkInfoOptions;
         _tokenOptions = tokenOptions;
         _tokenAccessOptions = tokenAccessOptions;
@@ -458,6 +465,58 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
                                     index.ExtensionInfo.ContainsKey(ExtensionKey.FailedReason)
                     ? index.ExtensionInfo[ExtensionKey.FailedReason]
                     : null;
+            }
+
+            if (item.OtherChainTokenInfo != null)
+            {
+                if (item.OtherChainTokenInfo.Status == TokenApplyOrderStatus.Reviewed.ToString() ||
+                    item.OtherChainTokenInfo.Status == TokenApplyOrderStatus.PoolInitializing.ToString() ||
+                    item.OtherChainTokenInfo.Status == TokenApplyOrderStatus.PoolInitialized.ToString() ||
+                    item.OtherChainTokenInfo.Status == TokenApplyOrderStatus.Integrating.ToString() ||
+                    item.OtherChainTokenInfo.Status == TokenApplyOrderStatus.Complete.ToString())
+                {
+                    var coboGrain = _clusterClient.GetGrain<ICoBoAccountGrain>(ICoBoAccountGrain.Id(
+                        item.OtherChainTokenInfo.ChainId, item.OtherChainTokenInfo.Symbol));
+                    item.OtherChainTokenInfo.BalanceAmount = (await coboGrain.Get())?.AbsBalance ?? "0";
+                }
+                if (!_networkInfoOptions.Value.NetworkMap.ContainsKey(item.OtherChainTokenInfo.Symbol) ||
+                    !_networkInfoOptions.Value.NetworkMap[item.OtherChainTokenInfo.Symbol].Exists(
+                        t => t.NetworkInfo.Network == item.OtherChainTokenInfo.ChainId)) continue;
+                var network = _networkInfoOptions.Value.NetworkMap[item.OtherChainTokenInfo.Symbol].FirstOrDefault(
+                    t => t.NetworkInfo.Network == item.OtherChainTokenInfo.ChainId);
+                item.OtherChainTokenInfo.MinAmount = network.NetworkInfo?.MinAmount ?? "0";
+                item.OtherChainTokenInfo.PoolAddress = network.NetworkInfo?.PoolAddress;
+                item.OtherChainTokenInfo.Limit24HInUsd = network.WithdrawInfo?.WithdrawLimit24h ?? "0";
+            }
+
+            if (item.ChainTokenInfo != null)
+            {
+                foreach (var chain in item.ChainTokenInfo)
+                {
+                    if (!_networkInfoOptions.Value.NetworkMap.ContainsKey(chain.Symbol) ||
+                        !_networkInfoOptions.Value.NetworkMap[chain.Symbol].Exists(
+                            t => t.NetworkInfo.Network == chain.ChainId)) continue;
+                    var network = _networkInfoOptions.Value.NetworkMap[chain.Symbol].FirstOrDefault(
+                        t => t.NetworkInfo.Network == chain.ChainId);
+                    chain.MinAmount = network.NetworkInfo?.MinAmount ?? "0";
+                    chain.PoolAddress = network.NetworkInfo?.PoolAddress;
+                    chain.Limit24HInUsd = network.WithdrawInfo?.WithdrawLimit24h ?? "0";
+                    if (item.OtherChainTokenInfo.PoolAddress.IsNullOrEmpty()) continue;
+                    if (item.OtherChainTokenInfo.Status == TokenApplyOrderStatus.PoolInitialized.ToString() ||
+                        item.OtherChainTokenInfo.Status == TokenApplyOrderStatus.Integrating.ToString() ||
+                        item.OtherChainTokenInfo.Status == TokenApplyOrderStatus.Complete.ToString())
+                    {
+                        var balance = await _contractProvider.CallTransactionAsync<GetBalanceOutput>(chain.ChainId,
+                            SystemContractName.TokenContract,
+                            "GetBalance",
+                            new GetBalanceInput
+                            {
+                                Owner = Address.FromBase58(item.OtherChainTokenInfo.PoolAddress),
+                                Symbol = chain.Symbol
+                            });
+                        chain.BalanceAmount = balance?.Balance.ToString() ?? "0";
+                    }
+                }
             }
         }
 

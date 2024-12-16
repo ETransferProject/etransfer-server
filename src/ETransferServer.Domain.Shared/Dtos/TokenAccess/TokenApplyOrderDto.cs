@@ -31,8 +31,9 @@ public class ChainTokenInfoDto
     [Id(7)] public string PoolAddress { get; set; }
     [Id(8)] public string ContractAddress { get; set; }
     [Id(9)] public string Status { get; set; }
-    [Id(10)] public string BalanceAmount { get; set; }
-    [Id(11)] public string MinAmount { get; set; }
+    [Id(10)] public string BalanceAmount { get; set; } = "0";
+    [Id(11)] public string MinAmount { get; set; } = "1000";
+    [Id(12)] public string Limit24HInUsd { get; set; } = "500000";
 }
 
 public static class ExtensionKey
