@@ -167,7 +167,7 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
 
         var networkList = _networkInfoOptions.Value.NetworkMap.OrderBy(m =>
                 _tokenOptions.Value.Transfer.Select(t => t.Symbol).ToList().IndexOf(m.Key))
-            .SelectMany(kvp => kvp.Value).Where(a =>
+            .SelectMany(kvp => kvp.Value).Where(a => a.NetworkInfo.IsTokenAccessRange &&
                 a.SupportType.Contains(OrderTypeEnum.Transfer.ToString())).GroupBy(g => g.NetworkInfo.Network)
             .Select(s => s.First().NetworkInfo).ToList();
         
@@ -501,10 +501,10 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
                     chain.MinAmount = network.NetworkInfo?.MinAmount ?? "0";
                     chain.PoolAddress = network.NetworkInfo?.PoolAddress;
                     chain.Limit24HInUsd = network.WithdrawInfo?.WithdrawLimit24h ?? "0";
-                    if (item.OtherChainTokenInfo.PoolAddress.IsNullOrEmpty()) continue;
-                    if (item.OtherChainTokenInfo.Status == TokenApplyOrderStatus.PoolInitialized.ToString() ||
-                        item.OtherChainTokenInfo.Status == TokenApplyOrderStatus.Integrating.ToString() ||
-                        item.OtherChainTokenInfo.Status == TokenApplyOrderStatus.Complete.ToString())
+                    if (chain.PoolAddress.IsNullOrEmpty()) continue;
+                    if (chain.Status == TokenApplyOrderStatus.PoolInitialized.ToString() ||
+                        chain.Status == TokenApplyOrderStatus.Integrating.ToString() ||
+                        chain.Status == TokenApplyOrderStatus.Complete.ToString())
                     {
                         var balance = await _contractProvider.CallTransactionAsync<GetBalanceOutput>(chain.ChainId,
                             SystemContractName.TokenContract,

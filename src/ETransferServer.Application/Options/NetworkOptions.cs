@@ -32,6 +32,7 @@ public class NetworkInfo
     public decimal AveragePendingSeconds { get; set; }
     public string MinShowVersion { get; set; }
     public string ExplorerUrl { get; set; }
+    public bool IsTokenAccessRange { get; set; }
     public string Status { get; set; }
     public string MinAmount { get; set; }
     public string PoolAddress { get; set; }
