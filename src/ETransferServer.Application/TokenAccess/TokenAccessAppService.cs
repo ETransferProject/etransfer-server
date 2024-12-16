@@ -260,8 +260,11 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         AssertHelper.IsTrue(input.OtherChainIds.IsNullOrEmpty() || !input.OtherChainIds.Any(t => 
             !chainStatus.OtherChainList.Exists(c => c.ChainId == t)), "Param invalid.");
         
-        var result = new AddChainResultDto();
         var address = await GetUserAddressAsync();
+        AssertHelper.IsTrue(await GetTokenApplyOrderIndexListCountAsync(address, input.Symbol) > 0 ||
+            (!input.ChainIds.IsNullOrEmpty() && !input.OtherChainIds.IsNullOrEmpty()), "Param invalid.");
+        
+        var result = new AddChainResultDto();
         if (!input.OtherChainIds.IsNullOrEmpty())
         {
             foreach (var item in input.OtherChainIds)
@@ -502,7 +505,8 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
                     chain.PoolAddress = network.NetworkInfo?.PoolAddress;
                     chain.Limit24HInUsd = network.WithdrawInfo?.WithdrawLimit24h ?? "0";
                     if (chain.PoolAddress.IsNullOrEmpty()) continue;
-                    if (chain.Status == TokenApplyOrderStatus.PoolInitialized.ToString() ||
+                    if (chain.Status == TokenApplyOrderStatus.PoolInitializing.ToString() ||
+                        chain.Status == TokenApplyOrderStatus.PoolInitialized.ToString() ||
                         chain.Status == TokenApplyOrderStatus.Integrating.ToString() ||
                         chain.Status == TokenApplyOrderStatus.Complete.ToString())
                     {
@@ -582,5 +586,15 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         QueryContainer Filter(QueryContainerDescriptor<TokenApplyOrderIndex> f) => f.Bool(b => b.Must(mustQuery));
         var result = await _tokenApplyOrderIndexRepository.GetListAsync(Filter);
         return result.Item2;
+    }
+    
+    private async Task<long> GetTokenApplyOrderIndexListCountAsync(string address, string symbol)
+    {
+        var mustQuery = new List<Func<QueryContainerDescriptor<TokenApplyOrderIndex>, QueryContainer>>();
+        mustQuery.Add(q => q.Term(i => i.Field(f => f.UserAddress).Value(address)));
+        mustQuery.Add(q => q.Term(i => i.Field(f => f.Symbol).Value(symbol)));
+        QueryContainer Filter(QueryContainerDescriptor<TokenApplyOrderIndex> f) => f.Bool(b => b.Must(mustQuery));
+        var result = await _tokenApplyOrderIndexRepository.CountAsync(Filter);
+        return result.Count;
     }
 }
