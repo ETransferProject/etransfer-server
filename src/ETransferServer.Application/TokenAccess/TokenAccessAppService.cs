@@ -299,44 +299,48 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
             }
         }
 
-        if (input.OtherChainIds.IsNullOrEmpty() && !input.ChainIds.IsNullOrEmpty() && input.ChainIds.Count == 1)
+        if (!input.ChainIds.IsNullOrEmpty())
         {
-            var chain = chainStatus.ChainList.FirstOrDefault(t => t.ChainId == input.ChainIds[0]);
-            if (chain.Status != TokenApplyOrderStatus.Issued.ToString() &&
-                chain.Status != TokenApplyOrderStatus.Rejected.ToString()) return result;
-            var orderId = GuidHelper.UniqGuid(input.Symbol, address, input.ChainIds[0]);
-            var tokenApplyOrderGrain = _clusterClient.GetGrain<IUserTokenApplyOrderGrain>(orderId);
-            var applyOrder = await GetTokenApplyOrderIndexAsync(orderId.ToString());
-            if (applyOrder != null && applyOrder.Status == TokenApplyOrderStatus.Rejected.ToString() &&
-                applyOrder.StatusChangedRecord != null &&
-                applyOrder.StatusChangedRecord.ContainsKey(TokenApplyOrderStatus.Rejected.ToString()))
+            foreach (var item in input.ChainIds)
             {
-                var time = applyOrder.StatusChangedRecord[TokenApplyOrderStatus.Rejected.ToString()].SafeToLong();
-                if (DateTime.UtcNow.ToUtcMilliSeconds() - time <= _tokenAccessOptions.Value.ReApplyHours * 3600000)
-                    return result;
+                var chain = chainStatus.ChainList.FirstOrDefault(t => t.ChainId == item);
+                if (chain.Status != TokenApplyOrderStatus.Issued.ToString() &&
+                    chain.Status != TokenApplyOrderStatus.Rejected.ToString()) return result;
+                var orderId = GuidHelper.UniqGuid(input.Symbol, address, item);
+                var tokenApplyOrderGrain = _clusterClient.GetGrain<IUserTokenApplyOrderGrain>(orderId);
+                var applyOrder = await GetTokenApplyOrderIndexAsync(orderId.ToString());
+                if (applyOrder != null && applyOrder.Status == TokenApplyOrderStatus.Rejected.ToString() &&
+                    applyOrder.StatusChangedRecord != null &&
+                    applyOrder.StatusChangedRecord.ContainsKey(TokenApplyOrderStatus.Rejected.ToString()))
+                {
+                    var time = applyOrder.StatusChangedRecord[TokenApplyOrderStatus.Rejected.ToString()].SafeToLong();
+                    if (DateTime.UtcNow.ToUtcMilliSeconds() - time <= _tokenAccessOptions.Value.ReApplyHours * 3600000)
+                        return result;
+                }
+                else if (await tokenApplyOrderGrain.Get() != null || applyOrder != null) return result;
+                
+                chain.Status = TokenApplyOrderStatus.PoolInitializing.ToString();
+                var dto = new TokenApplyOrderDto
+                {
+                    Id = orderId,
+                    Symbol = input.Symbol,
+                    UserAddress = address,
+                    Status = TokenApplyOrderStatus.PoolInitializing.ToString(),
+                    ChainTokenInfo = new List<ChainTokenInfoDto> { _objectMapper.Map<ChainAccessInfo, ChainTokenInfoDto>(chain) }
+                };
+                dto.StatusChangedRecord ??= new Dictionary<string, string>();
+                dto.StatusChangedRecord.AddOrReplace(TokenApplyOrderStatus.PoolInitializing.ToString(),
+                    DateTime.UtcNow.ToUtcMilliSeconds().ToString());
+                await tokenApplyOrderGrain.AddOrUpdate(dto);
+                result.ChainList ??= new List<AddChainDto>();
+                result.ChainList.Add(new()
+                {
+                    Id = orderId.ToString(),
+                    ChainId = item
+                });
             }
-            else if (await tokenApplyOrderGrain.Get() != null || applyOrder != null) return result;
-            
-            chain.Status = TokenApplyOrderStatus.Reviewing.ToString();
-            var dto = new TokenApplyOrderDto
-            {
-                Id = orderId,
-                Symbol = input.Symbol,
-                UserAddress = address,
-                Status = TokenApplyOrderStatus.Reviewing.ToString(),
-                ChainTokenInfo = new List<ChainTokenInfoDto> { _objectMapper.Map<ChainAccessInfo, ChainTokenInfoDto>(chain) }
-            };
-            dto.StatusChangedRecord ??= new Dictionary<string, string>();
-            dto.StatusChangedRecord.AddOrReplace(TokenApplyOrderStatus.Reviewing.ToString(),
-                DateTime.UtcNow.ToUtcMilliSeconds().ToString());
-            await tokenApplyOrderGrain.AddOrUpdate(dto);
-            result.ChainList ??= new List<AddChainDto>();
-            result.ChainList.Add(new()
-            {
-                Id = orderId.ToString(),
-                ChainId = input.ChainIds[0]
-            });
         }
+
         if (!result.ChainList.IsNullOrEmpty() || !result.OtherChainList.IsNullOrEmpty())
         {
             var monitorGrain = _clusterClient.GetGrain<IUserTokenAccessMonitorGrain>(Guid.NewGuid().ToString());
