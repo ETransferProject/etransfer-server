@@ -515,10 +515,16 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
                             "GetBalance",
                             new GetBalanceInput
                             {
-                                Owner = Address.FromBase58(item.OtherChainTokenInfo.PoolAddress),
+                                Owner = Address.FromBase58(chain.PoolAddress),
                                 Symbol = chain.Symbol
                             });
-                        chain.BalanceAmount = balance?.Balance.ToString() ?? "0";
+                        if (balance.Balance == 0) continue;
+                        var tokenGrain =
+                            _clusterClient.GetGrain<ITokenGrain>(ITokenGrain.GenGrainId(chain.Symbol, chain.ChainId));
+                        var token = await tokenGrain.GetToken();
+                        var decimalPow = (decimal)Math.Pow(10, token.Decimals);
+                        var balanceDecimal = balance.Balance / decimalPow;
+                        chain.BalanceAmount = balanceDecimal.ToString();
                     }
                 }
             }
