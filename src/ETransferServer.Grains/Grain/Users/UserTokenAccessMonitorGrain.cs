@@ -13,12 +13,14 @@ namespace ETransferServer.Grains.Grain.Users;
 public interface IUserTokenAccessMonitorGrain : IGrainWithStringKey
 {
     Task DoTokenListingMonitor(AddChainResultDto dto);
+    Task DoTokenIntegrateMonitor(TokenApplyDto dto);
     Task DoLiquidityMonitor(TokenApplyDto dto);
 }
 
 public class UserTokenAccessMonitorGrain : Grain<UserTokenAccessMonitorState>, IUserTokenAccessMonitorGrain
 {
     private const string TokenListingAlarm = "TokenListingAlarm";
+    private const string TokenIntegrateAlarm = "TokenIntegrateAlarm";
     private const string LiquidityInsufficientAlarm = "LiquidityInsufficientAlarm";
     private readonly ILogger<WithdrawOrderMonitorGrain> _logger;
     private readonly Dictionary<string, INotifyProvider> _notifyProvider;
@@ -92,6 +94,31 @@ public class UserTokenAccessMonitorGrain : Grain<UserTokenAccessMonitorState>, I
                 this.GetPrimaryKeyString(), JsonConvert.SerializeObject(dto));
         }
     }
+    
+    public async Task DoTokenIntegrateMonitor(TokenApplyDto dto)
+    {
+        try
+        {
+            var integrateDto = new IntegrateDto
+            {
+                Token = dto.Symbol,
+                TokenContract = dto.ContractAddress,
+                Chain = dto.ChainId
+            };
+            await SendNotifyAsync(integrateDto);
+        }
+        catch (UserFriendlyException e)
+        {
+            _logger.LogWarning(
+                "IntegrateMonitor handle failed , Message={Msg}, GrainId={GrainId} dto={dto}",
+                e.Message, this.GetPrimaryKeyString(), JsonConvert.SerializeObject(dto));
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "IntegrateMonitor handle failed GrainId={GrainId}, " +
+                                "dto={dto}", this.GetPrimaryKeyString(), JsonConvert.SerializeObject(dto));
+        }
+    }
 
     public async Task DoLiquidityMonitor(TokenApplyDto dto)
     {
@@ -142,6 +169,22 @@ public class UserTokenAccessMonitorGrain : Grain<UserTokenAccessMonitorState>, I
         });
     }
     
+    private async Task<bool> SendNotifyAsync(IntegrateDto dto)
+    {
+        var providerExists = _notifyProvider.TryGetValue(NotifyTypeEnum.FeiShuGroup.ToString(), out var provider);
+        AssertHelper.IsTrue(providerExists, "Provider not found");
+        return await provider.SendNotifyAsync(new NotifyRequest
+        {
+            Template = TokenIntegrateAlarm,
+            Params = new Dictionary<string, string>
+            {
+                [IntegrateKeys.Token] = dto.Token,
+                [IntegrateKeys.TokenContract] = dto.TokenContract,
+                [IntegrateKeys.Chain] = dto.Chain
+            }
+        });
+    }
+    
     private async Task<bool> SendNotifyAsync(LiquidityDto dto)
     {
         var providerExists = _notifyProvider.TryGetValue(NotifyTypeEnum.FeiShuGroup.ToString(), out var provider);
@@ -169,6 +212,13 @@ public class UserTokenAccessMonitorGrain : Grain<UserTokenAccessMonitorState>, I
         public string Website { get; set; }
     }
     
+    public class IntegrateDto
+    {
+        public string Token { get; set; }
+        public string TokenContract { get; set; }
+        public string Chain { get; set; }
+    }
+    
     public class LiquidityDto
     {
         public string Token { get; set; }
@@ -185,6 +235,13 @@ public class UserTokenAccessMonitorGrain : Grain<UserTokenAccessMonitorState>, I
         public const string TokenContract = "tokenContract";
         public const string Chain = "chain";
         public const string Website = "website";
+    }
+    
+    private static class IntegrateKeys
+    {
+        public const string Token = "token";
+        public const string TokenContract = "tokenContract";
+        public const string Chain = "chain";
     }
     
     private static class LiquidityKeys

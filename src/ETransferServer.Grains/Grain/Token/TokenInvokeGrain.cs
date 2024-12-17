@@ -88,7 +88,7 @@ public class TokenInvokeGrain : Grain<TokenInvokeState>, ITokenInvokeGrain
                     ChainIds = detailDto?.Data?.ChainIds ?? new List<string> { item.OriginIssueChain },
                     TotalSupply = item.TotalSupply,
                     LiquidityInUsd = await GetLiquidityInUsd(item.Symbol),
-                    Holders = detailDto?.Data?.Holders ?? 0,
+                    Holders = detailDto?.Data?.MergeHolders ?? 0,
                     ContractAddress = detailDto?.Data?.TokenContractAddress,
                     Status = TokenApplyOrderStatus.Issued.ToString()
                 });
@@ -329,7 +329,7 @@ public class TokenDetailResultDto
 
 public class TokenDetailDto {
     public string TokenContractAddress { get; set; }
-    public int Holders { get; set; }
+    public int MergeHolders { get; set; }
     public List<string> ChainIds { get; set; }
 }
 

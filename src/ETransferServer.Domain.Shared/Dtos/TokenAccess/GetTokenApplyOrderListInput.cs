@@ -4,4 +4,5 @@ namespace ETransferServer.Dtos.TokenAccess;
 
 public class GetTokenApplyOrderListInput : PagedAndSortedResultRequestDto
 {
+    public string Status { get; set; }
 }

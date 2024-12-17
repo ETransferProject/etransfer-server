@@ -416,10 +416,10 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         };
     }
 
-    public async Task<PagedResultDto<TokenApplyOrderResultDto>> GetCompleteTokenApplyListAsync(GetTokenApplyOrderListInput input)
+    public async Task<PagedResultDto<TokenApplyOrderResultDto>> GetTokenApplyListAsync(GetTokenApplyOrderListInput input)
     {
         var mustQuery = new List<Func<QueryContainerDescriptor<TokenApplyOrderIndex>, QueryContainer>>();
-        mustQuery.Add(q => q.Term(i => i.Field(f => f.Status).Value(TokenApplyOrderStatus.Complete.ToString())));
+        mustQuery.Add(q => q.Term(i => i.Field(f => f.Status).Value(input.Status)));
         QueryContainer Filter(QueryContainerDescriptor<TokenApplyOrderIndex> f) => f.Bool(b => b.Must(mustQuery));
         var (count, list) = await _tokenApplyOrderIndexRepository.GetSortListAsync(Filter,
             sortFunc: s => s.Ascending(a => a.UpdateTime), 

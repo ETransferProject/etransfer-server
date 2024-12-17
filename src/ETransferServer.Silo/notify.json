@@ -137,6 +137,17 @@
           ]
         }
       },
+      "TokenIntegrateAlarm": {
+        "FeiShuGroup": {
+          "WebhookUrl": "",
+          "Secret": "",
+          "TitleTemplate": "orange",
+          "Title": "❗️ [test3] Cross-chain integration alert",
+          "Contents": [
+            "Token: {token}\nTokenContract: {tokenContract}\nChain: {chain}"
+          ]
+        }
+      },
       "LiquidityInsufficientAlarm": {
         "FeiShuGroup": {
           "WebhookUrl": "",

@@ -51,4 +51,5 @@ public class TokenApplyDto
     [Id(2)] public string ChainId { get; set; }
     [Id(3)] public string Coin { get; set; }
     [Id(4)] public string Amount { get; set; }
+    [Id(5)] public string ContractAddress { get; set; }
 }

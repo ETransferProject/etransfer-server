@@ -69,9 +69,10 @@ public class TokenLiquidityTimerGrain : Grain<TokenLiquidityState>, ITokenLiquid
             var resultDto = new PagedResultDto<TokenApplyOrderResultDto>();
             try
             {
-                resultDto = await _tokenAccessAppService.GetCompleteTokenApplyListAsync(
+                resultDto = await _tokenAccessAppService.GetTokenApplyListAsync(
                     new GetTokenApplyOrderListInput
                     {
+                        Status = TokenApplyOrderStatus.Complete.ToString(),
                         SkipCount = skipCount,
                         MaxResultCount = PageSize
                     });
