@@ -490,6 +490,8 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
                 item.OtherChainTokenInfo.MinAmount = network.NetworkInfo?.MinAmount ?? "0";
                 item.OtherChainTokenInfo.PoolAddress = network.NetworkInfo?.PoolAddress;
                 item.OtherChainTokenInfo.Limit24HInUsd = network.WithdrawInfo?.WithdrawLimit24h ?? "0";
+                item.OtherChainTokenInfo.Decimals = network.WithdrawInfo?.Decimals ?? 0;
+                item.OtherChainTokenInfo.TokenContractAddress = network.NetworkInfo?.ContractAddress;
             }
 
             if (item.ChainTokenInfo != null)
@@ -504,6 +506,8 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
                     chain.MinAmount = network.NetworkInfo?.MinAmount ?? "0";
                     chain.PoolAddress = network.NetworkInfo?.PoolAddress;
                     chain.Limit24HInUsd = network.WithdrawInfo?.WithdrawLimit24h ?? "0";
+                    chain.Decimals = network.WithdrawInfo?.Decimals ?? 0;
+                    chain.TokenContractAddress = network.NetworkInfo?.ContractAddress;
                     if (chain.PoolAddress.IsNullOrEmpty()) continue;
                     if (chain.Status == TokenApplyOrderStatus.PoolInitializing.ToString() ||
                         chain.Status == TokenApplyOrderStatus.PoolInitialized.ToString() ||
