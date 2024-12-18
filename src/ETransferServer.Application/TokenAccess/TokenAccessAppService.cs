@@ -480,29 +480,41 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
 
             if (item.OtherChainTokenInfo != null)
             {
-                if (item.OtherChainTokenInfo.Status == TokenApplyOrderStatus.Reviewed.ToString() ||
+                if (item.OtherChainTokenInfo.Status == TokenApplyOrderStatus.Reviewing.ToString() ||
+                    item.OtherChainTokenInfo.Status == TokenApplyOrderStatus.Reviewed.ToString() ||
                     item.OtherChainTokenInfo.Status == TokenApplyOrderStatus.PoolInitializing.ToString() ||
                     item.OtherChainTokenInfo.Status == TokenApplyOrderStatus.PoolInitialized.ToString() ||
                     item.OtherChainTokenInfo.Status == TokenApplyOrderStatus.Integrating.ToString() ||
                     item.OtherChainTokenInfo.Status == TokenApplyOrderStatus.Complete.ToString())
                 {
-                    var coboGrain = _clusterClient.GetGrain<ICoBoAccountGrain>(ICoBoAccountGrain.Id(
-                        item.OtherChainTokenInfo.ChainId, item.OtherChainTokenInfo.Symbol));
-                    item.OtherChainTokenInfo.BalanceAmount = (await coboGrain.Get())?.AbsBalance ?? "0";
+                    try
+                    {
+                        var coboGrain = _clusterClient.GetGrain<ICoBoAccountGrain>(GuidHelper.UniqGuid(
+                            nameof(ICoBoAccountGrain)));
+                        item.OtherChainTokenInfo.BalanceAmount = (await coboGrain.Get(ICoBoAccountGrain.Id(
+                            item.OtherChainTokenInfo.ChainId, item.OtherChainTokenInfo.Symbol)))?.AbsBalance ?? "0";
+                    }
+                    catch (Exception e)
+                    {
+                        _logger.LogError(e, "Get cobo account info fail.");
+                        item.OtherChainTokenInfo.BalanceAmount = "0";
+                    }
                 }
-                if (!_networkInfoOptions.Value.NetworkMap.ContainsKey(item.OtherChainTokenInfo.Symbol) ||
-                    !_networkInfoOptions.Value.NetworkMap[item.OtherChainTokenInfo.Symbol].Exists(
-                        t => t.NetworkInfo.Network == item.OtherChainTokenInfo.ChainId)) continue;
-                var network = _networkInfoOptions.Value.NetworkMap[item.OtherChainTokenInfo.Symbol].FirstOrDefault(
-                    t => t.NetworkInfo.Network == item.OtherChainTokenInfo.ChainId);
-                item.OtherChainTokenInfo.MinAmount = network.NetworkInfo?.MinAmount ?? "0";
-                item.OtherChainTokenInfo.PoolAddress = network.NetworkInfo?.PoolAddress;
-                item.OtherChainTokenInfo.Limit24HInUsd = network.WithdrawInfo?.WithdrawLimit24h ?? "0";
-                item.OtherChainTokenInfo.Decimals = network.WithdrawInfo?.Decimals ?? 0;
-                item.OtherChainTokenInfo.TokenContractAddress = network.NetworkInfo?.ContractAddress;
+                if (_networkInfoOptions.Value.NetworkMap.ContainsKey(item.OtherChainTokenInfo.Symbol) &&
+                    _networkInfoOptions.Value.NetworkMap[item.OtherChainTokenInfo.Symbol].Exists(
+                        t => t.NetworkInfo.Network == item.OtherChainTokenInfo.ChainId))
+                {
+                    var network = _networkInfoOptions.Value.NetworkMap[item.OtherChainTokenInfo.Symbol].FirstOrDefault(
+                        t => t.NetworkInfo.Network == item.OtherChainTokenInfo.ChainId);
+                    item.OtherChainTokenInfo.MinAmount = network.NetworkInfo?.MinAmount ?? "0";
+                    item.OtherChainTokenInfo.PoolAddress = network.NetworkInfo?.PoolAddress;
+                    item.OtherChainTokenInfo.Limit24HInUsd = network.WithdrawInfo?.WithdrawLimit24h ?? "0";
+                    item.OtherChainTokenInfo.Decimals = network.WithdrawInfo?.Decimals ?? 0;
+                    item.OtherChainTokenInfo.TokenContractAddress = network.NetworkInfo?.ContractAddress;
+                }
             }
 
-            if (item.ChainTokenInfo != null)
+            if (!item.ChainTokenInfo.IsNullOrEmpty())
             {
                 foreach (var chain in item.ChainTokenInfo)
                 {
@@ -522,21 +534,29 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
                         chain.Status == TokenApplyOrderStatus.Integrating.ToString() ||
                         chain.Status == TokenApplyOrderStatus.Complete.ToString())
                     {
-                        var balance = await _contractProvider.CallTransactionAsync<GetBalanceOutput>(chain.ChainId,
-                            SystemContractName.TokenContract,
-                            "GetBalance",
-                            new GetBalanceInput
-                            {
-                                Owner = Address.FromBase58(chain.PoolAddress),
-                                Symbol = chain.Symbol
-                            });
-                        if (balance.Balance == 0) continue;
-                        var tokenGrain =
-                            _clusterClient.GetGrain<ITokenGrain>(ITokenGrain.GenGrainId(chain.Symbol, chain.ChainId));
-                        var token = await tokenGrain.GetToken();
-                        var decimalPow = (decimal)Math.Pow(10, token.Decimals);
-                        var balanceDecimal = balance.Balance / decimalPow;
-                        chain.BalanceAmount = balanceDecimal.ToString();
+                        try
+                        {
+                            var balance = await _contractProvider.CallTransactionAsync<GetBalanceOutput>(chain.ChainId,
+                                SystemContractName.TokenContract,
+                                "GetBalance",
+                                new GetBalanceInput
+                                {
+                                    Owner = Address.FromBase58(chain.PoolAddress),
+                                    Symbol = chain.Symbol
+                                });
+                            if (balance.Balance == 0) continue;
+                            var tokenGrain =
+                                _clusterClient.GetGrain<ITokenGrain>(ITokenGrain.GenGrainId(chain.Symbol, chain.ChainId));
+                            var token = await tokenGrain.GetToken();
+                            var decimalPow = (decimal)Math.Pow(10, token.Decimals);
+                            var balanceDecimal = balance.Balance / decimalPow;
+                            chain.BalanceAmount = balanceDecimal.ToString();
+                        }
+                        catch (Exception e)
+                        {
+                            _logger.LogError(e, "GetBalance fail.");
+                            chain.BalanceAmount = "0";
+                        }
                     }
                 }
             }

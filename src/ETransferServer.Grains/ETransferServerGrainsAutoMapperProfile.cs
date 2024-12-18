@@ -49,7 +49,7 @@ public class ETransferServerGrainsAutoMapperProfile : Profile
         CreateMap<CoBoCoinDetailDto, CoBoCoinDto>().ReverseMap();
         CreateMap<CoBoCoinState, CoBoCoinDto>().ReverseMap();
         CreateMap<CoBoCoinState, CoBoCoinDetailDto>().ReverseMap();
-        CreateMap<CoBoAccountState, AssetDto>().ReverseMap();
+        CreateMap<CoBoAccountState, AccountDetailDto>().ReverseMap();
         CreateMap<CoBoTransactionState, CoBoTransactionDto>().ReverseMap();
         CreateMap<SwapReserveState, ReserveDto>().ReverseMap().ForMember(
             destination => destination.SymbolIn,
