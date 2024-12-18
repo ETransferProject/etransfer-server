@@ -23,4 +23,5 @@ public class ChainAccessInfo
     public string ContractAddress { get; set; }
     public string BindingId { get; set; }
     public string ThirdTokenId { get; set; }
+    public long RejectedTime { get; set; }
 }
