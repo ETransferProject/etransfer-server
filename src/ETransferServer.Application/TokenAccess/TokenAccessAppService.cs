@@ -220,6 +220,7 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         {
             var isCompleted = _tokenInfoOptions.Value.ContainsKey(item.Symbol) &&
                               _tokenInfoOptions.Value[item.Symbol].Transfer.Contains(item.ChainId);
+            var tokenOwner = listDto.TokenOwnerList.FirstOrDefault();
             var applyStatus = applyOrderList.FirstOrDefault(t => t.OtherChainTokenInfo != null &&
                 t.OtherChainTokenInfo.ChainId == item.ChainId)?.Status;
             var userTokenIssueGrain = _clusterClient.GetGrain<IUserTokenIssueGrain>(
@@ -227,9 +228,9 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
             var res = await userTokenIssueGrain.Get();
             item.TotalSupply = res?.TotalSupply.SafeToDecimal() ?? 0M;
             item.Decimals = 0;
-            item.TokenName = res?.TokenName;
+            item.TokenName = res?.TokenName ?? tokenOwner?.TokenName;
             item.ContractAddress = res?.ContractAddress;
-            item.Icon = res?.TokenImage;
+            item.Icon = res?.TokenImage ?? tokenOwner?.Icon;
             item.Status = isCompleted
                 ? TokenApplyOrderStatus.Complete.ToString()
                 : !applyStatus.IsNullOrEmpty() 
@@ -379,8 +380,8 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
             WalletAddress = input.Address,
             Symbol = input.Symbol,
             ChainId = input.ChainId,
-            TokenName = chainStatus.ChainList.FirstOrDefault(t => t.ChainId == input.ChainId).TokenName,
-            TokenImage = chainStatus.ChainList.FirstOrDefault(t => t.ChainId == input.ChainId).Icon,
+            TokenName = chainStatus.ChainList.FirstOrDefault()?.TokenName,
+            TokenImage = chainStatus.ChainList.FirstOrDefault()?.Icon,
             OtherChainId = input.OtherChainId,
             ContractAddress = input.ContractAddress,
             TotalSupply = input.Supply
