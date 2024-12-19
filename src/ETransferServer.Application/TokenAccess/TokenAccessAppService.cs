@@ -83,6 +83,8 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         };
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(TokenAccessAppService),
+        MethodName = nameof(HandleGetAvailableTokensExceptionAsync))]
     public async Task<AvailableTokensDto> GetAvailableTokensAsync()
     {
         var result = new AvailableTokensDto();
@@ -106,6 +108,8 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         return result;
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(TokenAccessAppService),
+        MethodName = nameof(HandleCommitTokenAccessInfoExceptionAsync))]
     public async Task<bool> CommitTokenAccessInfoAsync(UserTokenAccessInfoInput input)
     {
         var address = await GetUserAddressAsync();
@@ -141,6 +145,8 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         Logger.LogInformation("Save token apply order success, symbol:{symbol}", dto.Symbol);
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(TokenAccessAppService),
+        MethodName = nameof(HandleGetUserTokenAccessInfoExceptionAsync))]
     public async Task<UserTokenAccessInfoDto> GetUserTokenAccessInfoAsync(UserTokenAccessInfoBaseInput input)
     {
         var address = await GetUserAddressAsync();
@@ -154,6 +160,8 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         return _objectMapper.Map<UserTokenAccessInfoIndex, UserTokenAccessInfoDto>(await GetUserTokenAccessInfoIndexAsync(input.Symbol, address));
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(TokenAccessAppService),
+        MethodName = nameof(HandleCheckChainAccessStatusExceptionAsync))]
     public async Task<CheckChainAccessStatusResultDto> CheckChainAccessStatusAsync(CheckChainAccessStatusInput input)
     {
         var result = new CheckChainAccessStatusResultDto();
@@ -259,6 +267,8 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         return result;
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(TokenAccessAppService),
+        MethodName = nameof(HandleAddChainExceptionAsync))]
     public async Task<AddChainResultDto> AddChainAsync(AddChainInput input)
     {
         AssertHelper.IsTrue(!input.ChainIds.IsNullOrEmpty() || !input.OtherChainIds.IsNullOrEmpty(), 
@@ -367,6 +377,8 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         return result;
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(TokenAccessAppService),
+        MethodName = nameof(HandlePrepareBindingIssueExceptionAsync))]
     public async Task<UserTokenBindingDto> PrepareBindingIssueAsync(PrepareBindIssueInput input)
     {
         AssertHelper.IsTrue(!input.ChainId.IsNullOrEmpty() || !input.OtherChainId.IsNullOrEmpty(), 
@@ -398,6 +410,8 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         return await tokenInvokeGrain.PrepareBinding(dto);
     }
     
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(TokenAccessAppService),
+        MethodName = nameof(HandleGetBindingIssueExceptionAsync))]
     public async Task<bool> GetBindingIssueAsync(UserTokenBindingDto input)
     {
         var address = await GetUserAddressAsync();
@@ -408,6 +422,8 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         return await tokenInvokeGrain.Binding(input);
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(TokenAccessAppService),
+        MethodName = nameof(HandleGetTokenApplyOrderListExceptionAsync))]
     public async Task<PagedResultDto<TokenApplyOrderResultDto>> GetTokenApplyOrderListAsync(GetTokenApplyOrderListInput input)
     {
         var address = await GetUserAddressAsync();
@@ -441,6 +457,8 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         };
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(TokenAccessAppService),
+        MethodName = nameof(HandleGetTokenApplyOrderDetailExceptionAsync))]
     public async Task<List<TokenApplyOrderResultDto>> GetTokenApplyOrderDetailAsync(GetTokenApplyOrderInput input)
     {
         var address = await GetUserAddressAsync();
