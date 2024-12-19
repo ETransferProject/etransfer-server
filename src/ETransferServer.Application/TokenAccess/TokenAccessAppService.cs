@@ -387,8 +387,10 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
             WalletAddress = input.Address,
             Symbol = input.Symbol,
             ChainId = input.ChainId,
-            TokenName = chainStatus.ChainList.FirstOrDefault()?.TokenName,
-            TokenImage = chainStatus.ChainList.FirstOrDefault()?.Icon,
+            TokenName = chainStatus.OtherChainList.FirstOrDefault(t => t.ChainId == input.OtherChainId)?.TokenName ??
+                        chainStatus.ChainList.FirstOrDefault(t => t.ChainId == input.ChainId)?.TokenName,
+            TokenImage = chainStatus.OtherChainList.FirstOrDefault(t => t.ChainId == input.OtherChainId)?.Icon ??
+                         chainStatus.ChainList.FirstOrDefault(t => t.ChainId == input.ChainId)?.Icon,
             OtherChainId = input.OtherChainId,
             ContractAddress = input.ContractAddress,
             TotalSupply = input.Supply
