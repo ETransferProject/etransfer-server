@@ -220,7 +220,7 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         {
             var isCompleted = _tokenInfoOptions.Value.ContainsKey(item.Symbol) &&
                               _tokenInfoOptions.Value[item.Symbol].Transfer.Contains(item.ChainId);
-            var tokenOwner = listDto.TokenOwnerList.FirstOrDefault();
+            var tokenOwner = listDto.TokenOwnerList.FirstOrDefault(t => t.Symbol == input.Symbol && !t.TokenName.IsNullOrEmpty());
             var applyOrder = applyOrderList.FirstOrDefault(t => t.OtherChainTokenInfo != null &&
                 t.OtherChainTokenInfo.ChainId == item.ChainId);
             var applyStatus = applyOrder?.OtherChainTokenInfo?.Status;
