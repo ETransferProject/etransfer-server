@@ -7,6 +7,7 @@ using ETransferServer.Dtos.TokenAccess;
 using ETransferServer.Grains.Grain.Users;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.State.Token;
+using ETransferServer.Options;
 using ETransferServer.Samples.HttpClient;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -29,6 +30,7 @@ public class TokenInvokeGrain : Grain<TokenInvokeState>, ITokenInvokeGrain
     private readonly ILogger<TokenGrain> _logger;
     private readonly IHttpProvider _httpProvider;
     private readonly IOptionsSnapshot<TokenAccessOptions> _tokenAccessOptions;
+    private readonly IOptionsSnapshot<ChainOptions> _chainOption;
     private ApiInfo _scanTokenDetailUri => new(HttpMethod.Get, _tokenAccessOptions.Value.ScanTokenDetailUri);
     private ApiInfo _tokenLiquidityUri => new(HttpMethod.Get, _tokenAccessOptions.Value.AwakenGetTokenLiquidityUri);
     private ApiInfo _userThirdTokenListUri => new(HttpMethod.Get, _tokenAccessOptions.Value.SymbolMarketUserThirdTokenListUri);
@@ -36,11 +38,13 @@ public class TokenInvokeGrain : Grain<TokenInvokeState>, ITokenInvokeGrain
 
     public TokenInvokeGrain(ILogger<TokenGrain> logger, 
         IHttpProvider httpProvider,
-        IOptionsSnapshot<TokenAccessOptions> tokenAccessOptions)
+        IOptionsSnapshot<TokenAccessOptions> tokenAccessOptions,
+        IOptionsSnapshot<ChainOptions> chainOption)
     {
         _logger = logger;
         _httpProvider = httpProvider;
         _tokenAccessOptions = tokenAccessOptions;
+        _chainOption = chainOption;
     }
     
     public async Task<TokenOwnerListDto> GetUserTokenOwnerList()
@@ -85,7 +89,7 @@ public class TokenInvokeGrain : Grain<TokenInvokeState>, ITokenInvokeGrain
                     Decimals = item.Decimals,
                     Icon = item.TokenImage,
                     Owner = item.Owner,
-                    ChainIds = detailDto?.Data?.ChainIds ?? new List<string> { item.OriginIssueChain },
+                    ChainIds = _chainOption.Value.ChainInfos.Keys.ToList(),
                     TotalSupply = item.TotalSupply,
                     LiquidityInUsd = await GetLiquidityInUsd(item.Symbol),
                     Holders = detailDto?.Data?.MergeHolders ?? 0,
