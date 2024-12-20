@@ -423,6 +423,61 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
     }
 
     [ExceptionHandler(typeof(Exception), TargetType = typeof(TokenAccessAppService),
+        MethodName = nameof(HandleChangeStatusExceptionAsync))]
+    public async Task<bool> ChangeStatusAsync(GetTokenApplyOrderInput input)
+    {
+        var list = await GetTokenApplyOrderDetailAsync(input);
+        foreach (var item in list)
+        {
+            var needUpdate = false;
+            if (!item.ChainTokenInfo.IsNullOrEmpty())
+            {
+                foreach (var chain in item.ChainTokenInfo)
+                {
+                    if (chain.Status != TokenApplyOrderStatus.PoolInitializing.ToString()) continue;
+                    if (chain.BalanceAmount.SafeToDecimal() >= chain.MinAmount.SafeToDecimal())
+                    {
+                        chain.Status = TokenApplyOrderStatus.PoolInitialized.ToString();
+                        needUpdate = true;
+                    }
+                }
+            }
+
+            if (item.OtherChainTokenInfo != null &&
+                item.OtherChainTokenInfo.Status == TokenApplyOrderStatus.PoolInitializing.ToString() &&
+                item.OtherChainTokenInfo.BalanceAmount.SafeToDecimal() >=
+                item.OtherChainTokenInfo.MinAmount.SafeToDecimal())
+            {
+                item.OtherChainTokenInfo.Status = TokenApplyOrderStatus.PoolInitialized.ToString();
+                needUpdate = true;
+            }
+
+            if (item.Status == TokenApplyOrderStatus.PoolInitializing.ToString() &&
+                (item.ChainTokenInfo.IsNullOrEmpty() || item.ChainTokenInfo.All(t =>
+                    t.Status == TokenApplyOrderStatus.PoolInitialized.ToString() ||
+                    t.Status == TokenApplyOrderStatus.Integrating.ToString() ||
+                    t.Status == TokenApplyOrderStatus.Complete.ToString())) &&
+                (item.OtherChainTokenInfo == null ||
+                 item.OtherChainTokenInfo.Status == TokenApplyOrderStatus.PoolInitialized.ToString() ||
+                 item.OtherChainTokenInfo.Status == TokenApplyOrderStatus.Integrating.ToString() ||
+                 item.OtherChainTokenInfo.Status == TokenApplyOrderStatus.Complete.ToString()))
+            {
+                item.Status = TokenApplyOrderStatus.PoolInitialized.ToString();
+                needUpdate = true;
+            }
+
+            if (needUpdate)
+            {
+                var tokenApplyOrderGrain = _clusterClient.GetGrain<IUserTokenApplyOrderGrain>(item.Id);
+                await tokenApplyOrderGrain.AddOrUpdate(
+                    _objectMapper.Map<TokenApplyOrderResultDto, TokenApplyOrderDto>(item));
+            }
+        }
+
+        return true;
+    }
+
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(TokenAccessAppService),
         MethodName = nameof(HandleGetTokenApplyOrderListExceptionAsync))]
     public async Task<PagedResultDto<TokenApplyOrderResultDto>> GetTokenApplyOrderListAsync(GetTokenApplyOrderListInput input)
     {
@@ -473,7 +528,6 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
     {
         foreach (var item in itemList)
         {
-            item.StatusChangedRecord = null;
             var index = indexList.FirstOrDefault(i => i.Id == item.Id);
             if (item.Status == TokenApplyOrderStatus.Rejected.ToString())
             {

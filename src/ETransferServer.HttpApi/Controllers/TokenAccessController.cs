@@ -81,6 +81,13 @@ public class TokenAccessController : ETransferController
     }
     
     [Authorize]
+    [HttpPost("change-status")]
+    public async Task<bool> ChangeStatusAsync(GetTokenApplyOrderInput input)
+    {
+        return await _tokenAccessAppService.ChangeStatusAsync(input);
+    }
+    
+    [Authorize]
     [HttpGet("list")]
     public async Task<PagedResultDto<TokenApplyOrderResultDto>> GetTokenApplyOrderListAsync(GetTokenApplyOrderListInput input)
     {

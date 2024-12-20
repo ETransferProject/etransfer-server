@@ -51,6 +51,7 @@ public class ETransferServerApplicationAutoMapperProfile : Profile
         CreateMap<UserTokenAccessInfoDto, UserTokenAccessInfoIndex>().ReverseMap();
         CreateMap<TokenApplyOrderIndex, TokenApplyOrderDto>().ReverseMap();
         CreateMap<TokenApplyOrderIndex, TokenApplyOrderResultDto>().ReverseMap();
+        CreateMap<TokenApplyOrderResultDto, TokenApplyOrderDto>().ReverseMap();
         CreateMap<ChainAccessInfo, ChainTokenInfoDto>().ReverseMap();
         CreateMap<ChainTokenInfoDto, ChainTokenInfo>().ReverseMap();
         CreateMap<NetworkInfo, NetworkDto>()

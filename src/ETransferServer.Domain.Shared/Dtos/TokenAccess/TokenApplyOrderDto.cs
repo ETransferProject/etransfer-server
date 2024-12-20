@@ -16,6 +16,7 @@ public class TokenApplyOrderDto
     [Id(6)] public List<ChainTokenInfoDto> ChainTokenInfo { get; set; }
     [Id(7)] public ChainTokenInfoDto OtherChainTokenInfo { get; set; }
     [Id(8)] public Dictionary<string, string> StatusChangedRecord { get; set; }
+    [Id(9)] public Dictionary<string, string> ExtensionInfo { get; set; }
 }
 
 [GenerateSerializer]

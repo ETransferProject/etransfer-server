@@ -95,6 +95,16 @@ public partial class TokenAccessAppService
         };
     }
     
+    public async Task<FlowBehavior> HandleChangeStatusExceptionAsync(Exception ex, GetTokenApplyOrderInput dto)
+    {
+        Logger.LogError(ex, "ChangeStatusAsync error, {dto}", JsonConvert.SerializeObject(dto));
+        return new FlowBehavior
+        {
+            ExceptionHandlingStrategy = ExceptionHandlingStrategy.Return,
+            ReturnValue = false
+        };
+    }
+    
     public async Task<FlowBehavior> HandleGetTokenApplyOrderListExceptionAsync(Exception ex, GetTokenApplyOrderListInput dto)
     {
         Logger.LogError(ex, "GetTokenApplyOrderListAsync error, {dto}", JsonConvert.SerializeObject(dto));

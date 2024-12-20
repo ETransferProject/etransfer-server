@@ -17,6 +17,7 @@ public interface ITokenAccessAppService
     Task<AddChainResultDto> AddChainAsync(AddChainInput input);
     Task<UserTokenBindingDto> PrepareBindingIssueAsync(PrepareBindIssueInput input);
     Task<bool> GetBindingIssueAsync(UserTokenBindingDto input);
+    Task<bool> ChangeStatusAsync(GetTokenApplyOrderInput input);
     Task<PagedResultDto<TokenApplyOrderResultDto>> GetTokenApplyOrderListAsync(GetTokenApplyOrderListInput input);
     Task<PagedResultDto<TokenApplyOrderResultDto>> GetTokenApplyListAsync(GetTokenApplyOrderListInput input);
     Task<List<TokenApplyOrderResultDto>> GetTokenApplyOrderDetailAsync(GetTokenApplyOrderInput input);
