@@ -341,11 +341,11 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
             {
                 var chain = chainStatus.ChainList.FirstOrDefault(t => t.ChainId == item);
                 if (chain.Status != TokenApplyOrderStatus.Issued.ToString() || 
-                    !input.OtherChainIds.IsNullOrEmpty()) return result;
+                    !input.OtherChainIds.IsNullOrEmpty()) continue;
                 var orderId = GuidHelper.UniqGuid(input.Symbol, address, item);
                 var tokenApplyOrderGrain = _clusterClient.GetGrain<IUserTokenApplyOrderGrain>(orderId);
                 var applyOrder = await GetTokenApplyOrderIndexAsync(orderId.ToString());
-                if (await tokenApplyOrderGrain.Get() != null || applyOrder != null) return result;
+                if (await tokenApplyOrderGrain.Get() != null || applyOrder != null) continue;
                 
                 chain.Status = TokenApplyOrderStatus.PoolInitializing.ToString();
                 var dto = new TokenApplyOrderDto
