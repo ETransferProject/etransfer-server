@@ -51,7 +51,9 @@ public class UserTokenAccessMonitorGrain : Grain<UserTokenAccessMonitorState>, I
                     var tokenListingDto = new TokenListingDto
                     {
                         Token = tokenApplyOrderDto.Symbol,
-                        TokenContract = tokenApplyOrderDto.ChainTokenInfo[0]?.ContractAddress,
+                        TokenContract = !tokenApplyOrderDto.ChainTokenInfo.IsNullOrEmpty() 
+                            ? tokenApplyOrderDto.ChainTokenInfo[0]?.ContractAddress
+                            : null,
                         Chain = item.ChainId,
                         Website = userTokenAccessInfo?.OfficialWebsite
                     };

@@ -99,7 +99,7 @@ public class TokenIntegrateTimerGrain : Grain<TokenIntegrateState>, ITokenIntegr
                 var dto = await tokenApplyOrderGrain.Get() ?? 
                           _objectMapper.Map<TokenApplyOrderResultDto, TokenApplyOrderDto>(item);
                 dto.Status = TokenApplyOrderStatus.Integrating.ToString();
-                (dto.OtherChainTokenInfo ?? dto.ChainTokenInfo[0]).Status = dto.Status;
+                if (dto.OtherChainTokenInfo != null) dto.OtherChainTokenInfo.Status = dto.Status;
                 if (!dto.ChainTokenInfo.IsNullOrEmpty()) dto.ChainTokenInfo.ForEach(t => t.Status = dto.Status);
                 dto.StatusChangedRecord ??= new Dictionary<string, string>();
                 dto.StatusChangedRecord.AddOrReplace(TokenApplyOrderStatus.Integrating.ToString(),
