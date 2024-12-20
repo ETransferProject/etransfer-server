@@ -5,6 +5,7 @@ using AElf.ExceptionHandler;
 using ETransferServer.Dtos.TokenAccess;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using Volo.Abp;
 using Volo.Abp.Application.Dtos;
 
 namespace ETransferServer.TokenAccess;
@@ -68,6 +69,15 @@ public partial class TokenAccessAppService
     public async Task<FlowBehavior> HandleAddChainExceptionAsync(Exception ex, AddChainInput dto)
     {
         Logger.LogError(ex, "AddChainAsync error, {dto}", JsonConvert.SerializeObject(dto));
+        if (ex is UserFriendlyException && (ex.Message.StartsWith("A listing is in progress") ||
+                                            ex.Message.StartsWith("Failed to add chain")))
+        {
+            return new FlowBehavior
+            {
+                ExceptionHandlingStrategy = ExceptionHandlingStrategy.Rethrow
+            };
+        }
+
         return new FlowBehavior
         {
             ExceptionHandlingStrategy = ExceptionHandlingStrategy.Return,

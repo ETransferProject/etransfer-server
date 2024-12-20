@@ -267,22 +267,33 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         return result;
     }
 
-    [ExceptionHandler(typeof(Exception), TargetType = typeof(TokenAccessAppService),
-        MethodName = nameof(HandleAddChainExceptionAsync))]
+    [ExceptionHandler(typeof(UserFriendlyException), typeof(Exception), 
+        TargetType = typeof(TokenAccessAppService), MethodName = nameof(HandleAddChainExceptionAsync))]
     public async Task<AddChainResultDto> AddChainAsync(AddChainInput input)
     {
         AssertHelper.IsTrue(!input.ChainIds.IsNullOrEmpty() || !input.OtherChainIds.IsNullOrEmpty(), 
-            "Param invalid.");
+            "Failed to add chain.");
         var chainStatus = await CheckChainAccessStatusAsync(new CheckChainAccessStatusInput { Symbol = input.Symbol });
         AssertHelper.IsTrue(input.ChainIds.IsNullOrEmpty() || !input.ChainIds.Any(t => 
-            !chainStatus.ChainList.Exists(c => c.ChainId == t)), "Param invalid.");
+            !chainStatus.ChainList.Exists(c => c.ChainId == t)), "Failed to add chain.");
         AssertHelper.IsTrue(input.OtherChainIds.IsNullOrEmpty() || !input.OtherChainIds.Any(t => 
-            !chainStatus.OtherChainList.Exists(c => c.ChainId == t)), "Param invalid.");
+            !chainStatus.OtherChainList.Exists(c => c.ChainId == t)), "Failed to add chain.");
         
         var address = await GetUserAddressAsync();
         AssertHelper.IsTrue(await GetTokenApplyOrderIndexListCountAsync(address, input.Symbol) > 0 ||
-            (!input.ChainIds.IsNullOrEmpty() && !input.OtherChainIds.IsNullOrEmpty()), "Param invalid.");
-        
+            (!input.ChainIds.IsNullOrEmpty() && !input.OtherChainIds.IsNullOrEmpty()), "Failed to add chain.");
+        if (!input.ChainIds.IsNullOrEmpty() && input.OtherChainIds.IsNullOrEmpty())
+        {
+            if (chainStatus.ChainList.Exists(t => t.Status ==
+                    TokenApplyOrderStatus.PoolInitializing.ToString() || t.Status ==
+                    TokenApplyOrderStatus.PoolInitialized.ToString() || t.Status ==
+                    TokenApplyOrderStatus.Integrating.ToString()))
+            {
+                throw new UserFriendlyException(
+                    "A listing is in progress. Wait for completion before adding the aelf chain.");
+            }
+        }
+
         var result = new AddChainResultDto();
         if (!input.OtherChainIds.IsNullOrEmpty())
         {
