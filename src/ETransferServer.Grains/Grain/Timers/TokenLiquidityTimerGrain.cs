@@ -30,6 +30,7 @@ public class TokenLiquidityTimerGrain : Grain<TokenLiquidityState>, ITokenLiquid
     private readonly IContractProvider _contractProvider;
     private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
     private readonly IOptionsSnapshot<TokenAccessOptions> _tokenAccessOptions;
+    private readonly IOptionsSnapshot<WithdrawOptions> _withdrawOptions;
     private readonly ILogger<TokenAddressRecycleTimerGrain> _logger;
     private const int PageSize = 1000;
     
@@ -38,6 +39,7 @@ public class TokenLiquidityTimerGrain : Grain<TokenLiquidityState>, ITokenLiquid
         IContractProvider contractProvider,
         IOptionsSnapshot<TimerOptions> timerOptions,
         IOptionsSnapshot<TokenAccessOptions> tokenAccessOptions,
+        IOptionsSnapshot<WithdrawOptions> withdrawOptions,
         ILogger<TokenAddressRecycleTimerGrain> logger)
     {
         _tokenAccessAppService = tokenAccessAppService;
@@ -45,6 +47,7 @@ public class TokenLiquidityTimerGrain : Grain<TokenLiquidityState>, ITokenLiquid
         _contractProvider = contractProvider;
         _timerOptions = timerOptions;
         _tokenAccessOptions = tokenAccessOptions;
+        _withdrawOptions = withdrawOptions;
         _logger = logger;
     }
 
@@ -107,7 +110,10 @@ public class TokenLiquidityTimerGrain : Grain<TokenLiquidityState>, ITokenLiquid
                         foreach (var chain in item.ChainTokenInfo)
                         {
                             chainId = chain.ChainId;
-                            tokenApplyList = AddTokenApplyList(tokenApplyList, item.Symbol, item.UserAddress, chainId);
+                            if (!_withdrawOptions.Value.PaymentAddresses?.ContainsKey(chainId) ?? false) continue;
+                            var poolAddress = _withdrawOptions.Value.PaymentAddresses.GetValueOrDefault(chainId)?.GetValueOrDefault(item.Symbol);
+                            if (poolAddress.IsNullOrEmpty()) continue;
+                            tokenApplyList = AddTokenApplyList(tokenApplyList, item.Symbol, poolAddress, chainId);
                         }
                     }
                 }
@@ -115,7 +121,10 @@ public class TokenLiquidityTimerGrain : Grain<TokenLiquidityState>, ITokenLiquid
                 {
                     foreach (var chain in item.ChainTokenInfo)
                     {
-                        tokenApplyList = AddTokenApplyList(tokenApplyList, item.Symbol, item.UserAddress, chain.ChainId);
+                        if (!_withdrawOptions.Value.PaymentAddresses?.ContainsKey(chain.ChainId) ?? false) continue;
+                        var poolAddress = _withdrawOptions.Value.PaymentAddresses.GetValueOrDefault(chain.ChainId)?.GetValueOrDefault(item.Symbol);
+                        if (poolAddress.IsNullOrEmpty()) continue;
+                        tokenApplyList = AddTokenApplyList(tokenApplyList, item.Symbol, poolAddress, chain.ChainId);
                     }
                 }
             }
@@ -125,62 +134,70 @@ public class TokenLiquidityTimerGrain : Grain<TokenLiquidityState>, ITokenLiquid
 
         if (tokenApplyList.IsNullOrEmpty()) return;
         _logger.LogInformation("TokenLiquidityTimerGrain query count: {count}", tokenApplyList.Count);
-        var result = await _coBoProvider.GetAccountDetailAsync();
-        if (result == null || result.Assets.IsNullOrEmpty()) return;
-        foreach (var item in result.Assets)
+        try
         {
-            if (!tokenApplyList.Exists(t => t.Coin == item.Coin)) continue;
-            
-            var coin = item.Coin.Split(CommonConstant.Underline);
-            var symbol = coin.Length == 1 ? coin[0] : coin[1];
-            var exchangeSymbolPair = string.Join(CommonConstant.Underline, symbol, CommonConstant.Symbol.USDT);
-            var avgExchange = await GetExchchangeAsync(exchangeSymbolPair, item.Coin);
-            if (avgExchange <= 0) continue;
-            var amount = avgExchange * item.AbsBalance.SafeToDecimal();
-            if (amount <= (!_tokenAccessOptions.Value.PoolConfig.ContainsKey(item.Coin)
-                    ? _tokenAccessOptions.Value.DefaultPoolConfig.Liquidity.SafeToDecimal()
-                    : _tokenAccessOptions.Value.PoolConfig[item.Coin].Liquidity.SafeToDecimal()))
+            var result = await _coBoProvider.GetAccountDetailAsync();
+            if (result == null || result.Assets.IsNullOrEmpty()) return;
+            foreach (var item in result.Assets)
             {
-                var monitorGrain = GrainFactory.GetGrain<IUserTokenAccessMonitorGrain>(item.Coin);
-                var tokenApply = tokenApplyList.FirstOrDefault(t => t.Coin == item.Coin);
-                tokenApply.Amount = amount.ToString();
-                await monitorGrain.DoLiquidityMonitor(tokenApply);
+                if (!tokenApplyList.Exists(t => t.Coin == item.Coin)) continue;
+
+                var coin = item.Coin.Split(CommonConstant.Underline);
+                var symbol = coin.Length == 1 ? coin[0] : coin[1];
+                var exchangeSymbolPair = string.Join(CommonConstant.Underline, symbol, CommonConstant.Symbol.USDT);
+                var avgExchange = await GetExchchangeAsync(exchangeSymbolPair, item.Coin);
+                if (avgExchange <= 0) continue;
+                var amount = avgExchange * item.AbsBalance.SafeToDecimal();
+                if (amount <= (!_tokenAccessOptions.Value.PoolConfig.ContainsKey(item.Coin)
+                        ? _tokenAccessOptions.Value.DefaultPoolConfig.Liquidity.SafeToDecimal()
+                        : _tokenAccessOptions.Value.PoolConfig[item.Coin].Liquidity.SafeToDecimal()))
+                {
+                    var monitorGrain = GrainFactory.GetGrain<IUserTokenAccessMonitorGrain>(item.Coin);
+                    var tokenApply = tokenApplyList.FirstOrDefault(t => t.Coin == item.Coin);
+                    tokenApply.Amount = amount.ToString();
+                    await monitorGrain.DoLiquidityMonitor(tokenApply);
+                }
+            }
+
+            var aelfTokenApplyList = tokenApplyList.Where(t => t.ChainId == ChainId.AELF
+                                                               || t.ChainId == ChainId.tDVV ||
+                                                               t.ChainId == ChainId.tDVW).ToList();
+            if (aelfTokenApplyList.IsNullOrEmpty()) return;
+            foreach (var item in aelfTokenApplyList)
+            {
+                var balance = await _contractProvider.CallTransactionAsync<GetBalanceOutput>(item.ChainId,
+                    SystemContractName.TokenContract,
+                    "GetBalance",
+                    new GetBalanceInput
+                    {
+                        Owner = Address.FromBase58(item.Address),
+                        Symbol = item.Symbol
+                    });
+                if (balance.Balance == 0) continue;
+                var tokenGrain =
+                    GrainFactory.GetGrain<ITokenGrain>(ITokenGrain.GenGrainId(item.Symbol, item.ChainId));
+                var token = await tokenGrain.GetToken();
+                var decimalPow = (decimal)Math.Pow(10, token.Decimals);
+                var balanceDecimal = balance.Balance / decimalPow;
+
+                var exchangeSymbolPair = string.Join(CommonConstant.Underline, item.Symbol, CommonConstant.Symbol.USDT);
+                var avgExchange = await GetExchchangeAsync(exchangeSymbolPair, item.Coin);
+                if (avgExchange <= 0) continue;
+                var amount = avgExchange * balanceDecimal;
+                if (amount <= (!_tokenAccessOptions.Value.PoolConfig.ContainsKey(item.Coin)
+                        ? _tokenAccessOptions.Value.DefaultPoolConfig.Liquidity.SafeToDecimal()
+                        : _tokenAccessOptions.Value.PoolConfig[item.Coin].Liquidity.SafeToDecimal()))
+                {
+                    var monitorGrain = GrainFactory.GetGrain<IUserTokenAccessMonitorGrain>(item.Coin);
+                    var tokenApply = tokenApplyList.FirstOrDefault(t => t.Coin == item.Coin);
+                    tokenApply.Amount = amount.ToString();
+                    await monitorGrain.DoLiquidityMonitor(tokenApply);
+                }
             }
         }
-
-        var aelfTokenApplyList = tokenApplyList.Where(t => t.ChainId == ChainId.AELF
-                                || t.ChainId == ChainId.tDVV || t.ChainId == ChainId.tDVW).ToList();
-        if (aelfTokenApplyList.IsNullOrEmpty()) return;
-        foreach (var item in aelfTokenApplyList)
+        catch (Exception e)
         {
-            var balance = await _contractProvider.CallTransactionAsync<GetBalanceOutput>(item.ChainId,
-                SystemContractName.TokenContract,
-                "GetBalance",
-                new GetBalanceInput
-                {
-                    Owner = Address.FromBase58(item.Address),
-                    Symbol = item.Symbol
-                });
-            if (balance.Balance == 0) continue;
-            var tokenGrain =
-                GrainFactory.GetGrain<ITokenGrain>(ITokenGrain.GenGrainId(item.Symbol, item.ChainId));
-            var token = await tokenGrain.GetToken();
-            var decimalPow = (decimal)Math.Pow(10, token.Decimals);
-            var balanceDecimal = balance.Balance / decimalPow;
-            
-            var exchangeSymbolPair = string.Join(CommonConstant.Underline, item.Symbol, CommonConstant.Symbol.USDT);
-            var avgExchange = await GetExchchangeAsync(exchangeSymbolPair, item.Coin);
-            if (avgExchange <= 0) continue;
-            var amount = avgExchange * balanceDecimal;
-            if (amount <= (!_tokenAccessOptions.Value.PoolConfig.ContainsKey(item.Coin)
-                    ? _tokenAccessOptions.Value.DefaultPoolConfig.Liquidity.SafeToDecimal()
-                    : _tokenAccessOptions.Value.PoolConfig[item.Coin].Liquidity.SafeToDecimal()))
-            {
-                var monitorGrain = GrainFactory.GetGrain<IUserTokenAccessMonitorGrain>(item.Coin);
-                var tokenApply = tokenApplyList.FirstOrDefault(t => t.Coin == item.Coin);
-                tokenApply.Amount = amount.ToString();
-                await monitorGrain.DoLiquidityMonitor(tokenApply);
-            }
+            _logger.LogError(e, "TokenLiquidityTimerGrain query balance error.");
         }
     }
 
