@@ -11,5 +11,5 @@ public class TokenDto
     [Id(3)] public int Decimals { get; set; }
     [Id(4)] public bool IsBurnable { get; set; }
     [Id(5)] public long IssueChainId { get; set; }
-
+    [Id(6)] public string Owner { get; set; }
 }
