@@ -104,7 +104,7 @@ public class TokenLiquidityTimerGrain : Grain<TokenLiquidityState>, ITokenLiquid
                 if (item.OtherChainTokenInfo != null)
                 {
                     var chainId = item.OtherChainTokenInfo.ChainId;
-                    tokenApplyList = AddTokenApplyList(tokenApplyList, item.Symbol, item.UserAddress, chainId);
+                    tokenApplyList = AddTokenApplyList(tokenApplyList, item.Symbol, item.UserAddress, null, chainId);
                     if (!item.ChainTokenInfo.IsNullOrEmpty())
                     {
                         foreach (var chain in item.ChainTokenInfo)
@@ -113,7 +113,7 @@ public class TokenLiquidityTimerGrain : Grain<TokenLiquidityState>, ITokenLiquid
                             if (!_withdrawOptions.Value.PaymentAddresses?.ContainsKey(chainId) ?? false) continue;
                             var poolAddress = _withdrawOptions.Value.PaymentAddresses.GetValueOrDefault(chainId)?.GetValueOrDefault(item.Symbol);
                             if (poolAddress.IsNullOrEmpty()) continue;
-                            tokenApplyList = AddTokenApplyList(tokenApplyList, item.Symbol, poolAddress, chainId);
+                            tokenApplyList = AddTokenApplyList(tokenApplyList, item.Symbol, item.UserAddress, poolAddress, chainId);
                         }
                     }
                 }
@@ -124,7 +124,7 @@ public class TokenLiquidityTimerGrain : Grain<TokenLiquidityState>, ITokenLiquid
                         if (!_withdrawOptions.Value.PaymentAddresses?.ContainsKey(chain.ChainId) ?? false) continue;
                         var poolAddress = _withdrawOptions.Value.PaymentAddresses.GetValueOrDefault(chain.ChainId)?.GetValueOrDefault(item.Symbol);
                         if (poolAddress.IsNullOrEmpty()) continue;
-                        tokenApplyList = AddTokenApplyList(tokenApplyList, item.Symbol, poolAddress, chain.ChainId);
+                        tokenApplyList = AddTokenApplyList(tokenApplyList, item.Symbol, item.UserAddress, poolAddress, chain.ChainId);
                     }
                 }
             }
@@ -170,7 +170,7 @@ public class TokenLiquidityTimerGrain : Grain<TokenLiquidityState>, ITokenLiquid
                     "GetBalance",
                     new GetBalanceInput
                     {
-                        Owner = Address.FromBase58(item.Address),
+                        Owner = Address.FromBase58(item.PoolAddress),
                         Symbol = item.Symbol
                     });
                 if (balance.Balance == 0) continue;
@@ -207,7 +207,7 @@ public class TokenLiquidityTimerGrain : Grain<TokenLiquidityState>, ITokenLiquid
     }
 
     private List<TokenApplyDto> AddTokenApplyList(List<TokenApplyDto> tokenApplyList, string symbol, string address, 
-        string chainId)
+        string poolAddress, string chainId)
     {
         if (tokenApplyList.Any(t => t.Symbol == symbol && t.Address == address && t.ChainId == chainId)) 
             return tokenApplyList;
@@ -216,6 +216,7 @@ public class TokenLiquidityTimerGrain : Grain<TokenLiquidityState>, ITokenLiquid
         {
             Symbol = symbol,
             Address = address,
+            PoolAddress = poolAddress,
             ChainId = chainId,
             Coin = string.Join(CommonConstant.Underline, chainId, symbol)
         });

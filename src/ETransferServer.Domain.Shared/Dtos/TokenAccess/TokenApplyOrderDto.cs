@@ -49,8 +49,9 @@ public class TokenApplyDto
 {
     [Id(0)] public string Symbol { get; set; }
     [Id(1)] public string Address { get; set; }
-    [Id(2)] public string ChainId { get; set; }
-    [Id(3)] public string Coin { get; set; }
-    [Id(4)] public string Amount { get; set; }
-    [Id(5)] public string ContractAddress { get; set; }
+    [Id(2)] public string PoolAddress { get; set; }
+    [Id(3)] public string ChainId { get; set; }
+    [Id(4)] public string Coin { get; set; }
+    [Id(5)] public string Amount { get; set; }
+    [Id(6)] public string ContractAddress { get; set; }
 }
