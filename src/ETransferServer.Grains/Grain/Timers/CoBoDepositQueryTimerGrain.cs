@@ -10,6 +10,7 @@ using ETransferServer.Grains.Grain.Order.Deposit;
 using ETransferServer.Grains.Grain.Users;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.State.Order;
+using ETransferServer.Network;
 using ETransferServer.Options;
 using ETransferServer.ThirdPart.CoBo;
 using ETransferServer.ThirdPart.CoBo.Dtos;
@@ -42,6 +43,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
     private readonly IOptionsSnapshot<CoBoOptions> _coBoOptions;
     private readonly IUserAppService _userAppService;
     private readonly IUserAddressService _userAddressService;
+    private readonly INetworkAppService _networkService;
 
     private readonly ICoBoProvider _coBoProvider;
     private readonly IUserDepositProvider _userDepositProvider;
@@ -59,6 +61,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         IOptionsSnapshot<CoBoOptions> coBoOptions,
         IUserAppService userAppService, 
         IUserAddressService userAddressService,
+        INetworkAppService networkService,
         IObjectMapper objectMapper, 
         IBus bus)
     {
@@ -72,6 +75,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         _coBoOptions = coBoOptions;
         _userAppService = userAppService;
         _userAddressService = userAddressService;
+        _networkService = networkService;
         _objectMapper = objectMapper;
         _bus = bus;
     }
@@ -183,6 +187,15 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
             AssertHelper.IsTrue(orderExists.Success, "Query deposit exists order failed {Msg}", orderExists.Message);
             AssertHelper.IsTrue(orderExists.Value == null || orderExists.Value.Status == OrderStatusEnum.FromTransferring.ToString(), 
                 "Deposit order {OrderId} exists", orderDto.Id);
+            if (orderDto.ToTransfer.Amount == 0)
+            {
+                orderDto.Status = OrderStatusEnum.Finish.ToString();
+                orderDto.ToTransfer.Status = OrderTransferStatusEnum.Confirmed.ToString();
+                var res = await userDepositRecordGrain.CreateOrUpdateAsync(orderDto);
+                await _userDepositProvider.AddOrUpdateSync(res.Value);
+                await _bus.Publish(_objectMapper.Map<DepositOrderDto, OrderChangeEto>(res.Value));
+                return;
+            }
             if (orderExists.Value == null)
             {
                 await _bus.Publish(_objectMapper.Map<DepositOrderDto, OrderChangeEto>(orderDto));
@@ -253,6 +266,9 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         AssertHelper.IsTrue(paymentAddressExists, "Payment address missing, ChainId={ChainId}", userAddress.ChainId);
         var paymentAddressDic = _depositOption.Value.PaymentAddresses.GetValueOrDefault(userAddress.ChainId);
         AssertHelper.NotEmpty(paymentAddressDic, "Payment address empty, ChainId={ChainId}", userAddress.ChainId);
+        var toAmount = coBoTransaction.AbsAmount.SafeToDecimal() -
+                       await _networkService.GetMaxThirdPartFeeAsync(coinInfo.Network, coinInfo.Symbol);
+        toAmount = toAmount <= 0 ? 0M : toAmount;
         
         var depositOrderDto = new DepositOrderDto
         {
@@ -281,15 +297,15 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
                 Network = CommonConstant.Network.AElf,
                 ChainId = userAddress.ChainId,
                 Symbol = coinInfo.Symbol,
-                Amount = coBoTransaction.AbsAmount.SafeToDecimal(),
+                Amount = toAmount,
                 Status = OrderTransferStatusEnum.Created.ToString(),
             }
         };
 
-        return SpecialHandle(depositOrderDto, coBoTransaction, userAddress.ToSymbol);
+        return SpecialHandle(depositOrderDto, coBoTransaction, userAddress.ToSymbol, toAmount);
     }
 
-    private DepositOrderDto SpecialHandle(DepositOrderDto dto, CoBoTransactionDto coBoTransaction, string symbol)
+    private DepositOrderDto SpecialHandle(DepositOrderDto dto, CoBoTransactionDto coBoTransaction, string symbol, decimal amount)
     {
         _logger.LogInformation("SpecialHandle, input dto: {dto}", JsonConvert.SerializeObject(dto));
         // Add ExtensionInfo
@@ -303,7 +319,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
             dto.ExtensionInfo.AddOrReplace(ExtensionKey.Memo, coBoTransaction.Memo);
         }
         
-        if (symbol.IsNullOrEmpty() || _depositOption.Value.NoSwapSymbols.Contains(dto.FromTransfer.Symbol))
+        if (amount == 0 || symbol.IsNullOrEmpty() || _depositOption.Value.NoSwapSymbols.Contains(dto.FromTransfer.Symbol))
         {
             _logger.LogInformation("SpecialHandle, not need swap, set ToTransfer.Symbol = FromTransfer.Symbol");
             return dto;
