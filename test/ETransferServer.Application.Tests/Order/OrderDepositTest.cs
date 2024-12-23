@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Models;
+using ETransferServer.Network;
 using ETransferServer.Options;
 using ETransferServer.Swap;
 using ETransferServer.Swap.Dtos;
@@ -34,6 +35,7 @@ public class OrderDepositTest : ETransferServerApplicationTestBase
         services.AddSingleton(MockNetworkOptions());
         services.AddSingleton(MockUserAddressService());
         services.AddSingleton(MockTokenAppService());
+        services.AddSingleton(MockNetworkAppService());
         services.AddSingleton(MockSwapAppService());
     }
 
@@ -202,7 +204,17 @@ public class OrderDepositTest : ETransferServerApplicationTestBase
             o.IsValidSwap(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>())).Returns(true);
         return tokenAppService.Object;
     }
-    
+
+    private INetworkAppService MockNetworkAppService()
+    {
+        var networkAppService = new Mock<INetworkAppService>();
+
+        networkAppService.Setup(o =>
+            o.GetServiceFeeAsync(It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync(
+            Tuple.Create(false, 1M, 1M));
+        return networkAppService.Object;
+    }
+
     private ISwapAppService MockSwapAppService()
     {
         var swapAppService = new Mock<ISwapAppService>();
