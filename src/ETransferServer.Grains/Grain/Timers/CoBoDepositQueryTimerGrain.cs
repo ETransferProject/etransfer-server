@@ -266,10 +266,13 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         AssertHelper.IsTrue(paymentAddressExists, "Payment address missing, ChainId={ChainId}", userAddress.ChainId);
         var paymentAddressDic = _depositOption.Value.PaymentAddresses.GetValueOrDefault(userAddress.ChainId);
         AssertHelper.NotEmpty(paymentAddressDic, "Payment address empty, ChainId={ChainId}", userAddress.ChainId);
-        var toFee = await _networkService.GetMaxThirdPartFeeAsync(coinInfo.Network, coinInfo.Symbol);
-        var toAmount = coBoTransaction.AbsAmount.SafeToDecimal() - toFee;
-        toAmount = toAmount <= 0 ? 0M : toAmount;
-        
+        var (isOpen, serviceFee, minAmount) = await _networkService.GetServiceFeeAsync(coinInfo.Network, coinInfo.Symbol);
+        var toAmount = isOpen && coBoTransaction.AbsAmount.SafeToDecimal() >= minAmount
+            ? coBoTransaction.AbsAmount.SafeToDecimal() - serviceFee
+            : !isOpen && coBoTransaction.AbsAmount.SafeToDecimal() >= minAmount
+                ? coBoTransaction.AbsAmount.SafeToDecimal()
+                : 0M;
+
         var depositOrderDto = new DepositOrderDto
         {
             Id = OrderIdHelper.DepositOrderId(coinInfo.Network, coinInfo.Symbol, coBoTransaction.TxId),
@@ -301,11 +304,11 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
                 Status = OrderTransferStatusEnum.Created.ToString(),
             }
         };
-        if (toFee > 0)
+        if (isOpen)
         {
             depositOrderDto.ToTransfer.FeeInfo = new List<FeeInfo>
             {
-                new(coinInfo.Symbol, toFee.ToString())
+                new(coinInfo.Symbol, serviceFee.ToString())
             };
         }
 

@@ -340,6 +340,16 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
             : 0M);
     }
 
+    public async Task<Tuple<bool, decimal, decimal>> GetServiceFeeAsync(string network, string symbol)
+    {
+        var isOpen = _withdrawInfoOptions.Value.ServiceFee.IsOpen;
+        var serviceFee = await GetMaxThirdPartFeeAsync(network, symbol);
+        var minAmount = serviceFee + (_withdrawInfoOptions.Value.ServiceFee.MinPlace.ContainsKey(symbol)
+            ? _withdrawInfoOptions.Value.ServiceFee.MinPlace[symbol]
+            : 0M);
+        return Tuple.Create(isOpen, serviceFee, minAmount);
+    }
+
     public Task<int> GetDecimalsAsync(string chainId, string symbol)
     {
         return Task.FromResult((!chainId.IsNullOrEmpty() && _tokenOptions.Value.Withdraw.ContainsKey(chainId)
