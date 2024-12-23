@@ -11,6 +11,7 @@ public class DepositInfoDto
 {
     public string DepositAddress { get; set; }
     public string ServiceFee { get; set; }
+    public string ServiceFeeUsd { get; set; }
     public string MinAmount { get; set; }
     public string MinAmountUsd { get; set; }
     public List<string> ExtraNotes { get; set; }

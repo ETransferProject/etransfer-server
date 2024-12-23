@@ -87,7 +87,7 @@ public partial class OrderDepositAppService : ApplicationService, IOrderDepositA
         var getDepositInfoDto = new GetDepositInfoDto();
         var userAddressAsync = await _userAddressService.GetUserAddressAsync(getUserDepositAddressInput);
         var (isOpen, serviceFee, minAmount) = await _networkAppService.GetServiceFeeAsync(request.Network, request.Symbol);
-        getDepositInfoDto.DepositInfo = new DepositInfoDto()
+        getDepositInfoDto.DepositInfo = new DepositInfoDto
         {
             DepositAddress = userAddressAsync,
             ServiceFee = isOpen ? serviceFee.ToString() : "0",
@@ -111,6 +111,10 @@ public partial class OrderDepositAppService : ApplicationService, IOrderDepositA
                 await _networkAppService.GetAvgExchangeAsync(request.Symbol, CommonConstant.Symbol.USD);
             var decimals =
                 await _networkAppService.GetDecimalsAsync(request.ChainId, request.Symbol);
+            getDepositInfoDto.DepositInfo.ServiceFeeUsd = isOpen
+                ? (serviceFee * avgExchange).ToString(
+                    decimals, DecimalHelper.RoundingOption.Ceiling)
+                : "0";
             getDepositInfoDto.DepositInfo.MinAmountUsd =
                 (minAmount * avgExchange).ToString(
                     decimals, DecimalHelper.RoundingOption.Ceiling);
