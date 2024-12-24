@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Order;
+using ETransferServer.Dtos.Token;
 using ETransferServer.Dtos.User;
 using ETransferServer.Etos.Order;
 using ETransferServer.Grains.Common;
@@ -266,7 +267,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         AssertHelper.IsTrue(paymentAddressExists, "Payment address missing, ChainId={ChainId}", userAddress.ChainId);
         var paymentAddressDic = _depositOption.Value.PaymentAddresses.GetValueOrDefault(userAddress.ChainId);
         AssertHelper.NotEmpty(paymentAddressDic, "Payment address empty, ChainId={ChainId}", userAddress.ChainId);
-        var (isOpen, serviceFee, minAmount) = await _networkService.GetServiceFeeAsync(coinInfo.Network, coinInfo.Symbol);
+        var (isOpen, serviceFee, minAmount) = await GetServiceFeeAsync(coinInfo.Network, coinInfo.Symbol);
         var toAmount = isOpen && coBoTransaction.AbsAmount.SafeToDecimal() >= minAmount
             ? coBoTransaction.AbsAmount.SafeToDecimal() - serviceFee
             : !isOpen && coBoTransaction.AbsAmount.SafeToDecimal() >= minAmount
@@ -309,7 +310,8 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         {
             depositOrderDto.ToTransfer.FeeInfo = new List<FeeInfo>
             {
-                new(coinInfo.Symbol, serviceFee.ToString())
+                new(coinInfo.Symbol, coBoTransaction.AbsAmount.SafeToDecimal() >= serviceFee
+                ? serviceFee.ToString() : coBoTransaction.AbsAmount)
             };
         }
 
@@ -355,6 +357,24 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         var paymentAddress = paymentAddressDic.GetValueOrDefault(symbol);
         AssertHelper.NotEmpty(paymentAddress, "Payment address empty, Symbol={Symbol}", symbol);
         return paymentAddress;
+    }
+    
+    private async Task<Tuple<bool, decimal, decimal>> GetServiceFeeAsync(string network, string symbol)
+    {
+        var isOpen = _depositOption.Value.ServiceFee.IsOpen;
+        var (estimateFee, coin) = network == ChainId.AELF || network == ChainId.tDVV || network == ChainId.tDVW
+            ? Tuple.Create(0M, new CoBoCoinDto { ExpireTime = 0L })
+            : await _networkService.CalculateNetworkFeeAsync(network, symbol);
+        var feeKey = string.Join(CommonConstant.Underline, network, symbol);
+        var serviceFee = Math.Min(estimateFee, _depositOption.Value.ServiceFee.MaxThirdPartFee.ContainsKey(feeKey)
+            ? _depositOption.Value.ServiceFee.MaxThirdPartFee[feeKey]
+            : 0M);
+        var minAmount = _depositOption.Value.ServiceFee.MinAmount.ContainsKey(feeKey)
+            ? _depositOption.Value.ServiceFee.MinAmount[feeKey]
+            : 0M;
+        _logger.LogDebug("Grain Deposit from network fee: {network}, {symbol}, {isOpen}, {serviceFee}, {minAmount}", 
+            network, symbol, isOpen, serviceFee, minAmount);
+        return Tuple.Create(isOpen, serviceFee, minAmount);
     }
 
     private async Task AddAfter(CoBoTransactionDto depositOrder)
