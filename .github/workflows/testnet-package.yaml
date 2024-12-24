@@ -21,9 +21,9 @@ jobs:
       matrix:
         servicename:
           [
-#            ETransferServer.Silo,
+            ETransferServer.Silo
 #            ETransferServer.AuthServer,
-            ETransferServer.HttpApi.Host
+#            ETransferServer.HttpApi.Host
 #            ETransferServer.SignatureApi.Host
           ]
     steps:
@@ -66,9 +66,9 @@ jobs:
       matrix:
         servicename:
           [
-#            ETransferServer.Silo,
+            ETransferServer.Silo,
 #            ETransferServer.AuthServer,
-            ETransferServer.HttpApi.Host
+#            ETransferServer.HttpApi.Host
 #            ETransferServer.SignatureApi.Host
           ]
     permissions:
