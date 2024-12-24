@@ -272,6 +272,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
             : !isOpen && coBoTransaction.AbsAmount.SafeToDecimal() >= minAmount
                 ? coBoTransaction.AbsAmount.SafeToDecimal()
                 : 0M;
+        toAmount = toAmount < 0 ? 0M : toAmount;
 
         var depositOrderDto = new DepositOrderDto
         {
