@@ -31,6 +31,7 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
     private readonly ILogger<NetworkAppService> _logger;
     private readonly IOptionsSnapshot<NetworkOptions> _networkOptions;
     private readonly CoinGeckoOptions _coinGeckoOptions;
+    private readonly IOptionsSnapshot<DepositInfoOptions> _depositInfoOptions;
     private readonly IOptionsSnapshot<WithdrawInfoOptions> _withdrawInfoOptions;
     private readonly IOptionsSnapshot<TokenOptions> _tokenOptions;
     private readonly IObjectMapper _objectMapper;
@@ -41,6 +42,7 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
         IOptionsSnapshot<CoinGeckoOptions> coinGeckoOptions,
         IObjectMapper objectMapper,
         IClusterClient clusterClient, 
+        IOptionsSnapshot<DepositInfoOptions> depositInfoOptions,
         IOptionsSnapshot<WithdrawInfoOptions> withdrawInfoOptions,
         IOptionsSnapshot<TokenOptions> tokenOptions)
     {
@@ -49,6 +51,7 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
         _coinGeckoOptions = coinGeckoOptions.Value;
         _objectMapper = objectMapper;
         _clusterClient = clusterClient;
+        _depositInfoOptions = depositInfoOptions;
         _withdrawInfoOptions = withdrawInfoOptions;
         _tokenOptions = tokenOptions;
     }
@@ -338,6 +341,23 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
         return Task.FromResult(_withdrawInfoOptions.Value.MaxThirdPartFee.ContainsKey(maxFeeKey)
             ? _withdrawInfoOptions.Value.MaxThirdPartFee[maxFeeKey]
             : 0M);
+    }
+
+    public async Task<Tuple<bool, decimal, decimal>> GetServiceFeeAsync(string network, string symbol)
+    {
+        var isOpen = _depositInfoOptions.Value.ServiceFee.IsOpen;
+        var (estimateFee, coin) = network == ChainId.AELF || network == ChainId.tDVV || network == ChainId.tDVW
+            ? Tuple.Create(0M, new CoBoCoinDto { ExpireTime = 0L })
+            : await CalculateNetworkFeeAsync(network, symbol);
+        var serviceFee = Math.Min(estimateFee, await GetMaxThirdPartFeeAsync(network, symbol)).ToString(
+            2, DecimalHelper.RoundingOption.Ceiling).SafeToDecimal();
+        var minAmount = _networkOptions.Value.NetworkMap.ContainsKey(symbol)
+            ? _networkOptions.Value.NetworkMap[symbol].FirstOrDefault(t => t.NetworkInfo.Network == network)
+                ?.DepositInfo?.MinDeposit.SafeToDecimal() ?? 0M
+            : 0M;
+        _logger.LogDebug("Deposit from network fee: {network}, {symbol}, {isOpen}, {serviceFee}, {minAmount}", 
+            network, symbol, isOpen, serviceFee, minAmount);
+        return Tuple.Create(isOpen, serviceFee, minAmount);
     }
 
     public Task<int> GetDecimalsAsync(string chainId, string symbol)

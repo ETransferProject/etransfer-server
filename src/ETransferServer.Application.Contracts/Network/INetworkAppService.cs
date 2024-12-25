@@ -18,6 +18,7 @@ public interface INetworkAppService : IApplicationService
     Task<decimal> GetAvgExchangeAsync(string fromSymbol, string toSymbol, long timestamp = 0L);
     Task<decimal> GetMinThirdPartFeeAsync(string network, string symbol);
     Task<decimal> GetMaxThirdPartFeeAsync(string network, string symbol);
+    Task<Tuple<bool, decimal, decimal>> GetServiceFeeAsync(string network, string symbol);
     Task<int> GetDecimalsAsync(string chainId, string symbol);
     Task<string> GetIconAsync(string orderType, string chainId, string fromSymbol, string toSymbol = null);
     Task<ListResultDto<TokenPriceDataDto>> GetTokenPriceListAsync(GetTokenPriceListRequestDto request);
