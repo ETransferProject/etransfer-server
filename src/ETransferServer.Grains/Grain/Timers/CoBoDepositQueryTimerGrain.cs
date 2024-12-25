@@ -311,7 +311,8 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
             depositOrderDto.ToTransfer.FeeInfo = new List<FeeInfo>
             {
                 new(coinInfo.Symbol, coBoTransaction.AbsAmount.SafeToDecimal() >= serviceFee
-                ? serviceFee.ToString() : coBoTransaction.AbsAmount)
+                ? serviceFee.ToString() : coBoTransaction.AbsAmount.SafeToDecimal().ToString(
+                    DecimalHelper.GetDecimals(coinInfo.Symbol), DecimalHelper.RoundingOption.Floor))
             };
         }
 
