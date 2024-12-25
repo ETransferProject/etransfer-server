@@ -368,7 +368,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         var feeKey = string.Join(CommonConstant.Underline, network, symbol);
         var serviceFee = Math.Min(estimateFee, _depositOption.Value.ServiceFee.MaxThirdPartFee.ContainsKey(feeKey)
             ? _depositOption.Value.ServiceFee.MaxThirdPartFee[feeKey]
-            : 0M);
+            : 0M).ToString(2, DecimalHelper.RoundingOption.Ceiling).SafeToDecimal();
         var minAmount = _depositOption.Value.ServiceFee.MinAmount.ContainsKey(feeKey)
             ? _depositOption.Value.ServiceFee.MinAmount[feeKey]
             : 0M;

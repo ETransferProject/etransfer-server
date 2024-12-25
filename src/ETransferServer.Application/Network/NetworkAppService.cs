@@ -349,7 +349,8 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
         var (estimateFee, coin) = network == ChainId.AELF || network == ChainId.tDVV || network == ChainId.tDVW
             ? Tuple.Create(0M, new CoBoCoinDto { ExpireTime = 0L })
             : await CalculateNetworkFeeAsync(network, symbol);
-        var serviceFee = Math.Min(estimateFee, await GetMaxThirdPartFeeAsync(network, symbol));
+        var serviceFee = Math.Min(estimateFee, await GetMaxThirdPartFeeAsync(network, symbol)).ToString(
+            2, DecimalHelper.RoundingOption.Ceiling).SafeToDecimal();
         var minAmount = _networkOptions.Value.NetworkMap.ContainsKey(symbol)
             ? _networkOptions.Value.NetworkMap[symbol].FirstOrDefault(t => t.NetworkInfo.Network == network)
                 ?.DepositInfo?.MinDeposit.SafeToDecimal() ?? 0M
