@@ -301,6 +301,13 @@ public partial class InfoAppService : ETransferServerAppService, IInfoAppService
         var mustNotQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
         mustNotQuery.Add(q => q.Match(i =>
             i.Field("extensionInfo.RefundTx").Query(ExtensionKey.RefundTx)));
+        mustNotQuery.Add(q => q.Bool(i => i.Must(
+            s => s.Term(k =>
+                k.Field(f => f.OrderType).Value(OrderTypeEnum.Deposit.ToString())),
+            s => s.Term(k =>
+                k.Field(f => f.Status).Value(OrderStatusEnum.Finish.ToString())),
+            s => s.Term(k =>
+                k.Field(f => f.ToTransfer.Amount).Value(0M)))));
         mustNotQuery.Add(GetFilterCondition(_depositInfoOptions.Value.AssignedAddressExpiredHour));
         
         QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery)

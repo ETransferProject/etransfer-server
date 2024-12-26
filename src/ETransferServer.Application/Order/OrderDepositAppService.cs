@@ -86,10 +86,12 @@ public partial class OrderDepositAppService : ApplicationService, IOrderDepositA
 
         var getDepositInfoDto = new GetDepositInfoDto();
         var userAddressAsync = await _userAddressService.GetUserAddressAsync(getUserDepositAddressInput);
-        getDepositInfoDto.DepositInfo = new DepositInfoDto()
+        var (isOpen, serviceFee, minAmount) = await _networkAppService.GetServiceFeeAsync(request.Network, request.Symbol);
+        getDepositInfoDto.DepositInfo = new DepositInfoDto
         {
             DepositAddress = userAddressAsync,
-            MinAmount = depositInfo.MinDeposit,
+            ServiceFee = isOpen ? serviceFee.ToString() : "0",
+            MinAmount = minAmount.ToString(),
             ExtraNotes = depositInfo.ExtraNotes,
         };
 
@@ -109,8 +111,12 @@ public partial class OrderDepositAppService : ApplicationService, IOrderDepositA
                 await _networkAppService.GetAvgExchangeAsync(request.Symbol, CommonConstant.Symbol.USD);
             var decimals =
                 await _networkAppService.GetDecimalsAsync(request.ChainId, request.Symbol);
+            getDepositInfoDto.DepositInfo.ServiceFeeUsd = isOpen
+                ? (serviceFee * avgExchange).ToString(
+                    decimals, DecimalHelper.RoundingOption.Ceiling)
+                : "0";
             getDepositInfoDto.DepositInfo.MinAmountUsd =
-                (depositInfo.MinDeposit.SafeToDecimal() * avgExchange).ToString(
+                (minAmount * avgExchange).ToString(
                     decimals, DecimalHelper.RoundingOption.Ceiling);
         }
         catch (Exception e)

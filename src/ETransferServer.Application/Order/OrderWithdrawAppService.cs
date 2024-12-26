@@ -105,15 +105,14 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
     public async Task<GetWithdrawInfoDto> GetWithdrawInfoAsync(GetWithdrawListRequestDto request, string version = null)
     {
         AssertHelper.IsTrue(request.ChainId == ChainId.AELF || request.ChainId == ChainId.tDVV
-                                                            || request.ChainId == ChainId.tDVW,
-            "Param is invalid. Please refresh and try again.");
+            || request.ChainId == ChainId.tDVW, ErrorResult.ChainIdInvalidCode);
         AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.Symbol),
-            "Symbol is not exist. Please refresh and try again.");
+            ErrorResult.SymbolInvalidCode, null, request.Symbol);
         AssertHelper.IsTrue(
             string.IsNullOrWhiteSpace(request.Version) ||
             CommonConstant.DefaultConst.PortKeyVersion.Equals(request.Version) ||
             CommonConstant.DefaultConst.PortKeyVersion2.Equals(request.Version),
-            "Version is invalid. Please refresh and try again.");
+            ErrorResult.VersionOrWhitelistVerifyFailCode);
         AssertHelper.IsTrue(VerifyMemo(request.Memo), ErrorResult.MemoInvalidCode);
         var userId = await GetUserIdAsync(request.SourceType, request.FromAddress);
         if (!request.Network.IsNullOrEmpty())
@@ -128,7 +127,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
         {
             AssertHelper.IsTrue(_withdrawInfoOptions.Value.CanCrossSameChain ||
                                 (!_withdrawInfoOptions.Value.CanCrossSameChain && request.ChainId != request.Network),
-                "Network is invalid. Please refresh and try again.");
+                ErrorResult.NetworkInvalidCode);
             AssertHelper.IsTrue(VerifyHelper.VerifyAelfAddress(request.Address), ErrorResult.AddressFormatWrongCode);
         }
 
@@ -142,7 +141,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
         withdrawInfoDto.TransactionUnit = request.Symbol;
 
         // query async
-        var networkFeeTask = CalculateNetworkFeeAsync(userId, request.ChainId, request.Version);
+        var networkFeeTask = CalculateNetworkFeeAsync(userId, request.ChainId, request.Version, request.FromAddress);
         var decimals = await _networkAppService.GetDecimalsAsync(request.ChainId, request.Symbol);
         var (feeAmount, expireAt) = (0M,
             DateTime.UtcNow.AddSeconds(_coBoOptions.Value.CoinExpireSeconds).ToUtcMilliSeconds());
@@ -217,7 +216,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
             return new GetWithdrawInfoDto { WithdrawInfo = withdrawInfoDto };
 
         AssertHelper.IsTrue(await IsAddressSupport(request.ChainId, request.Symbol, request.Address, version),
-            "Invalid address. Please refresh and try again.");
+            ErrorResult.AddressInvalidCode);
         return new GetWithdrawInfoDto
         {
             WithdrawInfo = withdrawInfoDto
@@ -399,17 +398,22 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
     }
 
 
-    private async Task<decimal> CalculateNetworkFeeAsync(Guid? userId, string chainId, string version)
+    private async Task<decimal> CalculateNetworkFeeAsync(Guid? userId, string chainId, string version, string userAddress)
     {
         if (!userId.HasValue || userId == Guid.Empty) return 0;
 
         var userGrain = _clusterClient.GetGrain<IUserGrain>((Guid)userId);
         var userDto = await userGrain.GetUser();
-        AssertHelper.IsTrue(userDto.Success, "User not exists");
+        // AssertHelper.IsTrue(userDto.Success, "User not exists");
 
-        AddressInfo addressInfo;
+        AddressInfo addressInfo = null;
         Address address;
-        if (userDto.Data.AppId == CommonConstant.NightElfAppId)
+        if (!userDto.Success && !userAddress.IsNullOrEmpty())
+        {
+            AssertHelper.IsTrue(VerifyHelper.VerifyAelfAddress(userAddress), ErrorResult.AddressInvalidCode);
+            address = Address.FromBase58(userAddress);
+        }
+        else if (userDto.Data.AppId == CommonConstant.NightElfAppId)
         {
             addressInfo = userDto.Data.AddressInfos.FirstOrDefault(addr => addr.ChainId == chainId);
             address = Address.FromBase58(addressInfo.Address);
@@ -462,7 +466,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
         var allowanceDecimal = totalAllowance / decimalPow;
         var transactionFee = Math.Max(0, chainInfo.TransactionFee - allowanceDecimal);
         _logger.LogDebug("Fee of address {Address}, balance={Balance}, freeAllowance={Free}, transactionFee={TxFee}",
-            addressInfo.Address, balanceDecimal, allowanceDecimal, transactionFee);
+            addressInfo?.Address ?? userAddress, balanceDecimal, allowanceDecimal, transactionFee);
         return Math.Min(balanceDecimal, transactionFee);
     }
 
@@ -482,7 +486,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
                 ChainId = chainId,
                 Symbol = symbol,
                 Address = address
-            }, version);
+            }, version, true);
             return network != null && !network.NetworkList.IsNullOrEmpty();
         }
         catch (Exception e)
