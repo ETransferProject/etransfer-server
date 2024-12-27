@@ -303,7 +303,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
                 ChainId = userAddress.ChainId,
                 Symbol = coinInfo.Symbol,
                 Amount = toAmount,
-                Status = OrderTransferStatusEnum.Created.ToString(),
+                Status = OrderTransferStatusEnum.Created.ToString()
             }
         };
         if (isOpen)
@@ -346,6 +346,21 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
             dto.ExtensionInfo.AddOrReplace(ExtensionKey.NeedSwap, Boolean.TrueString);
             dto.ExtensionInfo.AddOrReplace(ExtensionKey.SwapStage, SwapStage.SwapTx);
             dto.ToTransfer.Symbol = symbol;
+            if (dto.ToTransfer.ChainId == ChainId.AELF)
+            {
+                _logger.LogInformation("Swap to mainChain, {fromSymbol}, {toSymbol}", dto.FromTransfer.Symbol, symbol);
+                dto.ExtensionInfo.AddOrReplace(ExtensionKey.SwapToMain, Boolean.TrueString);
+                dto.ExtensionInfo.AddOrReplace(ExtensionKey.SwapFromAddress, GetPaymentAddress(
+                    _depositOption.Value.PaymentAddresses.GetValueOrDefault(dto.ToTransfer.ChainId), symbol));
+                dto.ExtensionInfo.AddOrReplace(ExtensionKey.SwapToAddress, dto.ToTransfer.ToAddress);
+                dto.ExtensionInfo.AddOrReplace(ExtensionKey.SwapChainId, dto.ToTransfer.ChainId);
+                var sideChainId = _depositOption.Value.PaymentAddresses.Keys.FirstOrDefault(t => t != ChainId.AELF);
+                var paymentAddressDic = _depositOption.Value.PaymentAddresses.GetValueOrDefault(sideChainId);
+                dto.ToTransfer.FromAddress = GetPaymentAddress(paymentAddressDic, dto.FromTransfer.Symbol);
+                dto.ToTransfer.ToAddress = GetPaymentAddress(paymentAddressDic, symbol);
+                dto.ToTransfer.ChainId = sideChainId;
+            }
+
             return dto;
         }
         

@@ -236,6 +236,27 @@ public class SwapTxTimerGrain : Grain<OrderSwapTimerState>, ISwapTxTimerGrain
             var swapGrain = GrainFactory.GetGrain<ISwapGrain>(order.Id);
             order.ToTransfer.Amount =  await swapGrain.RecordAmountOut(transfer.AmountOut);
             _logger.LogInformation("SwapTxTimer toTransfer amount: {Amount}", order.ToTransfer.Amount);
+            if (order.ExtensionInfo.ContainsKey(ExtensionKey.SwapToMain) &&
+                order.ExtensionInfo[ExtensionKey.SwapToMain].Equals(Boolean.TrueString))
+            {
+                order.ToTransfer.FromAddress = order.ExtensionInfo[ExtensionKey.SwapFromAddress];
+                order.ToTransfer.ToAddress = order.ExtensionInfo[ExtensionKey.SwapToAddress];
+                order.ToTransfer.ChainId = order.ExtensionInfo[ExtensionKey.SwapChainId];
+                order.ToTransfer.Status = OrderTransferStatusEnum.StartTransfer.ToString();
+                order.Status = OrderStatusEnum.ToStartTransfer.ToString();
+                order.FromRawTransaction = null;
+                order.ToTransfer.TxId = null;
+                order.ToTransfer.TxTime = null;
+                order.ExtensionInfo[ExtensionKey.NeedSwap] = Boolean.FalseString;
+                order.ExtensionInfo[ExtensionKey.ToConfirmedNum] = "0";
+                _logger.LogDebug("SwapTxTimer start to mainChain, dto={dto}", JsonConvert.SerializeObject(order));
+                await SaveOrder(order, ExtensionBuilder.New()
+                    .Add(ExtensionKey.TransactionStatus, CommonConstant.TransactionState.Mined)
+                    .Build());
+                result[orderId] = true;
+                continue;
+            }
+
             order.ToTransfer.Status = OrderTransferStatusEnum.Confirmed.ToString();
             order.Status = OrderStatusEnum.ToTransferConfirmed.ToString();
             order.ExtensionInfo ??= new Dictionary<string, string>();
@@ -356,8 +377,6 @@ public class SwapTxTimerGrain : Grain<OrderSwapTimerState>, ISwapTxTimerGrain
                     if (!IsTxConfirmed(txStatus.BlockNumber, chainStatus)) return false;
 
                     // LIB confirmed, return order to stream
-                    transferInfo.Status = OrderTransferStatusEnum.Confirmed.ToString();
-                    order.Status = OrderStatusEnum.ToTransferConfirmed.ToString();
                     var swapGrain = GrainFactory.GetGrain<ISwapGrain>(order.Id);
                     transferInfo.Amount = 0;
                     if (txStatus.Logs.Length > 0)
@@ -365,16 +384,35 @@ public class SwapTxTimerGrain : Grain<OrderSwapTimerState>, ISwapTxTimerGrain
                         var swapLog = txStatus.Logs.FirstOrDefault(l => l.Name == nameof(TokenSwapped))?.NonIndexed;
                         transferInfo.Amount = await swapGrain.ParseReturnValue(swapLog);
                     }
-
+                    _logger.LogInformation("After ParseReturnValueAsync: {Amount}", transferInfo.Amount);
+                    if (order.ExtensionInfo.ContainsKey(ExtensionKey.SwapToMain) &&
+                        order.ExtensionInfo[ExtensionKey.SwapToMain].Equals(Boolean.TrueString))
+                    {
+                        order.ToTransfer.FromAddress = order.ExtensionInfo[ExtensionKey.SwapFromAddress];
+                        order.ToTransfer.ToAddress = order.ExtensionInfo[ExtensionKey.SwapToAddress];
+                        order.ToTransfer.ChainId = order.ExtensionInfo[ExtensionKey.SwapChainId];
+                        order.ToTransfer.Status = OrderTransferStatusEnum.StartTransfer.ToString();
+                        order.Status = OrderStatusEnum.ToStartTransfer.ToString();
+                        order.FromRawTransaction = null;
+                        order.ToTransfer.TxId = null;
+                        order.ToTransfer.TxTime = null;
+                        order.ExtensionInfo[ExtensionKey.NeedSwap] = Boolean.FalseString;
+                        order.ExtensionInfo[ExtensionKey.ToConfirmedNum] = "0";
+                        _logger.LogDebug("SwapTxTimer start to mainChain, dto={dto}", JsonConvert.SerializeObject(order));
+                        await SaveOrder(order, ExtensionBuilder.New()
+                            .Add(ExtensionKey.TransactionStatus, CommonConstant.TransactionState.Mined)
+                            .Build());
+                        return true;
+                    }
+                    transferInfo.Status = OrderTransferStatusEnum.Confirmed.ToString();
+                    order.Status = OrderStatusEnum.ToTransferConfirmed.ToString();
                     order.ExtensionInfo ??= new Dictionary<string, string>();
                     if (order.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus))
                     {
                         order.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus,
                             OrderOperationStatusEnum.ReleaseConfirmed.ToString());
                     }
-
-                    _logger.LogInformation("After ParseReturnValueAsync: {Amount}", transferInfo.Amount);
-
+                    
                     await SaveOrder(order, ExtensionBuilder.New()
                         .Add(ExtensionKey.TransactionStatus, txStatus.Status)
                         .Add(ExtensionKey.TransactionError, txStatus.Error)
