@@ -33,6 +33,7 @@ public partial class OrderDepositAppService : ApplicationService, IOrderDepositA
     private readonly IObjectMapper _objectMapper;
     private readonly ILogger<OrderDepositAppService> _logger;
     private readonly IOptionsSnapshot<NetworkOptions> _networkInfoOptions;
+    private readonly IOptionsSnapshot<ChainOptions> _chainOptions;
     private readonly IUserAddressService _userAddressService;
     private readonly INetworkAppService _networkAppService;
     private readonly ITokenAppService _tokenAppService;
@@ -42,11 +43,13 @@ public partial class OrderDepositAppService : ApplicationService, IOrderDepositA
         IObjectMapper objectMapper,
         ILogger<OrderDepositAppService> logger,
         IOptionsSnapshot<NetworkOptions> networkInfoOptions,
+        IOptionsSnapshot<ChainOptions> chainOptions,
         IUserAddressService userAddressService,
         INetworkAppService networkAppService, ITokenAppService tokenAppService, ISwapAppService swapAppService)
     {
         _depositOrderIndexRepository = depositOrderIndexRepository;
         _networkInfoOptions = networkInfoOptions;
+        _chainOptions = chainOptions;
         _objectMapper = objectMapper;
         _logger = logger;
         _userAddressService = userAddressService;
@@ -63,8 +66,6 @@ public partial class OrderDepositAppService : ApplicationService, IOrderDepositA
             || request.ChainId == ChainId.tDVW, "Param is invalid. Please refresh and try again.");
         AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.Symbol), 
             "Symbol is not exist. Please refresh and try again.");
-        AssertHelper.IsTrue(request.ToSymbol.IsNullOrEmpty() || _networkInfoOptions.Value.NetworkMap.ContainsKey(request.ToSymbol), 
-            "ToSymbol is an invalid parameter. Please refresh and try again. ");
         AssertHelper.IsTrue(
             request.ToSymbol.IsNullOrEmpty() || 
             _tokenAppService.IsValidDeposit(request.ChainId, request.Symbol, request.ToSymbol),
@@ -106,7 +107,6 @@ public partial class OrderDepositAppService : ApplicationService, IOrderDepositA
 
         try
         {
-
             var avgExchange =
                 await _networkAppService.GetAvgExchangeAsync(request.Symbol, CommonConstant.Symbol.USD);
             var decimals =
@@ -173,21 +173,18 @@ public partial class OrderDepositAppService : ApplicationService, IOrderDepositA
 
     public async Task<CalculateDepositRateDto> CalculateDepositRateAsync(GetCalculateDepositRateRequestDto request)
     {
-        
-        AssertHelper.IsTrue(request.ToChainId == ChainId.tDVV
+        AssertHelper.IsTrue(request.ToChainId == ChainId.AELF || request.ToChainId == ChainId.tDVV
                             || request.ToChainId == ChainId.tDVW, "Param is invalid. Please refresh and try again.");
         AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.FromSymbol), 
             "FromSymbol is not exist. Please refresh and try again.");
-        AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.ToSymbol), 
-            "ToSymbol is not exist. Please refresh and try again.");
         AssertHelper.IsTrue(DepositSwapAmountHelper.IsValidRange(request.FromAmount), "FromAmount is an invalid parameter. Please refresh and try again. ");
         AssertHelper.IsTrue(_tokenAppService.IsValidSwap(request.ToChainId, request.FromSymbol, request.ToSymbol), "The combination of ChainId, FromSymbol and ToSymbol is an invalid parameter. Please refresh and try again.");
 
         if (request.FromAmount == DepositSwapAmountHelper.AmountZero)
         {
-            return new CalculateDepositRateDto()
+            return new CalculateDepositRateDto
             {
-                ConversionRate = new ConversionRate()
+                ConversionRate = new ConversionRate
                 {
                     FromSymbol = request.FromSymbol,
                     ToSymbol = request.ToSymbol,
@@ -201,11 +198,13 @@ public partial class OrderDepositAppService : ApplicationService, IOrderDepositA
                 }
             };
         }
-        
+
+        if (request.ToChainId == ChainId.AELF)
+            request.ToChainId = _chainOptions.Value.ChainInfos.Keys.FirstOrDefault(t => t != ChainId.AELF);
         var calculateAmountsOut = await _swapAppService.CalculateAmountsOut(request.ToChainId, request.FromSymbol, request.ToSymbol, request.FromAmount);
-        return new CalculateDepositRateDto()
+        return new CalculateDepositRateDto
         {
-            ConversionRate = new ConversionRate()
+            ConversionRate = new ConversionRate
             {
                 FromSymbol = request.FromSymbol,
                 ToSymbol = request.ToSymbol,
