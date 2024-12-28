@@ -588,8 +588,8 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
             type == OrderStatusResponseEnum.Failed.ToString()
                 ? f.Bool(b => b.Must(mustQuery).MustNot(mustNotQuery))
                 : f.Bool(b => b.Must(mustQuery));
-
-        return await _orderIndexRepository.GetSortListAsync(Filter,
+        
+        var(count, list) = await _orderIndexRepository.GetSortListAsync(Filter,
             sortFunc: string.IsNullOrWhiteSpace(request.Sorting)
                 ? s => s.Descending(t => t.CreateTime)
                 : GetSorting(request.Sorting),
@@ -597,6 +597,12 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
             request.MaxResultCount > OrderOptions.MaxResultCount ? OrderOptions.MaxResultCount :
             request.MaxResultCount,
             skip: request.SkipCount);
+        if (count == OrderOptions.DefaultMaxSize)
+        {
+            count = (await _orderIndexRepository.CountAsync(Filter)).Count;
+        }
+
+        return Tuple.Create(count, list);
     }
 
     private async Task<List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>> GetMustQueryAsync(
