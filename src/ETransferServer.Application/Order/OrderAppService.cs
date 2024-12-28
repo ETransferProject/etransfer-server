@@ -633,6 +633,17 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
                                orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.OrderType)
             ? orderIndex.ExtensionInfo[ExtensionKey.OrderType]
             : string.Empty;
+        if (!orderIndex.ExtensionInfo.IsNullOrEmpty() &&
+            orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.SwapToMain) &&
+            orderIndex.ExtensionInfo[ExtensionKey.SwapToMain].Equals(Boolean.TrueString))
+        {
+            item.ToTransfer.FromAddress = orderIndex.FromTransfer.Symbol == orderIndex.ToTransfer.Symbol
+                ? orderIndex.ExtensionInfo[ExtensionKey.SwapOriginFromAddress]
+                : orderIndex.ExtensionInfo[ExtensionKey.SwapFromAddress];
+            item.ToTransfer.ToAddress = orderIndex.ExtensionInfo[ExtensionKey.SwapToAddress];
+            item.ToTransfer.ChainId = orderIndex.ExtensionInfo[ExtensionKey.SwapChainId];
+        }
+
         return item;
     }
 
