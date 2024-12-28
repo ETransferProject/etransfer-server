@@ -215,13 +215,13 @@ public class SwapTxTimerGrain : Grain<OrderSwapTimerState>, ISwapTxTimerGrain
             {
                 result[orderId] = false;
                 var info = await _transferProvider.GetSwapTokenInfoByTxIdsAsync(new List<string> { pendingTx.TxId }, 0);
-                if (info.TotalCount > 0)
+                if (info.TotalCount > 0 && !order.ExtensionInfo.ContainsKey(ExtensionKey.SwapToMain))
                 {
                     var txBlockHeight = info.Items.FirstOrDefault().BlockHeight;
                     order.ExtensionInfo.AddOrReplace(ExtensionKey.ToConfirmedNum,
                         (chainStatusDict[pendingTx.ChainId].BestChainHeight - txBlockHeight).ToString());
                     _logger.LogDebug(
-                        "TxTimer to confirmedNum, orderId={orderId}, bestHeight={bestHeight}, txBlockHeight={txBlockHeight}, confirmedNum={confirmedNum}",
+                        "SwapTxTimer to confirmedNum, orderId={orderId}, bestHeight={bestHeight}, txBlockHeight={txBlockHeight}, confirmedNum={confirmedNum}",
                         orderId, chainStatusDict[pendingTx.ChainId].BestChainHeight, txBlockHeight,
                         order.ExtensionInfo[ExtensionKey.ToConfirmedNum]);
                     await SaveOrder(order);
@@ -239,6 +239,7 @@ public class SwapTxTimerGrain : Grain<OrderSwapTimerState>, ISwapTxTimerGrain
             if (order.ExtensionInfo.ContainsKey(ExtensionKey.SwapToMain) &&
                 order.ExtensionInfo[ExtensionKey.SwapToMain].Equals(Boolean.TrueString))
             {
+                await SaveOrderTxFlowAsync(order, ThirdPartOrderStatusEnum.Success.ToString());
                 order.ToTransfer.FromAddress = order.ExtensionInfo[ExtensionKey.SwapFromAddress];
                 order.ToTransfer.ToAddress = order.ExtensionInfo[ExtensionKey.SwapToAddress];
                 order.ToTransfer.ChainId = order.ExtensionInfo[ExtensionKey.SwapChainId];
@@ -363,7 +364,8 @@ public class SwapTxTimerGrain : Grain<OrderSwapTimerState>, ISwapTxTimerGrain
                 "TxOrderTimer order={OrderId}, txId={TxId}, status={Status}, txHeight={Height}, LIB={Lib}, returnValue={ReturnValue}", order.Id,
                 timerTx.TxId, txStatus.Status, txStatus.BlockNumber, chainStatus.LastIrreversibleBlockHeight, txStatus.ReturnValue);
 
-            order.ExtensionInfo.AddOrReplace(ExtensionKey.ToConfirmedNum, (chainStatus.BestChainHeight - txStatus.BlockNumber).ToString());
+            if (!order.ExtensionInfo.ContainsKey(ExtensionKey.SwapToMain))
+                order.ExtensionInfo.AddOrReplace(ExtensionKey.ToConfirmedNum, (chainStatus.BestChainHeight - txStatus.BlockNumber).ToString());
 
             // pending status, continue waiting
             if (txStatus.Status == CommonConstant.TransactionState.Pending) return false;
@@ -388,6 +390,7 @@ public class SwapTxTimerGrain : Grain<OrderSwapTimerState>, ISwapTxTimerGrain
                     if (order.ExtensionInfo.ContainsKey(ExtensionKey.SwapToMain) &&
                         order.ExtensionInfo[ExtensionKey.SwapToMain].Equals(Boolean.TrueString))
                     {
+                        await SaveOrderTxFlowAsync(order, ThirdPartOrderStatusEnum.Success.ToString());
                         order.ToTransfer.FromAddress = order.ExtensionInfo[ExtensionKey.SwapFromAddress];
                         order.ToTransfer.ToAddress = order.ExtensionInfo[ExtensionKey.SwapToAddress];
                         order.ToTransfer.ChainId = order.ExtensionInfo[ExtensionKey.SwapChainId];
@@ -454,6 +457,13 @@ public class SwapTxTimerGrain : Grain<OrderSwapTimerState>, ISwapTxTimerGrain
                 order.ExtensionInfo[ExtensionKey.NeedSwap] = Boolean.FalseString;
                 order.ExtensionInfo[ExtensionKey.SwapStage] = SwapStage.SwapTxHandleFailAndToTransfer;
                 order.ExtensionInfo[ExtensionKey.ToConfirmedNum] = "0";
+                if (order.ExtensionInfo.ContainsKey(ExtensionKey.SwapToMain) &&
+                    order.ExtensionInfo[ExtensionKey.SwapToMain].Equals(Boolean.TrueString))
+                {
+                    order.ToTransfer.FromAddress = order.ExtensionInfo[ExtensionKey.SwapOriginFromAddress];
+                    order.ToTransfer.ToAddress = order.ExtensionInfo[ExtensionKey.SwapToAddress];
+                    order.ToTransfer.ChainId = order.ExtensionInfo[ExtensionKey.SwapChainId];
+                }
 
                 _logger.LogInformation("Before calling the ToStartTransfer method, after resetting the properties of the order, order: {order}",
                     JsonConvert.SerializeObject(order));
