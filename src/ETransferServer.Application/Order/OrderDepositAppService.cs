@@ -180,6 +180,18 @@ public partial class OrderDepositAppService : ApplicationService, IOrderDepositA
         AssertHelper.IsTrue(DepositSwapAmountHelper.IsValidRange(request.FromAmount), "FromAmount is an invalid parameter. Please refresh and try again. ");
         AssertHelper.IsTrue(_tokenAppService.IsValidSwap(request.ToChainId, request.FromSymbol, request.ToSymbol), "The combination of ChainId, FromSymbol and ToSymbol is an invalid parameter. Please refresh and try again.");
 
+        if (!request.FromChainId.IsNullOrEmpty())
+        {
+            var (isOpen, serviceFee, minAmount) =
+                await _networkAppService.GetServiceFeeAsync(request.FromChainId, request.FromSymbol);
+            var fromAmount = isOpen && request.FromAmount >= minAmount
+                ? request.FromAmount - serviceFee
+                : !isOpen && request.FromAmount >= minAmount
+                    ? request.FromAmount
+                    : 0M;
+            request.FromAmount = fromAmount < 0 ? 0M : fromAmount;
+        }
+
         if (request.FromAmount == DepositSwapAmountHelper.AmountZero)
         {
             return new CalculateDepositRateDto
