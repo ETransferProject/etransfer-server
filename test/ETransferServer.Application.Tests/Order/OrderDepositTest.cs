@@ -9,6 +9,7 @@ using ETransferServer.Options;
 using ETransferServer.Swap;
 using ETransferServer.Swap.Dtos;
 using ETransferServer.Token;
+using ETransferServer.Token.Dtos;
 using ETransferServer.User;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -51,6 +52,21 @@ public class OrderDepositTest : ETransferServerApplicationTestBase
 
         depositInfo.ShouldNotBeNull();
         depositInfo.DepositInfo.DepositAddress.ShouldBe("test");
+    }
+    
+    [Fact]
+    public async Task GetSwapDepositInfoTest()
+    {
+        var depositInfo = await _orderDepositAppService.GetDepositInfoAsync(new GetDepositRequestDto()
+        {
+            ChainId = "AELF",
+            Symbol = "USDT",
+            Network = "ETH",
+            ToSymbol = "ELF"
+        });
+
+        depositInfo.ShouldNotBeNull();
+        depositInfo.DepositInfo.DepositAddress.ShouldBe("deposit_address_out_elf");
     }
 
     [Fact]
@@ -181,6 +197,21 @@ public class OrderDepositTest : ETransferServerApplicationTestBase
                                 ExtraNotes = new List<string>() { "test" }
                             }
                         }
+                    },
+                    ["ELF"] = new List<NetworkConfig>()
+                    {
+                        new NetworkConfig()
+                        {
+                            NetworkInfo = new NetworkInfo()
+                            {
+                                Network = "AELF"
+                            },
+                            DepositInfo = new DepositInfo()
+                            {
+                                MinDeposit = "1",
+                                ExtraNotes = new List<string>() { "test" }
+                            }
+                        }
                     }
                 }
             });
@@ -193,6 +224,9 @@ public class OrderDepositTest : ETransferServerApplicationTestBase
 
         userAddressService.Setup(o =>
             o.GetUserAddressAsync(It.IsAny<GetUserDepositAddressInput>())).ReturnsAsync("test");
+        userAddressService.Setup(o =>
+            o.GetUserAddressAsync(It.Is<GetUserDepositAddressInput>(i => i.ToSymbol == "ELF")))
+            .ReturnsAsync("deposit_address_out_elf");
         return userAddressService.Object;
     }
     
@@ -202,6 +236,50 @@ public class OrderDepositTest : ETransferServerApplicationTestBase
 
         tokenAppService.Setup(o =>
             o.IsValidSwap(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>())).Returns(true);
+        tokenAppService.Setup(o =>
+            o.IsValidDeposit(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>())).Returns(true);
+        tokenAppService.Setup(o => o.GetTokenOptionListAsync(It.IsAny<GetTokenOptionListRequestDto>()))
+            .ReturnsAsync(new GetTokenOptionListDto()
+        {
+            TokenList = new List<TokenOptionConfigDto>()
+            {
+                new TokenOptionConfigDto()
+                {
+                    Symbol = "USDT",
+                    Decimals = 8,
+                    ToTokenList = new List<ToTokenOptionConfigDto>()
+                    {
+                        new ToTokenOptionConfigDto()
+                        {
+                            Symbol = "USDT",
+                            Decimals = 8,
+                            ChainIdList = new List<string>()
+                            {
+                                "AELF",
+                                "tDVV",
+                                "tDVW"
+                            }
+                        },
+                        new ToTokenOptionConfigDto()
+                        {
+                            Symbol = "ELF",
+                            Decimals = 8,
+                            ChainIdList = new List<string>()
+                            {
+                                "AELF",
+                                "tDVV",
+                                "tDVW"
+                            }
+                        }
+                    }
+                },
+                new TokenOptionConfigDto()
+                {
+                    Symbol = "ELF",
+                    Decimals = 8
+                }
+            }
+        });
         return tokenAppService.Object;
     }
 
