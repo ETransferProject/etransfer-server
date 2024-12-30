@@ -73,21 +73,39 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
         }
         else if (userId.HasValue && !request.AddressList.IsNullOrEmpty())
         {
-            mustQuery.Add(q => q.Bool(i => i.Should(
-                s => s.Term(k =>
-                    k.Field(f => f.UserId).Value(userId.ToString())),
-                s => s.Terms(k =>
-                    k.Field(f => f.FromTransfer.FromAddress).Terms(request.AddressList)),
-                s => s.Terms(k =>
-                    k.Field(f => f.ToTransfer.ToAddress).Terms(request.AddressList)))));
+            mustQuery.Add(q =>
+            {
+                var queries = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+                queries.Add(s => s.Term(k =>
+                    k.Field(f => f.UserId).Value(userId.ToString())));
+                queries.Add(s => s.Terms(k =>
+                    k.Field(f => f.FromTransfer.FromAddress).Terms(request.AddressList)));
+                queries.Add(s => s.Terms(k =>
+                    k.Field(f => f.ToTransfer.ToAddress).Terms(request.AddressList)));
+                foreach (var address in request.AddressList)
+                {
+                    queries.Add(s => s.Match(k =>
+                        k.Field("extensionInfo.SwapToAddress").Query(address)));
+                }
+                return q.Bool(i => i.Should(queries));
+            });
         }
         else if (!request.AddressList.IsNullOrEmpty())
         {
-            mustQuery.Add(q => q.Bool(i => i.Should(
-                s => s.Terms(k =>
-                    k.Field(f => f.FromTransfer.FromAddress).Terms(request.AddressList)),
-                s => s.Terms(k =>
-                    k.Field(f => f.ToTransfer.ToAddress).Terms(request.AddressList)))));
+            mustQuery.Add(q =>
+            {
+                var queries = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+                queries.Add(s => s.Terms(k =>
+                    k.Field(f => f.FromTransfer.FromAddress).Terms(request.AddressList)));
+                queries.Add(s => s.Terms(k =>
+                    k.Field(f => f.ToTransfer.ToAddress).Terms(request.AddressList)));
+                foreach (var address in request.AddressList)
+                {
+                    queries.Add(s => s.Match(k =>
+                        k.Field("extensionInfo.SwapToAddress").Query(address)));
+                }
+                return q.Bool(i => i.Should(queries));
+            });
         }
 
         if (request.Type > 0)
@@ -358,21 +376,39 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
             var addressList = request.AddressList.ConvertAll(t => t.Address).ToList();
             if (userDto != null)
             {
-                mustQuery.Add(q => q.Bool(i => i.Should(
-                    s => s.Term(k =>
-                        k.Field(f => f.UserId).Value(userDto.UserId.ToString())),
-                    s => s.Terms(k =>
-                        k.Field(f => f.FromTransfer.FromAddress).Terms(addressList)),
-                    s => s.Terms(k =>
-                        k.Field(f => f.ToTransfer.ToAddress).Terms(addressList)))));
+                mustQuery.Add(q =>
+                {
+                    var queries = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+                    queries.Add(s => s.Term(k =>
+                        k.Field(f => f.UserId).Value(userDto.UserId.ToString())));
+                    queries.Add(s => s.Terms(k =>
+                        k.Field(f => f.FromTransfer.FromAddress).Terms(addressList)));
+                    queries.Add(s => s.Terms(k =>
+                        k.Field(f => f.ToTransfer.ToAddress).Terms(addressList)));
+                    foreach (var address in addressList)
+                    {
+                        queries.Add(s => s.Match(k =>
+                            k.Field("extensionInfo.SwapToAddress").Query(address)));
+                    }
+                    return q.Bool(i => i.Should(queries));
+                });
             }
             else
             {
-                mustQuery.Add(q => q.Bool(i => i.Should(
-                    s => s.Terms(k =>
-                        k.Field(f => f.FromTransfer.FromAddress).Terms(addressList)),
-                    s => s.Terms(k =>
-                        k.Field(f => f.ToTransfer.ToAddress).Terms(addressList)))));
+                mustQuery.Add(q =>
+                {
+                    var queries = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+                    queries.Add(s => s.Terms(k =>
+                        k.Field(f => f.FromTransfer.FromAddress).Terms(addressList)));
+                    queries.Add(s => s.Terms(k =>
+                        k.Field(f => f.ToTransfer.ToAddress).Terms(addressList)));
+                    foreach (var address in addressList)
+                    {
+                        queries.Add(s => s.Match(k =>
+                            k.Field("extensionInfo.SwapToAddress").Query(address)));
+                    }
+                    return q.Bool(i => i.Should(queries));
+                });
             }
         }
 
@@ -448,21 +484,39 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
         }
         else if (userId.HasValue && !request.AddressList.IsNullOrEmpty())
         {
-            mustQuery.Add(q => q.Bool(i => i.Should(
-                s => s.Term(k =>
-                    k.Field(f => f.UserId).Value(userId.ToString())),
-                s => s.Terms(k =>
-                    k.Field(f => f.FromTransfer.FromAddress).Terms(request.AddressList)),
-                s => s.Terms(k =>
-                    k.Field(f => f.ToTransfer.ToAddress).Terms(request.AddressList)))));
+            mustQuery.Add(q =>
+            {
+                var queries = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+                queries.Add(s => s.Term(k =>
+                    k.Field(f => f.UserId).Value(userId.ToString())));
+                queries.Add(s => s.Terms(k =>
+                    k.Field(f => f.FromTransfer.FromAddress).Terms(request.AddressList)));
+                queries.Add(s => s.Terms(k =>
+                    k.Field(f => f.ToTransfer.ToAddress).Terms(request.AddressList)));
+                foreach (var address in request.AddressList)
+                {
+                    queries.Add(s => s.Match(k =>
+                        k.Field("extensionInfo.SwapToAddress").Query(address)));
+                }
+                return q.Bool(i => i.Should(queries));
+            });
         }
         else if (!request.AddressList.IsNullOrEmpty())
         {
-            mustQuery.Add(q => q.Bool(i => i.Should(
-                s => s.Terms(k =>
-                    k.Field(f => f.FromTransfer.FromAddress).Terms(request.AddressList)),
-                s => s.Terms(k =>
-                    k.Field(f => f.ToTransfer.ToAddress).Terms(request.AddressList)))));
+            mustQuery.Add(q =>
+            {
+                var queries = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+                queries.Add(s => s.Terms(k =>
+                    k.Field(f => f.FromTransfer.FromAddress).Terms(request.AddressList)));
+                queries.Add(s => s.Terms(k =>
+                    k.Field(f => f.ToTransfer.ToAddress).Terms(request.AddressList)));
+                foreach (var address in request.AddressList)
+                {
+                    queries.Add(s => s.Match(k =>
+                        k.Field("extensionInfo.SwapToAddress").Query(address)));
+                }
+                return q.Bool(i => i.Should(queries));
+            });
         }
 
         var mustNotQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
