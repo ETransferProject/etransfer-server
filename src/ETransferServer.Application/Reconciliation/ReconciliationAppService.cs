@@ -169,7 +169,7 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         {
             TotalAmount = await QuerySumAggAsync(request, OrderTypeEnum.Deposit.ToString()),
             Items = await LoopCollectionItemsAsync(
-                _objectMapper.Map<List<OrderIndex>, List<OrderRecordDto>>(list)),
+                _objectMapper.Map<List<OrderIndex>, List<OrderRecordDto>>(list), list),
             TotalCount = count
         };
     }
@@ -187,7 +187,7 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         {
             TotalAmount = await QuerySumAggAsync(request, OrderTypeEnum.Withdraw.ToString()),
             Items = await LoopWithdrawItemsAsync(await LoopCollectionItemsAsync(
-                _objectMapper.Map<List<OrderIndex>, List<OrderRecordDto>>(list)), list),
+                _objectMapper.Map<List<OrderIndex>, List<OrderRecordDto>>(list), list), list),
             TotalCount = count
         };
     }
