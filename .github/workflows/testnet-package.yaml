@@ -22,9 +22,9 @@ jobs:
         servicename:
           [
             ETransferServer.Silo,
-#            ETransferServer.AuthServer,
-            ETransferServer.HttpApi.Host
-#            ETransferServer.SignatureApi.Host
+            ETransferServer.AuthServer,
+            ETransferServer.HttpApi.Host,
+            ETransferServer.SignatureApi.Host
           ]
     steps:
       - name: Checkout
@@ -67,9 +67,9 @@ jobs:
         servicename:
           [
             ETransferServer.Silo,
-#            ETransferServer.AuthServer,
-            ETransferServer.HttpApi.Host
-#            ETransferServer.SignatureApi.Host
+            ETransferServer.AuthServer,
+            ETransferServer.HttpApi.Host,
+            ETransferServer.SignatureApi.Host
           ]
     permissions:
       contents: read

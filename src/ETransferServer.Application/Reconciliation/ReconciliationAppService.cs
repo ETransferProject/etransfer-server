@@ -169,7 +169,7 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         {
             TotalAmount = await QuerySumAggAsync(request, OrderTypeEnum.Deposit.ToString()),
             Items = await LoopCollectionItemsAsync(
-                _objectMapper.Map<List<OrderIndex>, List<OrderRecordDto>>(list)),
+                _objectMapper.Map<List<OrderIndex>, List<OrderRecordDto>>(list), list),
             TotalCount = count
         };
     }
@@ -187,7 +187,7 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         {
             TotalAmount = await QuerySumAggAsync(request, OrderTypeEnum.Withdraw.ToString()),
             Items = await LoopWithdrawItemsAsync(await LoopCollectionItemsAsync(
-                _objectMapper.Map<List<OrderIndex>, List<OrderRecordDto>>(list)), list),
+                _objectMapper.Map<List<OrderIndex>, List<OrderRecordDto>>(list), list), list),
             TotalCount = count
         };
     }
@@ -329,7 +329,8 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
 
         orderIndex.Status = OrderStatusEnum.FromTransferConfirmed.ToString();
         orderIndex.ToTransfer.Status = OrderTransferStatusEnum.Created.ToString();
-        if (orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.IsSwap))
+        if (orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.IsSwap) &&
+            orderIndex.ExtensionInfo[ExtensionKey.IsSwap].Equals(Boolean.TrueString))
         {
             orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.NeedSwap, Boolean.TrueString);
             orderIndex.ExtensionInfo.AddOrReplace(ExtensionKey.SwapStage, SwapStage.SwapTx);
@@ -587,8 +588,8 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
             type == OrderStatusResponseEnum.Failed.ToString()
                 ? f.Bool(b => b.Must(mustQuery).MustNot(mustNotQuery))
                 : f.Bool(b => b.Must(mustQuery));
-
-        return await _orderIndexRepository.GetSortListAsync(Filter,
+        
+        var(count, list) = await _orderIndexRepository.GetSortListAsync(Filter,
             sortFunc: string.IsNullOrWhiteSpace(request.Sorting)
                 ? s => s.Descending(t => t.CreateTime)
                 : GetSorting(request.Sorting),
@@ -596,6 +597,12 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
             request.MaxResultCount > OrderOptions.MaxResultCount ? OrderOptions.MaxResultCount :
             request.MaxResultCount,
             skip: request.SkipCount);
+        if (count == OrderOptions.DefaultMaxSize)
+        {
+            count = (await _orderIndexRepository.CountAsync(Filter)).Count;
+        }
+
+        return Tuple.Create(count, list);
     }
 
     private async Task<List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>> GetMustQueryAsync(
@@ -750,9 +757,20 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
             item.ToTransfer.Icon =
                 await _networkAppService.GetIconAsync(item.OrderType, ChainId.AELF, item.FromTransfer.Symbol,
                     item.ToTransfer.Symbol);
+            var orderIndex = orderList.FirstOrDefault(i => i.Id == item.Id);
+            if (orderIndex != null && !orderIndex.ExtensionInfo.IsNullOrEmpty() &&
+                orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.SwapToMain) &&
+                orderIndex.ExtensionInfo[ExtensionKey.SwapToMain].Equals(Boolean.TrueString))
+            {
+                item.ToTransfer.FromAddress = orderIndex.FromTransfer.Symbol == orderIndex.ToTransfer.Symbol
+                    ? orderIndex.ExtensionInfo[ExtensionKey.SwapOriginFromAddress]
+                    : orderIndex.ExtensionInfo[ExtensionKey.SwapFromAddress];
+                item.ToTransfer.ToAddress = orderIndex.ExtensionInfo[ExtensionKey.SwapToAddress];
+                item.ToTransfer.ChainId = orderIndex.ExtensionInfo[ExtensionKey.SwapChainId];
+            }
             if (!type.IsNullOrEmpty())
             {
-                var extensionInfo = orderList.FirstOrDefault(i => i.Id == item.Id)?.ExtensionInfo;
+                var extensionInfo = orderIndex?.ExtensionInfo;
                 if (!extensionInfo.IsNullOrEmpty() && extensionInfo.ContainsKey(ExtensionKey.SubStatus))
                 {
                     item.OperationStatus = extensionInfo[ExtensionKey.SubStatus];

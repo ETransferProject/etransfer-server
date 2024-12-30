@@ -49,6 +49,11 @@ public static class ExtensionKey
     public const string IsSwap = "IsSwap";
     public const string NeedSwap = "NeedSwap";
     public const string SwapStage = "SwapStage";
+    public const string SwapToMain = "SwapToMain";
+    public const string SwapFromAddress = "SwapFromAddress";
+    public const string SwapOriginFromAddress = "SwapOriginFromAddress";
+    public const string SwapToAddress = "SwapToAddress";
+    public const string SwapChainId = "SwapChainId";
 }
 
 public static class SwapStage
