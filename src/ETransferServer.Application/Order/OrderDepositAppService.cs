@@ -191,6 +191,11 @@ public partial class OrderDepositAppService : ApplicationService, IOrderDepositA
                     : 0M;
             request.FromAmount = fromAmount < 0 ? 0M : fromAmount;
         }
+        else
+        {
+            var fee = await _networkAppService.GetMaxThirdPartFeeAsync(string.Empty, request.FromSymbol);
+            request.FromAmount = request.FromAmount - fee < 0 ? 0M : request.FromAmount - fee;
+        }
 
         if (request.FromAmount == DepositSwapAmountHelper.AmountZero)
         {
