@@ -54,6 +54,7 @@ public static class ExtensionKey
     public const string SwapOriginFromAddress = "SwapOriginFromAddress";
     public const string SwapToAddress = "SwapToAddress";
     public const string SwapChainId = "SwapChainId";
+    public const string SwapTxId = "SwapTxId";
 }
 
 public static class SwapStage

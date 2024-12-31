@@ -104,7 +104,7 @@ public class TokenTransferProvider : ITokenTransferProvider, ISingletonDependenc
         if (txIds.IsNullOrEmpty())
             return new PagedResultDto<SwapRecordDto>();
         
-        return await GetSwapTokenInfoAsync(txIds, 0, endHeight, txIds.Count, 0);
+        return await GetSwapTokenInfoAsync(txIds, 0, endHeight == 0 ? null : endHeight, txIds.Count, 0);
     }
 
     [ExceptionHandler(typeof(Exception), LogLevel = LogLevel.Error, 
@@ -203,7 +203,7 @@ public class TokenTransferProvider : ITokenTransferProvider, ISingletonDependenc
     }
     
     private async Task<PagedResultDto<SwapRecordDto>> GetSwapTokenInfoAsync(List<string> txIds, long startBlockHeight,
-        long endBlockHeight, int inputMaxResultCount, int inputSkipCount = 0)
+        long? endBlockHeight, int inputMaxResultCount, int inputSkipCount = 0)
     {
         var res = await _graphQlHelper.QueryAsync<GraphQLResponse<PagedResultDto<SwapRecordDto>>>(new GraphQLRequest
         {

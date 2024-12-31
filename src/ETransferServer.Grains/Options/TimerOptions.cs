@@ -19,6 +19,7 @@ public class TimerOptions
         DelaySeconds = 60 * 60 * 48
     };
     public TimerOption DepositTimer { get; set; } = new();
+    public TimerOption SwapFastTimer { get; set; } = new(3);
     public TimerOption WithdrawFromTimer { get; set; } = new();
     public TimerOption WithdrawFromFastTimer { get; set; } = new(3);
     public TimerOption CoBoDepositQueryTimer { get; set; } = new(60);
