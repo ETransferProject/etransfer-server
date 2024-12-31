@@ -25,7 +25,7 @@ public interface ISwapTxFastTimerGrain : IGrainWithGuidKey
     public Task<DateTime> GetLastCallBackTime();
 }
 
-public abstract class SwapTxFastTimerGrain: Grain<OrderSwapFastTimerState>, ISwapTxFastTimerGrain
+public class SwapTxFastTimerGrain: Grain<OrderSwapFastTimerState>, ISwapTxFastTimerGrain
 {
     internal DateTime LastCallBackTime;
 
@@ -37,7 +37,7 @@ public abstract class SwapTxFastTimerGrain: Grain<OrderSwapFastTimerState>, ISwa
     private readonly IOptionsSnapshot<WithdrawOptions> _withdrawOptions;
     private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
 
-    protected SwapTxFastTimerGrain(ILogger<SwapTxFastTimerGrain> logger,
+    public SwapTxFastTimerGrain(ILogger<SwapTxFastTimerGrain> logger,
         IContractProvider contractProvider,
         IOptionsSnapshot<ChainOptions> chainOptions,
         IOptionsSnapshot<WithdrawOptions> withdrawOptions,
@@ -87,7 +87,7 @@ public abstract class SwapTxFastTimerGrain: Grain<OrderSwapFastTimerState>, ISwa
         );
     }
 
-    internal async Task TimerCallback(object state)
+    private async Task TimerCallback(object state)
     {
         var total = State.OrderTransactionDict.Count;
         _logger.LogDebug("SwapTxFastTimerGrain callback, Total={Total}", total);
@@ -244,7 +244,7 @@ public abstract class SwapTxFastTimerGrain: Grain<OrderSwapFastTimerState>, ISwa
     ///     true: Processing complete, need to remove from list
     ///     false:Transaction to be confirmed, continue to wait
     /// </returns>
-    internal async Task<bool> HandleOrderTransaction(DepositOrderDto order, TimerTransaction timerTx, ChainStatusDto chainStatus)
+    private async Task<bool> HandleOrderTransaction(DepositOrderDto order, TimerTransaction timerTx, ChainStatusDto chainStatus)
     {
         var txDateTime = TimeHelper.GetDateTimeFromTimeStamp(timerTx.TxTime ?? 0);
         var txExpireTime = txDateTime.AddSeconds(_chainOptions.Value.Contract.TransactionTimerMaxSeconds);
