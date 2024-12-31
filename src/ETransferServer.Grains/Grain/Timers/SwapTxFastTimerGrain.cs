@@ -32,6 +32,7 @@ public class SwapTxFastTimerGrain: Grain<OrderSwapFastTimerState>, ISwapTxFastTi
     private readonly ILogger<SwapTxFastTimerGrain> _logger;
     private readonly IContractProvider _contractProvider;
     private readonly ITokenTransferProvider _transferProvider;
+    private readonly IUserDepositProvider _userDepositProvider;
 
     private readonly IOptionsSnapshot<ChainOptions> _chainOptions;
     private readonly IOptionsSnapshot<WithdrawOptions> _withdrawOptions;
@@ -39,6 +40,7 @@ public class SwapTxFastTimerGrain: Grain<OrderSwapFastTimerState>, ISwapTxFastTi
 
     public SwapTxFastTimerGrain(ILogger<SwapTxFastTimerGrain> logger,
         IContractProvider contractProvider,
+        IUserDepositProvider userDepositProvider,
         IOptionsSnapshot<ChainOptions> chainOptions,
         IOptionsSnapshot<WithdrawOptions> withdrawOptions,
         IOptionsSnapshot<TimerOptions> timerOptions,
@@ -46,10 +48,11 @@ public class SwapTxFastTimerGrain: Grain<OrderSwapFastTimerState>, ISwapTxFastTi
     {
         _logger = logger;
         _contractProvider = contractProvider;
+        _transferProvider = transferProvider;
+        _userDepositProvider = userDepositProvider;
         _chainOptions = chainOptions;
         _withdrawOptions = withdrawOptions;
         _timerOptions = timerOptions;
-        _transferProvider = transferProvider;
     }
     
     public Task<DateTime> GetLastCallBackTime()
@@ -145,6 +148,13 @@ public class SwapTxFastTimerGrain: Grain<OrderSwapFastTimerState>, ISwapTxFastTi
             yield return locations.GetRange(i, Math.Min(nSize, locations.Count - i));
         }
     }
+    
+    private async Task SaveOrder(DepositOrderDto order)
+    {
+        var recordGrain = GrainFactory.GetGrain<IUserDepositRecordGrain>(order.Id);
+        var res = await recordGrain.CreateOrUpdateAsync(order);
+        await _userDepositProvider.AddOrUpdateSync(res.Value);
+    }
 
     private async Task SaveOrder(DepositOrderDto order, Dictionary<string, string> externalInfo)
     {
@@ -199,6 +209,17 @@ public class SwapTxFastTimerGrain: Grain<OrderSwapFastTimerState>, ISwapTxFastTi
                 continue;
             }
             
+            if (!order.ExtensionInfo.ContainsKey(ExtensionKey.SwapTxId) ||
+                order.ExtensionInfo[ExtensionKey.SwapTxId].IsNullOrEmpty())
+            {
+                var transfer = indexerTx[pendingTx.TxId];
+                order.ExtensionInfo[ExtensionKey.SwapTxId] = pendingTx.TxId;
+                var swapGrain = GrainFactory.GetGrain<ISwapGrain>(order.Id);
+                order.ToTransfer.Amount =  await swapGrain.RecordAmountOut(transfer.AmountOut);
+                _logger.LogInformation("SwapTxFastTimer toTransfer amount: {Amount}", order.ToTransfer.Amount);
+                await SaveOrder(order);
+            }
+            
             //fast confirmed
             if (!IsTxFastConfirmed(pendingTx, order, indexerTx, chainStatusDict[pendingTx.ChainId]))
             {
@@ -209,11 +230,7 @@ public class SwapTxFastTimerGrain: Grain<OrderSwapFastTimerState>, ISwapTxFastTi
             // Transfer data from indexer
             _logger.LogDebug("SwapTxFastTimer indexer transaction exists, orderId={OrderId}, txId={TxId}", orderId,
                 pendingTx.TxId);
-            var transfer = indexerTx[pendingTx.TxId];
-            var swapGrain = GrainFactory.GetGrain<ISwapGrain>(order.Id);
-            order.ToTransfer.Amount =  await swapGrain.RecordAmountOut(transfer.AmountOut);
-            _logger.LogInformation("SwapTxFastTimer toTransfer amount: {Amount}", order.ToTransfer.Amount);
-            await SaveOrderTxFlowAsync(order, ThirdPartOrderStatusEnum.Success.ToString());
+            await SaveOrderTxFlowAsync(order, pendingTx.TxId, ThirdPartOrderStatusEnum.Success.ToString());
             order.ToTransfer.FromAddress = order.ExtensionInfo[ExtensionKey.SwapFromAddress];
             order.ToTransfer.ToAddress = order.ExtensionInfo[ExtensionKey.SwapToAddress];
             order.ToTransfer.ChainId = order.ExtensionInfo[ExtensionKey.SwapChainId];
@@ -257,8 +274,6 @@ public class SwapTxFastTimerGrain: Grain<OrderSwapFastTimerState>, ISwapTxFastTi
              * if so, these data should be kicked out of the list and discarded.
              */
             AssertHelper.NotNull(transferInfo, "Order transfer not found, txId={TxId}", timerTx.TxId);
-            AssertHelper.IsTrue(transferInfo.TxId == timerTx.TxId,
-                "SwapTxFastTimer txId not match, expected={TimerTxId}, actually={TxId}", timerTx.TxId, transferInfo.TxId);
         }
         catch (UserFriendlyException e)
         {
@@ -276,7 +291,7 @@ public class SwapTxFastTimerGrain: Grain<OrderSwapFastTimerState>, ISwapTxFastTi
             }
 
             var txStatus =
-                await _contractProvider.QueryTransactionResultAsync(transferInfo.ChainId, transferInfo.TxId);
+                await _contractProvider.QueryTransactionResultAsync(transferInfo.ChainId, timerTx.TxId);
             _logger.LogInformation(
                 "SwapTxFastTimer order={OrderId}, txId={TxId}, status={Status}, bestHeight={BestHeight}, txHeight={Height}, LIB={Lib}", 
                 order.Id, timerTx.TxId, txStatus.Status, chainStatus.BestChainHeight, txStatus.BlockNumber, 
@@ -288,18 +303,24 @@ public class SwapTxFastTimerGrain: Grain<OrderSwapFastTimerState>, ISwapTxFastTi
             // Transaction is packaged and requires multiple verification
             if (txStatus.Status == CommonConstant.TransactionState.Mined)
             {
-                if (!IsTxFastConfirmed(order, txStatus.BlockNumber, chainStatus)) return false;
-
-                var swapGrain = GrainFactory.GetGrain<ISwapGrain>(order.Id);
-                transferInfo.Amount = 0;
-                if (txStatus.Logs.Length > 0)
+                if (!order.ExtensionInfo.ContainsKey(ExtensionKey.SwapTxId) ||
+                    order.ExtensionInfo[ExtensionKey.SwapTxId].IsNullOrEmpty())
                 {
-                    var swapLog = txStatus.Logs.FirstOrDefault(l => l.Name == nameof(TokenSwapped))?.NonIndexed;
-                    transferInfo.Amount = await swapGrain.ParseReturnValue(swapLog);
+                    var swapGrain = GrainFactory.GetGrain<ISwapGrain>(order.Id);
+                    transferInfo.Amount = 0;
+                    if (txStatus.Logs.Length > 0)
+                    {
+                        order.ExtensionInfo[ExtensionKey.SwapTxId] = timerTx.TxId;
+                        var swapLog = txStatus.Logs.FirstOrDefault(l => l.Name == nameof(TokenSwapped))?.NonIndexed;
+                        transferInfo.Amount = await swapGrain.ParseReturnValue(swapLog);
+                    }
+                    _logger.LogInformation("After ParseReturnValueAsync: {Amount}", transferInfo.Amount);
+                    await SaveOrder(order);
                 }
-                _logger.LogInformation("After ParseReturnValueAsync: {Amount}", transferInfo.Amount);
                 
-                await SaveOrderTxFlowAsync(order, ThirdPartOrderStatusEnum.Success.ToString());
+                if (!IsTxFastConfirmed(order, txStatus.BlockNumber, chainStatus)) return false;
+                
+                await SaveOrderTxFlowAsync(order, timerTx.TxId, ThirdPartOrderStatusEnum.Success.ToString());
                 order.ToTransfer.FromAddress = order.ExtensionInfo[ExtensionKey.SwapFromAddress];
                 order.ToTransfer.ToAddress = order.ExtensionInfo[ExtensionKey.SwapToAddress];
                 order.ToTransfer.ChainId = order.ExtensionInfo[ExtensionKey.SwapChainId];
@@ -325,7 +346,7 @@ public class SwapTxFastTimerGrain: Grain<OrderSwapFastTimerState>, ISwapTxFastTi
                     "SwapTxFastTimer result Confirmed failed, will call ToStartTransfer, status: {result}, order: {order}",
                     txStatus.Status, JsonConvert.SerializeObject(order));
 
-                await SaveOrderTxFlowAsync(order, ThirdPartOrderStatusEnum.Fail.ToString());
+                await SaveOrderTxFlowAsync(order, timerTx.TxId, ThirdPartOrderStatusEnum.Fail.ToString());
                 await DepositSwapFailureAlarmAsync(order, SwapStage.SwapTxHandleFailAndToTransfer);
 
                 transferInfo.Status = OrderTransferStatusEnum.StartTransfer.ToString();
@@ -337,6 +358,7 @@ public class SwapTxFastTimerGrain: Grain<OrderSwapFastTimerState>, ISwapTxFastTi
                 order.ExtensionInfo[ExtensionKey.NeedSwap] = Boolean.FalseString;
                 order.ExtensionInfo[ExtensionKey.SwapStage] = SwapStage.SwapTxHandleFailAndToTransfer;
                 order.ExtensionInfo[ExtensionKey.ToConfirmedNum] = "0";
+                order.ExtensionInfo[ExtensionKey.SwapTxId] = timerTx.TxId;
                 order.ToTransfer.FromAddress = order.ExtensionInfo[ExtensionKey.SwapOriginFromAddress];
                 order.ToTransfer.ToAddress = order.ExtensionInfo[ExtensionKey.SwapToAddress];
                 order.ToTransfer.ChainId = order.ExtensionInfo[ExtensionKey.SwapChainId];
@@ -350,7 +372,7 @@ public class SwapTxFastTimerGrain: Grain<OrderSwapFastTimerState>, ISwapTxFastTi
                     .Build());
                 _logger.LogWarning(
                     "SwapTxFastTimer tx status {TxStatus}, orderId={OrderId}. txId={TxId}, error={Error}", 
-                    txStatus.Status, order.Id, transferInfo.TxId, txStatus.Error);
+                    txStatus.Status, order.Id, timerTx.TxId, txStatus.Error);
 
                 return true;
             }
@@ -374,13 +396,13 @@ public class SwapTxFastTimerGrain: Grain<OrderSwapFastTimerState>, ISwapTxFastTi
         }
     }
 
-    private async Task SaveOrderTxFlowAsync(DepositOrderDto order, string status)
+    private async Task SaveOrderTxFlowAsync(DepositOrderDto order, string txId, string status)
     {
-        if (order.ToTransfer.TxId.IsNullOrEmpty()) return;
+        if (txId.IsNullOrEmpty()) return;
         var orderTxFlowGrain = GrainFactory.GetGrain<IOrderTxFlowGrain>(order.Id);
         await orderTxFlowGrain.AddOrUpdate(new OrderTxData
         {
-            TxId = order.ToTransfer.TxId,
+            TxId = txId,
             ChainId = order.ToTransfer.ChainId,
             Status = status
         });
