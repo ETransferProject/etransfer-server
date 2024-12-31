@@ -327,7 +327,7 @@ public class SwapTxTimerGrain : Grain<OrderSwapTimerState>, ISwapTxTimerGrain
         var txDateTime = TimeHelper.GetDateTimeFromTimeStamp(timerTx.TxTime ?? 0);
         var txExpireTime = txDateTime.AddSeconds(_chainOptions.Value.Contract.TransactionTimerMaxSeconds);
 
-        var transferInfo = order.ToTransfer;;
+        var transferInfo = order.ToTransfer;
         
         _logger.LogInformation("HandleOrderTransaction: {order}", JsonConvert.SerializeObject(order));
 

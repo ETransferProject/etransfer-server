@@ -199,6 +199,12 @@ public partial class UserDepositGrain
                orderDto.ExtensionInfo[ExtensionKey.NeedSwap].Equals(Boolean.TrueString);
     }
 
+    private bool IsSwapToMain(DepositOrderDto orderDto)
+    {
+        return orderDto.ExtensionInfo.ContainsKey(ExtensionKey.SwapToMain) &&
+               orderDto.ExtensionInfo[ExtensionKey.SwapToMain].Equals(Boolean.TrueString);
+    }
+
     private async Task DepositSwapFailureAlarmAsync(DepositOrderDto orderDto, string reason)
     {
         var depositSwapMonitorGrain = GrainFactory.GetGrain<IDepositSwapMonitorGrain>(orderDto.Id.ToString());
