@@ -379,7 +379,9 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
     private async Task<Tuple<bool, decimal, decimal, decimal>> GetServiceFeeAsync(string network, string symbol)
     {
         var isOpen = _depositOption.Value.ServiceFee.IsOpen;
-        var amountThreshold = _depositOption.Value.ServiceFee.AmountThreshold;
+        var amountThreshold = _depositOption.Value.ServiceFee.AmountThreshold.ContainsKey(symbol)
+            ? _depositOption.Value.ServiceFee.AmountThreshold[symbol]
+            : 0M;
         var (estimateFee, coin) = network == ChainId.AELF || network == ChainId.tDVV || network == ChainId.tDVW
             ? Tuple.Create(0M, new CoBoCoinDto { ExpireTime = 0L })
             : await _networkService.CalculateNetworkFeeAsync(network, symbol);

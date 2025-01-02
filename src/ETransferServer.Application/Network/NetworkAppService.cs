@@ -346,7 +346,9 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
     public async Task<Tuple<bool, decimal, decimal, decimal>> GetServiceFeeAsync(string network, string symbol)
     {
         var isOpen = _depositInfoOptions.Value.ServiceFee.IsOpen;
-        var amountThreshold = _depositInfoOptions.Value.ServiceFee.AmountThreshold;
+        var amountThreshold = _depositInfoOptions.Value.ServiceFee.AmountThreshold.ContainsKey(symbol)
+            ? _depositInfoOptions.Value.ServiceFee.AmountThreshold[symbol]
+            : 0M;
         var serviceFee = 0M;
         if (!network.IsNullOrEmpty())
         {

@@ -16,5 +16,5 @@ public class DepositInfoOptions
 public class ServiceFeeDto
 {
     public bool IsOpen { get; set; }
-    public decimal AmountThreshold { get; set; } = 10M;
+    public Dictionary<string, decimal> AmountThreshold { get; set; } = new();
 }
