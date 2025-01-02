@@ -88,7 +88,7 @@ public partial class OrderDepositAppService : ApplicationService, IOrderDepositA
         var getDepositInfoDto = new GetDepositInfoDto();
         var userAddressAsync = await _userAddressService.GetUserAddressAsync(getUserDepositAddressInput);
         var (isOpen, amountThreshold, serviceFee, minAmount) = 
-            await _networkAppService.GetServiceFeeAsync(string.Empty, request.Symbol);
+            await _networkAppService.GetServiceFeeAsync(request.Network, request.Symbol);
         var maxFee = await _networkAppService.GetMaxThirdPartFeeAsync(request.Network, request.Symbol);
         getDepositInfoDto.DepositInfo = new DepositInfoDto
         {
