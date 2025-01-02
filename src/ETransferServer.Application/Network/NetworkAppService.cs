@@ -360,7 +360,8 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
         }
         var minAmount = _networkOptions.Value.NetworkMap.ContainsKey(symbol)
             ? _networkOptions.Value.NetworkMap[symbol].FirstOrDefault(t => t.NetworkInfo.Network == network)
-                ?.DepositInfo?.MinDeposit.SafeToDecimal() ?? 0M
+                ?.DepositInfo?.MinDeposit.SafeToDecimal() ?? (_depositInfoOptions.Value.ServiceFee.MinDeposit.ContainsKey(symbol)
+            ? _depositInfoOptions.Value.ServiceFee.MinDeposit[symbol] : 0M)
             : 0M;
         _logger.LogDebug("Deposit from network fee: {network}, {symbol}, {isOpen}, {threshold}, {serviceFee}, {minAmount}", 
             network, symbol, isOpen, amountThreshold, serviceFee, minAmount);

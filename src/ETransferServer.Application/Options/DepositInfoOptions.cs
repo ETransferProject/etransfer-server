@@ -17,4 +17,5 @@ public class ServiceFeeDto
 {
     public bool IsOpen { get; set; }
     public Dictionary<string, decimal> AmountThreshold { get; set; } = new();
+    public Dictionary<string, decimal> MinDeposit { get; set; } = new();
 }
