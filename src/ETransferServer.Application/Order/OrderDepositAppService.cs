@@ -76,7 +76,7 @@ public partial class OrderDepositAppService : ApplicationService, IOrderDepositA
             .Select(n => n.DepositInfo).FirstOrDefault();
         AssertHelper.IsTrue(depositInfo != null, "Network is not exist. Please refresh and try again.");
 
-        var getUserDepositAddressInput = new GetUserDepositAddressInput()
+        var getUserDepositAddressInput = new GetUserDepositAddressInput
         {
             UserId = CurrentUser.GetId().ToString(),
             ChainId = request.ChainId,
@@ -87,13 +87,16 @@ public partial class OrderDepositAppService : ApplicationService, IOrderDepositA
 
         var getDepositInfoDto = new GetDepositInfoDto();
         var userAddressAsync = await _userAddressService.GetUserAddressAsync(getUserDepositAddressInput);
-        var (isOpen, serviceFee, minAmount) = await _networkAppService.GetServiceFeeAsync(request.Network, request.Symbol);
+        var (isOpen, amountThreshold, serviceFee, minAmount) = 
+            await _networkAppService.GetServiceFeeAsync(request.Network, request.Symbol);
+        var maxFee = await _networkAppService.GetMaxThirdPartFeeAsync(request.Network, request.Symbol);
         getDepositInfoDto.DepositInfo = new DepositInfoDto
         {
             DepositAddress = userAddressAsync,
-            ServiceFee = isOpen ? serviceFee.ToString() : "0",
+            ServiceFee = isOpen ? maxFee.ToString() : "0",
             MinAmount = minAmount.ToString(),
-            ExtraNotes = depositInfo.ExtraNotes,
+            CurrentThreshold = amountThreshold.ToString(),
+            ExtraNotes = depositInfo.ExtraNotes
         };
 
         if (DepositSwapHelper.IsDepositSwap(request.Symbol, request.ToSymbol))
@@ -112,7 +115,7 @@ public partial class OrderDepositAppService : ApplicationService, IOrderDepositA
             var decimals =
                 await _networkAppService.GetDecimalsAsync(request.ChainId, request.Symbol);
             getDepositInfoDto.DepositInfo.ServiceFeeUsd = isOpen
-                ? (serviceFee * avgExchange).ToString(
+                ? (maxFee * avgExchange).ToString(
                     decimals, DecimalHelper.RoundingOption.Ceiling)
                 : "0";
             getDepositInfoDto.DepositInfo.MinAmountUsd =
@@ -180,22 +183,15 @@ public partial class OrderDepositAppService : ApplicationService, IOrderDepositA
         AssertHelper.IsTrue(DepositSwapAmountHelper.IsValidRange(request.FromAmount), "FromAmount is an invalid parameter. Please refresh and try again. ");
         AssertHelper.IsTrue(_tokenAppService.IsValidSwap(request.ToChainId, request.FromSymbol, request.ToSymbol), "The combination of ChainId, FromSymbol and ToSymbol is an invalid parameter. Please refresh and try again.");
 
-        if (!request.FromChainId.IsNullOrEmpty())
-        {
-            var (isOpen, serviceFee, minAmount) =
-                await _networkAppService.GetServiceFeeAsync(request.FromChainId, request.FromSymbol);
-            var fromAmount = isOpen && request.FromAmount >= minAmount
-                ? request.FromAmount - serviceFee
-                : !isOpen && request.FromAmount >= minAmount
-                    ? request.FromAmount
-                    : 0M;
-            request.FromAmount = fromAmount < 0 ? 0M : fromAmount;
-        }
-        else
-        {
-            var fee = await _networkAppService.GetMaxThirdPartFeeAsync(string.Empty, request.FromSymbol);
-            request.FromAmount = request.FromAmount - fee < 0 ? 0M : request.FromAmount - fee;
-        }
+        var (isOpen, amountThreshold, serviceFee, minAmount) =
+            await _networkAppService.GetServiceFeeAsync(request.FromChainId, request.FromSymbol);
+        var fee = await _networkAppService.GetMaxThirdPartFeeAsync(string.Empty, request.FromSymbol);
+        var fromAmount = isOpen && request.FromAmount >= minAmount && request.FromAmount < amountThreshold
+            ? request.FromAmount - (request.FromChainId.IsNullOrEmpty() ? fee : serviceFee)
+            : (!isOpen && request.FromAmount >= minAmount) || (isOpen && request.FromAmount >= amountThreshold)
+                ? request.FromAmount
+                : 0M;
+        request.FromAmount = fromAmount < 0 ? 0M : fromAmount;
 
         if (request.FromAmount == DepositSwapAmountHelper.AmountZero)
         {

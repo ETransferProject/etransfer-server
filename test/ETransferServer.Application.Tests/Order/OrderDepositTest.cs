@@ -211,7 +211,7 @@ public class OrderDepositTest : ETransferServerApplicationTestBase
 
         networkAppService.Setup(o =>
             o.GetServiceFeeAsync(It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync(
-            Tuple.Create(false, 1M, 1M));
+            Tuple.Create(false, 10M, 1M, 1M));
         return networkAppService.Object;
     }
 
