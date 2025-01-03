@@ -217,6 +217,14 @@ public class SwapTxTimerGrain : Grain<OrderSwapTimerState>, ISwapTxTimerGrain
                 var info = await _transferProvider.GetSwapTokenInfoByTxIdsAsync(new List<string> { pendingTx.TxId }, 0);
                 if (info.TotalCount > 0 && !order.ExtensionInfo.ContainsKey(ExtensionKey.SwapToMain))
                 {
+                    if (!order.ExtensionInfo.ContainsKey(ExtensionKey.ToConfirmedNum) ||
+                        order.ExtensionInfo[ExtensionKey.ToConfirmedNum].SafeToLong() == 0)
+                    {
+                        var swapGn = GrainFactory.GetGrain<ISwapGrain>(order.Id);
+                        order.ToTransfer.Amount =
+                            await swapGn.RecordAmountOut(info.Items.FirstOrDefault().AmountOut);
+                        _logger.LogInformation("SwapTxTimer toTransfer first amount: {Amount}", order.ToTransfer.Amount);
+                    }
                     var txBlockHeight = info.Items.FirstOrDefault().BlockHeight;
                     order.ExtensionInfo.AddOrReplace(ExtensionKey.ToConfirmedNum,
                         (chainStatusDict[pendingTx.ChainId].BestChainHeight - txBlockHeight).ToString());
@@ -365,7 +373,23 @@ public class SwapTxTimerGrain : Grain<OrderSwapTimerState>, ISwapTxTimerGrain
                 timerTx.TxId, txStatus.Status, txStatus.BlockNumber, chainStatus.LastIrreversibleBlockHeight, txStatus.ReturnValue);
 
             if (!order.ExtensionInfo.ContainsKey(ExtensionKey.SwapToMain))
-                order.ExtensionInfo.AddOrReplace(ExtensionKey.ToConfirmedNum, (chainStatus.BestChainHeight - txStatus.BlockNumber).ToString());
+            {
+                if (!order.ExtensionInfo.ContainsKey(ExtensionKey.ToConfirmedNum) ||
+                    order.ExtensionInfo[ExtensionKey.ToConfirmedNum].SafeToLong() == 0)
+                {
+                    var swapGrain = GrainFactory.GetGrain<ISwapGrain>(order.Id);
+                    transferInfo.Amount = 0;
+                    if (txStatus.Logs.Length > 0)
+                    {
+                        var swapLog = txStatus.Logs.FirstOrDefault(l => l.Name == nameof(TokenSwapped))?.NonIndexed;
+                        transferInfo.Amount = await swapGrain.ParseReturnValue(swapLog);
+                    }
+                    _logger.LogInformation("After First ParseReturnValueAsync: {Amount}", transferInfo.Amount);
+                }
+                order.ExtensionInfo.AddOrReplace(ExtensionKey.ToConfirmedNum,
+                    (chainStatus.BestChainHeight - txStatus.BlockNumber).ToString());
+                await SaveOrder(order);
+            }
 
             // pending status, continue waiting
             if (txStatus.Status == CommonConstant.TransactionState.Pending) return false;
