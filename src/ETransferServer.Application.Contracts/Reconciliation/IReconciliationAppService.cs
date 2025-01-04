@@ -22,4 +22,7 @@ public interface IReconciliationAppService : IApplicationService
     Task<OrderOperationStatusDto> RequestRefundTokenAsync(GetRequestRefundDto request);
     Task<OrderOperationStatusDto> RejectRefundTokenAsync(GetOrderOperationDto request);
     Task<OrderOperationStatusDto> RefundTokenAsync(GetOrderSafeOperationDto request);
+    Task<OrderOperationStatusDto> RequestTransferReleaseTokenAsync(GetRequestReleaseDto request);
+    Task<OrderOperationStatusDto> RejectTransferReleaseTokenAsync(GetOrderOperationDto request);
+    Task<OrderOperationStatusDto> TransferReleaseTokenAsync(GetOrderSafeOperationDto request);
 }

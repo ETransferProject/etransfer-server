@@ -254,7 +254,17 @@ public partial class UserWithdrawGrain
     private async Task ChangeOperationStatus(WithdrawOrderDto order, bool success = true)
     {
         order.ExtensionInfo ??= new Dictionary<string, string>();
-        if (!order.ExtensionInfo.ContainsKey(ExtensionKey.RelatedOrderId)) return;
+        if (!order.ExtensionInfo.ContainsKey(ExtensionKey.RelatedOrderId))
+        {
+            {
+                if (!order.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)) return;
+            
+                order.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus, success
+                    ? OrderOperationStatusEnum.ReleaseConfirmed.ToString()
+                    : OrderOperationStatusEnum.ReleaseFailed.ToString());
+                return;
+            }
+        }
 
         var recordGrain = GrainFactory.GetGrain<IUserWithdrawRecordGrain>(Guid.Parse(order.ExtensionInfo[ExtensionKey.RelatedOrderId]));
         var res = await recordGrain.Get();
