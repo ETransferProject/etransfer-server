@@ -314,6 +314,11 @@ public partial class UserWithdrawGrain
         var addressGrain = GrainFactory.GetGrain<IUserTokenDepositAddressGrain>(order.FromTransfer.ToAddress);
         var userAddressDto = (await addressGrain.Get())?.Value;
         if (userAddressDto == null) return;
+        if (userAddressDto.IsAssigned && userAddressDto.OrderId != order.Id.ToString())
+        {
+            _logger.LogInformation("Recycle address but assigned another, orderId:{orderId}", order.Id);
+            return;
+        }
         
         var addressLimitGrain = GrainFactory.GetGrain<ITokenAddressLimitGrain>(
             GuidHelper.UniqGuid(nameof(ITokenAddressLimitGrain)));

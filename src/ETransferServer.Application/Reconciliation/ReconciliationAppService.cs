@@ -914,6 +914,10 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
                 item.ToTransfer.ToAddress = orderIndex.ExtensionInfo[ExtensionKey.SwapToAddress];
                 item.ToTransfer.ChainId = orderIndex.ExtensionInfo[ExtensionKey.SwapChainId];
             }
+            item.SecondOrderType = orderIndex != null && !orderIndex.ExtensionInfo.IsNullOrEmpty() &&
+                                   orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.OrderType)
+                ? orderIndex.ExtensionInfo[ExtensionKey.OrderType]
+                : string.Empty;
             if (!type.IsNullOrEmpty())
             {
                 var extensionInfo = orderIndex?.ExtensionInfo;
