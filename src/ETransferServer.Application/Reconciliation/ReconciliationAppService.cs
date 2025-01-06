@@ -788,6 +788,8 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
                     w.Field(f => f.ToTransfer.FromAddress).Value(request.Address.Trim()).CaseInsensitive()),
                 s => s.Term(w =>
                     w.Field(f => f.ToTransfer.ToAddress).Value(request.Address.Trim()).CaseInsensitive()),
+                s => s.Match(w =>
+                    w.Field("extensionInfo.SwapToAddress").Query(request.Address.Trim())),
                 s => s.Term(w =>
                     w.Field(f => f.FromTransfer.TxId).Value(request.Address.Trim()).CaseInsensitive()),
                 s => s.Term(w =>
