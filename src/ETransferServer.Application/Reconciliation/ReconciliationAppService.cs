@@ -239,8 +239,12 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
 
         if (!orderIndex.ExtensionInfo.IsNullOrEmpty() &&
             orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus) &&
+            (orderIndex.ExtensionInfo[ExtensionKey.SubStatus] ==
+            OrderOperationStatusEnum.ReleaseRequested.ToString() ||
             orderIndex.ExtensionInfo[ExtensionKey.SubStatus] ==
-            OrderOperationStatusEnum.ReleaseRequested.ToString())
+            OrderOperationStatusEnum.ReleaseConfirming.ToString() ||
+            orderIndex.ExtensionInfo[ExtensionKey.SubStatus] ==
+            OrderOperationStatusEnum.ReleaseConfirmed.ToString()))
         {
             throw new UserFriendlyException("Invalid request.");
         }
@@ -388,15 +392,26 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         if (orderIndex.FromTransfer.FromAddress != request.FromAddress
             || amount.SafeToDecimal() != request.Amount.SafeToDecimal()
             || orderIndex.FromTransfer.Symbol != request.Symbol
-            || orderIndex.FromTransfer.ChainId != request.ChainId)
+            || orderIndex.FromTransfer.ChainId != request.ChainId
+            || orderIndex.ToTransfer.Network != CommonConstant.Network.AElf)
         {
             throw new UserFriendlyException("Invalid param.");
         }
         
         if (!orderIndex.ExtensionInfo.IsNullOrEmpty() &&
             orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus) &&
+            (orderIndex.ExtensionInfo[ExtensionKey.SubStatus] ==
+            OrderOperationStatusEnum.RefundRequested.ToString() ||
             orderIndex.ExtensionInfo[ExtensionKey.SubStatus] ==
-            OrderOperationStatusEnum.RefundRequested.ToString())
+            OrderOperationStatusEnum.RefundConfirming.ToString() ||
+            orderIndex.ExtensionInfo[ExtensionKey.SubStatus] ==
+            OrderOperationStatusEnum.RefundConfirmed.ToString() ||
+            orderIndex.ExtensionInfo[ExtensionKey.SubStatus] ==
+            OrderOperationStatusEnum.ReleaseRequested.ToString()||
+            orderIndex.ExtensionInfo[ExtensionKey.SubStatus] ==
+            OrderOperationStatusEnum.ReleaseConfirming.ToString() ||
+            orderIndex.ExtensionInfo[ExtensionKey.SubStatus] ==
+            OrderOperationStatusEnum.ReleaseConfirmed.ToString()))
         {
             throw new UserFriendlyException("Invalid request.");
         }
@@ -538,8 +553,18 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
 
         if (!orderIndex.ExtensionInfo.IsNullOrEmpty() &&
             orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus) &&
-            orderIndex.ExtensionInfo[ExtensionKey.SubStatus] ==
-            OrderOperationStatusEnum.ReleaseRequested.ToString())
+            (orderIndex.ExtensionInfo[ExtensionKey.SubStatus] ==
+             OrderOperationStatusEnum.RefundRequested.ToString() ||
+             orderIndex.ExtensionInfo[ExtensionKey.SubStatus] ==
+             OrderOperationStatusEnum.RefundConfirming.ToString() ||
+             orderIndex.ExtensionInfo[ExtensionKey.SubStatus] ==
+             OrderOperationStatusEnum.RefundConfirmed.ToString() ||
+             orderIndex.ExtensionInfo[ExtensionKey.SubStatus] ==
+             OrderOperationStatusEnum.ReleaseRequested.ToString()||
+             orderIndex.ExtensionInfo[ExtensionKey.SubStatus] ==
+             OrderOperationStatusEnum.ReleaseConfirming.ToString() ||
+             orderIndex.ExtensionInfo[ExtensionKey.SubStatus] ==
+             OrderOperationStatusEnum.ReleaseConfirmed.ToString()))
         {
             throw new UserFriendlyException("Invalid request.");
         }
