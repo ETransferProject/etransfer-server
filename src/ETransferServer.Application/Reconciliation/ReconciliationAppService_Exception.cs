@@ -122,4 +122,31 @@ public partial class ReconciliationAppService
             ExceptionHandlingStrategy = ExceptionHandlingStrategy.Rethrow
         };
     }
+    
+    public async Task<FlowBehavior> HandleRequestTransferReleaseExceptionAsync(Exception ex, GetRequestReleaseDto request)
+    {
+        _logger.LogError(ex, "Request transfer release token failed");
+        return new FlowBehavior
+        {
+            ExceptionHandlingStrategy = ExceptionHandlingStrategy.Rethrow
+        };
+    }
+    
+    public async Task<FlowBehavior> HandleRejectTransferReleaseExceptionAsync(Exception ex, GetOrderOperationDto request)
+    {
+        _logger.LogError(ex, "Reject transfer release token failed");
+        return new FlowBehavior
+        {
+            ExceptionHandlingStrategy = ExceptionHandlingStrategy.Rethrow
+        };
+    }
+    
+    public async Task<FlowBehavior> HandleTransferReleaseExceptionAsync(Exception ex, GetOrderSafeOperationDto request)
+    {
+        _logger.LogError(ex, "Transfer release token failed");
+        return new FlowBehavior
+        {
+            ExceptionHandlingStrategy = ExceptionHandlingStrategy.Rethrow
+        };
+    }
 }
