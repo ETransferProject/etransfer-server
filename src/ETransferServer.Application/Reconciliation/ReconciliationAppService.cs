@@ -227,11 +227,11 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
             throw new UserFriendlyException("Invalid order.");
         }
 
-        var amount = orderIndex.FromTransfer.Amount.ToString(await _networkAppService.GetDecimalsAsync(ChainId.AELF, 
-            orderIndex.FromTransfer.Symbol), DecimalHelper.RoundingOption.Floor);
+        var amount = orderIndex.ToTransfer.Amount.ToString(await _networkAppService.GetDecimalsAsync(ChainId.AELF, 
+            orderIndex.ToTransfer.Symbol), DecimalHelper.RoundingOption.Floor);
         if (orderIndex.ToTransfer.ToAddress != request.ToAddress
             || amount.SafeToDecimal() != request.Amount.SafeToDecimal()
-            || orderIndex.FromTransfer.Symbol != request.Symbol
+            || orderIndex.ToTransfer.Symbol != request.Symbol
             || orderIndex.ToTransfer.ChainId != request.ChainId)
         {
             throw new UserFriendlyException("Invalid param.");
