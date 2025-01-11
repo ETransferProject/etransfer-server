@@ -343,21 +343,29 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
             : 0M);
     }
 
-    public async Task<Tuple<bool, decimal, decimal>> GetServiceFeeAsync(string network, string symbol)
+    public async Task<Tuple<bool, decimal, decimal, decimal>> GetServiceFeeAsync(string network, string symbol)
     {
         var isOpen = _depositInfoOptions.Value.ServiceFee.IsOpen;
-        var (estimateFee, coin) = network == ChainId.AELF || network == ChainId.tDVV || network == ChainId.tDVW
-            ? Tuple.Create(0M, new CoBoCoinDto { ExpireTime = 0L })
-            : await CalculateNetworkFeeAsync(network, symbol);
-        var serviceFee = Math.Min(estimateFee, await GetMaxThirdPartFeeAsync(network, symbol)).ToString(
-            2, DecimalHelper.RoundingOption.Ceiling).SafeToDecimal();
+        var amountThreshold = _depositInfoOptions.Value.ServiceFee.AmountThreshold.ContainsKey(symbol)
+            ? _depositInfoOptions.Value.ServiceFee.AmountThreshold[symbol]
+            : 0M;
+        var serviceFee = 0M;
+        if (!network.IsNullOrEmpty())
+        {
+            var (estimateFee, coin) = network == ChainId.AELF || network == ChainId.tDVV || network == ChainId.tDVW
+                ? Tuple.Create(0M, new CoBoCoinDto { ExpireTime = 0L })
+                : await CalculateNetworkFeeAsync(network, symbol);
+            serviceFee = Math.Min(estimateFee, await GetMaxThirdPartFeeAsync(network, symbol)).ToString(
+                2, DecimalHelper.RoundingOption.Ceiling).SafeToDecimal();
+        }
         var minAmount = _networkOptions.Value.NetworkMap.ContainsKey(symbol)
             ? _networkOptions.Value.NetworkMap[symbol].FirstOrDefault(t => t.NetworkInfo.Network == network)
-                ?.DepositInfo?.MinDeposit.SafeToDecimal() ?? 0M
+                ?.DepositInfo?.MinDeposit.SafeToDecimal() ?? (_depositInfoOptions.Value.ServiceFee.MinDeposit.ContainsKey(symbol)
+            ? _depositInfoOptions.Value.ServiceFee.MinDeposit[symbol] : 0M)
             : 0M;
-        _logger.LogDebug("Deposit from network fee: {network}, {symbol}, {isOpen}, {serviceFee}, {minAmount}", 
-            network, symbol, isOpen, serviceFee, minAmount);
-        return Tuple.Create(isOpen, serviceFee, minAmount);
+        _logger.LogDebug("Deposit from network fee: {network}, {symbol}, {isOpen}, {threshold}, {serviceFee}, {minAmount}", 
+            network, symbol, isOpen, amountThreshold, serviceFee, minAmount);
+        return Tuple.Create(isOpen, amountThreshold, serviceFee, minAmount);
     }
 
     public Task<int> GetDecimalsAsync(string chainId, string symbol)

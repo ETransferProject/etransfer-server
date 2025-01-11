@@ -63,6 +63,10 @@ public class WatchDogReminderGrain : Orleans.Grain, IWatchDogReminderGrain, IRem
         var swapTxTimerGrain = GrainFactory.GetGrain<ISwapTxTimerGrain>(
             GuidHelper.UniqGuid(nameof(ISwapTxTimerGrain)));
         swapTxTimerGrain.GetLastCallBackTime();
+        
+        var swapTxFastTimerGrain = GrainFactory.GetGrain<ISwapTxFastTimerGrain>(
+            GuidHelper.UniqGuid(nameof(ISwapTxFastTimerGrain)));
+        swapTxFastTimerGrain.GetLastCallBackTime();
 
         var userWithdrawTxTimerGrain = GrainFactory.GetGrain<IUserWithdrawTxTimerGrain>(
                 GuidHelper.UniqGuid(nameof(IUserWithdrawTxTimerGrain)));

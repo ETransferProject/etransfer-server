@@ -115,4 +115,25 @@ public class ReconciliationController : ETransferController
     {
         return await _reconciliationAppService.RefundTokenAsync(request);
     }
+    
+    [Authorize(Roles = "ordinary")]
+    [HttpPost("transfer-release-request")]
+    public async Task<OrderOperationStatusDto> RequestTransferReleaseTokenAsync(GetRequestReleaseDto request)
+    {
+        return await _reconciliationAppService.RequestTransferReleaseTokenAsync(request);
+    }
+    
+    [Authorize(Roles = "superAdmin,admin")]
+    [HttpPost("transfer-release-reject")]
+    public async Task<OrderOperationStatusDto> RejectTransferReleaseTokenAsync(GetOrderOperationDto request)
+    {
+        return await _reconciliationAppService.RejectTransferReleaseTokenAsync(request);
+    }
+    
+    [Authorize(Roles = "superAdmin,admin")]
+    [HttpPost("transfer-release")]
+    public async Task<OrderOperationStatusDto> TransferReleaseTokenAsync(GetOrderSafeOperationDto request)
+    {
+        return await _reconciliationAppService.TransferReleaseTokenAsync(request);
+    }
 }

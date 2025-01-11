@@ -179,6 +179,13 @@ public partial class UserDepositGrain
         orderDto.ExtensionInfo.AddOrReplace(ExtensionKey.NeedSwap, Boolean.FalseString);
         orderDto.ExtensionInfo.AddOrReplace(ExtensionKey.SwapStage, SwapStage.SwapTxCheckFailAndToTransfer);
         orderDto.ExtensionInfo.AddOrReplace(ExtensionKey.ToConfirmedNum, "0");
+        if (orderDto.ExtensionInfo.ContainsKey(ExtensionKey.SwapToMain) &&
+            orderDto.ExtensionInfo[ExtensionKey.SwapToMain].Equals(Boolean.TrueString))
+        {
+            orderDto.ToTransfer.FromAddress = orderDto.ExtensionInfo[ExtensionKey.SwapOriginFromAddress];
+            orderDto.ToTransfer.ToAddress = orderDto.ExtensionInfo[ExtensionKey.SwapToAddress];
+            orderDto.ToTransfer.ChainId = orderDto.ExtensionInfo[ExtensionKey.SwapChainId];
+        }
         
         _logger.LogInformation("Before calling the ToStartTransfer method, after resetting the properties of the order, order: {order}",
             JsonConvert.SerializeObject(orderDto));
@@ -190,6 +197,12 @@ public partial class UserDepositGrain
     {
         return orderDto.ExtensionInfo.ContainsKey(ExtensionKey.NeedSwap) &&
                orderDto.ExtensionInfo[ExtensionKey.NeedSwap].Equals(Boolean.TrueString);
+    }
+
+    private bool IsSwapToMain(DepositOrderDto orderDto)
+    {
+        return orderDto.ExtensionInfo.ContainsKey(ExtensionKey.SwapToMain) &&
+               orderDto.ExtensionInfo[ExtensionKey.SwapToMain].Equals(Boolean.TrueString);
     }
 
     private async Task DepositSwapFailureAlarmAsync(DepositOrderDto orderDto, string reason)

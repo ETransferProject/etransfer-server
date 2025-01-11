@@ -31,11 +31,13 @@
           ,**/src/ETransferServer.Application/Options/*.cs
           ,**/src/ETransferServer.Application/Protobuf/**/*.cs
           ,**/src/ETransferServer.Application/Reconciliation/*.cs
+          ,**/src/ETransferServer.Application/TokenAccess/*.cs
           ,**/src/ETransferServer.Application/Swap/*.cs
           ,**/src/ETransferServer.Application/Transaction/*.cs
           ,**/src/ETransferServer.Application/**/*_Exception.cs
           ,**/src/ETransferServer.Application/User/UserAddressOptions.cs
           ,**/src/ETransferServer.Application/User/UserAppService.cs
+          ,**/src/ETransferServer.Application/Order/OrderTransferAppService.cs
           ,**/src/ETransferServer.Application/Order/OrderWithdrawAppService.cs
           ,**/src/ETransferServer.Application/Network/NetworkAppService.cs
           </ExcludeByFile>
