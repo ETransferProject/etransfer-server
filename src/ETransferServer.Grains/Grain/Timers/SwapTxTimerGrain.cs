@@ -377,10 +377,10 @@ public class SwapTxTimerGrain : Grain<OrderSwapTimerState>, ISwapTxTimerGrain
                 if (!order.ExtensionInfo.ContainsKey(ExtensionKey.ToConfirmedNum) ||
                     order.ExtensionInfo[ExtensionKey.ToConfirmedNum].SafeToLong() == 0)
                 {
-                    var swapGrain = GrainFactory.GetGrain<ISwapGrain>(order.Id);
-                    transferInfo.Amount = 0;
-                    if (txStatus.Logs.Length > 0)
+                    if (!txStatus.Logs.IsNullOrEmpty() && txStatus.Logs.Length > 0)
                     {
+                        transferInfo.Amount = 0;
+                        var swapGrain = GrainFactory.GetGrain<ISwapGrain>(order.Id);
                         var swapLog = txStatus.Logs.FirstOrDefault(l => l.Name == nameof(TokenSwapped))?.NonIndexed;
                         transferInfo.Amount = await swapGrain.ParseReturnValue(swapLog);
                     }
@@ -403,10 +403,10 @@ public class SwapTxTimerGrain : Grain<OrderSwapTimerState>, ISwapTxTimerGrain
                     if (!IsTxConfirmed(txStatus.BlockNumber, chainStatus)) return false;
 
                     // LIB confirmed, return order to stream
-                    var swapGrain = GrainFactory.GetGrain<ISwapGrain>(order.Id);
-                    transferInfo.Amount = 0;
-                    if (txStatus.Logs.Length > 0)
+                    if (!txStatus.Logs.IsNullOrEmpty() && txStatus.Logs.Length > 0)
                     {
+                        transferInfo.Amount = 0;
+                        var swapGrain = GrainFactory.GetGrain<ISwapGrain>(order.Id);
                         var swapLog = txStatus.Logs.FirstOrDefault(l => l.Name == nameof(TokenSwapped))?.NonIndexed;
                         transferInfo.Amount = await swapGrain.ParseReturnValue(swapLog);
                     }
