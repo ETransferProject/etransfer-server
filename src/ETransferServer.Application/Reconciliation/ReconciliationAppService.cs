@@ -393,7 +393,7 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
             || amount.SafeToDecimal() != request.Amount.SafeToDecimal()
             || orderIndex.FromTransfer.Symbol != request.Symbol
             || orderIndex.FromTransfer.ChainId != request.ChainId
-            || orderIndex.ToTransfer.Network != CommonConstant.Network.AElf)
+            || orderIndex.FromTransfer.Network != CommonConstant.Network.AElf)
         {
             throw new UserFriendlyException("Invalid param.");
         }

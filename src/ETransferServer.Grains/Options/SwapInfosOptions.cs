@@ -6,7 +6,7 @@ public class SwapInfosOptions
     public int SafeLibDiff { get; set; } = 300;
     public int CallTxRetryTimes { get; set; } = 3;
     public int SafeBestChainDiff { get; set; } = 10;
-
+    public int TimeOut { get; set; } = 5;
 }
 
 public class SwapInfo

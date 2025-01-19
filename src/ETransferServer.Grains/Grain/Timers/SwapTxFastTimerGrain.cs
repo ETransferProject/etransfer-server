@@ -306,10 +306,10 @@ public class SwapTxFastTimerGrain: Grain<OrderSwapFastTimerState>, ISwapTxFastTi
                 if (!order.ExtensionInfo.ContainsKey(ExtensionKey.SwapTxId) ||
                     order.ExtensionInfo[ExtensionKey.SwapTxId].IsNullOrEmpty())
                 {
-                    var swapGrain = GrainFactory.GetGrain<ISwapGrain>(order.Id);
-                    transferInfo.Amount = 0;
-                    if (txStatus.Logs.Length > 0)
+                    if (!txStatus.Logs.IsNullOrEmpty() && txStatus.Logs.Length > 0)
                     {
+                        transferInfo.Amount = 0;
+                        var swapGrain = GrainFactory.GetGrain<ISwapGrain>(order.Id);
                         order.ExtensionInfo[ExtensionKey.SwapTxId] = timerTx.TxId;
                         var swapLog = txStatus.Logs.FirstOrDefault(l => l.Name == nameof(TokenSwapped))?.NonIndexed;
                         transferInfo.Amount = await swapGrain.ParseReturnValue(swapLog);
