@@ -1,11 +1,12 @@
-using Volo.Abp.ObjectMapping;
 using Awaken.Contracts.Swap;
 using ETransferServer.Common;
 using ETransferServer.Common.AElfSdk;
 using ETransferServer.Dtos.Token;
 using ETransferServer.Grains.Grain.Token;
+using ETransferServer.Grains.Options;
 using ETransferServer.Grains.State.Swap;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace ETransferServer.Grains.Grain.Swap;
 
@@ -23,15 +24,16 @@ public interface ISwapAmountsOutGrain : IGrainWithStringKey
 public class SwapAmountsOutGrain : Grain<SwapAmountsState>, ISwapAmountsOutGrain
 {
     private readonly ILogger<SwapAmountsOutGrain> _logger;
-    private readonly IObjectMapper _objectMapper;
     private readonly IContractProvider _contractProvider;
+    private readonly SwapInfosOptions _swapInfosOptions;
 
-    public SwapAmountsOutGrain(IObjectMapper objectMapper, IContractProvider contractProvider,
-        ILogger<SwapAmountsOutGrain> logger)
+    public SwapAmountsOutGrain(IContractProvider contractProvider,
+        ILogger<SwapAmountsOutGrain> logger,
+        IOptionsSnapshot<SwapInfosOptions> swapInfosOptions)
     {
-        _objectMapper = objectMapper;
         _contractProvider = contractProvider;
         _logger = logger;
+        _swapInfosOptions = swapInfosOptions.Value;
     }
 
     public async Task<(decimal, decimal, long, long)> GetAmountsOut(decimal amountIn, List<string> path,
@@ -69,12 +71,24 @@ public class SwapAmountsOutGrain : Grain<SwapAmountsState>, ISwapAmountsOutGrain
 
         try
         {
-            var amountsOut = await _contractProvider.CallTransactionAsync<GetAmountsOutOutput>(chainId, null,
+            var timeout = TimeSpan.FromSeconds(_swapInfosOptions.TimeOut);
+            var timeoutTask = Task.Delay(timeout);
+            _logger.LogInformation("GetAmountsOutAsync start, timeOut:{timeOut}", _swapInfosOptions.TimeOut);
+            
+            var amountsOutTask = _contractProvider.CallTransactionAsync<GetAmountsOutOutput>(chainId, null,
                 "GetAmountsOut", new GetAmountsOutInput
                 {
                     AmountIn = amountInActual,
                     Path = { path }
                 }, router);
+            
+            var completedTask = await Task.WhenAny(amountsOutTask, timeoutTask);
+            if (completedTask == timeoutTask)
+            {
+                _logger.LogInformation("GetAmountsOutAsync cancel");
+                return (0, 0, 0, 0);
+            }
+            var amountsOut = await amountsOutTask;
             if (amountsOut == null)
             {
                 return (0, 0, 0, 0);
