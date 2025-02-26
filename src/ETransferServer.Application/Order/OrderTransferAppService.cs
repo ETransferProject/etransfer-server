@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using AElf.ExceptionHandler;
@@ -66,6 +67,7 @@ public partial class OrderWithdrawAppService
         AssertHelper.IsTrue(await CheckNetworkAsync(request), ErrorResult.NetworkInvalidCode);
         if (VerifyAElfChain(request.FromNetwork))
         {
+            var stopwatch = Stopwatch.StartNew();
             var result = await GetWithdrawInfoAsync(
                 _objectMapper.Map<GetTransferListRequestDto, GetWithdrawListRequestDto>(request), version);
             var transferInfo = _objectMapper.Map<WithdrawInfoDto, TransferDetailInfoDto>(result.WithdrawInfo);
@@ -73,6 +75,7 @@ public partial class OrderWithdrawAppService
                 .FirstOrDefault(t => t.NetworkInfo.Network == request.FromNetwork)?.NetworkInfo?.ContractAddress
                 ?? _networkInfoOptions.Value.NetworkMap[CommonConstant.Symbol.USDT]
                 .FirstOrDefault(t => t.NetworkInfo.Network == request.FromNetwork)?.NetworkInfo?.ContractAddress;
+            _logger.LogInformation("Get transfer info cost time: {time}", stopwatch.ElapsedMilliseconds);
             return new GetTransferInfoDto
             {
                 TransferInfo = transferInfo
