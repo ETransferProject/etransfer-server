@@ -20,6 +20,7 @@ using ETransferServer.Auth.Options;
 using ETransferServer.Common;
 using ETransferServer.Grains.Grain.Users;
 using ETransferServer.User.Dtos;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Volo.Abp.DistributedLocking;
 using Volo.Abp.Identity;
@@ -38,6 +39,7 @@ public partial class SignatureGrantHandler : ITokenExtensionGrant
     private IClusterClient _clusterClient;
     private IOptionsSnapshot<GraphQlOption> _graphQlOptions;
     private IOptionsSnapshot<ChainOptions> _chainOptions;
+    private IOptionsSnapshot<DidServerOptions> _didServerOptions;
     private IOptionsSnapshot<RecaptchaOptions> _recaptchaOptions;
     private HttpClient _httpClient;
     private readonly string _lockKeyPrefix = "ETransferServer:Auth:SignatureGrantHandler:";
@@ -103,6 +105,7 @@ public partial class SignatureGrantHandler : ITokenExtensionGrant
         _distributedLock = context.HttpContext.RequestServices.GetRequiredService<IAbpDistributedLock>();
         _graphQlOptions = context.HttpContext.RequestServices.GetRequiredService<IOptionsSnapshot<GraphQlOption>>();
         _chainOptions = context.HttpContext.RequestServices.GetRequiredService<IOptionsSnapshot<ChainOptions>>();
+        _didServerOptions = context.HttpContext.RequestServices.GetRequiredService<IOptionsSnapshot<DidServerOptions>>();
         _recaptchaOptions =
             context.HttpContext.RequestServices.GetRequiredService<IOptionsSnapshot<RecaptchaOptions>>();
         
@@ -117,6 +120,7 @@ public partial class SignatureGrantHandler : ITokenExtensionGrant
         _logger.LogInformation("before create User, source: {source}", source);
         if (source == AuthConstant.PortKeySource)
         {
+            _httpClient = context.HttpContext.RequestServices.GetRequiredService<IHttpClientFactory>().CreateClient();
             var managerCheck = await CheckAddressAsync(chainId,
                 AuthConstant.PortKeyVersion2.Equals(version) ? _graphQlOptions.Value.Url2 : _graphQlOptions.Value.Url,
                 caHash, address, version, _chainOptions.Value);
@@ -555,7 +559,13 @@ public partial class SignatureGrantHandler : ITokenExtensionGrant
         if (!graphQlResult.HasValue || !graphQlResult.Value)
         {
             _logger.LogDebug("graphql is invalid.");
-            return await CheckAddressFromContractAsync(chainId, caHash, manager, version, chainOptions);
+            var contractResult =  await CheckAddressFromContractAsync(chainId, caHash, manager, version, chainOptions);
+            if (!contractResult.HasValue || !contractResult.Value)
+            {
+                _logger.LogDebug("contract is invalid.");
+                return await CheckManagerFromCache(_didServerOptions.Value.CheckManagerUrl, manager, caHash);
+            }
+            return true;
         }
 
         return true;
@@ -583,6 +593,23 @@ public partial class SignatureGrantHandler : ITokenExtensionGrant
                 param, false, chainOptions);
 
         return output?.ManagerInfos?.Any(t => t.Address.ToBase58() == manager);
+    }
+    
+    private async Task<bool?> CheckManagerFromCache(string checkUrl, string manager, string caHash)
+    {
+        try
+        {
+            var url = $"{checkUrl}?manager={manager}";
+            var response = await _httpClient.GetAsync(url);
+            response.EnsureSuccessStatusCode();
+            var content = await response.Content.ReadAsStringAsync();
+            return !content.IsNullOrEmpty() && caHash.Equals(JsonConvert.DeserializeObject<ManagerCacheDto>(content)?.CaHash);
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "CheckManagerFromCache fail, caHash:{caHash}", caHash);
+            return false;
+        }
     }
 
     private async Task<T> CallTransactionAsync<T>(string chainId, string methodName, string version, IMessage param,
