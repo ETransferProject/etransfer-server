@@ -63,6 +63,10 @@ public class WatchDogReminderGrain : Orleans.Grain, IWatchDogReminderGrain, IRem
         var swapTxTimerGrain = GrainFactory.GetGrain<ISwapTxTimerGrain>(
             GuidHelper.UniqGuid(nameof(ISwapTxTimerGrain)));
         swapTxTimerGrain.GetLastCallBackTime();
+        
+        var swapTxFastTimerGrain = GrainFactory.GetGrain<ISwapTxFastTimerGrain>(
+            GuidHelper.UniqGuid(nameof(ISwapTxFastTimerGrain)));
+        swapTxFastTimerGrain.GetLastCallBackTime();
 
         var userWithdrawTxTimerGrain = GrainFactory.GetGrain<IUserWithdrawTxTimerGrain>(
                 GuidHelper.UniqGuid(nameof(IUserWithdrawTxTimerGrain)));
@@ -75,7 +79,23 @@ public class WatchDogReminderGrain : Orleans.Grain, IWatchDogReminderGrain, IRem
         var tokenAddressTimerGrain = GrainFactory.GetGrain<ITokenAddressTimerGrain>(
                 GuidHelper.UniqGuid(nameof(ITokenAddressTimerGrain)));
         tokenAddressTimerGrain.GetLastCallBackTime();
+        
+        var tokenAddressRecycleTimerGrain = GrainFactory.GetGrain<ITokenAddressRecycleTimerGrain>(
+            GuidHelper.UniqGuid(nameof(ITokenAddressRecycleTimerGrain)));
+        tokenAddressRecycleTimerGrain.GetLastCallBackTime();
+        
+        var tokenIntegrateTimerGrain = GrainFactory.GetGrain<ITokenIntegrateTimerGrain>(
+            GuidHelper.UniqGuid(nameof(ITokenIntegrateTimerGrain)));
+        tokenIntegrateTimerGrain.GetLastCallBackTime();
+        
+        var tokenLiquidityTimerGrain = GrainFactory.GetGrain<ITokenLiquidityTimerGrain>(
+            GuidHelper.UniqGuid(nameof(ITokenLiquidityTimerGrain)));
+        tokenLiquidityTimerGrain.GetLastCallBackTime();
 
+        var withdrawCoboTimerGrain = GrainFactory.GetGrain<IWithdrawCoboTimerGrain>(
+            GuidHelper.UniqGuid(nameof(IWithdrawCoboTimerGrain)));
+        withdrawCoboTimerGrain.GetLastCallBackTime();
+        
         var withdrawTimerGrain = GrainFactory.GetGrain<IWithdrawTimerGrain>(
                 GuidHelper.UniqGuid(nameof(IWithdrawTimerGrain)));
         withdrawTimerGrain.GetLastCallBackTime();

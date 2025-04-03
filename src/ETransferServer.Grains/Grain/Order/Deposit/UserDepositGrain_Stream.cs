@@ -3,6 +3,7 @@ using Orleans.Streams;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Etos.Order;
+using ETransferServer.Grains.State.Order;
 using NBitcoin;
 
 namespace ETransferServer.Grains.Grain.Order.Deposit;
@@ -62,11 +63,13 @@ public partial class UserDepositGrain
             case OrderStatusEnum.ToTransferConfirmed:
                 orderDto.Status = OrderStatusEnum.Finish.ToString();
                 await AddOrUpdateOrder(orderDto);
+                await SaveOrderTxFlowAsync(orderDto);
                 break;
 
             // Retry with max count
             case OrderStatusEnum.ToTransferFailed:
             {
+                await SaveOrderTxFlowAsync(orderDto);
                 var statusFlow = await _orderStatusFlowGrain.GetAsync();
                 var querySuccess = statusFlow?.Data != null;
                 var retryFrom = OrderStatusEnum.ToStartTransfer.ToString();
@@ -94,6 +97,7 @@ public partial class UserDepositGrain
                     status.ToString());
                 await HandleDepositQueryGrain(orderDto.ThirdPartOrderId);
                 await ChangeOperationStatus(orderDto);
+                await SaveOrderTxFlowAsync(orderDto);
                 await _bus.Publish(_objectMapper.Map<DepositOrderDto, OrderChangeEto>(orderDto));
                 // await _orderChangeStream.OnCompletedAsync();
                 break;
@@ -141,6 +145,22 @@ public partial class UserDepositGrain
             await recordGrain.CreateOrUpdateAsync(order);
             await _userDepositProvider.AddOrUpdateSync(order);
         }
+    }
+
+    private async Task SaveOrderTxFlowAsync(DepositOrderDto order, string status = null)
+    {
+        if (order.ToTransfer.TxId.IsNullOrEmpty()) return;
+        await _orderTxFlowGrain.AddOrUpdate(new OrderTxData
+        {
+            TxId = order.ToTransfer.TxId,
+            ChainId = order.ToTransfer.ChainId,
+            Status = !status.IsNullOrEmpty()
+                ? status
+                : order.Status == OrderStatusEnum.ToTransferConfirmed.ToString() ||
+                  order.Status == OrderStatusEnum.Finish.ToString()
+                    ? ThirdPartOrderStatusEnum.Success.ToString()
+                    : ThirdPartOrderStatusEnum.Fail.ToString()
+        });
     }
 
     private async Task HandleDepositQueryGrain(string transactionId)

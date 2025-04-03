@@ -4,6 +4,7 @@ public enum OrderTypeEnum
 {
     Deposit = 1,
     Withdraw,
+    Transfer
 }
 
 public enum OrderTransferStatusEnum
@@ -68,6 +69,6 @@ public enum OrderOperationStatusEnum
     RefundConfirming,
     RefundConfirmed,
     RefundFailed,
-    RefundRejected
-
+    RefundRejected,
+    UserTransferRejected
 }

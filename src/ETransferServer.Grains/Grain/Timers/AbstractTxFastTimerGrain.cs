@@ -411,7 +411,15 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderFastTimerSta
         }
         if (order.OrderType == OrderTypeEnum.Withdraw.ToString())
         {
-            if (!order.ExtensionInfo.ContainsKey(ExtensionKey.RelatedOrderId)) return;
+            if (!order.ExtensionInfo.ContainsKey(ExtensionKey.RelatedOrderId))
+            {
+                if (!order.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)) return;
+            
+                order.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus, success
+                    ? OrderOperationStatusEnum.ReleaseConfirmed.ToString()
+                    : OrderOperationStatusEnum.ReleaseFailed.ToString());
+                return;
+            }
             var recordGrain = GrainFactory.GetGrain<IUserWithdrawRecordGrain>(Guid.Parse(order.ExtensionInfo[ExtensionKey.RelatedOrderId]));
             var res = await recordGrain.Get();
             if (res.Success)

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -16,6 +17,7 @@ using ETransferServer.Common.AElfSdk.Dtos;
 using ETransferServer.Common.Dtos;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Dtos.Token;
+using ETransferServer.Grains.Common;
 using ETransferServer.Grains.Grain.Order.Withdraw;
 using ETransferServer.Grains.Grain.Token;
 using ETransferServer.Grains.Grain.TokenLimit;
@@ -23,7 +25,9 @@ using ETransferServer.Grains.Grain.Users;
 using ETransferServer.Models;
 using ETransferServer.Network;
 using ETransferServer.Options;
+using ETransferServer.User;
 using ETransferServer.User.Dtos;
+using ETransferServer.Users;
 using ETransferServer.Withdraw.Dtos;
 using ETransferServer.WithdrawOrder.Dtos;
 using Google.Protobuf;
@@ -48,12 +52,15 @@ namespace ETransferServer.Order;
 public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdrawAppService
 {
     private readonly INESTRepository<Orders.OrderIndex, Guid> _withdrawOrderIndexRepository;
+    private readonly INESTRepository<UserAddress, Guid> _userAddressIndexRepository;
     private readonly IObjectMapper _objectMapper;
     private readonly ILogger<OrderWithdrawAppService> _logger;
     private readonly IClusterClient _clusterClient;
     private readonly INetworkAppService _networkAppService;
+    private readonly IUserAppService _userAppService;
     private readonly IContractProvider _contractProvider;
     private readonly IOptionsSnapshot<WithdrawInfoOptions> _withdrawInfoOptions;
+    private readonly IOptionsSnapshot<DepositInfoOptions> _depositInfoOptions;
     private readonly IOptionsSnapshot<NetworkOptions> _networkInfoOptions;
     private readonly IOptionsSnapshot<ChainOptions> _chainOptions;
     private readonly IOptionsSnapshot<CoBoOptions> _coBoOptions;
@@ -61,13 +68,16 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
     private readonly IDistributedCache<Tuple<decimal, long>> _minThirdPartFeeCache;
 
     public OrderWithdrawAppService(INESTRepository<Orders.OrderIndex, Guid> withdrawOrderIndexRepository,
+        INESTRepository<UserAddress, Guid> userAddressIndexRepository,
         IObjectMapper objectMapper,
         ILogger<OrderWithdrawAppService> logger, 
         IOptionsSnapshot<NetworkOptions> networkInfoOptions,
         IClusterClient clusterClient, 
         INetworkAppService networkAppService, 
+        IUserAppService userAppService,
         IContractProvider contractProvider,
         IOptionsSnapshot<WithdrawInfoOptions> withdrawInfoOptions,
+        IOptionsSnapshot<DepositInfoOptions> depositInfoOptions,
         IOptionsSnapshot<ChainOptions> chainOptions, 
         IOptionsSnapshot<CoBoOptions> coBoOptions,
         IDistributedCache<CoBoCoinDto> coBoCoinCache, 
@@ -75,13 +85,16 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
         )
     {
         _withdrawOrderIndexRepository = withdrawOrderIndexRepository;
+        _userAddressIndexRepository = userAddressIndexRepository;
         _objectMapper = objectMapper;
         _logger = logger;
         _networkInfoOptions = networkInfoOptions;
         _clusterClient = clusterClient;
         _networkAppService = networkAppService;
+        _userAppService = userAppService;
         _contractProvider = contractProvider;
         _withdrawInfoOptions = withdrawInfoOptions;
+        _depositInfoOptions = depositInfoOptions;
         _chainOptions = chainOptions;
         _coBoOptions = coBoOptions;
         _coBoCoinCache = coBoCoinCache;
@@ -92,19 +105,19 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
         MethodName = nameof(HandleGetInfoExceptionAsync))]
     public async Task<GetWithdrawInfoDto> GetWithdrawInfoAsync(GetWithdrawListRequestDto request, string version = null)
     {
-        var userId = CurrentUser.GetId();
-        AssertHelper.IsTrue(userId != Guid.Empty, "User not exists. Please refresh and try again.");
         AssertHelper.IsTrue(request.ChainId == ChainId.AELF || request.ChainId == ChainId.tDVV
-                                                            || request.ChainId == ChainId.tDVW,
-            "Param is invalid. Please refresh and try again.");
+            || request.ChainId == ChainId.tDVW, ErrorResult.ChainIdInvalidCode);
         AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.Symbol),
-            "Symbol is not exist. Please refresh and try again.");
+            ErrorResult.SymbolInvalidCode, null, request.Symbol);
         AssertHelper.IsTrue(
             string.IsNullOrWhiteSpace(request.Version) ||
             CommonConstant.DefaultConst.PortKeyVersion.Equals(request.Version) ||
             CommonConstant.DefaultConst.PortKeyVersion2.Equals(request.Version),
-            "Version is invalid. Please refresh and try again.");
+            ErrorResult.VersionOrWhitelistVerifyFailCode);
         AssertHelper.IsTrue(VerifyMemo(request.Memo), ErrorResult.MemoInvalidCode);
+        var stopwatch = Stopwatch.StartNew();
+        var userId = await GetUserIdAsync(request.SourceType, request.FromAddress);
+        _logger.LogInformation("Get transfer info cost time to get user: {time}", stopwatch.ElapsedMilliseconds);
         if (!request.Network.IsNullOrEmpty())
         {
             var networkConfig = _networkInfoOptions.Value.NetworkMap[request.Symbol]
@@ -117,7 +130,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
         {
             AssertHelper.IsTrue(_withdrawInfoOptions.Value.CanCrossSameChain ||
                                 (!_withdrawInfoOptions.Value.CanCrossSameChain && request.ChainId != request.Network),
-                "Network is invalid. Please refresh and try again.");
+                ErrorResult.NetworkInvalidCode);
             AssertHelper.IsTrue(VerifyHelper.VerifyAelfAddress(request.Address), ErrorResult.AddressFormatWrongCode);
         }
 
@@ -131,7 +144,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
         withdrawInfoDto.TransactionUnit = request.Symbol;
 
         // query async
-        var networkFeeTask = CalculateNetworkFeeAsync(request.ChainId, request.Version);
+        var networkFeeTask = CalculateNetworkFeeAsync(userId, request.ChainId, request.Version, request.FromAddress);
         var decimals = await _networkAppService.GetDecimalsAsync(request.ChainId, request.Symbol);
         var (feeAmount, expireAt) = (0M,
             DateTime.UtcNow.AddSeconds(_coBoOptions.Value.CoinExpireSeconds).ToUtcMilliSeconds());
@@ -145,12 +158,16 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
             (feeAmount, expireAt) = await thirdPartFeeTask;
         }
 
+        stopwatch = Stopwatch.StartNew();
         feeAmount = await GetTransactionFeeAsync(request, userId, feeAmount);
+        _logger.LogInformation("Get transfer info cost time to get tx fee: {time}", stopwatch.ElapsedMilliseconds);
         withdrawInfoDto.TransactionFee = feeAmount.ToString(decimals, DecimalHelper.RoundingOption.Ceiling);
         withdrawInfoDto.TransactionUnit = request.Symbol;
         withdrawInfoDto.ExpiredTimestamp = expireAt.ToString();
 
+        stopwatch = Stopwatch.StartNew();
         var networkFee = await networkFeeTask;
+        _logger.LogInformation("Get transfer info cost time to cal network fee: {time}", stopwatch.ElapsedMilliseconds);
         withdrawInfoDto.AelfTransactionFee = networkFee.ToString(CommonConstant.DefaultConst.ElfDecimals,
             DecimalHelper.RoundingOption.Ceiling);
         withdrawInfoDto.AelfTransactionUnit = CommonConstant.Symbol.Elf;
@@ -170,8 +187,10 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
             : withdrawInfoDto.ReceiveAmount ?? default(int).ToString();
         try
         {
+            stopwatch = Stopwatch.StartNew();
             var avgExchange =
                 await _networkAppService.GetAvgExchangeAsync(request.Symbol, CommonConstant.Symbol.USD);
+            _logger.LogInformation("Get transfer info cost time to get symbol usd: {time}", stopwatch.ElapsedMilliseconds);
             withdrawInfoDto.TotalLimit =
                 (_networkInfoOptions.Value.WithdrawLimit24H / avgExchange).ToString(decimals,
                     DecimalHelper.RoundingOption.Ceiling);
@@ -187,9 +206,11 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
             var fee = feeAmount * avgExchange;
             if (networkFee > 0)
             {
+                stopwatch = Stopwatch.StartNew();
                 avgExchange =
                     await _networkAppService.GetAvgExchangeAsync(CommonConstant.Symbol.Elf,
                         CommonConstant.Symbol.USD);
+                _logger.LogInformation("Get transfer info cost time to get elf usd: {time}", stopwatch.ElapsedMilliseconds);
                 fee += networkFee * avgExchange;
             }
 
@@ -200,18 +221,22 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
             _logger.LogError(e, "Get withdraw avg exchange failed.");
         }
 
+        AssertHelper.IsTrue(request.Amount >= 0 && request.Amount <= withdrawInfoDto.MaxAmount.SafeToDecimal(), 
+            ErrorResult.AmountNotEqualCode);
         if (request.Address.IsNullOrEmpty())
             return new GetWithdrawInfoDto { WithdrawInfo = withdrawInfoDto };
 
+        stopwatch = Stopwatch.StartNew();
         AssertHelper.IsTrue(await IsAddressSupport(request.ChainId, request.Symbol, request.Address, version),
-            "Invalid address. Please refresh and try again.");
+            ErrorResult.AddressInvalidCode);
+        _logger.LogInformation("Get transfer info cost time to check address: {time}", stopwatch.ElapsedMilliseconds);
         return new GetWithdrawInfoDto
         {
             WithdrawInfo = withdrawInfoDto
         };
     }
 
-    private async Task<decimal> GetTransactionFeeAsync(GetWithdrawListRequestDto request, Guid userId, decimal feeAmount)
+    private async Task<decimal> GetTransactionFeeAsync(GetWithdrawListRequestDto request, Guid? userId, decimal feeAmount)
     {
         var network = string.IsNullOrEmpty(request.Network) ? ChainId.AELF : request.Network;
         var networkConfig = _networkInfoOptions.Value.NetworkMap[request.Symbol]
@@ -226,7 +251,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
             : withdrawFee;
     }
 
-    private async Task<Tuple<decimal, long>> CalculateThirdPartFeesWithCacheAsync(Guid userId, string symbol, string version = null)
+    private async Task<Tuple<decimal, long>> CalculateThirdPartFeesWithCacheAsync(Guid? userId, string symbol, string version = null)
     {
         var thirdFeeCacheKey = CacheKey("minThirdPartFee", symbol);
         var cachedData = await _minThirdPartFeeCache.GetAsync(thirdFeeCacheKey);
@@ -240,7 +265,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
             });
     }
 
-    private async Task<Tuple<decimal, long>> CalculateThirdPartFeesAsync(Guid userId, string symbol, string version = null)
+    private async Task<Tuple<decimal, long>> CalculateThirdPartFeesAsync(Guid? userId, string symbol, string version = null)
     {
         Dictionary<string, Task<Tuple<decimal, long>>> fees = new();
         var networkList = GetThirdPartNetworkList(symbol);
@@ -292,7 +317,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
 
     // Estimate transaction fee
     // feeAmount in symbol => expire at milliseconds timestamp
-    private async Task<Tuple<decimal, long>> CalculateThirdPartFeeAsync(Guid userId, string network, string symbol, bool isNotify = true)
+    private async Task<Tuple<decimal, long>> CalculateThirdPartFeeAsync(Guid? userId, string network, string symbol, bool isNotify = true)
     {
         var (estimateFee, coin) = await _networkAppService.CalculateNetworkFeeAsync(network, symbol);
         estimateFee = Math.Max(estimateFee, await _networkAppService.GetMinThirdPartFeeAsync(network, symbol));
@@ -313,10 +338,39 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
 
         return Tuple.Create(estimateFee, coin.ExpireTime);
     }
-
-    private async Task SetFeeCacheAsync(Guid userId, string network, string symbol, decimal fee)
+    
+    private async Task<Tuple<decimal, long>> CalculateTotalFeeAsync(Guid? userId, string fromNetwork, string toNetwork,
+        string symbol, long expireAt, decimal feeAmount, bool isNotify = false)
     {
-        if (network.IsNullOrEmpty()) return;
+        var (estimateFee, coin) = VerifyAElfChain(fromNetwork)
+            ? Tuple.Create(0M, new CoBoCoinDto { ExpireTime = 0L })
+            : await _networkAppService.CalculateNetworkFeeAsync(fromNetwork, symbol);
+        estimateFee = Math.Min(estimateFee, await _networkAppService.GetMaxThirdPartFeeAsync(fromNetwork, symbol));
+        _logger.LogDebug("Cobo from network fee: {fromNetwork}, {fromFee}, {expireTime}, to network fee: {toNetwork}, " +
+            "{toFee}, {expireAt}, {userId}, {symbol}", fromNetwork, estimateFee, coin.ExpireTime, toNetwork, feeAmount, 
+            expireAt, userId, symbol);
+        var totalFee = estimateFee + feeAmount;
+
+        await SetFeeCacheAsync(userId, fromNetwork, toNetwork, symbol, totalFee);
+
+        var monitorCacheKey = CacheKey(FeeInfo.FeeName.CoBoFee, fromNetwork);
+        if (!VerifyAElfChain(fromNetwork) && null == await _coBoCoinCache.GetAsync(monitorCacheKey))
+        {
+            // If new data is generated
+            // go through the monitoring logic.
+            await DoMonitorAsync(fromNetwork, coin.AbsEstimateFee.SafeToDecimal(), coin.FeeCoin, isNotify);
+            _coBoCoinCache.GetOrAdd(monitorCacheKey, () => coin, () => new DistributedCacheEntryOptions
+            {
+                AbsoluteExpiration = DateTimeOffset.FromUnixTimeMilliseconds(coin.ExpireTime)
+            });
+        }
+
+        return Tuple.Create(totalFee, coin.ExpireTime > 0 && expireAt > 0 ? Math.Min(coin.ExpireTime, expireAt) : Math.Max(coin.ExpireTime, expireAt));
+    }
+
+    private async Task SetFeeCacheAsync(Guid? userId, string network, string symbol, decimal fee)
+    {
+        if (!userId.HasValue || network.IsNullOrEmpty()) return;
         var coinFeeCacheKey = CacheKey(FeeInfo.FeeName.CoBoFee, userId.ToString(), network, symbol);
         var decimals = await _networkAppService.GetDecimalsAsync(ChainId.AELF, symbol);
         await _coBoCoinCache.SetAsync(coinFeeCacheKey, new CoBoCoinDto { AbsEstimateFee = fee.ToString(decimals, DecimalHelper.RoundingOption.Ceiling) }, 
@@ -324,7 +378,22 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
             {
                 AbsoluteExpiration = DateTimeOffset.UtcNow.AddSeconds(_withdrawInfoOptions.Value.ThirdPartCacheFeeExpireSeconds)
             });
-        _logger.LogDebug("Cobo fee set cache: {fee}, {expireSeconds}", fee, _withdrawInfoOptions.Value.ThirdPartCacheFeeExpireSeconds);
+        _logger.LogDebug("Cobo fee set cache: {fee}, {expireSeconds}, {userId}, {network}, {symbol}", 
+            fee, _withdrawInfoOptions.Value.ThirdPartCacheFeeExpireSeconds, userId, network, symbol);
+    }
+    
+    private async Task SetFeeCacheAsync(Guid? userId, string fromNetwork, string toNetwork, string symbol, decimal fee)
+    {
+        if (!userId.HasValue || fromNetwork.IsNullOrEmpty() || toNetwork.IsNullOrEmpty()) return;
+        var coinFeeCacheKey = CacheKey(FeeInfo.FeeName.CoBoFee, userId.ToString(), fromNetwork, toNetwork, symbol);
+        var decimals = await _networkAppService.GetDecimalsAsync(ChainId.AELF, symbol);
+        await _coBoCoinCache.SetAsync(coinFeeCacheKey, new CoBoCoinDto { AbsEstimateFee = fee.ToString(decimals, DecimalHelper.RoundingOption.Ceiling) }, 
+            new DistributedCacheEntryOptions
+            {
+                AbsoluteExpiration = DateTimeOffset.UtcNow.AddSeconds(_withdrawInfoOptions.Value.ThirdPartCacheFeeExpireSeconds)
+            });
+        _logger.LogDebug("Cobo total fee set cache: {fee}, {expireSeconds}, {userId}, {fromNetwork}, {toNetwork}, {symbol}", 
+            fee, _withdrawInfoOptions.Value.ThirdPartCacheFeeExpireSeconds, userId, fromNetwork, toNetwork, symbol);
     }
 
     public async Task DoMonitorAsync(string network, decimal estimateFee, string symbol, bool isNotify)
@@ -342,18 +411,22 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
     }
 
 
-    private async Task<decimal> CalculateNetworkFeeAsync(string chainId, string version)
+    private async Task<decimal> CalculateNetworkFeeAsync(Guid? userId, string chainId, string version, string userAddress)
     {
-        var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
-        if (userId == null || userId == Guid.Empty) return 0;
+        if (!userId.HasValue || userId == Guid.Empty) return 0;
 
         var userGrain = _clusterClient.GetGrain<IUserGrain>((Guid)userId);
         var userDto = await userGrain.GetUser();
-        AssertHelper.IsTrue(userDto.Success, "User not exists");
+        // AssertHelper.IsTrue(userDto.Success, "User not exists");
 
-        AddressInfo addressInfo;
+        AddressInfo addressInfo = null;
         Address address;
-        if (userDto.Data.AppId == CommonConstant.NightElfAppId)
+        if (!userDto.Success && !userAddress.IsNullOrEmpty())
+        {
+            AssertHelper.IsTrue(VerifyHelper.VerifyAelfAddress(userAddress), ErrorResult.AddressInvalidCode);
+            address = Address.FromBase58(userAddress);
+        }
+        else if (userDto.Data.AppId == CommonConstant.NightElfAppId)
         {
             addressInfo = userDto.Data.AddressInfos.FirstOrDefault(addr => addr.ChainId == chainId);
             address = Address.FromBase58(addressInfo.Address);
@@ -373,6 +446,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
                 address, userId.ToString(), chainId, version);
         }
 
+        var stopwatch = Stopwatch.StartNew();
         var balance = await _contractProvider.CallTransactionAsync<GetBalanceOutput>(chainId,
             SystemContractName.TokenContract,
             "GetBalance",
@@ -381,7 +455,8 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
                 Owner = address,
                 Symbol = CommonConstant.Symbol.Elf
             });
-
+        _logger.LogInformation("Get transfer info cost time to call balance: {time}", stopwatch.ElapsedMilliseconds);
+        
         // When the user does not have a balance, the user's money will not be deducted in any case,
         // and when the free amount is not enough, the transaction fee will be deducted from the delegate account.
         if (balance.Balance == 0) return 0;
@@ -391,8 +466,10 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
             return 0;
         }
 
+        stopwatch = Stopwatch.StartNew();
         var freeAllowances = await _contractProvider.CallTransactionAsync<TransactionFeeFreeAllowancesMap>(chainId,
             SystemContractName.TokenContract, "GetTransactionFeeFreeAllowances", address);
+        _logger.LogInformation("Get transfer info cost time to call free allowances: {time}", stopwatch.ElapsedMilliseconds);
         var totalAllowance = freeAllowances.Map.Values
             .SelectMany(d => d.Map.Values)
             .Sum(m => m.Amount);
@@ -406,7 +483,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
         var allowanceDecimal = totalAllowance / decimalPow;
         var transactionFee = Math.Max(0, chainInfo.TransactionFee - allowanceDecimal);
         _logger.LogDebug("Fee of address {Address}, balance={Balance}, freeAllowance={Free}, transactionFee={TxFee}",
-            addressInfo.Address, balanceDecimal, allowanceDecimal, transactionFee);
+            addressInfo?.Address ?? userAddress, balanceDecimal, allowanceDecimal, transactionFee);
         return Math.Min(balanceDecimal, transactionFee);
     }
 
@@ -422,11 +499,11 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
         {
             var network = await _networkAppService.GetNetworkListWithLocalFeeAsync(new GetNetworkListRequestDto
             {
-                Type = OrderTypeEnum.Withdraw.ToString(),
+                Type = VerifyAElfChain(chainId) ? OrderTypeEnum.Withdraw.ToString() : OrderTypeEnum.Transfer.ToString(),
                 ChainId = chainId,
                 Symbol = symbol,
                 Address = address
-            }, version);
+            }, version, true);
             return network != null && !network.NetworkList.IsNullOrEmpty();
         }
         catch (Exception e)
@@ -437,7 +514,8 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
 
     [ExceptionHandler(typeof(UserFriendlyException), typeof(Exception), 
         TargetType = typeof(OrderWithdrawAppService), MethodName = nameof(HandleCreateWithdrawExceptionAsync))]
-    public async Task<CreateWithdrawOrderDto> CreateWithdrawOrderInfoAsync(GetWithdrawOrderRequestDto request, string version = null)
+    public async Task<CreateWithdrawOrderDto> CreateWithdrawOrderInfoAsync(GetWithdrawOrderRequestDto request, 
+        string version = null, bool isTransfer = false)
     {
         _logger.LogDebug("CreateWithdrawOrder: {request}", JsonConvert.SerializeObject(request));
         var userId = CurrentUser.GetId();
@@ -448,7 +526,8 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
             ErrorResult.SymbolInvalidCode, null, request.Symbol);
         AssertHelper.IsTrue(await IsAddressSupport(request.FromChainId, request.Symbol, request.ToAddress, version),
             ErrorResult.AddressInvalidCode);
-        AssertHelper.IsTrue(IsNetworkOpen(request.Symbol, request.Network), ErrorResult.CoinSuspendedTemporarily);
+        AssertHelper.IsTrue(IsNetworkOpen(request.Symbol, request.Network, OrderTypeEnum.Withdraw.ToString()), 
+            ErrorResult.CoinSuspendedTemporarily);
         AssertHelper.IsTrue(VerifyMemo(request.Memo), ErrorResult.MemoInvalidCode);
         
         var networkConfig = _networkInfoOptions.Value.NetworkMap[request.Symbol]
@@ -477,7 +556,8 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
             CacheKey(FeeInfo.FeeName.CoBoFee, userId.ToString(), request.Network, request.Symbol);
         var thirdPartFeeDto = await _coBoCoinCache.GetAsync(coBoCoinCacheKey);
         AssertHelper.IsTrue(thirdPartFeeDto != null, ErrorResult.FeeExpiredCode);
-        _logger.LogDebug("Cobo fee get cache: {fee}", thirdPartFeeDto.AbsEstimateFee);
+        _logger.LogDebug("Cobo fee get cache: {fee}, {userId}, {network}, {symbol}", 
+            thirdPartFeeDto.AbsEstimateFee, userId, request.Network, request.Symbol);
         var inputThirdPartFee = thirdPartFeeDto.AbsEstimateFee.SafeToDecimal(-1);
         AssertHelper.IsTrue(inputThirdPartFee >= 0, ErrorResult.FeeInvalidCode);
         
@@ -518,19 +598,20 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
         var expectedAmount = request.Amount * (decimal)Math.Pow(10, tokenDto.Decimals);
         AssertHelper.IsTrue(transferTokenInput.Amount == expectedAmount, ErrorResult.AmountNotEqualCode);
 
+        var userAddress = userDto.Data?.AddressInfos?.FirstOrDefault()?.Address;
         // Do create
-        return await DoCreateOrderAsync(request, transaction, withdrawAmount, inputThirdPartFee.ToString());
+        return await DoCreateOrderAsync(request, transaction, withdrawAmount, userAddress, inputThirdPartFee.ToString(), isTransfer);
     }
 
-    private bool IsNetworkOpen(string symbol, string network)
+    private bool IsNetworkOpen(string symbol, string network, string orderType)
     {
         return _networkInfoOptions.Value.NetworkMap[symbol].Exists(t =>
-            t.NetworkInfo.Network == network && t.SupportType.Contains(OrderTypeEnum.Withdraw.ToString()) &&
+            t.NetworkInfo.Network == network && t.SupportType.Contains(orderType) &&
             t.WithdrawInfo.IsOpen);
     }
 
     private async Task<CreateWithdrawOrderDto> DoCreateOrderAsync(GetWithdrawOrderRequestDto request,
-        Transaction transaction, decimal withdrawAmount, string feeStr)
+        Transaction transaction, decimal withdrawAmount, string userAddress, string feeStr, bool isTransfer)
     {
         // Replay attacks
         await AssertTxReplayAttacksAsync(transaction);
@@ -544,9 +625,10 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
                 DateTime.UtcNow.AddDays(1).Date));
         try
         {
-            var orderId = Guid.NewGuid();
+            var orderId = OrderIdHelper.WithdrawOrderId(request.RawTransaction, request.FromChainId,
+                request.ToAddress);
             var grain = _clusterClient.GetGrain<IUserWithdrawGrain>(orderId);
-            var withdrawOrderDto = new WithdrawOrderDto()
+            var withdrawOrderDto = new WithdrawOrderDto
             {
                 UserId = CurrentUser.GetId(),
                 RawTransaction = request.RawTransaction,
@@ -555,6 +637,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
                 FromTransfer = new TransferInfo
                 {
                     ChainId = request.FromChainId,
+                    FromAddress = userAddress,
                     Amount = request.Amount,
                     Symbol = request.Symbol,
                     TxId = transaction.GetHash().ToHex()
@@ -573,14 +656,20 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
                 }
             };
 
-            if (!string.IsNullOrWhiteSpace(request.Memo))
+            if (isTransfer)
             {
                 withdrawOrderDto.ExtensionInfo = new Dictionary<string, string>();
+                withdrawOrderDto.ExtensionInfo.Add(ExtensionKey.OrderType, OrderTypeEnum.Transfer.ToString());
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.Memo))
+            {
+                withdrawOrderDto.ExtensionInfo ??= new Dictionary<string, string>();
                 withdrawOrderDto.ExtensionInfo.Add(ExtensionKey.Memo, request.Memo);
             }
 
             var order = await grain.CreateOrder(withdrawOrderDto);
-            var getWithdrawOrderInfoDto = new CreateWithdrawOrderDto()
+            var getWithdrawOrderInfoDto = new CreateWithdrawOrderDto
             {
                 OrderId = order.Id.ToString(),
                 TransactionId = transaction.GetHash().ToHex()
@@ -651,21 +740,24 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
         return regex.IsMatch(memo);
     }
 
-    private async Task<bool> VerifyByVersionAndWhiteList(NetworkConfig networkConfig, Guid userId, string version)
+    private async Task<bool> VerifyByVersionAndWhiteList(NetworkConfig networkConfig, Guid? userId, string version)
     {
-        _logger.LogInformation("VerifyByVersionAndWhiteList currentUser:{userId},version:{version}", userId, version);
-        var userGrain = _clusterClient.GetGrain<IUserGrain>(userId);
-        var userDto = await userGrain.GetUser();
-        if (userDto.Success && userDto.Data != null && !userDto.Data.AddressInfos.IsNullOrEmpty())
+        if (userId.HasValue)
         {
-            return networkConfig.NetworkInfo.MinShowVersion.IsNullOrEmpty()
-                   || (VerifyHelper.VerifyMemoVersion(version, networkConfig.NetworkInfo.MinShowVersion)
-                       && (networkConfig.SupportWhiteList.IsNullOrEmpty() ||
-                           networkConfig.SupportWhiteList.Any(t => userDto.Data.AddressInfos.Exists(a =>
-                               a.Address.ToLower() == t.ToLower()))));
+            _logger.LogInformation("VerifyByVersionAndWhiteList currentUser:{userId},version:{version}", userId,
+                version);
+            var userGrain = _clusterClient.GetGrain<IUserGrain>(userId.Value);
+            var userDto = await userGrain.GetUser();
+            if (userDto.Success && userDto.Data != null && !userDto.Data.AddressInfos.IsNullOrEmpty())
+            {
+                return networkConfig.NetworkInfo.MinShowVersion.IsNullOrEmpty()
+                       || (VerifyHelper.VerifyMemoVersion(version, networkConfig.NetworkInfo.MinShowVersion)
+                           && (networkConfig.SupportWhiteList.IsNullOrEmpty() ||
+                               networkConfig.SupportWhiteList.Any(t => userDto.Data.AddressInfos.Exists(a =>
+                                   a.Address.ToLower() == t.ToLower()))));
 
+            }
         }
-
         return networkConfig.NetworkInfo.MinShowVersion.IsNullOrEmpty()
                || (VerifyHelper.VerifyMemoVersion(version, networkConfig.NetworkInfo.MinShowVersion)
                    && networkConfig.SupportWhiteList.IsNullOrEmpty());

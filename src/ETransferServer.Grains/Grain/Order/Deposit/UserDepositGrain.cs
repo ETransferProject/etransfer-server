@@ -38,8 +38,10 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
 
     private IUserDepositRecordGrain _recordGrain;
     private IOrderStatusFlowGrain _orderStatusFlowGrain;
+    private IOrderTxFlowGrain _orderTxFlowGrain;
     private IUserDepositTxTimerGrain _depositTxTimerGrain;
     private ISwapTxTimerGrain _swapTxTimerGrain;
+    private ISwapTxFastTimerGrain _swapTxFastTimerGrain;
     private IDepositOrderRetryTimerGrain _depositOrderRetryTimerGrain;
     private IOrderStatusReminderGrain _orderStatusReminderGrain;
     private ICoBoDepositQueryTimerGrain _depositQueryTimerGrain;
@@ -70,6 +72,7 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
 
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
+        _logger.LogInformation("StreamProvider deposit subscribe start, {Key}", this.GetPrimaryKey());
         await base.OnActivateAsync(cancellationToken);
 
         // subscribe stream
@@ -83,10 +86,14 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
         // other grain
         _recordGrain = GrainFactory.GetGrain<IUserDepositRecordGrain>(this.GetPrimaryKey());
         _orderStatusFlowGrain = GrainFactory.GetGrain<IOrderStatusFlowGrain>(this.GetPrimaryKey());
+        _orderTxFlowGrain = GrainFactory.GetGrain<IOrderTxFlowGrain>(this.GetPrimaryKey());
+        
         _depositTxTimerGrain =
             GrainFactory.GetGrain<IUserDepositTxTimerGrain>(GuidHelper.UniqGuid(nameof(IUserDepositTxTimerGrain)));
         _swapTxTimerGrain =
             GrainFactory.GetGrain<ISwapTxTimerGrain>(GuidHelper.UniqGuid(nameof(ISwapTxTimerGrain)));
+        _swapTxFastTimerGrain =
+            GrainFactory.GetGrain<ISwapTxFastTimerGrain>(GuidHelper.UniqGuid(nameof(ISwapTxFastTimerGrain)));
         _depositOrderRetryTimerGrain =
             GrainFactory.GetGrain<IDepositOrderRetryTimerGrain>(
                 GuidHelper.UniqGuid(nameof(IDepositOrderRetryTimerGrain)));

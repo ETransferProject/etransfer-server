@@ -3,6 +3,7 @@ using AutoMapper;
 using ETransferServer.Dtos.GraphQL;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Dtos.Token;
+using ETransferServer.Dtos.TokenAccess;
 using ETransferServer.Dtos.User;
 using ETransferServer.Etos.Order;
 using ETransferServer.Grains.Grain.Users;
@@ -35,6 +36,12 @@ public class ETransferServerGrainsAutoMapperProfile : Profile
 
         CreateMap<TokenState, TokenDto>().ReverseMap();
         CreateMap<TokenState, TokenInfo>().ReverseMap();
+        CreateMap<TokenOwnerRecordState, TokenOwnerListDto>().ReverseMap();
+        CreateMap<UserTokenOwnerState, TokenOwnerListDto>().ReverseMap();
+        CreateMap<UserTokenAccessInfoState, UserTokenAccessInfoDto>().ReverseMap();
+        CreateMap<UserTokenApplyOrderState, TokenApplyOrderDto>().ReverseMap();
+        CreateMap<TokenApplyOrderResultDto, TokenApplyOrderDto>().ReverseMap();
+        CreateMap<UserTokenIssueState, UserTokenIssueDto>().ReverseMap();
         CreateMap<TokenPoolState, TokenPoolDto>().ReverseMap();
 
         CreateMap<UserAddressDto, TokenDepositAddressState>().ReverseMap();
@@ -43,6 +50,7 @@ public class ETransferServerGrainsAutoMapperProfile : Profile
         CreateMap<CoBoCoinDetailDto, CoBoCoinDto>().ReverseMap();
         CreateMap<CoBoCoinState, CoBoCoinDto>().ReverseMap();
         CreateMap<CoBoCoinState, CoBoCoinDetailDto>().ReverseMap();
+        CreateMap<CoBoAccountState, AccountDetailDto>().ReverseMap();
         CreateMap<CoBoTransactionState, CoBoTransactionDto>().ReverseMap();
         CreateMap<SwapReserveState, ReserveDto>().ReverseMap().ForMember(
             destination => destination.SymbolIn,

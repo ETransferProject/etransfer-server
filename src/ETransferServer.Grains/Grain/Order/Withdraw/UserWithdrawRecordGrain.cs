@@ -63,20 +63,39 @@ public class UserWithdrawRecordGrain : Grain<WithdrawOrderState>, IUserWithdrawR
                 var netWorkInfo = _withdrawNetworkOptions.Value.NetworkInfos.FirstOrDefault(t =>
                     t.Coin.Equals(GuidHelper.GenerateId(orderDto.ToTransfer.Network,
                         orderDto.ToTransfer.Symbol), StringComparison.OrdinalIgnoreCase));
-
-                State.ArrivalTime = !IsBigAmountInAElf(orderDto).HasValue
-                    ? DateTime.UtcNow.AddSeconds(
-                            _chainOptions.Value.ChainInfos[orderDto.FromTransfer.ChainId].EstimatedArrivalTime)
-                        .AddSeconds(netWorkInfo.EstimatedArrivalTime).ToUtcMilliSeconds()
-                    : IsBigAmountInAElf(orderDto).Value
+                if (orderDto.FromTransfer.Network == CommonConstant.Network.AElf)
+                {
+                    State.ArrivalTime = !IsBigAmountInAElf(orderDto, orderDto.FromTransfer).HasValue
                         ? DateTime.UtcNow.AddSeconds(
-                                _chainOptions.Value.ChainInfos[orderDto.FromTransfer.ChainId]
-                                    .EstimatedArrivalFastUpperTime * 2)
-                            .ToUtcMilliSeconds()
-                        : DateTime.UtcNow.AddSeconds(
-                                _chainOptions.Value.ChainInfos[orderDto.FromTransfer.ChainId]
-                                    .EstimatedArrivalFastLowerTime * 2)
-                            .ToUtcMilliSeconds();
+                                _chainOptions.Value.ChainInfos[orderDto.FromTransfer.ChainId].EstimatedArrivalTime)
+                            .AddSeconds(netWorkInfo.EstimatedArrivalTime).ToUtcMilliSeconds()
+                        : IsBigAmountInAElf(orderDto, orderDto.FromTransfer).Value
+                            ? DateTime.UtcNow.AddSeconds(
+                                    _chainOptions.Value.ChainInfos[orderDto.FromTransfer.ChainId]
+                                        .EstimatedArrivalFastUpperTime * 2)
+                                .ToUtcMilliSeconds()
+                            : DateTime.UtcNow.AddSeconds(
+                                    _chainOptions.Value.ChainInfos[orderDto.FromTransfer.ChainId]
+                                        .EstimatedArrivalFastLowerTime * 2)
+                                .ToUtcMilliSeconds();
+                }
+                else
+                {
+                    var fromTime = _withdrawNetworkOptions.Value.NetworkInfos.FirstOrDefault(t =>
+                        t.Coin.Equals(GuidHelper.GenerateId(orderDto.FromTransfer.Network,
+                            orderDto.FromTransfer.Symbol), StringComparison.OrdinalIgnoreCase))?.EstimatedArrivalTime;
+                    var toTime = orderDto.ToTransfer.Network != CommonConstant.Network.AElf
+                        ? netWorkInfo?.EstimatedArrivalTime
+                        : !IsBigAmountInAElf(orderDto, orderDto.ToTransfer).HasValue
+                            ? _chainOptions.Value.ChainInfos[orderDto.ToTransfer.ChainId].EstimatedArrivalTime
+                            : IsBigAmountInAElf(orderDto, orderDto.ToTransfer).Value
+                                ? _chainOptions.Value.ChainInfos[orderDto.ToTransfer.ChainId]
+                                    .EstimatedArrivalFastUpperTime
+                                : _chainOptions.Value.ChainInfos[orderDto.ToTransfer.ChainId]
+                                    .EstimatedArrivalFastLowerTime;
+                    State.ArrivalTime = DateTime.UtcNow.AddSeconds(fromTime ?? 0).AddSeconds(toTime ?? 0)
+                        .ToUtcMilliSeconds();
+                }
             }
             if (orderDto.Status == OrderStatusEnum.Finish.ToString())
             {
@@ -135,17 +154,17 @@ public class UserWithdrawRecordGrain : Grain<WithdrawOrderState>, IUserWithdrawR
         return isAElf && (fromStatus || toStatus || finishStatus);
     }
 
-    private bool? IsBigAmountInAElf(WithdrawOrderDto orderDto)
+    private bool? IsBigAmountInAElf(WithdrawOrderDto orderDto, TransferInfo transfer)
     {
         try
         {
             if (orderDto.ToTransfer.Network != CommonConstant.Network.AElf) return null;
-            var symbol = orderDto.FromTransfer.Symbol;
+            var symbol = transfer.Symbol;
             var thresholdExists = _withdrawOptions.Value.Homogeneous.TryGetValue(symbol, out var threshold);
-            AssertHelper.IsTrue(thresholdExists, "Homogeneous symbol {} not found", symbol);
-            AssertHelper.NotNull(threshold, "Homogeneous threshold not fount, symbol:{}", symbol);
+            AssertHelper.IsTrue(thresholdExists, "Homogeneous symbol {symbol} not found", symbol);
+            AssertHelper.NotNull(threshold, "Homogeneous threshold not fount, symbol:{symbol}", symbol);
 
-            return orderDto.FromTransfer.Amount > threshold.AmountThreshold;
+            return transfer.Amount > threshold.AmountThreshold;
         }
         catch (UserFriendlyException e)
         {

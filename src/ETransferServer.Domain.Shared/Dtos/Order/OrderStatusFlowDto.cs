@@ -44,10 +44,17 @@ public static class ExtensionKey
     public const string RefundUser = "RefundUser";
     public const string RefundTime = "RefundTime";
     public const string SubStatus = "SubStatus";
+    public const string OrderType = "OrderType";
     
     public const string IsSwap = "IsSwap";
     public const string NeedSwap = "NeedSwap";
     public const string SwapStage = "SwapStage";
+    public const string SwapToMain = "SwapToMain";
+    public const string SwapFromAddress = "SwapFromAddress";
+    public const string SwapOriginFromAddress = "SwapOriginFromAddress";
+    public const string SwapToAddress = "SwapToAddress";
+    public const string SwapChainId = "SwapChainId";
+    public const string SwapTxId = "SwapTxId";
 }
 
 public static class SwapStage

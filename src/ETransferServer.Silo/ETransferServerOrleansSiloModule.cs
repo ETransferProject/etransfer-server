@@ -40,6 +40,7 @@ public class ETransferServerOrleansSiloModule : AbpModule
         Configure<SignatureServiceOption>(configuration.GetSection("SignatureService"));
         Configure<SyncStateServiceOption>(configuration.GetSection("SyncStateService"));
         Configure<TimerOptions>(configuration.GetSection("Timer"));
+        Configure<ETransferServer.Grains.Options.TokenAccessOptions>(configuration.GetSection("TokenAccess"));
         Configure<DepositOptions>(configuration.GetSection("Deposit"));
         Configure<WithdrawOptions>(configuration.GetSection("Withdraw"));
         Configure<DepositAddressOptions>(configuration.GetSection("DepositAddress"));

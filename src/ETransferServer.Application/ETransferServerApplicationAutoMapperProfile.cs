@@ -4,16 +4,22 @@ using ETransferServer.Dtos.Info;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Dtos.Reconciliation;
 using ETransferServer.Dtos.Token;
+using ETransferServer.Dtos.TokenAccess;
 using ETransferServer.Dtos.User;
 using ETransferServer.Entities;
 using ETransferServer.Etos.Order;
+using ETransferServer.Models;
 using ETransferServer.Orders;
 using ETransferServer.User.Dtos;
 using ETransferServer.Network.Dtos;
 using ETransferServer.Options;
 using ETransferServer.Users;
 using ETransferServer.Token.Dtos;
+using ETransferServer.TokenAccess;
 using ETransferServer.Tokens;
+using ETransferServer.Withdraw.Dtos;
+using ETransferServer.WithdrawOrder.Dtos;
+using TokenConfigDto = ETransferServer.Token.Dtos.TokenConfigDto;
 using TokenDto = ETransferServer.Dtos.User.TokenDto;
 
 namespace ETransferServer;
@@ -46,6 +52,15 @@ public class ETransferServerApplicationAutoMapperProfile : Profile
         CreateMap<TokenSwapConfig, TokenOptionConfigDto>().ReverseMap();
         CreateMap<ToTokenConfig, ToTokenOptionConfigDto>().ReverseMap();
         CreateMap<ToTokenConfig, TokenConfig>().ReverseMap();
+        
+        CreateMap<UserTokenAccessInfoIndex, UserTokenAccessInfoDto>().ReverseMap();
+        CreateMap<UserTokenAccessInfoInput, UserTokenAccessInfoDto>().ReverseMap();
+        CreateMap<UserTokenAccessInfoDto, UserTokenAccessInfoIndex>().ReverseMap();
+        CreateMap<TokenApplyOrderIndex, TokenApplyOrderDto>().ReverseMap();
+        CreateMap<TokenApplyOrderIndex, TokenApplyOrderResultDto>().ReverseMap();
+        CreateMap<TokenApplyOrderResultDto, TokenApplyOrderDto>().ReverseMap();
+        CreateMap<ChainAccessInfo, ChainTokenInfoDto>().ReverseMap();
+        CreateMap<ChainTokenInfoDto, ChainTokenInfo>().ReverseMap();
         CreateMap<NetworkInfo, NetworkDto>()
             .ForMember(des => des.MultiConfirmTime, opt =>
                 opt.MapFrom(src => TimeHelper.SecondsToMinute((int)src.MultiConfirmSeconds)))
@@ -53,5 +68,25 @@ public class ETransferServerApplicationAutoMapperProfile : Profile
         CreateMap<NetworkInfo, NetworkOptionDto>().ReverseMap();
         CreateMap<OrderStatusFlowDto, OrderStatusFlow>().ReverseMap();
         CreateMap<OrderChangeEto, OrderIndex>().ReverseMap();
+        CreateMap<WithdrawInfoDto, TransferDetailInfoDto>().ReverseMap();
+        CreateMap<GetTransferListRequestDto, GetWithdrawListRequestDto>().ForMember(
+                destination => destination.ChainId,
+                opt => opt.MapFrom(source => source.FromNetwork))
+            .ForMember(
+                destination => destination.Network,
+                opt => opt.MapFrom(source => source.ToNetwork))
+            .ForMember(
+                destination => destination.Address,
+                opt => opt.MapFrom(source => source.ToAddress));
+        CreateMap<CreateWithdrawOrderDto, CreateTransferOrderDto>().ReverseMap();
+        CreateMap<GetTransferOrderRequestDto, GetWithdrawOrderRequestDto>().ForMember(
+                destination => destination.FromChainId,
+                opt => opt.MapFrom(source => source.FromNetwork))
+            .ForMember(
+                destination => destination.Network,
+                opt => opt.MapFrom(source => source.ToNetwork))
+            .ForMember(
+                destination => destination.Symbol,
+                opt => opt.MapFrom(source => source.FromSymbol));
     }
 }

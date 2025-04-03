@@ -8,9 +8,11 @@ using ETransferServer.Common.ChainsClient;
 using ETransferServer.Dtos.GraphQL;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Dtos.Token;
+using ETransferServer.Grains.Grain.Order;
 using ETransferServer.Grains.Grain.Order.Deposit;
 using ETransferServer.Grains.Grain.Token;
 using ETransferServer.Grains.Options;
+using ETransferServer.Grains.State.Order;
 using ETransferServer.Grains.State.Swap;
 using ETransferServer.Options;
 using Google.Protobuf;
@@ -69,11 +71,10 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
                 DepositOrder = dto
             }
         };
-
+        var toTransfer = dto.ToTransfer;
+        var fromTransfer = dto.FromTransfer;
         try
         {
-            var toTransfer = dto.ToTransfer;
-            var fromTransfer = dto.FromTransfer;
             var pairSymbol = GeneratePairSymbol(fromTransfer.Symbol, toTransfer.Symbol);
             _logger.LogInformation("Start to swap {pairSymbol}", pairSymbol);
             var res = _swapInfosOptions.PairInfos.TryGetValue(pairSymbol, out var swapInfo);
@@ -85,13 +86,14 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
                 return result;
             }
 
+            var newTxId = string.Empty;
             Transaction rawTransaction;
             if (dto.FromRawTransaction.IsNullOrEmpty())
             {
                 State.ToChainId = dto.ToTransfer.ChainId;
                 State.SymbolIn = dto.FromTransfer.Symbol;
                 State.SymbolOut = dto.ToTransfer.Symbol;
-                State.AmountIn = dto.FromTransfer.Amount;
+                State.AmountIn = dto.ToTransfer.Amount;
                 await WriteStateAsync();
                 long timestamp = 0;
                 _logger.LogInformation("New swap transaction will struct.{grainId}", this.GetPrimaryKey().ToString());
@@ -132,25 +134,48 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
                     _chainOptions.ChainInfos[toTransfer.ChainId].ReleaseAccount,
                     CommonConstant.ETransferTokenPoolContractName, CommonConstant.ETransferSwapToken, swapInput);
 
-                toTransfer.TxId = txId.ToHex();
+                newTxId = txId.ToHex();
                 rawTransaction = newTransaction;
-                dto.FromRawTransaction = newTransaction.ToByteArray().ToHex();
             }
             else
             {
                 rawTransaction = Transaction.Parser.ParseFrom(ByteStringHelper.FromHexString(dto.FromRawTransaction));
             }
 
-            toTransfer.TxTime = DateTime.UtcNow.ToUtcMilliSeconds();
             toTransfer.Status = OrderTransferStatusEnum.Transferring.ToString();
-
             dto.Status = OrderStatusEnum.ToTransferring.ToString();
 
+            // check
+            var txFlowGrain = GrainFactory.GetGrain<IOrderTxFlowGrain>(dto.Id);
+            if (!await txFlowGrain.Check(dto.ToTransfer.ChainId))
+            {
+                _logger.LogInformation("Swap send transaction intercept hit: {OrderId}, {ChainId}",
+                    dto.Id, dto.ToTransfer.ChainId);
+                result.Data = new DepositOrderChangeDto
+                {
+                    DepositOrder = dto
+                };
+                return result;
+            }
+            
+            if (!newTxId.IsNullOrEmpty())
+            {
+                toTransfer.TxId = newTxId;
+                dto.FromRawTransaction = rawTransaction.ToByteArray().ToHex();
+            }
+            toTransfer.TxTime = DateTime.UtcNow.ToUtcMilliSeconds();
+            await txFlowGrain.AddOrUpdate(new OrderTxData
+            {
+                TxId = toTransfer.TxId,
+                ChainId = toTransfer.ChainId,
+                Status = ThirdPartOrderStatusEnum.Pending.ToString()
+            });
+            
             var recordGrain = GrainFactory.GetGrain<IUserDepositRecordGrain>(dto.Id);
             var response = await recordGrain.CreateOrUpdateAsync(dto);
             await _userDepositProvider.AddOrUpdateSync(response.Value);
             _logger.LogInformation("swap save grain, {orderId}", dto.Id);
-
+            
             // send 
             var (isSuccess, error) = await _contractProvider.SendTransactionAsync(toTransfer.ChainId, rawTransaction);
             AssertHelper.IsTrue(isSuccess, error);
@@ -168,6 +193,12 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
                 case CommonConstant.TransactionState.NodeValidationFailed:
                     toTransfer.Status = OrderTransferStatusEnum.Failed.ToString();
                     dto.Status = OrderStatusEnum.ToTransferFailed.ToString();
+                    await txFlowGrain.AddOrUpdate(new OrderTxData
+                    {
+                        TxId = toTransfer.TxId,
+                        ChainId = toTransfer.ChainId,
+                        Status = ThirdPartOrderStatusEnum.Fail.ToString()
+                    });
                     result.Success = false;
                     break;
                 default:
@@ -193,6 +224,13 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
 
             dto.ToTransfer.Status = OrderTransferStatusEnum.Failed.ToString();
             dto.Status = OrderStatusEnum.ToTransferFailed.ToString();
+            var txFlowGrain = GrainFactory.GetGrain<IOrderTxFlowGrain>(dto.Id);
+            await txFlowGrain.AddOrUpdate(new OrderTxData
+            {
+                TxId = toTransfer.TxId,
+                ChainId = toTransfer.ChainId,
+                Status = ThirdPartOrderStatusEnum.Fail.ToString()
+            });
             result.Data = new DepositOrderChangeDto
             {
                 DepositOrder = dto,
@@ -239,7 +277,7 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
         var result = new GrainResultDto();
         decimal amountsExpected = 0;
         // 1. get create time reserve
-        var fromAmount = fromTransfer.Amount;
+        var fromAmount = toTransfer.Amount;
         for (var i = 0; i < swapInfo.Path.Count - 1; i++)
         {
             var reserveResult = await GetOrderTimeReserveAsync(orderId, fromTransfer, swapInfo.Path[i],
@@ -350,7 +388,7 @@ public class SwapGrain : Grain<SwapState>, ISwapGrain
             toTransfer.ChainId,
             fromTransfer.Symbol, toTransfer.Symbol, swapInfo.Router));
         var (amountIn, amountOut, amountInActual, amountOutActual) =
-            await swapAmountsGrain.GetAmountsOut(fromTransfer.Amount, swapInfo.Path);
+            await swapAmountsGrain.GetAmountsOut(toTransfer.Amount, swapInfo.Path);
         State.AmountOutNow = amountOut;
         await WriteStateAsync();
         return (amountIn, amountOut, amountInActual, amountOutActual);

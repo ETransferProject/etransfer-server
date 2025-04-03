@@ -14,13 +14,13 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
-using Orleans;
 using Portkey.Contracts.CA;
 using ETransferServer.Auth.Dtos;
 using ETransferServer.Auth.Options;
 using ETransferServer.Common;
 using ETransferServer.Grains.Grain.Users;
 using ETransferServer.User.Dtos;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Volo.Abp.DistributedLocking;
 using Volo.Abp.Identity;
@@ -31,7 +31,7 @@ using SignInResult = Microsoft.AspNetCore.Mvc.SignInResult;
 
 namespace ETransferServer.Auth;
 
-public class SignatureGrantHandler : ITokenExtensionGrant
+public partial class SignatureGrantHandler : ITokenExtensionGrant
 {
     private ILogger<SignatureGrantHandler> _logger;
     private IAbpDistributedLock _distributedLock;
@@ -39,6 +39,7 @@ public class SignatureGrantHandler : ITokenExtensionGrant
     private IClusterClient _clusterClient;
     private IOptionsSnapshot<GraphQlOption> _graphQlOptions;
     private IOptionsSnapshot<ChainOptions> _chainOptions;
+    private IOptionsSnapshot<DidServerOptions> _didServerOptions;
     private IOptionsSnapshot<RecaptchaOptions> _recaptchaOptions;
     private HttpClient _httpClient;
     private readonly string _lockKeyPrefix = "ETransferServer:Auth:SignatureGrantHandler:";
@@ -48,20 +49,20 @@ public class SignatureGrantHandler : ITokenExtensionGrant
         var publicKeyVal = context.Request.GetParameter("pubkey").ToString();
         var signatureVal = context.Request.GetParameter("signature").ToString();
         var plainText = context.Request.GetParameter("plain_text").ToString();
-        var caHash = context.Request.GetParameter("ca_hash").ToString();
-        var chainId = context.Request.GetParameter("chain_id").ToString();
+        var caHash = context.Request.GetParameter("ca_hash")?.ToString();
+        var chainId = context.Request.GetParameter("chain_id")?.ToString();
         var scope = context.Request.GetParameter("scope").ToString();
         var version = context.Request.GetParameter("version")?.ToString();
         var source = context.Request.GetParameter("source").ToString();
-        var recaptchaToken = context.Request.GetParameter("recaptchaToken").ToString();
+        var sourceType = context.Request.GetParameter("sourceType")?.ToString();
+        var recaptchaToken = context.Request.GetParameter("recaptchaToken")?.ToString();
 
         _logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<SignatureGrantHandler>>();
         _logger.LogInformation(
-            "before publicKeyVal:{publicKeyVal}, signatureVal:{signatureVal}, plainText:{plainText}, caHash:{caHash}, chainId:{chainId}, version:{version}, source:{source}, recaptchaToken: {recaptchaToken}",
-            publicKeyVal, signatureVal, plainText, caHash, chainId, version, source, recaptchaToken);
+            "before publicKeyVal:{publicKeyVal}, signatureVal:{signatureVal}, plainText:{plainText}, caHash:{caHash}, chainId:{chainId}, version:{version}, source:{source}, sourceType:{sourceType}, recaptchaToken: {recaptchaToken}",
+            publicKeyVal, signatureVal, plainText, caHash, chainId, version, source, sourceType, recaptchaToken);
         
-        
-        var invalidParamResult = CheckParams(publicKeyVal, signatureVal, plainText, caHash, chainId, scope, version, source);
+        var invalidParamResult = CheckParams(publicKeyVal, signatureVal, plainText, caHash, chainId, scope, version, source, sourceType);
         if (invalidParamResult != null)
         {
             return invalidParamResult;
@@ -81,17 +82,10 @@ public class SignatureGrantHandler : ITokenExtensionGrant
         _logger.LogInformation("signature:{signature}", signature);
         var timestamp = long.Parse(nonce);
         _logger.LogInformation("timestamp:{timestamp}", timestamp);
-        var address = Address.FromPublicKey(publicKey).ToBase58();
-        _logger.LogInformation("address:{address}", address);
-
         var time = DateTime.UnixEpoch.AddMilliseconds(timestamp);
         _logger.LogInformation("time:{time}", time);
         var timeRangeConfig = context.HttpContext.RequestServices
             .GetRequiredService<IOptionsSnapshot<TimeRangeOption>>().Value;
-        _contractOptions = context.HttpContext.RequestServices.GetRequiredService<IOptionsSnapshot<ContractOptions>>();
-        _clusterClient = context.HttpContext.RequestServices.GetRequiredService<IClusterClient>();
-
-        _distributedLock = context.HttpContext.RequestServices.GetRequiredService<IAbpDistributedLock>();
 
         if (time < DateTime.UtcNow.AddMinutes(-timeRangeConfig.TimeRange) ||
             time > DateTime.UtcNow.AddMinutes(timeRangeConfig.TimeRange))
@@ -100,25 +94,33 @@ public class SignatureGrantHandler : ITokenExtensionGrant
                 $"The time should be {timeRangeConfig.TimeRange} minutes before and after the current time.");
         }
 
-        _logger.LogInformation("before Encoding.UTF8.GetBytes(plainText).ComputeHash()");
-        var hash = Encoding.UTF8.GetBytes(plainText).ComputeHash();
-        _logger.LogInformation("hash:{hash}", hash);
-        if (!AElf.Cryptography.CryptoHelper.VerifySignature(signature, hash, publicKey))
+        if (!await CheckSignature(source, sourceType, signature, plainText, publicKey))
         {
             return GetForbidResult(OpenIddictConstants.Errors.InvalidRequest, "Signature validation failed.");
         }
 
         //Find manager by caHash
+        _contractOptions = context.HttpContext.RequestServices.GetRequiredService<IOptionsSnapshot<ContractOptions>>();
+        _clusterClient = context.HttpContext.RequestServices.GetRequiredService<IClusterClient>();
+        _distributedLock = context.HttpContext.RequestServices.GetRequiredService<IAbpDistributedLock>();
         _graphQlOptions = context.HttpContext.RequestServices.GetRequiredService<IOptionsSnapshot<GraphQlOption>>();
         _chainOptions = context.HttpContext.RequestServices.GetRequiredService<IOptionsSnapshot<ChainOptions>>();
+        _didServerOptions = context.HttpContext.RequestServices.GetRequiredService<IOptionsSnapshot<DidServerOptions>>();
         _recaptchaOptions =
             context.HttpContext.RequestServices.GetRequiredService<IOptionsSnapshot<RecaptchaOptions>>();
         
         IdentityUser user = null;
-        
+        var address = string.Empty;
+        if (source == AuthConstant.PortKeySource || source == AuthConstant.NightElfSource)
+        {
+            address = Address.FromPublicKey(publicKey).ToBase58();
+            _logger.LogInformation("address:{address}", address);
+        }
+
         _logger.LogInformation("before create User, source: {source}", source);
         if (source == AuthConstant.PortKeySource)
         {
+            _httpClient = context.HttpContext.RequestServices.GetRequiredService<IHttpClientFactory>().CreateClient();
             var managerCheck = await CheckAddressAsync(chainId,
                 AuthConstant.PortKeyVersion2.Equals(version) ? _graphQlOptions.Value.Url2 : _graphQlOptions.Value.Url,
                 caHash, address, version, _chainOptions.Value);
@@ -169,7 +171,7 @@ public class SignatureGrantHandler : ITokenExtensionGrant
                 }
             }
         }
-        else
+        else if (source == AuthConstant.NightElfSource)
         {
             var userManager = context.HttpContext.RequestServices.GetRequiredService<IdentityUserManager>();
             user = await userManager.FindByNameAsync(address);
@@ -183,7 +185,7 @@ public class SignatureGrantHandler : ITokenExtensionGrant
                 }
                 
                 var userId = GuidHelper.UniqGuid(address);
-                var createUserResult = await CreateEoaUserAsync(userManager, userId, address);
+                var createUserResult = await CreateUserAsync(userManager, userId, address);
                 if (!createUserResult)
                 {
                     return GetForbidResult(OpenIddictConstants.Errors.ServerError, "Create user failed.");
@@ -216,6 +218,42 @@ public class SignatureGrantHandler : ITokenExtensionGrant
                         AddressInfos = addressInfos
                     });
                     _logger.LogInformation("save user success, userId:{userId}", user.Id.ToString());
+                }
+            }
+        }
+        else
+        {
+            var userManager = context.HttpContext.RequestServices.GetRequiredService<IdentityUserManager>();
+            address = Encoding.UTF8.GetString(publicKey);
+            var fullAddress = string.Concat(sourceType.ToLower(), CommonConstant.Underline, address);
+            user = await userManager.FindByNameAsync(fullAddress);
+            if (user == null)
+            {
+                _logger.LogInformation("check new wallet user data, address:{address}", fullAddress);
+                _httpClient = context.HttpContext.RequestServices.GetRequiredService<IHttpClientFactory>().CreateClient();
+                var valid = !recaptchaToken.IsNullOrEmpty() && await IsCaptchaValid(recaptchaToken);
+                if (!valid)
+                {
+                    return GetForbidResult(OpenIddictConstants.Errors.InvalidRequest, "RecaptchaToken validation failed.");
+                }
+                
+                var userId = GuidHelper.UniqGuid(fullAddress);
+                var createUserResult = await CreateUserAsync(userManager, userId, fullAddress, sourceType);
+                if (!createUserResult)
+                {
+                    return GetForbidResult(OpenIddictConstants.Errors.ServerError, "Create user failed.");
+                }
+
+                user = await userManager.GetByIdAsync(userId);
+            }
+            else
+            {
+                _logger.LogInformation("check wallet user data consistency, userId:{userId}", user.Id.ToString());
+                var userGrain = _clusterClient.GetGrain<IUserGrain>(user.Id);
+                var userInfo = await userGrain.GetUser();
+                if (!userInfo.Success)
+                {
+                    return GetForbidResult(OpenIddictConstants.Errors.ServerError, userInfo.Message);
                 }
             }
         }
@@ -280,10 +318,10 @@ public class SignatureGrantHandler : ITokenExtensionGrant
     }
 
     private ForbidResult CheckParams(string publicKeyVal, string signatureVal, string plainText, string caHash,
-        string chainId, string scope, string version, string source)
+        string chainId, string scope, string version, string source, string sourceType)
     {
         var errors = new List<string>();
-        if (string.IsNullOrWhiteSpace(source) || !(source == AuthConstant.PortKeySource || source == AuthConstant.NightElfSource))
+        if (string.IsNullOrWhiteSpace(source) || !(source == AuthConstant.PortKeySource || source == AuthConstant.NightElfSource || source == AuthConstant.WalletSource))
         {
             errors.Add("invalid parameter source.");
         }
@@ -311,6 +349,11 @@ public class SignatureGrantHandler : ITokenExtensionGrant
         {
             errors.Add("invalid parameter chain_id.");
         }
+        
+        if (source == AuthConstant.WalletSource && !Enum.TryParse<WalletEnum>(sourceType, true, out _))
+        {
+            errors.Add("invalid parameter sourceType.");
+        }
 
         if (string.IsNullOrWhiteSpace(scope))
         {
@@ -318,7 +361,8 @@ public class SignatureGrantHandler : ITokenExtensionGrant
         }
         
         if (!(string.IsNullOrWhiteSpace(version) || AuthConstant.PortKeyVersion.Equals(version) || 
-              AuthConstant.PortKeyVersion2.Equals(version)))
+              AuthConstant.PortKeyVersion2.Equals(version)) 
+            || (source == AuthConstant.WalletSource && !AuthConstant.PortKeyVersion2.Equals(version)))
         {
             errors.Add("invalid parameter version.");
         }
@@ -383,7 +427,7 @@ public class SignatureGrantHandler : ITokenExtensionGrant
         return result;
     }
     
-    private async Task<bool> CreateEoaUserAsync(IdentityUserManager userManager, Guid userId, string address)
+    private async Task<bool> CreateUserAsync(IdentityUserManager userManager, Guid userId, string address, string sourceType = null)
     {
         var result = false;
         await using var handle =
@@ -396,20 +440,33 @@ public class SignatureGrantHandler : ITokenExtensionGrant
 
             if (identityResult.Succeeded)
             {
-                _logger.LogInformation("save eoa user info into grain, userId:{userId}", userId.ToString());
+                _logger.LogInformation("save user info into grain, userId:{userId}", userId.ToString());
                 var grain = _clusterClient.GetGrain<IUserGrain>(userId);
 
-                var chainIds = _recaptchaOptions.Value.ChainIds;
-                _logger.LogInformation("_recaptchaOptions chainIds: {chainIds}", chainIds);
-                var addressInfos = chainIds.Select(chainId => new AddressInfo { ChainId = chainId, Address = address }).ToList();
-                
-                await grain.AddOrUpdateUser(new UserGrainDto()
+                List<AddressInfo> addressInfos;
+                if (sourceType.IsNullOrEmpty())
+                {
+                    var chainIds = _recaptchaOptions.Value.ChainIds;
+                    _logger.LogInformation("_recaptchaOptions chainIds: {chainIds}", chainIds);
+                    addressInfos = chainIds
+                        .Select(chainId => new AddressInfo { ChainId = chainId, Address = address }).ToList();
+                }
+                else
+                {
+                    addressInfos = new List<AddressInfo> { new() { Address = address } };
+                }
+
+                await grain.AddOrUpdateUser(new UserGrainDto
                 {
                     UserId = userId,
-                    AppId = AuthConstant.NightElfAppId,
+                    AppId = sourceType.IsNullOrEmpty() 
+                        ? AuthConstant.NightElfAppId 
+                        : Enum.TryParse<WalletEnum>(sourceType, true, out var w) 
+                            ? w.ToString() 
+                            : sourceType,
                     AddressInfos = addressInfos
                 });
-                _logger.LogInformation("create eoa user success, userId:{userId}", userId.ToString());
+                _logger.LogInformation("create user success, userId:{userId}", userId.ToString());
             }
 
             result = identityResult.Succeeded;
@@ -502,7 +559,13 @@ public class SignatureGrantHandler : ITokenExtensionGrant
         if (!graphQlResult.HasValue || !graphQlResult.Value)
         {
             _logger.LogDebug("graphql is invalid.");
-            return await CheckAddressFromContractAsync(chainId, caHash, manager, version, chainOptions);
+            var contractResult =  await CheckAddressFromContractAsync(chainId, caHash, manager, version, chainOptions);
+            if (!contractResult.HasValue || !contractResult.Value)
+            {
+                _logger.LogDebug("contract is invalid.");
+                return await CheckManagerFromCache(_didServerOptions.Value.CheckManagerUrl, manager, caHash);
+            }
+            return true;
         }
 
         return true;
@@ -530,6 +593,23 @@ public class SignatureGrantHandler : ITokenExtensionGrant
                 param, false, chainOptions);
 
         return output?.ManagerInfos?.Any(t => t.Address.ToBase58() == manager);
+    }
+    
+    private async Task<bool?> CheckManagerFromCache(string checkUrl, string manager, string caHash)
+    {
+        try
+        {
+            var url = $"{checkUrl}?manager={manager}";
+            var response = await _httpClient.GetAsync(url);
+            response.EnsureSuccessStatusCode();
+            var content = await response.Content.ReadAsStringAsync();
+            return !content.IsNullOrEmpty() && caHash.Equals(JsonConvert.DeserializeObject<ManagerCacheDto>(content)?.CaHash);
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "CheckManagerFromCache fail, caHash:{caHash}", caHash);
+            return false;
+        }
     }
 
     private async Task<T> CallTransactionAsync<T>(string chainId, string methodName, string version, IMessage param,

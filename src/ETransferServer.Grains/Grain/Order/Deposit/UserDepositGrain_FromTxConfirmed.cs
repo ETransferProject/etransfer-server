@@ -32,6 +32,7 @@ public partial class UserDepositGrain
     {
         try
         {
+            var newTxId = string.Empty;
             Transaction rawTransaction;
             var toTransfer = orderDto.ToTransfer;
 
@@ -57,9 +58,8 @@ public partial class UserDepositGrain
                     CommonConstant.ETransferTokenPoolContractName, CommonConstant.ETransferReleaseToken,
                     releaseTokenInput);
 
-                toTransfer.TxId = txId.ToHex();
+                newTxId = txId.ToHex();
                 rawTransaction = newTransaction;
-                orderDto.FromRawTransaction = newTransaction.ToByteArray().ToHex();
             }
             else
             {
@@ -67,11 +67,27 @@ public partial class UserDepositGrain
                     Transaction.Parser.ParseFrom(ByteStringHelper.FromHexString(orderDto.FromRawTransaction));
             }
 
-            toTransfer.TxTime = DateTime.UtcNow.ToUtcMilliSeconds();
             toTransfer.Status = OrderTransferStatusEnum.Transferring.ToString();
-
             orderDto.Status = OrderStatusEnum.ToTransferring.ToString();
 
+            // check
+            if (!await _orderTxFlowGrain.Check(orderDto.ToTransfer.ChainId))
+            {
+                _logger.LogInformation("Deposit send transaction intercept hit: {OrderId}, {ChainId}",
+                    orderDto.Id, orderDto.ToTransfer.ChainId);
+                return new DepositOrderChangeDto
+                {
+                    DepositOrder = orderDto
+                };
+            }
+
+            if (!newTxId.IsNullOrEmpty())
+            {
+                toTransfer.TxId = newTxId;
+                orderDto.FromRawTransaction = rawTransaction.ToByteArray().ToHex();
+            }
+            toTransfer.TxTime = DateTime.UtcNow.ToUtcMilliSeconds();
+            await SaveOrderTxFlowAsync(orderDto, ThirdPartOrderStatusEnum.Pending.ToString());
             await AddOrUpdateOrder(orderDto, ExtensionBuilder.New()
                 .Add(ExtensionKey.IsForward, Boolean.FalseString)
                 .Add(ExtensionKey.TransactionId, toTransfer.TxId)
@@ -140,10 +156,18 @@ public partial class UserDepositGrain
             _logger.LogInformation("ToStartSwapTx success, result: {result}", JsonConvert.SerializeObject(result));
             return result.Data;
         }
-
+        
+        // double check
+        if (!await _orderTxFlowGrain.Check(orderDto.ToTransfer.ChainId))
+        {
+            _logger.LogInformation("Swap double send transaction intercept hit: {OrderId}, {ChainId}",
+                orderDto.Id, orderDto.ToTransfer.ChainId);
+            return result.Data;
+        }
         _logger.LogInformation("ToStartSwapTx method validation or invocation failed, will call ToStartTransfer, result: {result}, order: {order}",
             JsonConvert.SerializeObject(result), JsonConvert.SerializeObject(orderDto));
 
+        await SaveOrderTxFlowAsync(orderDto, ThirdPartOrderStatusEnum.Fail.ToString());
         await DepositSwapFailureAlarmAsync(orderDto, SwapStage.SwapTxCheckFailAndToTransfer);
         
         orderDto.Status = OrderStatusEnum.ToStartTransfer.ToString();
@@ -155,6 +179,13 @@ public partial class UserDepositGrain
         orderDto.ExtensionInfo.AddOrReplace(ExtensionKey.NeedSwap, Boolean.FalseString);
         orderDto.ExtensionInfo.AddOrReplace(ExtensionKey.SwapStage, SwapStage.SwapTxCheckFailAndToTransfer);
         orderDto.ExtensionInfo.AddOrReplace(ExtensionKey.ToConfirmedNum, "0");
+        if (orderDto.ExtensionInfo.ContainsKey(ExtensionKey.SwapToMain) &&
+            orderDto.ExtensionInfo[ExtensionKey.SwapToMain].Equals(Boolean.TrueString))
+        {
+            orderDto.ToTransfer.FromAddress = orderDto.ExtensionInfo[ExtensionKey.SwapOriginFromAddress];
+            orderDto.ToTransfer.ToAddress = orderDto.ExtensionInfo[ExtensionKey.SwapToAddress];
+            orderDto.ToTransfer.ChainId = orderDto.ExtensionInfo[ExtensionKey.SwapChainId];
+        }
         
         _logger.LogInformation("Before calling the ToStartTransfer method, after resetting the properties of the order, order: {order}",
             JsonConvert.SerializeObject(orderDto));
@@ -166,6 +197,12 @@ public partial class UserDepositGrain
     {
         return orderDto.ExtensionInfo.ContainsKey(ExtensionKey.NeedSwap) &&
                orderDto.ExtensionInfo[ExtensionKey.NeedSwap].Equals(Boolean.TrueString);
+    }
+
+    private bool IsSwapToMain(DepositOrderDto orderDto)
+    {
+        return orderDto.ExtensionInfo.ContainsKey(ExtensionKey.SwapToMain) &&
+               orderDto.ExtensionInfo[ExtensionKey.SwapToMain].Equals(Boolean.TrueString);
     }
 
     private async Task DepositSwapFailureAlarmAsync(DepositOrderDto orderDto, string reason)

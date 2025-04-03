@@ -13,11 +13,20 @@ public class TimerOptions
         PeriodSeconds = 60,
         DelaySeconds = 60 * 10
     };
+    public TimerOption TransferOrderStatusReminder { get; set; } = new()
+    {
+        PeriodSeconds = 60,
+        DelaySeconds = 60 * 60 * 48
+    };
     public TimerOption DepositTimer { get; set; } = new();
+    public TimerOption SwapFastTimer { get; set; } = new(3);
     public TimerOption WithdrawFromTimer { get; set; } = new();
     public TimerOption WithdrawFromFastTimer { get; set; } = new(3);
     public TimerOption CoBoDepositQueryTimer { get; set; } = new(60);
     public TimerOption TokenAddressTimer { get; set; } = new();
+    public TimerOption TokenAddressRecycleTimer { get; set; } = new(60);
+    public TimerOption TokenIntegrateTimer { get; set; } = new(60, 60);
+    public TimerOption TokenLiquidityTimer { get; set; } = new(7200, 60);
     public TimerOption TokenPoolTimer { get; set; } = new(1800);
     public TimerOption WithdrawTimer { get; set; } = new();
     public TimerOption DepositRetryTimer { get; set; } = new();

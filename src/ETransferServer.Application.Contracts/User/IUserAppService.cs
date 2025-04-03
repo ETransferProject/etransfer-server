@@ -10,4 +10,5 @@ public interface IUserAppService
     Task<UserDto> GetUserByIdAsync(string userId);
     Task<UserDto> GetUserByAddressAsync(string address);
     Task<EoaRegistrationResult> CheckEoaRegistrationAsync(GetEoaRegistrationResultRequestDto requestDto);
+    Task<RegistrationResult> CheckRegistrationAsync(GetRegistrationResultRequestDto requestDto);
 }

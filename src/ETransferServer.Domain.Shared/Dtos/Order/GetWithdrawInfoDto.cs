@@ -1,5 +1,3 @@
-using Newtonsoft.Json;
-
 namespace ETransferServer.Withdraw.Dtos;
 
 public class GetWithdrawInfoDto

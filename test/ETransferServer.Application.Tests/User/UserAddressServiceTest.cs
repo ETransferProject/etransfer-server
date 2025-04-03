@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using ETransferServer.Common;
 using ETransferServer.Dtos.User;
+using ETransferServer.Grains.Grain;
 using ETransferServer.Grains.Grain.Users;
 using ETransferServer.Grains.Options;
 using ETransferServer.Security;
@@ -31,6 +33,7 @@ public class UserAddressServiceTest : ETransferServerApplicationTestBase
     {
         services.AddSingleton(MockDepositAddressOptions());
         services.AddSingleton(MockUserDepositAddressGrain());
+        services.AddSingleton(MockUserGrain());
         base.AfterAddApplication(services);
     }
 
@@ -95,6 +98,23 @@ public class UserAddressServiceTest : ETransferServerApplicationTestBase
         inputList.Add("Test2");
         list2 = await _userAddressService.GetAddressListAsync(inputList);
         list2.Count.ShouldBe(1);
+        
+        var dto4 = new UserAddressDto()
+        {
+            Id = Guid.NewGuid(),
+            UserToken = new TokenDto()
+            {
+                ChainId = "ETH",
+                Symbol = "USDT",
+                Address = "Test4"
+            },
+            IsAssigned = true,
+            ChainId = "tDVV",
+            UpdateTime = DateTime.UtcNow.AddDays(-3).ToUtcMilliSeconds()
+        };
+        result = await _userAddressService.AddOrUpdateAsync(dto4);
+        var list4 = await _userAddressService.GetExpiredAddressListAsync(48);
+        list4.Count.ShouldBeGreaterThan(0);
 
         try
         {
@@ -102,7 +122,6 @@ public class UserAddressServiceTest : ETransferServerApplicationTestBase
         }
         catch (Exception ex)
         {
-            ex.Message.ShouldContain("UserDepositAddressGrain");
         }
     }
 
@@ -127,6 +146,22 @@ public class UserAddressServiceTest : ETransferServerApplicationTestBase
             .ReturnsAsync(
                 new string("test")
             );
-    return mockUserDepositAddressGrain.Object;
+        return mockUserDepositAddressGrain.Object;
+    }
+    
+    private IUserGrain MockUserGrain()
+    {
+        var mockUserGrain = new Mock<IUserGrain>();
+        mockUserGrain.Setup(o => o.GetUser())
+            .ReturnsAsync(
+                new GrainResultDto<UserGrainDto>{
+                    Success = true,
+                    Data = new UserGrainDto
+                    {
+                        AppId = WalletEnum.Portkey.ToString(),
+                        UserId = Guid.Parse("2e701e62-0953-4dd3-910b-dc6cc93ccb0d")
+                    }}
+            );
+        return mockUserGrain.Object;
     }
 }

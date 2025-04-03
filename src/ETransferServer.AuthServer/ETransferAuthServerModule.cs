@@ -1,3 +1,4 @@
+using AElf.ExceptionHandler.ABP;
 using AElf.OpenTelemetry;
 using Localization.Resources.AbpUi;
 using Medallion.Threading;
@@ -45,7 +46,8 @@ namespace ETransferServer.Auth;
     typeof(AbpAspNetCoreSerilogModule),
     typeof(AbpEventBusRabbitMqModule),
     typeof(ETransferServerGrainsModule),
-    typeof(OpenTelemetryModule)
+    typeof(OpenTelemetryModule),
+    typeof(AOPExceptionModule)
 )]
 public class ETransferAuthServerModule : AbpModule
 {
@@ -96,6 +98,7 @@ public class ETransferAuthServerModule : AbpModule
 
         context.Services.Configure<GraphQlOption>(configuration.GetSection("GraphQL"));
         context.Services.Configure<ChainOptions>(configuration.GetSection("Chains"));
+        context.Services.Configure<DidServerOptions>(configuration.GetSection("DidServer"));
         context.Services.Configure<RecaptchaOptions>(configuration.GetSection("Recaptcha"));
         Configure<ContractOptions>(configuration.GetSection("Contract"));
         context.Services.Configure<TimeRangeOption>(option =>

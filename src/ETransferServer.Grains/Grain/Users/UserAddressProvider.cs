@@ -27,6 +27,11 @@ public class UserAddressProvider : IUserAddressProvider
         return await _userAddressService.GetAddressListAsync(addressList);
     }
 
+    public async Task<List<UserAddressDto>> GetExpiredAddressListAsync(int expiredHour)
+    {
+        return await _userAddressService.GetExpiredAddressListAsync(expiredHour);
+    }
+
     public async Task<bool> BulkAddSync(List<UserAddressDto> dto)
     {
         return await _userAddressService.BulkAddOrUpdateAsync(dto);

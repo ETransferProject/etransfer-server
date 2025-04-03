@@ -25,6 +25,7 @@ public class DepositOrderStatusReminderGrain : Orleans.Grain, IDepositOrderStatu
     private readonly ILogger<DepositOrderStatusReminderGrain> _logger;
     private readonly IReminderRegistry _reminderRegistry;
     private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
+    private readonly IOptionsSnapshot<DepositOptions> _depositOptions;
     private readonly IUserDepositProvider _userDepositProvider;
     private readonly Dictionary<string, INotifyProvider> _notifyProvider;
     private readonly Dictionary<string, int> _reminderCountMap = new();
@@ -33,12 +34,14 @@ public class DepositOrderStatusReminderGrain : Orleans.Grain, IDepositOrderStatu
     public DepositOrderStatusReminderGrain(IReminderRegistry reminderRegistry,
         ILogger<DepositOrderStatusReminderGrain> logger,
         IOptionsSnapshot<TimerOptions> timerOptions,
+        IOptionsSnapshot<DepositOptions> depositOptions,
         IUserDepositProvider userDepositProvider,
         IEnumerable<INotifyProvider> notifyProvider)
     {
         _reminderRegistry = reminderRegistry;
         _logger = logger;
         _timerOptions = timerOptions;
+        _depositOptions = depositOptions;
         _userDepositProvider = userDepositProvider;
         _notifyProvider = notifyProvider.ToDictionary(p => p.NotifyType().ToString());
     }
@@ -147,6 +150,15 @@ public class DepositOrderStatusReminderGrain : Orleans.Grain, IDepositOrderStatu
 
         var coBoDepositGrain = GrainFactory.GetGrain<ICoBoDepositGrain>(transactionId);
         var coBoTransaction = await coBoDepositGrain.Get();
+        if (_depositOptions.Value.AlarmWhiteLists.ContainsKey(coBoTransaction.Coin) &&
+            _depositOptions.Value.AlarmWhiteLists[coBoTransaction.Coin].ContainsKey(coBoTransaction.Address) &&
+            _depositOptions.Value.AlarmWhiteLists[coBoTransaction.Coin][coBoTransaction.Address]
+                .Contains(coBoTransaction.AbsAmount))
+        {
+            _logger.LogInformation("DepositOrderStatusReminderGrain hit whiteList, txId={txId}, {coin}, {address}", 
+                transactionId, coBoTransaction.Coin, coBoTransaction.Address);
+            return true;
+        }
 
         var notifyRequest = new NotifyRequest
         {
@@ -154,7 +166,7 @@ public class DepositOrderStatusReminderGrain : Orleans.Grain, IDepositOrderStatu
             Params = new Dictionary<string, string>
             {
                 [Keys.OrderType] = OrderTypeEnum.Deposit.ToString(),
-                [Keys.Message] = coBoTransaction == null
+                [Keys.Message] = coBoTransaction == null || coBoTransaction.Id == null
                     ? string.Empty
                     : JsonConvert.SerializeObject(coBoTransaction)
                         .Replace("\"", string.Empty)

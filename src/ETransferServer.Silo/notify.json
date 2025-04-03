@@ -112,6 +112,53 @@
             "Amount: {amount} Symbol: {symbol}\nToAddress: {toAddress}"
           ]
         }
+      },
+      "TransferCallbackAlarm": {
+        "FeiShuGroup": {
+          "WebhookUrl": "",
+          "Secret": "",
+          "TitleTemplate": "orange",
+          "Title": "❗️ [test3] Transfer callback abnormal alert",
+          "Contents": [
+            "OrderType: {orderType}",
+            "OrderId: {orderId}\nFromNetwork: {fromNetwork}\nToNetwork: {toNetwork}",
+            "Amount: {amount} Symbol: {symbol}\nReason: {reason}"
+          ]
+        }
+      },
+      "TokenListingAlarm": {
+        "FeiShuGroup": {
+          "WebhookUrl": "",
+          "Secret": "",
+          "TitleTemplate": "orange",
+          "Title": "❗️ [test3] New Listing alert",
+          "Contents": [
+            "Token: {token}\nTokenContract: {tokenContract}\nChain: {chain}\nWebsite: {website}"
+          ]
+        }
+      },
+      "TokenIntegrateAlarm": {
+        "FeiShuGroup": {
+          "WebhookUrl": "",
+          "Secret": "",
+          "TitleTemplate": "orange",
+          "Title": "❗️ [test3] Cross-chain integration alert",
+          "Contents": [
+            "Token: {token}\nTokenContract: {tokenContract}\nChain: {chain}"
+          ]
+        }
+      },
+      "LiquidityInsufficientAlarm": {
+        "FeiShuGroup": {
+          "WebhookUrl": "",
+          "Secret": "",
+          "TitleTemplate": "orange",
+          "Title": "❗️ [test3] Liquidity Insufficient alert",
+          "Contents": [
+            "Token: {token}\nLiquidityInUsd: {liquidityInUsd}\nChain: {chain}",
+            "PersonName: {personName}\nTelegramHandler: {telegramHandler}\nEmail: {email}"
+          ]
+        }
       }
     }
   }

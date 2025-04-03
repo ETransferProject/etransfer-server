@@ -4,6 +4,7 @@ using ETransferServer.Common;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Etos.Order;
 using ETransferServer.Grains.Grain.TokenLimit;
+using ETransferServer.Grains.Grain.Users;
 using ETransferServer.Grains.State.Order;
 using NBitcoin;
 
@@ -74,10 +75,12 @@ public partial class UserWithdrawGrain
             case OrderStatusEnum.ToTransferConfirmed:
                 orderDto.Status = OrderStatusEnum.Finish.ToString();
                 await AddOrUpdateOrder(orderDto);
+                await SaveOrderTxFlowAsync(orderDto);
                 break;
             case OrderStatusEnum.ToTransferFailed:
                 _logger.LogError("Order {Id} ToTransferFailed, invalid status, current status={Status}",
                     this.GetPrimaryKey(), status.ToString());
+                await SaveOrderTxFlowAsync(orderDto);
                 await AddToRetryTx(orderDto);
                 break;
             
@@ -87,6 +90,8 @@ public partial class UserWithdrawGrain
                     status.ToString());
                 await HandleWithdrawQueryGrain(orderDto.FromTransfer.TxId);
                 await ChangeOperationStatus(orderDto);
+                await SaveOrderTxFlowAsync(orderDto);
+                await RecycleAddressAsync(orderDto);
                 await _bus.Publish(_objectMapper.Map<WithdrawOrderDto, OrderChangeEto>(orderDto));
                 break;
             case OrderStatusEnum.Expired:
@@ -96,6 +101,8 @@ public partial class UserWithdrawGrain
                 await ReverseTokenLimitAsync(orderDto.Id, orderDto.ToTransfer.Symbol, orderDto.AmountUsd);
                 await HandleWithdrawQueryGrain(orderDto.FromTransfer.TxId);
                 await ChangeOperationStatus(orderDto, false);
+                await SaveOrderTxFlowAsync(orderDto);
+                await RecycleAddressAsync(orderDto);
                 await _bus.Publish(_objectMapper.Map<WithdrawOrderDto, OrderChangeEto>(orderDto));
                 break;
 
@@ -114,12 +121,34 @@ public partial class UserWithdrawGrain
         return Task.CompletedTask;
     }
 
-    public Task OnErrorAsync(Exception ex)
+    public async Task OnErrorAsync(Exception ex)
     {
         _logger.LogError(ex, "withdraw order {Id} stream OnError", this.GetPrimaryKey());
-        return Task.CompletedTask;
+        await HandlerWithdrawErrorAsync();
     }
-    
+
+    private async Task HandlerWithdrawErrorAsync()
+    {
+        var callGrain = GrainFactory.GetGrain<IWithdrawOrderCallGrain>(this.GetPrimaryKey());
+        if (!await callGrain.AddRetry()) return;
+        var order = await _recordGrain.Get();
+        if (order?.Value == null) return;
+        var status = await callGrain.AddOrGet();
+        if (status >= 1 && status <= 2)
+        {
+            await callGrain.AddToRequest(order.Value);
+        }
+        else if (status >= 3 && status <= 4)
+        {
+            order.Value.Status = OrderStatusEnum.ToTransferring.ToString();
+            await AddOrUpdateOrder(order.Value);
+        }
+        else if (status > 4)
+        {
+            await callGrain.AddToQuery(order.Value);
+        }
+    }
+
     private async Task WithdrawLargeAmountAlarmAsync(WithdrawOrderDto orderDto)
     {
         var withdrawOrderMonitorGrain = GrainFactory.GetGrain<IWithdrawOrderMonitorGrain>(orderDto.Id.ToString());
@@ -135,7 +164,9 @@ public partial class UserWithdrawGrain
         }
         else
         {
-            await _withdrawTimerGrain.AddToRequest(orderDto);
+            var callGrain = GrainFactory.GetGrain<IWithdrawOrderCallGrain>(orderDto.Id);
+            await callGrain.AddOrGet(1);
+            await _withdrawCoboTimerGrain.AddToRequest(orderDto);
         }
     }
     
@@ -147,6 +178,8 @@ public partial class UserWithdrawGrain
         }
         else
         {
+            var callGrain = GrainFactory.GetGrain<IWithdrawOrderCallGrain>(orderDto.Id);
+            await callGrain.AddOrGet(5);
             await _withdrawTimerGrain.AddToQuery(orderDto);
         }
     }
@@ -221,7 +254,17 @@ public partial class UserWithdrawGrain
     private async Task ChangeOperationStatus(WithdrawOrderDto order, bool success = true)
     {
         order.ExtensionInfo ??= new Dictionary<string, string>();
-        if (!order.ExtensionInfo.ContainsKey(ExtensionKey.RelatedOrderId)) return;
+        if (!order.ExtensionInfo.ContainsKey(ExtensionKey.RelatedOrderId))
+        {
+            {
+                if (!order.ExtensionInfo.ContainsKey(ExtensionKey.SubStatus)) return;
+            
+                order.ExtensionInfo.AddOrReplace(ExtensionKey.SubStatus, success
+                    ? OrderOperationStatusEnum.ReleaseConfirmed.ToString()
+                    : OrderOperationStatusEnum.ReleaseFailed.ToString());
+                return;
+            }
+        }
 
         var recordGrain = GrainFactory.GetGrain<IUserWithdrawRecordGrain>(Guid.Parse(order.ExtensionInfo[ExtensionKey.RelatedOrderId]));
         var res = await recordGrain.Get();
@@ -236,6 +279,55 @@ public partial class UserWithdrawGrain
             await recordGrain.AddOrUpdate(orderRelated);
             await _userWithdrawProvider.AddOrUpdateSync(orderRelated);
         }
+    }
+    
+    private async Task SaveOrderTxFlowAsync(WithdrawOrderDto order, string status = null)
+    {
+        if (order.ToTransfer.TxId.IsNullOrEmpty()) return;
+        await _orderTxFlowGrain.AddOrUpdate(new OrderTxData
+        {
+            TxId = order.ToTransfer.TxId,
+            ChainId = order.ToTransfer.ChainId,
+            Status = !status.IsNullOrEmpty()
+                ? status
+                : order.Status == OrderStatusEnum.ToTransferConfirmed.ToString() ||
+                  order.Status == OrderStatusEnum.Finish.ToString()
+                    ? ThirdPartOrderStatusEnum.Success.ToString()
+                    : ThirdPartOrderStatusEnum.Fail.ToString()
+        });
+    }
+    
+    private async Task RecycleAddressAsync(WithdrawOrderDto order)
+    {
+        if (order.ExtensionInfo.IsNullOrEmpty() ||
+            !order.ExtensionInfo.ContainsKey(ExtensionKey.OrderType) ||
+            order.ExtensionInfo[ExtensionKey.OrderType] != OrderTypeEnum.Transfer.ToString())
+            return;
+
+        var addressKey = GuidHelper.GenerateId(order.FromTransfer.Network, order.FromTransfer.Symbol);
+        if (!_depositAddressOption.Value.TransferAddressLists.IsNullOrEmpty() &&
+            _depositAddressOption.Value.TransferAddressLists.ContainsKey(addressKey) &&
+            _depositAddressOption.Value.TransferAddressLists[addressKey]
+                .Contains(order.FromTransfer.ToAddress)) return;
+        
+        _logger.LogInformation("Address recycle: {orderId}, {address}", order.Id, order.FromTransfer.ToAddress);
+        var addressGrain = GrainFactory.GetGrain<IUserTokenDepositAddressGrain>(order.FromTransfer.ToAddress);
+        var userAddressDto = (await addressGrain.Get())?.Value;
+        if (userAddressDto == null) return;
+        if (userAddressDto.IsAssigned && userAddressDto.OrderId != order.Id.ToString())
+        {
+            _logger.LogInformation("Recycle address but assigned another, orderId:{orderId}", order.Id);
+            return;
+        }
+        
+        var addressLimitGrain = GrainFactory.GetGrain<ITokenAddressLimitGrain>(
+            GuidHelper.UniqGuid(nameof(ITokenAddressLimitGrain)));
+        await addressLimitGrain.Reverse();
+        userAddressDto.IsAssigned = false;
+        userAddressDto.OrderId = string.Empty;
+        userAddressDto.UpdateTime = DateTimeHelper.ToUnixTimeMilliseconds(DateTime.UtcNow);
+        await addressGrain.AddOrUpdate(userAddressDto);
+        await _userAddressProvider.UpdateSync(userAddressDto);
     }
 
     private async Task HandleWithdrawQueryGrain(string transactionId)

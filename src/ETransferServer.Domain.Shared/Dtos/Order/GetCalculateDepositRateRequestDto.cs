@@ -6,6 +6,7 @@ namespace ETransferServer.Models;
 
 public class GetCalculateDepositRateRequestDto : IValidatableObject
 {
+    public string? FromChainId { get; set; }
     public string ToChainId { get; set; }
     public string FromSymbol { get; set; }
     public string ToSymbol { get; set; }

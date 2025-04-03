@@ -13,8 +13,10 @@ using ETransferServer.Grains.Grain.Users;
 using ETransferServer.Network;
 using ETransferServer.Options;
 using ETransferServer.Orders;
+using ETransferServer.ThirdPart.CoBo.Dtos;
 using ETransferServer.User.Dtos;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Nest;
 using Orleans;
 using Volo.Abp;
@@ -35,6 +37,7 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
     private readonly IClusterClient _clusterClient;
     private readonly IObjectMapper _objectMapper;
     private readonly ILogger<OrderAppService> _logger;
+    private readonly IOptionsSnapshot<DepositInfoOptions> _depositInfoOptions;
     private readonly INetworkAppService _networkAppService;
 
     public OrderAppService(INESTRepository<OrderIndex, Guid> orderIndexRepository,
@@ -42,6 +45,7 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
         IClusterClient clusterClient,
         IObjectMapper objectMapper,
         ILogger<OrderAppService> logger,
+        IOptionsSnapshot<DepositInfoOptions> depositInfoOptions,
         INetworkAppService networkAppService)
     {
         _orderIndexRepository = orderIndexRepository;
@@ -49,6 +53,7 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
         _clusterClient = clusterClient;
         _objectMapper = objectMapper;
         _logger = logger;
+        _depositInfoOptions = depositInfoOptions;
         _networkAppService = networkAppService;
     }
 
@@ -57,11 +62,51 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
     public async Task<PagedResultDto<OrderIndexDto>> GetOrderRecordListAsync(GetOrderRecordRequestDto request)
     {
         var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
-        if (!userId.HasValue || userId == Guid.Empty) return new PagedResultDto<OrderIndexDto>();
+        if ((!userId.HasValue || userId == Guid.Empty) && request.AddressList.IsNullOrEmpty())
+            return new PagedResultDto<OrderIndexDto>();
 
         var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
-        mustQuery.Add(q => q.Term(i =>
-            i.Field(f => f.UserId).Value(userId.ToString())));
+        if (userId.HasValue && request.AddressList.IsNullOrEmpty())
+        {
+            mustQuery.Add(q => q.Term(i =>
+                i.Field(f => f.UserId).Value(userId.ToString())));
+        }
+        else if (userId.HasValue && !request.AddressList.IsNullOrEmpty())
+        {
+            mustQuery.Add(q =>
+            {
+                var queries = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+                queries.Add(s => s.Term(k =>
+                    k.Field(f => f.UserId).Value(userId.ToString())));
+                queries.Add(s => s.Terms(k =>
+                    k.Field(f => f.FromTransfer.FromAddress).Terms(request.AddressList)));
+                queries.Add(s => s.Terms(k =>
+                    k.Field(f => f.ToTransfer.ToAddress).Terms(request.AddressList)));
+                foreach (var address in request.AddressList)
+                {
+                    queries.Add(s => s.Match(k =>
+                        k.Field("extensionInfo.SwapToAddress").Query(address)));
+                }
+                return q.Bool(i => i.Should(queries));
+            });
+        }
+        else if (!request.AddressList.IsNullOrEmpty())
+        {
+            mustQuery.Add(q =>
+            {
+                var queries = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+                queries.Add(s => s.Terms(k =>
+                    k.Field(f => f.FromTransfer.FromAddress).Terms(request.AddressList)));
+                queries.Add(s => s.Terms(k =>
+                    k.Field(f => f.ToTransfer.ToAddress).Terms(request.AddressList)));
+                foreach (var address in request.AddressList)
+                {
+                    queries.Add(s => s.Match(k =>
+                        k.Field("extensionInfo.SwapToAddress").Query(address)));
+                }
+                return q.Bool(i => i.Should(queries));
+            });
+        }
 
         if (request.Type > 0)
         {
@@ -126,6 +171,7 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
             mustNotQuery.Add(q => q.Match(i =>
                 i.Field("extensionInfo.ToConfirmedNum").Query("0")));
         }
+        mustNotQuery.Add(GetFilterCondition(_depositInfoOptions.Value.AssignedAddressExpiredHour));
 
         QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery)
             .MustNot(mustNotQuery));
@@ -149,8 +195,19 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
         if (orderIndexDtoPageResult.Items.Any())
         {
             var maxCreateTime = orderIndexDtoPageResult.Items.Max(item => item.CreateTime);
-            var userOrderActionGrain = _clusterClient.GetGrain<IUserOrderActionGrain>(userId.ToString());
-            await userOrderActionGrain.AddOrUpdate(maxCreateTime);
+            if (userId.HasValue)
+            {
+                var userOrderActionGrain = _clusterClient.GetGrain<IUserOrderActionGrain>(userId.ToString());
+                await userOrderActionGrain.AddOrUpdate(maxCreateTime);
+            }
+            if (!request.AddressList.IsNullOrEmpty())
+            {
+                foreach (var address in request.AddressList)
+                {
+                    var userOrderActionGrain = _clusterClient.GetGrain<IUserOrderActionGrain>(address);
+                    await userOrderActionGrain.AddOrUpdate(maxCreateTime);
+                }
+            }
         }
         
         return orderIndexDtoPageResult;
@@ -160,19 +217,13 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
         MethodName = nameof(HandleGetDetailExceptionAsync))]
     public async Task<OrderDetailDto> GetOrderRecordDetailAsync(string id)
     {
-        var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
-        if (id.IsNullOrWhiteSpace() || !userId.HasValue || userId == Guid.Empty) return new OrderDetailDto();
-        return (await GetOrderDetailAsync(id, userId, false)).Item1;
+        if (id.IsNullOrWhiteSpace()) return new OrderDetailDto();
+        return (await GetOrderDetailAsync(id)).Item1;
     }
 
-    public async Task<Tuple<OrderDetailDto, OrderIndex>> GetOrderDetailAsync(string id, Guid? userId, bool includeAll = false)
+    public async Task<Tuple<OrderDetailDto, OrderIndex>> GetOrderDetailAsync(string id, bool includeAll = false)
     {
         var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
-        if (!includeAll)
-        {
-            mustQuery.Add(q => q.Term(i =>
-                i.Field(f => f.UserId).Value(userId.ToString())));
-        }
         mustQuery.Add(q => q.Term(i =>
             i.Field(f => f.Id).Value(id)));
             
@@ -182,28 +233,184 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
         return Tuple.Create(await GetOrderDetailDtoAsync(orderIndex, includeAll), orderIndex);
     }
 
+    public async Task<OrderIndexDto> GetTransferOrderAsync(CoBoTransactionDto coBoTransaction)
+    {
+        var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+        mustQuery.Add(q => q.Term(i =>
+            i.Field(f => f.OrderType).Value(OrderTypeEnum.Withdraw.ToString())));
+        mustQuery.Add(q => q.Match(i =>
+            i.Field("extensionInfo.OrderType").Query(OrderTypeEnum.Transfer.ToString())));
+        mustQuery.Add(q => q.Match(i =>
+            i.Field("extensionInfo.SubStatus").Query(OrderOperationStatusEnum.UserTransferRejected.ToString())));
+        mustQuery.Add(q => q.Bool(i => i.Should(
+            s => s.Term(w =>
+                w.Field(f => f.ThirdPartOrderId).Value(coBoTransaction.Id)),
+            s => s.Term(w =>
+                w.Field(f => f.FromTransfer.TxId).Value(coBoTransaction.TxId)))));
+        
+        QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) =>
+            f.Bool(b => b.Must(mustQuery));
+
+        var index = await _orderIndexRepository.GetAsync(Filter);
+        if (index != null) return _objectMapper.Map<OrderIndex, OrderIndexDto>(index);
+        
+        var coin = coBoTransaction.Coin.Split(CommonConstant.Underline);
+        if (coin.Length < 2) return null;
+        mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+        mustQuery.Add(q => q.Term(i =>
+            i.Field(f => f.OrderType).Value(OrderTypeEnum.Withdraw.ToString())));
+        mustQuery.Add(q => q.Match(i =>
+            i.Field("extensionInfo.OrderType").Query(OrderTypeEnum.Transfer.ToString())));
+        mustQuery.Add(q => q.Match(i =>
+            i.Field("extensionInfo.SubStatus").Query(OrderOperationStatusEnum.UserTransferRejected.ToString())));
+        mustQuery.Add(q => q.Term(i =>
+            i.Field(f => f.FromTransfer.FromAddress).Value(coBoTransaction.SourceAddress).CaseInsensitive()));
+        mustQuery.Add(q => q.Term(i =>
+            i.Field(f => f.FromTransfer.ToAddress).Value(coBoTransaction.Address).CaseInsensitive()));
+        mustQuery.Add(q => q.Term(i =>
+            i.Field(f => f.FromTransfer.Amount).Value(coBoTransaction.AbsAmount.SafeToDecimal())));
+        mustQuery.Add(q => q.Term(i =>
+            i.Field(f => f.FromTransfer.Network).Value(coin[0])));
+        mustQuery.Add(q => q.Term(i =>
+            i.Field(f => f.FromTransfer.Symbol).Value(coin[1])));
+
+        var mustNotQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+        mustNotQuery.Add(q => q.Exists(i => i.Field(t => t.ThirdPartOrderId)));
+
+        QueryContainer Filter2(QueryContainerDescriptor<OrderIndex> f) =>
+            f.Bool(b => b.Must(mustQuery).MustNot(mustNotQuery));
+        
+        var (count, list) = await _orderIndexRepository.GetSortListAsync(Filter2,
+            sortFunc: s => s.Descending(t => t.CreateTime),
+            limit: 1);
+        if (count == 0) return null;
+        return _objectMapper.Map<OrderIndex, OrderIndexDto>(list[0]);
+    }
+
+    public async Task<bool> CheckTransferOrderAsync(CoBoTransactionDto coBoTransaction, long time)
+    {
+        var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+        mustQuery.Add(q => q.Term(i =>
+            i.Field(f => f.OrderType).Value(OrderTypeEnum.Withdraw.ToString())));
+        mustQuery.Add(q => q.Match(i =>
+            i.Field("extensionInfo.OrderType").Query(OrderTypeEnum.Transfer.ToString())));
+        mustQuery.Add(q => q.Bool(i => i.Should(
+            s => s.Term(w =>
+                w.Field(f => f.ThirdPartOrderId).Value(coBoTransaction.Id)),
+            s => s.Term(w =>
+                w.Field(f => f.FromTransfer.TxId).Value(coBoTransaction.TxId)))));
+
+        QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) =>
+            f.Bool(b => b.Must(mustQuery));
+
+        var count = await _orderIndexRepository.CountAsync(Filter);
+        if (count.Count > 0) return true;
+        if (DateTime.UtcNow.ToUtcMilliSeconds() - time >= OrderOptions.SubMilliSeconds) return false;
+
+        var coin = coBoTransaction.Coin.Split(CommonConstant.Underline);
+        if (coin.Length < 2) return false;
+        mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+        mustQuery.Add(q => q.Term(i =>
+            i.Field(f => f.FromTransfer.FromAddress).Value(coBoTransaction.SourceAddress).CaseInsensitive()));
+        mustQuery.Add(q => q.Term(i =>
+            i.Field(f => f.FromTransfer.ToAddress).Value(coBoTransaction.Address).CaseInsensitive()));
+        mustQuery.Add(q => q.Term(i =>
+            i.Field(f => f.FromTransfer.Amount).Value(coBoTransaction.AbsAmount.SafeToDecimal())));
+        mustQuery.Add(q => q.Term(i =>
+            i.Field(f => f.FromTransfer.Network).Value(coin[0])));
+        mustQuery.Add(q => q.Term(i =>
+            i.Field(f => f.FromTransfer.Symbol).Value(coin[1])));
+        mustQuery.Add(q => q.Term(i =>
+            i.Field(f => f.OrderType).Value(OrderTypeEnum.Withdraw.ToString())));
+        mustQuery.Add(q => q.Match(i =>
+            i.Field("extensionInfo.OrderType").Query(OrderTypeEnum.Transfer.ToString())));
+        mustQuery.Add(q => q.Match(i =>
+            i.Field("extensionInfo.SubStatus").Query(OrderOperationStatusEnum.UserTransferRejected.ToString())));
+        mustQuery.Add(q => q.Range(i =>
+            i.Field(f => f.CreateTime).LessThan(time)));
+        mustQuery.Add(q => q.Range(i =>
+            i.Field(f => f.CreateTime).GreaterThan(time - OrderOptions.SubMilliSeconds)));
+
+        var mustNotQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+        mustNotQuery.Add(q => q.Exists(i => i.Field(t => t.ThirdPartOrderId)));
+
+        QueryContainer Filter2(QueryContainerDescriptor<OrderIndex> f) =>
+            f.Bool(b => b.Must(mustQuery).MustNot(mustNotQuery));
+        
+        count = await _orderIndexRepository.CountAsync(Filter2);
+        return count.Count > 0;
+    }
+
     [ExceptionHandler(typeof(Exception), TargetType = typeof(OrderAppService),
         MethodName = nameof(HandleGetUserListExceptionAsync))]
     public async Task<UserOrderDto> GetUserOrderRecordListAsync(GetUserOrderRecordRequestDto request, OrderChangeEto orderEto = null)
     {
         var userOrderDto = new UserOrderDto
         {
-            Address = request.Address
+            Address = request.Address,
+            AddressList = request.AddressList
         };
-        var preQuery = new List<Func<QueryContainerDescriptor<UserIndex>, QueryContainer>>();
-        preQuery.Add(q => q.Term(i => i.Field("addressInfos.address").Value(request.Address)));
-
-        QueryContainer PreFilter(QueryContainerDescriptor<UserIndex> f) => f.Bool(b => b.Must(preQuery));
-        var user = await _userIndexRepository.GetListAsync(PreFilter);
-        var userDto = ObjectMapper.Map<UserIndex, UserDto>(user.Item2.FirstOrDefault());
-        if (userDto == null || userDto.UserId == Guid.Empty)
+        UserDto userDto = null;
+        if (!request.Address.IsNullOrEmpty())
         {
-            return userOrderDto;
-        }
+            var preQuery = new List<Func<QueryContainerDescriptor<UserIndex>, QueryContainer>>();
+            preQuery.Add(q => q.Term(i => i.Field("addressInfos.address").Value(request.Address)));
 
+            QueryContainer PreFilter(QueryContainerDescriptor<UserIndex> f) => f.Bool(b => b.Must(preQuery));
+            var user = await _userIndexRepository.GetListAsync(PreFilter);
+            userDto = ObjectMapper.Map<UserIndex, UserDto>(user.Item2.FirstOrDefault());
+            if ((userDto == null || userDto.UserId == Guid.Empty) && request.AddressList.IsNullOrEmpty())
+            {
+                return userOrderDto;
+            }
+        }
+        
         var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
-        mustQuery.Add(q => q.Term(i =>
-            i.Field(f => f.UserId).Value(userDto.UserId.ToString())));
+        if (userDto != null && request.AddressList.IsNullOrEmpty())
+        {
+            mustQuery.Add(q => q.Term(i =>
+                i.Field(f => f.UserId).Value(userDto.UserId.ToString())));
+        }
+        else if (!request.AddressList.IsNullOrEmpty())
+        {
+            var addressList = request.AddressList.ConvertAll(t => t.Address).ToList();
+            if (userDto != null)
+            {
+                mustQuery.Add(q =>
+                {
+                    var queries = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+                    queries.Add(s => s.Term(k =>
+                        k.Field(f => f.UserId).Value(userDto.UserId.ToString())));
+                    queries.Add(s => s.Terms(k =>
+                        k.Field(f => f.FromTransfer.FromAddress).Terms(addressList)));
+                    queries.Add(s => s.Terms(k =>
+                        k.Field(f => f.ToTransfer.ToAddress).Terms(addressList)));
+                    foreach (var address in addressList)
+                    {
+                        queries.Add(s => s.Match(k =>
+                            k.Field("extensionInfo.SwapToAddress").Query(address)));
+                    }
+                    return q.Bool(i => i.Should(queries));
+                });
+            }
+            else
+            {
+                mustQuery.Add(q =>
+                {
+                    var queries = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+                    queries.Add(s => s.Terms(k =>
+                        k.Field(f => f.FromTransfer.FromAddress).Terms(addressList)));
+                    queries.Add(s => s.Terms(k =>
+                        k.Field(f => f.ToTransfer.ToAddress).Terms(addressList)));
+                    foreach (var address in addressList)
+                    {
+                        queries.Add(s => s.Match(k =>
+                            k.Field("extensionInfo.SwapToAddress").Query(address)));
+                    }
+                    return q.Bool(i => i.Should(queries));
+                });
+            }
+        }
 
         if (request.Time.HasValue && request.Time.Value > 0)
         {
@@ -218,7 +425,10 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
                     .AddDays(OrderOptions.ValidOrderMessageThreshold).ToUtcMilliSeconds())));
         }
 
-        QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery));
+        var mustNotQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+        mustNotQuery.Add(GetFilterCondition(_depositInfoOptions.Value.AssignedAddressExpiredHour));
+        QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery)
+            .MustNot(mustNotQuery));
 
         var (count, list) = await _orderIndexRepository.GetSortListAsync(Filter,
             sortFunc: s => s.Descending(t => t.CreateTime));
@@ -238,26 +448,84 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
 
     [ExceptionHandler(typeof(Exception), TargetType = typeof(OrderAppService),
         MethodName = nameof(HandleGetStatusExceptionAsync))]
-    public async Task<OrderStatusDto> GetOrderRecordStatusAsync()
+    public async Task<OrderStatusDto> GetOrderRecordStatusAsync(GetOrderRecordStatusRequestDto request)
     {
         var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
-        if (!userId.HasValue || userId == Guid.Empty)
+        if ((!userId.HasValue || userId == Guid.Empty) && request.AddressList.IsNullOrEmpty())
         {
             return new OrderStatusDto();
         }
 
-        var userOrderActionGrain = _clusterClient.GetGrain<IUserOrderActionGrain>(userId.ToString());
-        var lastModifyTime = await userOrderActionGrain.Get();
+        var lastModifyTime = 0L;
+        if (userId.HasValue)
+        {
+            var userOrderActionGrain = _clusterClient.GetGrain<IUserOrderActionGrain>(userId.ToString());
+            lastModifyTime = Math.Max(lastModifyTime, await userOrderActionGrain.Get());
+        }
+        if (!request.AddressList.IsNullOrEmpty())
+        {
+            foreach (var address in request.AddressList)
+            {
+                var userOrderActionGrain = _clusterClient.GetGrain<IUserOrderActionGrain>(address);
+                lastModifyTime = Math.Max(lastModifyTime, await userOrderActionGrain.Get());
+            }
+        }
 
         var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>
         {
-            q => q.Term(i => i.Field(f => f.UserId).Value(userId.ToString())),
             q => q.Range(i => i.Field(f => f.CreateTime).GreaterThan(lastModifyTime)),
             q => q.Range(i => i.Field(f => f.CreateTime).GreaterThan(DateTime.UtcNow.AddDays(OrderOptions.ValidOrderThreshold).ToUtcMilliSeconds())),
             q => q.Terms(i => i.Field(f => f.Status).Terms((IEnumerable<string>)OrderStatusHelper.GetProcessingList()))
         };
+        if (userId.HasValue && request.AddressList.IsNullOrEmpty())
+        {
+            mustQuery.Add(q => q.Term(i =>
+                i.Field(f => f.UserId).Value(userId.ToString())));
+        }
+        else if (userId.HasValue && !request.AddressList.IsNullOrEmpty())
+        {
+            mustQuery.Add(q =>
+            {
+                var queries = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+                queries.Add(s => s.Term(k =>
+                    k.Field(f => f.UserId).Value(userId.ToString())));
+                queries.Add(s => s.Terms(k =>
+                    k.Field(f => f.FromTransfer.FromAddress).Terms(request.AddressList)));
+                queries.Add(s => s.Terms(k =>
+                    k.Field(f => f.ToTransfer.ToAddress).Terms(request.AddressList)));
+                foreach (var address in request.AddressList)
+                {
+                    queries.Add(s => s.Match(k =>
+                        k.Field("extensionInfo.SwapToAddress").Query(address)));
+                }
+                return q.Bool(i => i.Should(queries));
+            });
+        }
+        else if (!request.AddressList.IsNullOrEmpty())
+        {
+            mustQuery.Add(q =>
+            {
+                var queries = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+                queries.Add(s => s.Terms(k =>
+                    k.Field(f => f.FromTransfer.FromAddress).Terms(request.AddressList)));
+                queries.Add(s => s.Terms(k =>
+                    k.Field(f => f.ToTransfer.ToAddress).Terms(request.AddressList)));
+                foreach (var address in request.AddressList)
+                {
+                    queries.Add(s => s.Match(k =>
+                        k.Field("extensionInfo.SwapToAddress").Query(address)));
+                }
+                return q.Bool(i => i.Should(queries));
+            });
+        }
 
-        QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery));
+        var mustNotQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
+        mustNotQuery.Add(q => q.Match(i =>
+            i.Field("extensionInfo.RefundTx").Query(ExtensionKey.RefundTx)));
+        mustNotQuery.Add(GetFilterCondition(_depositInfoOptions.Value.AssignedAddressExpiredHour));
+        
+        QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery)
+            .MustNot(mustNotQuery));
         
         var count = await _orderIndexRepository.CountAsync(Filter);
         
@@ -265,6 +533,34 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
         {
             Status = count.Count > 0
         };
+    }
+
+    private static Func<QueryContainerDescriptor<OrderIndex>, QueryContainer> GetFilterCondition(int expiredHour = 48)
+    {
+        QueryContainer query(QueryContainerDescriptor<OrderIndex> q) => q.Bool(i => i.Must(
+            s => s.Match(k =>
+                k.Field("extensionInfo.OrderType").Query(OrderTypeEnum.Transfer.ToString())),
+            p => p.Bool(j => j.Should(
+                s => s.Match(k =>
+                    k.Field("extensionInfo.SubStatus").Query(OrderOperationStatusEnum.UserTransferRejected.ToString())),
+                q => q.Bool(b => b.MustNot(
+                    s => s.Exists(k =>
+                        k.Field(f => f.FromTransfer.TxId)))),
+                q => q.Bool(b => b.Must(
+                    s => s.Range(k =>
+                        k.Field(f => f.CreateTime).LessThan(DateTime.UtcNow.AddHours(
+                            -1 * expiredHour).ToUtcMilliSeconds())),
+                    s => s.Exists(k =>
+                        k.Field(f => f.FromTransfer.TxId)),
+                    r => r.Bool(d => d.MustNot(
+                        s => s.Exists(k =>
+                            k.Field(f => f.ThirdPartOrderId)))),
+                    r => r.Bool(d => d.MustNot(
+                        s => s.Match(k =>
+                            k.Field("extensionInfo.SubStatus")
+                                .Query(OrderOperationStatusEnum.UserTransferRejected.ToString()))))))))));
+
+        return query;
     }
 
     private static Func<SortDescriptor<OrderIndex>, IPromise<IList<ISort>>> GetSorting(string sorting)
@@ -283,6 +579,10 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
                         result = s =>
                             s.Ascending(t => t.ArrivalTime);
                         break;
+                    case OrderOptions.CreateTime:
+                        result = s =>
+                            s.Ascending(t => t.CreateTime);
+                        break;
                 }
                 break;
             case 2:
@@ -293,6 +593,12 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
                             sortingArray[1] == OrderOptions.Asc || sortingArray[1] == OrderOptions.Ascend
                                 ? s.Ascending(t => t.ArrivalTime)
                                 : s.Descending(t => t.ArrivalTime);
+                        break;
+                    case OrderOptions.CreateTime:
+                        result = s =>
+                            sortingArray[1] == OrderOptions.Asc || sortingArray[1] == OrderOptions.Ascend
+                                ? s.Ascending(t => t.CreateTime)
+                                : s.Descending(t => t.CreateTime);
                         break;
                 }
                 break;
@@ -377,6 +683,21 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
             await _networkAppService.GetIconAsync(item.OrderType, ChainId.AELF, item.FromTransfer.Symbol);
         item.ToTransfer.Icon =
             await _networkAppService.GetIconAsync(item.OrderType, ChainId.AELF, item.FromTransfer.Symbol, item.ToTransfer.Symbol);
+        item.SecondOrderType = orderIndex != null && !orderIndex.ExtensionInfo.IsNullOrEmpty() &&
+                               orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.OrderType)
+            ? orderIndex.ExtensionInfo[ExtensionKey.OrderType]
+            : string.Empty;
+        if (!orderIndex.ExtensionInfo.IsNullOrEmpty() &&
+            orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.SwapToMain) &&
+            orderIndex.ExtensionInfo[ExtensionKey.SwapToMain].Equals(Boolean.TrueString))
+        {
+            item.ToTransfer.FromAddress = orderIndex.FromTransfer.Symbol == orderIndex.ToTransfer.Symbol
+                ? orderIndex.ExtensionInfo[ExtensionKey.SwapOriginFromAddress]
+                : orderIndex.ExtensionInfo[ExtensionKey.SwapFromAddress];
+            item.ToTransfer.ToAddress = orderIndex.ExtensionInfo[ExtensionKey.SwapToAddress];
+            item.ToTransfer.ChainId = orderIndex.ExtensionInfo[ExtensionKey.SwapChainId];
+        }
+
         return item;
     }
 
@@ -506,23 +827,29 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
         dto.Processing.Deposit =
             await GetUserDepositOrderInfoListAsync(itemList, OrderStatusResponseEnum.Processing, OrderTypeEnum.Deposit);
         dto.Processing.DepositCount = dto.Processing.Deposit.Count;
-        dto.Processing.Withdraw =
-            await GetUserWithdrawOrderInfoListAsync(itemList, OrderStatusResponseEnum.Processing, OrderTypeEnum.Withdraw);
-        dto.Processing.WithdrawCount = dto.Processing.Withdraw.Count;
+        dto.Processing.Transfer =
+            await GetUserTransferOrderInfoListAsync(itemList, OrderStatusResponseEnum.Processing, OrderTypeEnum.Withdraw);
+        dto.Processing.TransferCount = dto.Processing.Transfer.Count;
+        dto.Processing.Withdraw = dto.Processing.Transfer;
+        dto.Processing.WithdrawCount = dto.Processing.TransferCount;
 
         dto.Succeed.Deposit =
             await GetUserDepositOrderInfoListAsync(itemList, OrderStatusResponseEnum.Succeed, OrderTypeEnum.Deposit);
         dto.Succeed.DepositCount = dto.Succeed.Deposit.Count;
-        dto.Succeed.Withdraw =
-            await GetUserWithdrawOrderInfoListAsync(itemList, OrderStatusResponseEnum.Succeed, OrderTypeEnum.Withdraw);
-        dto.Succeed.WithdrawCount = dto.Succeed.Withdraw.Count;
+        dto.Succeed.Transfer =
+            await GetUserTransferOrderInfoListAsync(itemList, OrderStatusResponseEnum.Succeed, OrderTypeEnum.Withdraw);
+        dto.Succeed.TransferCount = dto.Succeed.Transfer.Count;
+        dto.Succeed.Withdraw = dto.Succeed.Transfer;
+        dto.Succeed.WithdrawCount = dto.Succeed.TransferCount;
 
         dto.Failed.Deposit =
             await GetUserDepositOrderInfoListAsync(itemList, OrderStatusResponseEnum.Failed, OrderTypeEnum.Deposit);
         dto.Failed.DepositCount = dto.Failed.Deposit.Count;
-        dto.Failed.Withdraw =
-            await GetUserWithdrawOrderInfoListAsync(itemList, OrderStatusResponseEnum.Failed, OrderTypeEnum.Withdraw);
-        dto.Failed.WithdrawCount = dto.Failed.Withdraw.Count;
+        dto.Failed.Transfer =
+            await GetUserTransferOrderInfoListAsync(itemList, OrderStatusResponseEnum.Failed, OrderTypeEnum.Withdraw);
+        dto.Failed.TransferCount = dto.Failed.Transfer.Count;
+        dto.Failed.Withdraw = dto.Failed.Transfer;
+        dto.Failed.WithdrawCount = dto.Failed.TransferCount;
 
         return dto;
     }
@@ -555,15 +882,15 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
         return result;
     }
     
-    private async Task<List<UserWithdrawOrderInfo>> GetUserWithdrawOrderInfoListAsync(List<OrderIndex> itemList,
+    private async Task<List<UserTransferOrderInfo>> GetUserTransferOrderInfoListAsync(List<OrderIndex> itemList,
         OrderStatusResponseEnum orderStatus, OrderTypeEnum orderType)
     {
-        var result = new List<UserWithdrawOrderInfo>();
+        var result = new List<UserTransferOrderInfo>();
         var recordList = await FilterOrderIndexListAsync(itemList, orderStatus, orderType);
         
         foreach (var item in recordList)
         {
-            var record = new UserWithdrawOrderInfo
+            var record = new UserTransferOrderInfo
             {
                 Id = item.Id.ToString(),
                 Symbol = item.ToTransfer.Symbol,
