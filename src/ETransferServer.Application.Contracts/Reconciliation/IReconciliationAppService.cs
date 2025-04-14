@@ -29,4 +29,10 @@ public interface IReconciliationAppService : IApplicationService
     Task<OrderOperationStatusDto> TransferReleaseTokenAsync(GetOrderSafeOperationDto request);
     Task<bool> AddOrUpdateTokenPoolAsync(TokenPoolDto dto);
     Task<Tuple<Dictionary<string, string>, Dictionary<string, string>>> GetFeeListAsync(bool includeAll);
+    Task<MultiPoolOverviewDto> GetMultiPoolOverviewAsync();
+    Task<bool> ResetMultiPoolThresholdAsync(GetMultiPoolRequestDto request);
+    Task<MultiPoolChangeListDto<MultiPoolChangeDto>> GetMultiPoolChangeListAsync(PagedAndSortedResultRequestDto request);
+    Task<TokenPoolOverviewDto> GetTokenPoolOverviewAsync();
+    Task<bool> ResetTokenPoolThresholdAsync(GetTokenPoolRequestDto request);
+    Task<TokenPoolChangeListDto<TokenPoolChangeDto>> GetTokenPoolChangeListAsync(PagedAndSortedResultRequestDto request);
 }

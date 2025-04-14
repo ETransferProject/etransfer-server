@@ -73,6 +73,17 @@ public static class StringHelper
         return bool.TryParse(s, out var result) ? result : defaultValue;
     }
     
+    public static string RemoveTrailingZeros(this string s)
+    {
+        if (string.IsNullOrEmpty(s)) return s;
+        if (s.Contains('.'))
+        {
+            s = Regex.Replace(s, @"(?<=\.\d*)0+$", "");
+            s = Regex.Replace(s, @"\.$", "");
+        }
+        return s;
+    }
+    
     /// replace all {param.key} in string
     public static string ReplaceWithDict(this string input, Dictionary<string, string> replacements, bool throwErrorIfNotFound = true, string defaultValue = "")
     {

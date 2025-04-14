@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -15,7 +16,9 @@ using ETransferServer.Dtos.Token;
 using ETransferServer.Grains.Grain.Order.Deposit;
 using ETransferServer.Grains.Grain.Order.Withdraw;
 using ETransferServer.Grains.Grain.Timers;
+using ETransferServer.Grains.Grain.Token;
 using ETransferServer.Grains.Grain.Users;
+using ETransferServer.Models;
 using ETransferServer.Network;
 using ETransferServer.Options;
 using ETransferServer.Order;
@@ -50,7 +53,9 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
     private readonly IOrderAppService _orderService;
     private readonly INetworkAppService _networkAppService;
     private readonly IdentityUserManager _userManager;
+    private readonly IOptionsSnapshot<TokenOptions> _tokenOptions;
     private readonly IOptionsSnapshot<StringEncryptionOptions> _stringEncryptionOptions;
+    private readonly Dictionary<string, string> MappingItems = new() { ["SGR-1"] = "SGR" };
 
     public ReconciliationAppService(INESTRepository<OrderIndex, Guid> orderIndexRepository,
         INESTRepository<TokenPoolIndex, Guid> tokenPoolIndexRepository,
@@ -61,6 +66,7 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         IOrderAppService orderService,
         INetworkAppService networkAppService,
         IdentityUserManager userManager,
+        IOptionsSnapshot<TokenOptions> tokenOptions,
         IOptionsSnapshot<StringEncryptionOptions> stringEncryptionOptions)
     {
         _orderIndexRepository = orderIndexRepository;
@@ -72,6 +78,7 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         _orderService = orderService;
         _networkAppService = networkAppService;
         _userManager = userManager;
+        _tokenOptions = tokenOptions;
         _stringEncryptionOptions = stringEncryptionOptions;
     }
 
@@ -696,8 +703,268 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
     public async Task<Tuple<Dictionary<string, string>, Dictionary<string, string>>> GetFeeListAsync(bool includeAll)
     {
         var thirdPartFee = await QueryThirdPartFeeSumAggAsync(includeAll, 0);
-        var aelfFee = await QueryThirdPartFeeSumAggAsync(includeAll, 1);
+        var aelfFee = await QueryAELfFeeSumAggAsync(includeAll, 1);
         return Tuple.Create(thirdPartFee, aelfFee);
+    }
+
+    public async Task<MultiPoolOverviewDto> GetMultiPoolOverviewAsync()
+    {
+        var result = new MultiPoolOverviewDto();
+
+        var tokenPoolGrain = _clusterClient.GetGrain<ITokenPoolGrain>(ITokenPoolGrain.GenerateGrainId());
+        var tokenPoolDto = await tokenPoolGrain.Get();
+        if (tokenPoolDto == null)
+        {
+            tokenPoolGrain = _clusterClient.GetGrain<ITokenPoolGrain>(
+                ITokenPoolGrain.GenerateGrainId(DateTime.UtcNow.AddDays(-1).Date.ToUtcMilliSeconds()));
+            tokenPoolDto = await tokenPoolGrain.Get();
+        }
+        var tokenPoolThresholdGrain = _clusterClient.GetGrain<ITokenPoolGrain>(
+            DateTime.MinValue.Date.ToUtcString(TimeHelper.DatePattern));
+        var tokenPoolThresholdDto = await tokenPoolThresholdGrain.Get();
+        
+        var symbolList = _tokenOptions.Value.Transfer.Select(t => t.Symbol).ToList();
+        foreach (var item in symbolList)
+        {
+            var symbol = MappingItems.ContainsKey(item) ? MappingItems[item] : item;
+            if (!result.MultiPool.ContainsKey("Total"))
+                result.MultiPool.Add("Total", new List<PoolOverviewDto>());
+            result.MultiPool["Total"].Add(new PoolOverviewDto
+            {
+                Symbol = item,
+                CurrentAmount = tokenPoolDto != null && tokenPoolDto.MultiPool.ContainsKey(symbol)
+                    ? tokenPoolDto.MultiPool[symbol]
+                    : "0",
+                ThresholdAmount = CalculateThresholdTotal(tokenPoolThresholdDto.MultiPool, symbol).ToString()
+            });
+        }
+
+        var networkList = await _networkAppService.GetNetworkTokenListAsync(new GetNetworkTokenListRequestDto());
+        foreach (var kv in networkList)
+        {
+            if (kv.Key == ChainId.AELF || kv.Key == ChainId.tDVV || kv.Key == ChainId.tDVW) continue;
+
+            foreach (var key in kv.Value.Keys)
+            {
+                var network = MappingItems.ContainsKey(kv.Key) ? MappingItems[kv.Key] : kv.Key;
+                var symbol = MappingItems.ContainsKey(key) ? MappingItems[key] : key;
+                var tpKey = string.Join(CommonConstant.Underline, network, symbol);
+                if (!result.MultiPool.ContainsKey(kv.Key))
+                    result.MultiPool.Add(kv.Key, new List<PoolOverviewDto>());
+                result.MultiPool[kv.Key].Add(new PoolOverviewDto
+                {
+                    Symbol = key,
+                    CurrentAmount = tokenPoolDto != null && tokenPoolDto.MultiPool.ContainsKey(tpKey)
+                        ? tokenPoolDto.MultiPool[tpKey]
+                        : "0",
+                    ThresholdAmount = tokenPoolThresholdDto != null &&
+                                      tokenPoolThresholdDto.MultiPool.ContainsKey(tpKey)
+                        ? tokenPoolThresholdDto.MultiPool[tpKey]
+                        : "0",
+                });
+            }
+        }
+
+        return result;
+    }
+
+    public async Task<bool> ResetMultiPoolThresholdAsync(GetMultiPoolRequestDto request)
+    {
+        if (request.Network.IsNullOrWhiteSpace() || request.Symbol.IsNullOrWhiteSpace() ||
+            !decimal.TryParse(request.ResetAmount, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+            return false;
+        var tokenList = await _networkAppService.GetNetworkTokenListAsync(new GetNetworkTokenListRequestDto());
+        if (!tokenList.ContainsKey(request.Network) || !tokenList[request.Network].ContainsKey(request.Symbol))
+            return false;
+        if (request.Network == ChainId.AELF || request.Network == ChainId.tDVV || request.Network == ChainId.tDVW)
+            return false;
+        
+        var tokenPoolThresholdGrain = _clusterClient.GetGrain<ITokenPoolGrain>(
+            DateTime.MinValue.Date.ToUtcString(TimeHelper.DatePattern));
+        var dto = await tokenPoolThresholdGrain.Get();
+        if (dto == null) dto = new TokenPoolDto();
+        var network = MappingItems.ContainsKey(request.Network) ? MappingItems[request.Network] : request.Network;
+        var symbol = MappingItems.ContainsKey(request.Symbol) ? MappingItems[request.Symbol] : request.Symbol;
+        var coin = string.Join(CommonConstant.Underline, network, symbol);
+        dto.MultiPool.AddOrReplace(coin, request.ResetAmount);
+        await tokenPoolThresholdGrain.AddOrUpdate(dto);
+        return true;
+    }
+    
+    public async Task<MultiPoolChangeListDto<MultiPoolChangeDto>> GetMultiPoolChangeListAsync(PagedAndSortedResultRequestDto request)
+    {
+        var dto = new Dictionary<string, List<MultiPoolChangeDto>>();
+
+        var (count, list) = await GetPoolChangeListAsync(request);
+        var symbolList = _tokenOptions.Value.Transfer.Select(t => t.Symbol).ToList();
+        var networkList = await _networkAppService.GetNetworkTokenListAsync(new GetNetworkTokenListRequestDto());
+        foreach (var changeItem in list)
+        {
+            foreach (var item in symbolList)
+            {
+                var symbol = MappingItems.ContainsKey(item) ? MappingItems[item] : item;
+                if(!dto.ContainsKey(changeItem.Date)) dto.Add(changeItem.Date, new List<MultiPoolChangeDto>());
+                dto[changeItem.Date].Add(new MultiPoolChangeDto
+                {
+                    Symbol = item,
+                    Network = string.Empty,
+                    ChangeAmount = changeItem.MultiPool != null && changeItem.MultiPool.ContainsKey(symbol)
+                        ? changeItem.MultiPool[symbol].RemoveTrailingZeros()
+                        : "0",
+                });
+            }
+            foreach (var kv in networkList)
+            {
+                if (kv.Key == ChainId.AELF || kv.Key == ChainId.tDVV || kv.Key == ChainId.tDVW) continue;
+                
+                foreach (var key in kv.Value.Keys)
+                {
+                    var network = MappingItems.ContainsKey(kv.Key) ? MappingItems[kv.Key] : kv.Key;
+                    var symbol = MappingItems.ContainsKey(key) ? MappingItems[key] : key;
+                    var tpKey = string.Join(CommonConstant.Underline, network, symbol);
+                    dto[changeItem.Date].Add(new MultiPoolChangeDto
+                    {
+                        Symbol = key,
+                        Network = kv.Key,
+                        ChangeAmount = changeItem.MultiPool != null && changeItem.MultiPool.ContainsKey(tpKey)
+                            ? changeItem.MultiPool[tpKey].RemoveTrailingZeros()
+                            : "0"
+                    });
+                }
+            }
+        }
+        
+        return new MultiPoolChangeListDto<MultiPoolChangeDto>
+        {
+            TotalCount = count,
+            MultiPool = dto
+        };
+    }
+    
+    public async Task<TokenPoolOverviewDto> GetTokenPoolOverviewAsync()
+    {
+        var result = new TokenPoolOverviewDto();
+
+        var tokenPoolGrain = _clusterClient.GetGrain<ITokenPoolGrain>(ITokenPoolGrain.GenerateGrainId());
+        var tokenPoolDto = await tokenPoolGrain.Get();
+        if (tokenPoolDto == null)
+        {
+            tokenPoolGrain = _clusterClient.GetGrain<ITokenPoolGrain>(
+                ITokenPoolGrain.GenerateGrainId(DateTime.UtcNow.AddDays(-1).Date.ToUtcMilliSeconds()));
+            tokenPoolDto = await tokenPoolGrain.Get();
+        }
+        var tokenPoolThresholdGrain = _clusterClient.GetGrain<ITokenPoolGrain>(
+            DateTime.MinValue.Date.ToUtcString(TimeHelper.DatePattern));
+        var tokenPoolThresholdDto = await tokenPoolThresholdGrain.Get();
+        
+        var symbolList = _tokenOptions.Value.Transfer.Select(t => t.Symbol).ToList();
+        foreach (var item in symbolList)
+        {
+            if (!result.TokenPool.ContainsKey("Total"))
+                result.TokenPool.Add("Total", new List<PoolOverviewDto>());
+            result.TokenPool["Total"].Add(new PoolOverviewDto
+            {
+                Symbol = item,
+                CurrentAmount = tokenPoolDto != null && tokenPoolDto.TokenPool.ContainsKey(item)
+                    ? tokenPoolDto.TokenPool[item]
+                    : "0",
+                ThresholdAmount = CalculateThresholdTotal(tokenPoolThresholdDto.TokenPool, item).ToString()
+            });
+        }
+
+        var networkList = await _networkAppService.GetNetworkTokenListAsync(new GetNetworkTokenListRequestDto());
+        foreach (var kv in networkList)
+        {
+            if (kv.Key != ChainId.AELF && kv.Key != ChainId.tDVV && kv.Key != ChainId.tDVW) continue;
+
+            foreach (var key in kv.Value.Keys)
+            {
+                var tpKey = string.Join(CommonConstant.Underline, kv.Key, key);
+                if (!result.TokenPool.ContainsKey(kv.Key))
+                    result.TokenPool.Add(kv.Key, new List<PoolOverviewDto>());
+                result.TokenPool[kv.Key].Add(new PoolOverviewDto
+                {
+                    Symbol = key,
+                    CurrentAmount = tokenPoolDto != null && tokenPoolDto.TokenPool.ContainsKey(tpKey)
+                        ? tokenPoolDto.TokenPool[tpKey]
+                        : "0",
+                    ThresholdAmount = tokenPoolThresholdDto != null &&
+                                      tokenPoolThresholdDto.TokenPool.ContainsKey(tpKey)
+                        ? tokenPoolThresholdDto.TokenPool[tpKey]
+                        : "0",
+                });
+            }
+        }
+
+        return result;
+    }
+    
+    public async Task<bool> ResetTokenPoolThresholdAsync(GetTokenPoolRequestDto request)
+    {
+        if (request.ChainId.IsNullOrWhiteSpace() || request.Symbol.IsNullOrWhiteSpace() ||
+            !decimal.TryParse(request.ResetAmount, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+            return false;
+        var tokenList = await _networkAppService.GetNetworkTokenListAsync(new GetNetworkTokenListRequestDto());
+        if (!tokenList.ContainsKey(request.ChainId) || !tokenList[request.ChainId].ContainsKey(request.Symbol))
+            return false;
+        if (request.ChainId != ChainId.AELF && request.ChainId != ChainId.tDVV && request.ChainId != ChainId.tDVW)
+            return false;
+        
+        var tokenPoolThresholdGrain = _clusterClient.GetGrain<ITokenPoolGrain>(
+            DateTime.MinValue.Date.ToUtcString(TimeHelper.DatePattern));
+        var dto = await tokenPoolThresholdGrain.Get();
+        if (dto == null) dto = new TokenPoolDto();
+        var coin = string.Join(CommonConstant.Underline, request.ChainId, request.Symbol);
+        dto.TokenPool.AddOrReplace(coin, request.ResetAmount);
+        await tokenPoolThresholdGrain.AddOrUpdate(dto);
+        return true;
+    }
+    
+    public async Task<TokenPoolChangeListDto<TokenPoolChangeDto>> GetTokenPoolChangeListAsync(PagedAndSortedResultRequestDto request)
+    {
+        var dto = new Dictionary<string, List<TokenPoolChangeDto>>();
+
+        var (count, list) = await GetPoolChangeListAsync(request);
+        var symbolList = _tokenOptions.Value.Transfer.Select(t => t.Symbol).ToList();
+        var networkList = await _networkAppService.GetNetworkTokenListAsync(new GetNetworkTokenListRequestDto());
+        foreach (var changeItem in list)
+        {
+            foreach (var item in symbolList)
+            {
+                if(!dto.ContainsKey(changeItem.Date)) dto.Add(changeItem.Date, new List<TokenPoolChangeDto>());
+                dto[changeItem.Date].Add(new TokenPoolChangeDto
+                {
+                    Symbol = item,
+                    ChainId = string.Empty,
+                    ChangeAmount = changeItem.TokenPool != null && changeItem.TokenPool.ContainsKey(item)
+                        ? changeItem.TokenPool[item].RemoveTrailingZeros()
+                        : "0",
+                });
+            }
+            foreach (var kv in networkList)
+            {
+                if (kv.Key != ChainId.AELF && kv.Key != ChainId.tDVV && kv.Key != ChainId.tDVW) continue;
+                
+                foreach (var key in kv.Value.Keys)
+                {
+                    var tpKey = string.Join(CommonConstant.Underline, kv.Key, key);
+                    dto[changeItem.Date].Add(new TokenPoolChangeDto
+                    {
+                        Symbol = key,
+                        ChainId = kv.Key,
+                        ChangeAmount = changeItem.TokenPool != null && changeItem.TokenPool.ContainsKey(tpKey)
+                            ? changeItem.TokenPool[tpKey].RemoveTrailingZeros()
+                            : "0"
+                    });
+                }
+            }
+        }
+        
+        return new TokenPoolChangeListDto<TokenPoolChangeDto>
+        {
+            TotalCount = count,
+            TokenPool = dto
+        };
     }
 
     private async Task<string> VerifyCode(string code)
@@ -922,14 +1189,21 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
             .Size(0)
             .Query(f => f.Bool(b => b.Must(mustQuery)));
         s.Aggregations(agg => agg
-            .Terms("symbol", ts => ts
-                .Field("thirdPartFee.symbol")
-                .Aggregations(d => d
-                    .Terms("decimals", terms => terms
-                        .Field("thirdPartFee.decimals")
-                        .Aggregations(sumAgg => sumAgg
-                            .Sum("sum_amount", sum => sum
-                                .Field("thirdPartFee.amount"))
+            .Terms("symbol", t => t
+                .Field("thirdPartFee.symbol.keyword")
+                .Aggregations(sumAgg => sumAgg
+                    .Sum("sum_amount", sum => sum
+                        .Script(script => script
+                            .Source(@"
+                                if (params._source.thirdPartFee != null && 
+                                    params._source.thirdPartFee.length > 0) {
+                                    def fee = params._source.thirdPartFee[0];
+                                    def amount = Double.parseDouble(fee.amount);
+                                    def decimals = Integer.parseInt(fee.decimals);
+                                    return amount / Math.pow(10, decimals);
+                                }
+                                return 0;
+                            ")
                         )
                     )
                 )
@@ -942,18 +1216,16 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
             _logger.LogError("Rec QueryThirdPartFeeSumAggAsync error: {error}", searchResponse.ServerError?.Error);
             return result;
         }
-
         var symbolAgg = searchResponse.Aggregations.Terms("symbol");
         foreach (var symbolBucket in symbolAgg.Buckets)
         {
             var feeCoin = symbolBucket.Key.Split(CommonConstant.Underline);
             var feeSymbol = feeCoin.Length == 1 ? feeCoin[0] : feeCoin[1];
-            var decimals = symbolBucket.Terms("decimals");
-            foreach (var decimalsBucket in decimals.Buckets)
-            {
-                var amount = (decimal)decimalsBucket.Sum("sum_amount")?.Value / decimalsBucket.Key.SafeToInt();
-                result.Add(feeSymbol, amount.ToString());
-            }
+            if (!result.ContainsKey(feeSymbol))
+                result.Add(feeSymbol, symbolBucket.Sum("sum_amount")?.Value.ToString().SafeToDecimal().ToString());
+            else
+                result[feeSymbol] = (result[feeSymbol].SafeToDouble() + symbolBucket.Sum("sum_amount")?.Value)
+                    .ToString().SafeToDecimal().ToString();
         }
 
         return result;
@@ -969,11 +1241,21 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
             .Size(0)
             .Query(f => f.Bool(b => b.Must(mustQuery)));
         s.Aggregations(agg => agg
-            .Terms("symbol", ts => ts
+            .Terms("symbol", t => t
                 .Field("toTransfer.feeInfo.symbol")
                 .Aggregations(sumAgg => sumAgg
                     .Sum("sum_amount", sum => sum
-                        .Field("toTransfer.feeInfo.amount"))
+                        .Script(script => script
+                            .Source(@"
+                                if (params._source.toTransfer.feeInfo != null && 
+                                    params._source.toTransfer.feeInfo.length > 0) {
+                                    def fee = params._source.toTransfer.feeInfo[0];
+                                    return Double.parseDouble(fee.amount);
+                                }
+                                return 0;
+                            ")
+                        )
+                    )
                 )
             )
         );
@@ -989,7 +1271,7 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         foreach (var symbolBucket in symbolAgg.Buckets)
         {
             var amount = (decimal)symbolBucket.Sum("sum_amount")?.Value;
-            result.Add(symbolBucket.Key, amount.ToString());
+            result.Add(symbolBucket.Key, amount.ToString().SafeToDecimal().ToString());
         }
 
         return result;
@@ -1234,5 +1516,41 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         }
 
         return result;
+    }
+    
+    private decimal CalculateThresholdTotal(Dictionary<string, string> dic, string symbol)
+    {
+        var total = 0M;
+        if (dic == null) return total;
+        foreach (var kvp in dic)
+        {
+            if (kvp.Key.EndsWith(symbol))
+            {
+                if (decimal.TryParse(kvp.Value, out var value))
+                {
+                    total += value;
+                }
+            }
+        }
+        return total;
+    }
+    
+    private async Task<Tuple<long, List<TokenPoolIndex>>> GetPoolChangeListAsync(PagedAndSortedResultRequestDto request)
+    {
+        var mustQuery = new List<Func<QueryContainerDescriptor<TokenPoolIndex>, QueryContainer>>();
+
+        QueryContainer Filter(QueryContainerDescriptor<TokenPoolIndex> f) => f.Bool(b => b.Must(mustQuery));
+        
+        var(count, list) = await _tokenPoolIndexRepository.GetSortListAsync(Filter,
+            sortFunc: s => s.Descending(t => t.Date),
+            limit: request.MaxResultCount == 0 ? OrderOptions.DefaultResultCount :
+            request.MaxResultCount > OrderOptions.MaxResultCount ? OrderOptions.MaxResultCount : request.MaxResultCount,
+            skip: request.SkipCount);
+        if (count == OrderOptions.DefaultMaxSize)
+        {
+            count = (await _tokenPoolIndexRepository.CountAsync(Filter)).Count;
+        }
+
+        return Tuple.Create(count, list);
     }
 }
