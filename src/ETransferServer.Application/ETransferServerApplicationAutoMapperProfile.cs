@@ -3,6 +3,7 @@ using ETransferServer.Common;
 using ETransferServer.Dtos.Info;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Dtos.Reconciliation;
+using ETransferServer.Dtos.Token;
 using ETransferServer.Dtos.TokenAccess;
 using ETransferServer.Dtos.User;
 using ETransferServer.Entities;
@@ -15,9 +16,11 @@ using ETransferServer.Options;
 using ETransferServer.Users;
 using ETransferServer.Token.Dtos;
 using ETransferServer.TokenAccess;
+using ETransferServer.Tokens;
 using ETransferServer.Withdraw.Dtos;
 using ETransferServer.WithdrawOrder.Dtos;
 using TokenConfigDto = ETransferServer.Token.Dtos.TokenConfigDto;
+using TokenDto = ETransferServer.Dtos.User.TokenDto;
 
 namespace ETransferServer;
 
@@ -29,6 +32,10 @@ public class ETransferServerApplicationAutoMapperProfile : Profile
         CreateMap<AddressInfo, UserAddressInfo>().ReverseMap();
         CreateMap<UserAddress, UserAddressDto>().ReverseMap();
         CreateMap<TokenDto, Tokens.Token>().ReverseMap();
+        CreateMap<TokenPoolDto, TokenPoolIndex>()
+            .ForMember(des => des.Id, opt =>
+                opt.MapFrom(src => GuidHelper.UniqGuid(src.Date)))
+            .ReverseMap();
 
         CreateMap<FeeInfo, Fee>().ReverseMap();
         CreateMap<TransferInfo, Transfer>().ReverseMap();
