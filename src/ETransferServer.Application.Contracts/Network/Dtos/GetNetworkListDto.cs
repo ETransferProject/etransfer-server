@@ -18,6 +18,7 @@ public class NetworkDto
     public string ContractAddress { get; set; }
     public string ExplorerUrl { get; set; }
     public string Status { get; set; }
+    public Dictionary<string, string> MultiStatus { get; set; }
     [CanBeNull] public string WithdrawFee { get; set; }
     [CanBeNull] public string WithdrawFeeUnit { get; set; }
     public bool SpecialWithdrawFeeDisplay { get; set; }

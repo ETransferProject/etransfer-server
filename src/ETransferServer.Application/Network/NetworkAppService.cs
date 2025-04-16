@@ -15,6 +15,7 @@ using ETransferServer.Options;
 using ETransferServer.Network.Dtos;
 using ETransferServer.ThirdPart.Exchange;
 using ETransferServer.Token.Dtos;
+using NBitcoin;
 using Orleans;
 using Volo.Abp;
 using Volo.Abp.Application.Dtos;
@@ -260,7 +261,7 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
         getNetworkListDto.ChainId = request.ChainId;
 
         getNetworkListDto.NetworkList = _objectMapper.Map<List<NetworkInfo>, List<NetworkDto>>(networkInfos);
-        FillMultiConfirmMinutes(request.Type, getNetworkListDto.NetworkList, networkConfigs);
+        FillMultiConfirmMinutes(request.Type, request.Symbol, getNetworkListDto.NetworkList, networkConfigs);
 
         foreach (var networkDto in getNetworkListDto.NetworkList)
         {
@@ -516,7 +517,8 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
                 && config.SupportWhiteList.IsNullOrEmpty())).ToList();
     }
 
-    private void FillMultiConfirmMinutes(string type, List<NetworkDto> networkList, List<NetworkConfig> networkConfigs)
+    private void FillMultiConfirmMinutes(string type, string symbol, List<NetworkDto> networkList, 
+        List<NetworkConfig> networkConfigs)
     {
         foreach (var networkDto in networkList)
         {
@@ -526,12 +528,29 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
             if (config == null) continue;
 
             var multiConfirmSeconds = config.NetworkInfo.MultiConfirmSeconds;
+            var multiTokens = symbol.IsNullOrEmpty()
+                ? _networkOptions.Value.NetworkMap.Where(t => _tokenOptions.Value.Transfer.Any(
+                        c => c.Symbol == t.Key)).OrderBy(m => 
+                        _tokenOptions.Value.Transfer.Select(t => t.Symbol).ToList().IndexOf(m.Key))
+                    .ToDictionary(kv => kv.Key, kv => kv.Value.FirstOrDefault(t => t.NetworkInfo.Network == networkDto.Network))
+                : _networkOptions.Value.NetworkMap[symbol].Where(a =>
+                        a.SupportType.Contains(type) && a.NetworkInfo.Network == networkDto.Network)
+                    .ToDictionary(c => symbol, c => c);
             if (type == OrderTypeEnum.Deposit.ToString() && config.DepositInfo != null)
             {
                 networkDto.Status = config.DepositInfo.IsOpen
                     ? CommonConstant.NetworkStatus.Health
                     : CommonConstant.NetworkStatus.Offline;
                 multiConfirmSeconds = config.DepositInfo.MultiConfirmSeconds;
+                foreach (var kv in multiTokens) {
+                    networkDto.MultiStatus ??= new Dictionary<string, string>();
+                    if (kv.Value != null && kv.Value.DepositInfo != null)
+                    {
+                        networkDto.MultiStatus.AddOrReplace(kv.Key, kv.Value.DepositInfo.IsOpen
+                            ? CommonConstant.NetworkStatus.Health
+                            : CommonConstant.NetworkStatus.Offline);
+                    }
+                }
             }
 
             if ((type == OrderTypeEnum.Withdraw.ToString() || type == OrderTypeEnum.Transfer.ToString())
@@ -541,6 +560,15 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
                     ? CommonConstant.NetworkStatus.Health
                     : CommonConstant.NetworkStatus.Offline;
                 multiConfirmSeconds = config.WithdrawInfo.MultiConfirmSeconds;
+                foreach (var kv in multiTokens) {
+                    networkDto.MultiStatus ??= new Dictionary<string, string>();
+                    if (kv.Value != null && kv.Value.WithdrawInfo != null)
+                    {
+                        networkDto.MultiStatus.AddOrReplace(kv.Key, kv.Value.WithdrawInfo.IsOpen
+                            ? CommonConstant.NetworkStatus.Health
+                            : CommonConstant.NetworkStatus.Offline);
+                    }
+                }
             }
 
             networkDto.MultiConfirmTime = TimeHelper.SecondsToMinute((int)multiConfirmSeconds);
