@@ -77,8 +77,12 @@ public class TokenPoolTimerGrain : Grain<TokenPoolTimerState>, ITokenPoolTimerGr
         var result = await _coBoProvider.GetAccountDetailAsync();
         if (result == null || result.Assets.IsNullOrEmpty()) return;
 
+        var assets = result.Assets
+            .GroupBy(c => c.Coin)
+            .Select(g => g.Last())
+            .ToList();
         var dto = new TokenPoolDto();
-        foreach (var item in result.Assets)
+        foreach (var item in assets)
         {
             if (!_withdrawNetworkOptions.Value.NetworkInfos.Exists(i => i.Coin == item.Coin)) continue;
             var split = item.Coin.Split(CommonConstant.Underline);

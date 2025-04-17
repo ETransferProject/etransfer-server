@@ -55,7 +55,7 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
     private readonly IdentityUserManager _userManager;
     private readonly IOptionsSnapshot<TokenOptions> _tokenOptions;
     private readonly IOptionsSnapshot<StringEncryptionOptions> _stringEncryptionOptions;
-    private readonly Dictionary<string, string> MappingItems = new() { ["SGR-1"] = "SGR" };
+    private readonly Dictionary<string, string> MappingItems = new();
 
     public ReconciliationAppService(INESTRepository<OrderIndex, Guid> orderIndexRepository,
         INESTRepository<TokenPoolIndex, Guid> tokenPoolIndexRepository,
