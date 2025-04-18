@@ -144,7 +144,7 @@ public class ReconciliationController : ETransferController
         return await _reconciliationAppService.GetMultiPoolOverviewAsync();
     }
     
-    [Authorize(Roles = "ordinary,superAdmin,admin")]
+    [Authorize(Roles = "superAdmin")]
     [HttpPost("multi-pool-threshold-reset")]
     public async Task<bool> ResetMultiPoolThresholdAsync(GetMultiPoolRequestDto request)
     {
@@ -165,7 +165,7 @@ public class ReconciliationController : ETransferController
         return await _reconciliationAppService.GetTokenPoolOverviewAsync();
     }
     
-    [Authorize(Roles = "ordinary,superAdmin,admin")]
+    [Authorize(Roles = "superAdmin")]
     [HttpPost("token-pool-threshold-reset")]
     public async Task<bool> ResetTokenPoolThresholdAsync(GetTokenPoolRequestDto request)
     {
