@@ -124,9 +124,9 @@ public class TokenPoolTimerGrain : Grain<TokenPoolTimerState>, ITokenPoolTimerGr
             }
         }
 
-        var feeInfo = await _tokenPoolProvider.GetFeeListAsync(true);
-        dto.ThirdFeeInfo = feeInfo.Item1;
-        dto.AelfFeeInfo = feeInfo.Item2;
+        // var feeInfo = await _tokenPoolProvider.GetFeeListAsync(true);
+        // dto.ThirdFeeInfo = feeInfo.Item1;
+        // dto.AelfFeeInfo = feeInfo.Item2;
 
         var tokenPoolGrain = GrainFactory.GetGrain<ITokenPoolGrain>(ITokenPoolGrain.GenerateGrainId());
         await tokenPoolGrain.AddOrUpdate(dto);
@@ -152,18 +152,18 @@ public class TokenPoolTimerGrain : Grain<TokenPoolTimerState>, ITokenPoolTimerGr
                 ? (kv.Value.SafeToDecimal() - yesDto.TokenPool[kv.Key].SafeToDecimal()).ToString()
                 : kv.Value);
         }
-        foreach (var kv in dto.ThirdFeeInfo)
-        {
-            changeDto.ThirdFeeInfo.AddOrReplace(kv.Key, yesDto != null && yesDto.ThirdFeeInfo.ContainsKey(kv.Key)
-                ? (kv.Value.SafeToDecimal() - yesDto.ThirdFeeInfo[kv.Key].SafeToDecimal()).ToString()
-                : kv.Value);
-        }
-        foreach (var kv in dto.AelfFeeInfo)
-        {
-            changeDto.AelfFeeInfo.AddOrReplace(kv.Key, yesDto != null && yesDto.AelfFeeInfo.ContainsKey(kv.Key)
-                ? (kv.Value.SafeToDecimal() - yesDto.AelfFeeInfo[kv.Key].SafeToDecimal()).ToString()
-                : kv.Value);
-        }
+        // foreach (var kv in dto.ThirdFeeInfo)
+        // {
+        //     changeDto.ThirdFeeInfo.AddOrReplace(kv.Key, yesDto != null && yesDto.ThirdFeeInfo.ContainsKey(kv.Key)
+        //         ? (kv.Value.SafeToDecimal() - yesDto.ThirdFeeInfo[kv.Key].SafeToDecimal()).ToString()
+        //         : kv.Value);
+        // }
+        // foreach (var kv in dto.AelfFeeInfo)
+        // {
+        //     changeDto.AelfFeeInfo.AddOrReplace(kv.Key, yesDto != null && yesDto.AelfFeeInfo.ContainsKey(kv.Key)
+        //         ? (kv.Value.SafeToDecimal() - yesDto.AelfFeeInfo[kv.Key].SafeToDecimal()).ToString()
+        //         : kv.Value);
+        // }
         await _tokenPoolProvider.AddOrUpdateSync(changeDto);
 
         State.LastQueryTime = now;
