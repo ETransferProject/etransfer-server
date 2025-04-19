@@ -42,6 +42,7 @@ public class ETransferServerGrainsAutoMapperProfile : Profile
         CreateMap<UserTokenApplyOrderState, TokenApplyOrderDto>().ReverseMap();
         CreateMap<TokenApplyOrderResultDto, TokenApplyOrderDto>().ReverseMap();
         CreateMap<UserTokenIssueState, UserTokenIssueDto>().ReverseMap();
+        CreateMap<TokenPoolState, TokenPoolDto>().ReverseMap();
 
         CreateMap<UserAddressDto, TokenDepositAddressState>().ReverseMap();
         CreateMap<UserAddressDto, UserDepositAddressState>().ReverseMap();

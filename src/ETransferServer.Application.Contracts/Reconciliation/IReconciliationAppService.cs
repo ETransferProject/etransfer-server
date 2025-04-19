@@ -1,7 +1,9 @@
+using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using ETransferServer.Dtos.Info;
-using ETransferServer.Dtos.Order;
 using ETransferServer.Dtos.Reconciliation;
+using ETransferServer.Dtos.Token;
 using Volo.Abp.Application.Dtos;
 using Volo.Abp.Application.Services;
 
@@ -25,4 +27,12 @@ public interface IReconciliationAppService : IApplicationService
     Task<OrderOperationStatusDto> RequestTransferReleaseTokenAsync(GetRequestReleaseDto request);
     Task<OrderOperationStatusDto> RejectTransferReleaseTokenAsync(GetOrderOperationDto request);
     Task<OrderOperationStatusDto> TransferReleaseTokenAsync(GetOrderSafeOperationDto request);
+    Task<bool> AddOrUpdateTokenPoolAsync(TokenPoolDto dto);
+    Task<Tuple<Dictionary<string, string>, Dictionary<string, string>>> GetFeeListAsync(bool includeAll);
+    Task<MultiPoolOverviewDto> GetMultiPoolOverviewAsync();
+    Task<bool> ResetMultiPoolThresholdAsync(GetMultiPoolRequestDto request);
+    Task<MultiPoolChangeListDto<MultiPoolChangeDto>> GetMultiPoolChangeListAsync(PagedAndSortedResultRequestDto request);
+    Task<TokenPoolOverviewDto> GetTokenPoolOverviewAsync();
+    Task<bool> ResetTokenPoolThresholdAsync(GetTokenPoolRequestDto request);
+    Task<TokenPoolChangeListDto<TokenPoolChangeDto>> GetTokenPoolChangeListAsync(PagedAndSortedResultRequestDto request);
 }

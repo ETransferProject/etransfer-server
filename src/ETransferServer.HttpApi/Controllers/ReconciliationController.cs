@@ -136,4 +136,46 @@ public class ReconciliationController : ETransferController
     {
         return await _reconciliationAppService.TransferReleaseTokenAsync(request);
     }
+    
+    [Authorize(Roles = "ordinary,superAdmin,admin")]
+    [HttpGet("multi-pool-overview")]
+    public async Task<MultiPoolOverviewDto> GetMultiPoolOverviewAsync()
+    {
+        return await _reconciliationAppService.GetMultiPoolOverviewAsync();
+    }
+    
+    [Authorize(Roles = "superAdmin")]
+    [HttpPost("multi-pool-threshold-reset")]
+    public async Task<bool> ResetMultiPoolThresholdAsync(GetMultiPoolRequestDto request)
+    {
+        return await _reconciliationAppService.ResetMultiPoolThresholdAsync(request);
+    }
+    
+    [Authorize(Roles = "ordinary,superAdmin,admin")]
+    [HttpGet("multi-pool-change")]
+    public async Task<MultiPoolChangeListDto<MultiPoolChangeDto>> GetMultiPoolChangeListAsync(PagedAndSortedResultRequestDto request)
+    {
+        return await _reconciliationAppService.GetMultiPoolChangeListAsync(request);
+    }
+    
+    [Authorize(Roles = "ordinary,superAdmin,admin")]
+    [HttpGet("token-pool-overview")]
+    public async Task<TokenPoolOverviewDto> GetTokenPoolOverviewAsync()
+    {
+        return await _reconciliationAppService.GetTokenPoolOverviewAsync();
+    }
+    
+    [Authorize(Roles = "superAdmin")]
+    [HttpPost("token-pool-threshold-reset")]
+    public async Task<bool> ResetTokenPoolThresholdAsync(GetTokenPoolRequestDto request)
+    {
+        return await _reconciliationAppService.ResetTokenPoolThresholdAsync(request);
+    }
+    
+    [Authorize(Roles = "ordinary,superAdmin,admin")]
+    [HttpGet("token-pool-change")]
+    public async Task<TokenPoolChangeListDto<TokenPoolChangeDto>> GetTokenPoolChangeListAsync(PagedAndSortedResultRequestDto request)
+    {
+        return await _reconciliationAppService.GetTokenPoolChangeListAsync(request);
+    }
 }
