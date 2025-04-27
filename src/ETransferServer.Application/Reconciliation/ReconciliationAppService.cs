@@ -1106,6 +1106,8 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
                         ? tokenPoolInitDto.ThirdPoolFeeInfo[kvp.Key]
                         : "0"
                 };
+                itemDto.ChangeAmount =
+                    (itemDto.CurrentAmount.SafeToDecimal() - itemDto.InitAmount.SafeToDecimal()).ToString();
                 var exchange = 0M;
                 var symbol = kvp.Key.Split(CommonConstant.Underline).LastOrDefault();
                 try
@@ -1118,8 +1120,6 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
                 {
                     _logger.LogError(e, "Rec GetFeeOverviewAsync exchange error, {symbol}", symbol);
                 }
-                itemDto.ChangeAmount =
-                    (itemDto.CurrentAmount.SafeToDecimal() - itemDto.InitAmount.SafeToDecimal()).ToString();
                 itemDto.ChangeAmountUsd =
                     (itemDto.ChangeAmount.SafeToDecimal() * exchange).ToString(6, DecimalHelper.RoundingOption.Floor);
                 result.Fee.ThirdPart.Items.Add(itemDto);
