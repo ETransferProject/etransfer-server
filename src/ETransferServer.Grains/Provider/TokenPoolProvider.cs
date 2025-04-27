@@ -7,7 +7,7 @@ namespace ETransferServer.Grains.Provider;
 public interface ITokenPoolProvider
 {
     Task<bool> AddOrUpdateSync(TokenPoolDto dto);
-    Task<Tuple<Dictionary<string, string>, Dictionary<string, string>>> GetFeeListAsync(bool includeAll);
+    Task<Tuple<Dictionary<string, string>, Dictionary<string, string>, Dictionary<string, string>>> GetFeeListAsync(bool includeAll);
 }
 
 public class TokenPoolProvider : ITokenPoolProvider, ISingletonDependency 
@@ -24,7 +24,7 @@ public class TokenPoolProvider : ITokenPoolProvider, ISingletonDependency
         return await _reconciliationAppService.AddOrUpdateTokenPoolAsync(dto);
     }
 
-    public async Task<Tuple<Dictionary<string, string>, Dictionary<string, string>>> GetFeeListAsync(bool includeAll)
+    public async Task<Tuple<Dictionary<string, string>, Dictionary<string, string>, Dictionary<string, string>>> GetFeeListAsync(bool includeAll)
     {
         return await _reconciliationAppService.GetFeeListAsync(includeAll);
     }
