@@ -1253,9 +1253,9 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
             {
                 foreach (var kvp in tokenPoolDto.ThirdPoolFeeInfo)
                 {
-                    if (!dto[changeItem.Date].ContainsKey("ThirdPart"))
-                        dto[changeItem.Date].Add("ThirdPart", new List<FeeChangeDto>());
-                    dto[changeItem.Date]["ThirdPart"].Add(new FeeChangeDto
+                    if (!dto[changeItem.Date].ContainsKey("thirdPart"))
+                        dto[changeItem.Date].Add("thirdPart", new List<FeeChangeDto>());
+                    dto[changeItem.Date]["thirdPart"].Add(new FeeChangeDto
                     {
                         Symbol = kvp.Key,
                         ChangeAmount = changeItem.ThirdPoolFeeInfo != null && changeItem.ThirdPoolFeeInfo.ContainsKey(kvp.Key)
@@ -1268,8 +1268,8 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
 
             foreach (var item in symbolList)
             {
-                if (!dto[changeItem.Date].ContainsKey("Etransfer"))
-                    dto[changeItem.Date].Add("Etransfer", new List<FeeChangeDto>());
+                if (!dto[changeItem.Date].ContainsKey("etransfer"))
+                    dto[changeItem.Date].Add("etransfer", new List<FeeChangeDto>());
                 var changeDto = new FeeChangeDto
                 {
                     Symbol = item
@@ -1284,12 +1284,12 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
                 changeDto.ChangeAmount = (withdrawChangeFee + depositChangeFee)
                     .ToString(6, DecimalHelper.RoundingOption.Floor)
                     .RemoveTrailingZeros();
-                dto[changeItem.Date]["Etransfer"].Add(changeDto);
+                dto[changeItem.Date]["etransfer"].Add(changeDto);
             }
             
-            if (!dto[changeItem.Date].ContainsKey("Subsidy"))
-                dto[changeItem.Date].Add("Subsidy", new List<FeeChangeDto>());
-            dto[changeItem.Date]["Subsidy"].Add(new FeeChangeDto
+            if (!dto[changeItem.Date].ContainsKey("subsidy"))
+                dto[changeItem.Date].Add("subsidy", new List<FeeChangeDto>());
+            dto[changeItem.Date]["subsidy"].Add(new FeeChangeDto
             {
                 Symbol = TokenSymbol.ELF,
                 ChangeAmount = "0"
