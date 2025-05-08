@@ -13,5 +13,8 @@ public class TokenPoolIndex : AbstractEntity<Guid>, IIndexBuild
     public Dictionary<string, string> MultiPool { get; set; } = new();
     public Dictionary<string, string> TokenPool { get; set; } = new();
     public Dictionary<string, string> ThirdFeeInfo { get; set; } = new();
-    public Dictionary<string, string> AelfFeeInfo { get; set; } = new();
+    public Dictionary<string, string> ThirdPoolFeeInfo { get; set; } = new();
+    public Dictionary<string, string> Pool { get; set; } = new();
+    public Dictionary<string, string> WithdrawFeeInfo { get; set; } = new();
+    public Dictionary<string, string> DepositFeeInfo { get; set; } = new();
 }

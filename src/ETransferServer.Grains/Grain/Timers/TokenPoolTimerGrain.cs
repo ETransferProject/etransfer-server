@@ -82,6 +82,7 @@ public class TokenPoolTimerGrain : Grain<TokenPoolTimerState>, ITokenPoolTimerGr
             .Select(g => g.Last())
             .ToList();
         var dto = new TokenPoolDto();
+        var feeCoinList = new List<string>();
         foreach (var item in assets)
         {
             if (!_withdrawNetworkOptions.Value.NetworkInfos.Exists(i => i.Coin == item.Coin)) continue;
@@ -92,6 +93,13 @@ public class TokenPoolTimerGrain : Grain<TokenPoolTimerState>, ITokenPoolTimerGr
                 dto.MultiPool[split[1]] =
                     (dto.MultiPool[split[1]].SafeToDecimal() + item.AbsBalance.SafeToDecimal()).ToString();
             dto.MultiPool.AddOrReplace(item.Coin, item.AbsBalance);
+            
+            if(!feeCoinList.Contains(item.FeeCoin)) feeCoinList.Add(item.FeeCoin);
+        }
+        foreach (var item in assets)
+        {
+            if (!feeCoinList.Contains(item.Coin)) continue;
+            dto.ThirdPoolFeeInfo.AddOrReplace(item.Coin, item.AbsBalance);
         }
 
         dto.MultiPool = dto.MultiPool.OrderBy(k =>
@@ -123,10 +131,26 @@ public class TokenPoolTimerGrain : Grain<TokenPoolTimerState>, ITokenPoolTimerGr
                     balanceDecimal.ToString());
             }
         }
+        
+        foreach (var kv in _withdrawOption.Value.PaymentAddresses)
+        {
+            if (kv.Key != ChainId.AELF) continue;
+            foreach (var subKey in kv.Value.Keys)
+            {
+                var multiPoolAmount = dto.MultiPool.ContainsKey(subKey)
+                    ? dto.MultiPool[subKey].SafeToDecimal()
+                    : 0M;
+                var tokenPoolAmount = dto.TokenPool.ContainsKey(subKey)
+                    ? dto.TokenPool[subKey].SafeToDecimal()
+                    : 0M;
+                dto.Pool[subKey] = (multiPoolAmount + tokenPoolAmount).ToString();
+            }
+        }
 
-        // var feeInfo = await _tokenPoolProvider.GetFeeListAsync(true);
-        // dto.ThirdFeeInfo = feeInfo.Item1;
-        // dto.AelfFeeInfo = feeInfo.Item2;
+        var feeInfo = await _tokenPoolProvider.GetFeeListAsync(true);
+        dto.ThirdFeeInfo = feeInfo.Item1;
+        dto.WithdrawFeeInfo = feeInfo.Item2;
+        dto.DepositFeeInfo = feeInfo.Item3;
 
         var tokenPoolGrain = GrainFactory.GetGrain<ITokenPoolGrain>(ITokenPoolGrain.GenerateGrainId());
         await tokenPoolGrain.AddOrUpdate(dto);
@@ -152,18 +176,30 @@ public class TokenPoolTimerGrain : Grain<TokenPoolTimerState>, ITokenPoolTimerGr
                 ? (kv.Value.SafeToDecimal() - yesDto.TokenPool[kv.Key].SafeToDecimal()).ToString()
                 : kv.Value);
         }
-        // foreach (var kv in dto.ThirdFeeInfo)
-        // {
-        //     changeDto.ThirdFeeInfo.AddOrReplace(kv.Key, yesDto != null && yesDto.ThirdFeeInfo.ContainsKey(kv.Key)
-        //         ? (kv.Value.SafeToDecimal() - yesDto.ThirdFeeInfo[kv.Key].SafeToDecimal()).ToString()
-        //         : kv.Value);
-        // }
-        // foreach (var kv in dto.AelfFeeInfo)
-        // {
-        //     changeDto.AelfFeeInfo.AddOrReplace(kv.Key, yesDto != null && yesDto.AelfFeeInfo.ContainsKey(kv.Key)
-        //         ? (kv.Value.SafeToDecimal() - yesDto.AelfFeeInfo[kv.Key].SafeToDecimal()).ToString()
-        //         : kv.Value);
-        // }
+        foreach (var kv in dto.Pool)
+        {
+            changeDto.Pool.AddOrReplace(kv.Key, yesDto != null && yesDto.Pool.ContainsKey(kv.Key)
+                ? (kv.Value.SafeToDecimal() - yesDto.Pool[kv.Key].SafeToDecimal()).ToString()
+                : kv.Value);
+        }
+        foreach (var kv in dto.ThirdPoolFeeInfo)
+        {
+            changeDto.ThirdPoolFeeInfo.AddOrReplace(kv.Key, yesDto != null && yesDto.ThirdPoolFeeInfo.ContainsKey(kv.Key)
+                ? (kv.Value.SafeToDecimal() - yesDto.ThirdPoolFeeInfo[kv.Key].SafeToDecimal()).ToString()
+                : kv.Value);
+        }
+        foreach (var kv in dto.WithdrawFeeInfo)
+        {
+            changeDto.WithdrawFeeInfo.AddOrReplace(kv.Key, yesDto != null && yesDto.WithdrawFeeInfo.ContainsKey(kv.Key)
+                ? (kv.Value.SafeToDecimal() - yesDto.WithdrawFeeInfo[kv.Key].SafeToDecimal()).ToString()
+                : kv.Value);
+        }
+        foreach (var kv in dto.DepositFeeInfo)
+        {
+            changeDto.DepositFeeInfo.AddOrReplace(kv.Key, yesDto != null && yesDto.DepositFeeInfo.ContainsKey(kv.Key)
+                ? (kv.Value.SafeToDecimal() - yesDto.DepositFeeInfo[kv.Key].SafeToDecimal()).ToString()
+                : kv.Value);
+        }
         await _tokenPoolProvider.AddOrUpdateSync(changeDto);
 
         State.LastQueryTime = now;

@@ -138,6 +138,27 @@ public class ReconciliationController : ETransferController
     }
     
     [Authorize(Roles = "ordinary,superAdmin,admin")]
+    [HttpGet("pool-overview")]
+    public async Task<PoolOverviewListDto> GetPoolOverviewAsync()
+    {
+        return await _reconciliationAppService.GetPoolOverviewAsync();
+    }
+    
+    [Authorize(Roles = "superAdmin")]
+    [HttpPost("pool-init-reset")]
+    public async Task<bool> ResetPoolInitAsync(GetPoolRequestDto request)
+    {
+        return await _reconciliationAppService.ResetPoolInitAsync(request);
+    }
+    
+    [Authorize(Roles = "ordinary,superAdmin,admin")]
+    [HttpGet("pool-change")]
+    public async Task<PoolChangeListDto<PoolChangeDto>> GetPoolChangeListAsync(PagedAndSortedResultRequestDto request)
+    {
+        return await _reconciliationAppService.GetPoolChangeListAsync(request);
+    }
+    
+    [Authorize(Roles = "ordinary,superAdmin,admin")]
     [HttpGet("multi-pool-overview")]
     public async Task<MultiPoolOverviewDto> GetMultiPoolOverviewAsync()
     {
@@ -177,5 +198,26 @@ public class ReconciliationController : ETransferController
     public async Task<TokenPoolChangeListDto<TokenPoolChangeDto>> GetTokenPoolChangeListAsync(PagedAndSortedResultRequestDto request)
     {
         return await _reconciliationAppService.GetTokenPoolChangeListAsync(request);
+    }
+    
+    [Authorize(Roles = "ordinary,superAdmin,admin")]
+    [HttpGet("fee-overview")]
+    public async Task<FeeOverviewDto> GetFeeOverviewAsync()
+    {
+        return await _reconciliationAppService.GetFeeOverviewAsync();
+    }
+    
+    [Authorize(Roles = "superAdmin")]
+    [HttpPost("fee-init-reset")]
+    public async Task<bool> ResetFeeInitAsync(GetFeeRequestDto request)
+    {
+        return await _reconciliationAppService.ResetFeeInitAsync(request);
+    }
+    
+    [Authorize(Roles = "ordinary,superAdmin,admin")]
+    [HttpGet("fee-change")]
+    public async Task<FeeChangeListDto<FeeChangeDto>> GetFeeChangeListAsync(PagedAndSortedResultRequestDto request)
+    {
+        return await _reconciliationAppService.GetFeeChangeListAsync(request);
     }
 }

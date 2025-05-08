@@ -699,12 +699,115 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         await _tokenPoolIndexRepository.AddOrUpdateAsync(index);
         return true;
     }
-    
-    public async Task<Tuple<Dictionary<string, string>, Dictionary<string, string>>> GetFeeListAsync(bool includeAll)
+
+    public async Task<PoolOverviewListDto> GetPoolOverviewAsync()
     {
-        var thirdPartFee = await QueryThirdPartFeeSumAggAsync(includeAll, 0);
-        var aelfFee = await QueryAELfFeeSumAggAsync(includeAll, 1);
-        return Tuple.Create(thirdPartFee, aelfFee);
+        var result = new PoolOverviewListDto();
+
+        var tokenPoolGrain = _clusterClient.GetGrain<ITokenPoolGrain>(ITokenPoolGrain.GenerateGrainId());
+        var tokenPoolDto = await tokenPoolGrain.Get();
+        if (tokenPoolDto == null)
+        {
+            tokenPoolGrain = _clusterClient.GetGrain<ITokenPoolGrain>(
+                ITokenPoolGrain.GenerateGrainId(DateTime.UtcNow.AddDays(-1).Date.ToUtcMilliSeconds()));
+            tokenPoolDto = await tokenPoolGrain.Get();
+        }
+        var tokenPoolInitGrain = _clusterClient.GetGrain<ITokenPoolGrain>(
+            DateTime.MinValue.Date.ToUtcString(TimeHelper.DatePattern));
+        var tokenPoolInitDto = await tokenPoolInitGrain.Get();
+        
+        var symbolList = _tokenOptions.Value.Transfer.Select(t => t.Symbol).ToList();
+        foreach (var item in symbolList)
+        {
+            var detailDto = new PoolOverviewDetailDto
+            {
+                Symbol = item,
+                CurrentAmount = tokenPoolDto != null && tokenPoolDto.Pool.ContainsKey(item)
+                    ? tokenPoolDto.Pool[item].SafeToDecimal().ToString(6, DecimalHelper.RoundingOption.Floor)
+                    : "0",
+                InitAmount = tokenPoolInitDto != null && tokenPoolInitDto.Pool.ContainsKey(item)
+                    ? tokenPoolInitDto.Pool[item].SafeToDecimal().ToString(6, DecimalHelper.RoundingOption.Floor)
+                    : "0"
+            };
+            detailDto.ChangeAmount =
+                (detailDto.CurrentAmount.SafeToDecimal() - detailDto.InitAmount.SafeToDecimal()).ToString();
+            var exchange = 0M;
+            try
+            {
+                exchange = detailDto.CurrentAmount.SafeToDecimal() == 0M 
+                           && detailDto.InitAmount.SafeToDecimal() == 0M
+                           && detailDto.ChangeAmount.SafeToDecimal() == 0M
+                    ? 0M
+                    : await _networkAppService.GetAvgExchangeAsync(item, CommonConstant.Symbol.USD);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "Rec GetPoolOverviewAsync exchange error, {symbol}", item);
+            }
+
+            detailDto.CurrentAmountUsd =
+                (detailDto.CurrentAmount.SafeToDecimal() * exchange).ToString(6, DecimalHelper.RoundingOption.Floor);
+            detailDto.InitAmountUsd =
+                (detailDto.InitAmount.SafeToDecimal() * exchange).ToString(6, DecimalHelper.RoundingOption.Floor);
+            detailDto.ChangeAmountUsd =
+                (detailDto.ChangeAmount.SafeToDecimal() * exchange).ToString(6, DecimalHelper.RoundingOption.Floor);
+            result.Pool.Add(detailDto);
+            result.Total.CurrentTotalAmountUsd = (result.Total.CurrentTotalAmountUsd.SafeToDecimal() +
+                                                  detailDto.CurrentAmountUsd.SafeToDecimal()).ToString();
+            result.Total.InitTotalAmountUsd = (result.Total.InitTotalAmountUsd.SafeToDecimal() +
+                                                  detailDto.InitAmountUsd.SafeToDecimal()).ToString();
+            result.Total.ChangeTotalAmountUsd = (result.Total.ChangeTotalAmountUsd.SafeToDecimal() +
+                                               detailDto.ChangeAmountUsd.SafeToDecimal()).ToString();
+        }
+
+        return result;
+    }
+
+    public async Task<bool> ResetPoolInitAsync(GetPoolRequestDto request)
+    {
+        if (request.Symbol.IsNullOrWhiteSpace() ||
+            !decimal.TryParse(request.ResetAmount, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+            return false;
+        var symbolList = _tokenOptions.Value.Transfer.Select(t => t.Symbol).ToList();
+        if (!symbolList.Contains(request.Symbol))
+            return false;
+        
+        var tokenPoolInitGrain = _clusterClient.GetGrain<ITokenPoolGrain>(
+            DateTime.MinValue.Date.ToUtcString(TimeHelper.DatePattern));
+        var dto = await tokenPoolInitGrain.Get();
+        if (dto == null) dto = new TokenPoolDto();
+        dto.Pool.AddOrReplace(request.Symbol, request.ResetAmount);
+        await tokenPoolInitGrain.AddOrUpdate(dto);
+        return true;
+    }
+
+    public async Task<PoolChangeListDto<PoolChangeDto>> GetPoolChangeListAsync(PagedAndSortedResultRequestDto request)
+    {
+        var dto = new Dictionary<string, List<PoolChangeDto>>();
+
+        var (count, list) = await GetTokenPoolIndexChangeListAsync(request, 0);
+        var symbolList = _tokenOptions.Value.Transfer.Select(t => t.Symbol).ToList();
+        foreach (var changeItem in list)
+        {
+            foreach (var item in symbolList)
+            {
+                if (!dto.ContainsKey(changeItem.Date)) dto.Add(changeItem.Date, new List<PoolChangeDto>());
+                dto[changeItem.Date].Add(new PoolChangeDto
+                {
+                    Symbol = item,
+                    ChangeAmount = changeItem.Pool != null && changeItem.Pool.ContainsKey(item)
+                        ? changeItem.Pool[item].SafeToDecimal().ToString(6, DecimalHelper.RoundingOption.Floor)
+                            .RemoveTrailingZeros()
+                        : "0"
+                });
+            }
+        }
+        
+        return new PoolChangeListDto<PoolChangeDto>
+        {
+            TotalCount = count,
+            Pool = dto
+        };
     }
 
     public async Task<MultiPoolOverviewDto> GetMultiPoolOverviewAsync()
@@ -795,7 +898,7 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
     {
         var dto = new Dictionary<string, List<MultiPoolChangeDto>>();
 
-        var (count, list) = await GetPoolChangeListAsync(request);
+        var (count, list) = await GetTokenPoolIndexChangeListAsync(request);
         var symbolList = _tokenOptions.Value.Transfer.Select(t => t.Symbol).ToList();
         var networkList = await _networkAppService.GetNetworkTokenListAsync(new GetNetworkTokenListRequestDto());
         foreach (var changeItem in list)
@@ -924,7 +1027,7 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
     {
         var dto = new Dictionary<string, List<TokenPoolChangeDto>>();
 
-        var (count, list) = await GetPoolChangeListAsync(request);
+        var (count, list) = await GetTokenPoolIndexChangeListAsync(request);
         var symbolList = _tokenOptions.Value.Transfer.Select(t => t.Symbol).ToList();
         var networkList = await _networkAppService.GetNetworkTokenListAsync(new GetNetworkTokenListRequestDto());
         foreach (var changeItem in list)
@@ -964,6 +1067,239 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         {
             TotalCount = count,
             TokenPool = dto
+        };
+    }
+    
+    public async Task<Tuple<Dictionary<string, string>, Dictionary<string, string>, Dictionary<string, string>>> GetFeeListAsync(bool includeAll)
+    {
+        var thirdPartFee = await QueryThirdPartFeeSumAggAsync(includeAll, 0);
+        var withdrawFee = await QueryOrderFeeSumAggAsync(includeAll, 1);
+        var depositFee = await QueryOrderFeeSumAggAsync(includeAll, 2);
+        return Tuple.Create(thirdPartFee, withdrawFee, depositFee);
+    }
+
+    public async Task<FeeOverviewDto> GetFeeOverviewAsync()
+    {
+        var result = new FeeOverviewDto();
+
+        var tokenPoolGrain = _clusterClient.GetGrain<ITokenPoolGrain>(ITokenPoolGrain.GenerateGrainId());
+        var tokenPoolDto = await tokenPoolGrain.Get();
+        if (tokenPoolDto == null)
+        {
+            tokenPoolGrain = _clusterClient.GetGrain<ITokenPoolGrain>(
+                ITokenPoolGrain.GenerateGrainId(DateTime.UtcNow.AddDays(-1).Date.ToUtcMilliSeconds()));
+            tokenPoolDto = await tokenPoolGrain.Get();
+        }
+        var tokenPoolInitGrain = _clusterClient.GetGrain<ITokenPoolGrain>(
+            DateTime.MinValue.Date.ToUtcString(TimeHelper.DatePattern));
+        var tokenPoolInitDto = await tokenPoolInitGrain.Get();
+        
+        if (tokenPoolDto != null)
+        {
+            foreach (var kvp in tokenPoolDto.ThirdPoolFeeInfo)
+            {
+                var itemDto = new FeeItemDto
+                {
+                    Symbol = kvp.Key,
+                    CurrentAmount = tokenPoolDto.ThirdPoolFeeInfo[kvp.Key],
+                    InitAmount = tokenPoolInitDto != null && tokenPoolInitDto.ThirdPoolFeeInfo.ContainsKey(kvp.Key)
+                        ? tokenPoolInitDto.ThirdPoolFeeInfo[kvp.Key]
+                        : "0"
+                };
+                itemDto.ChangeAmount =
+                    (itemDto.CurrentAmount.SafeToDecimal() - itemDto.InitAmount.SafeToDecimal()).ToString();
+                var exchange = 0M;
+                var symbol = kvp.Key.Split(CommonConstant.Underline).LastOrDefault();
+                try
+                {
+                    exchange = itemDto.ChangeAmount.SafeToDecimal() == 0M
+                        ? 0M
+                        : await _networkAppService.GetAvgExchangeAsync(symbol, CommonConstant.Symbol.USD);
+                }
+                catch (Exception e)
+                {
+                    _logger.LogError(e, "Rec GetFeeOverviewAsync exchange error, {symbol}", symbol);
+                }
+                itemDto.ChangeAmountUsd =
+                    (itemDto.ChangeAmount.SafeToDecimal() * exchange).ToString(6, DecimalHelper.RoundingOption.Floor);
+                result.Fee.ThirdPart.Items.Add(itemDto);
+                result.Fee.ThirdPart.TotalUsd =
+                    (result.Fee.ThirdPart.TotalUsd.SafeToDecimal() + itemDto.ChangeAmountUsd.SafeToDecimal())
+                    .ToString();
+            }
+        }
+        
+        var symbolList = _tokenOptions.Value.Transfer.Select(t => t.Symbol).ToList();
+        foreach (var item in symbolList)
+        {
+            var detailDto = new FeeItemDto
+            {
+                Symbol = item,
+                InitAmount = tokenPoolInitDto != null && tokenPoolInitDto.WithdrawFeeInfo.ContainsKey(item)
+                    ? tokenPoolInitDto.WithdrawFeeInfo[item].SafeToDecimal().ToString(6, DecimalHelper.RoundingOption.Floor)
+                    : "0"
+            };
+            var withdrawFee = tokenPoolDto != null && tokenPoolDto.WithdrawFeeInfo.ContainsKey(item)
+                ? tokenPoolDto.WithdrawFeeInfo[item].SafeToDecimal()
+                : 0;
+            var depositFee = tokenPoolDto != null && tokenPoolDto.DepositFeeInfo.ContainsKey(item)
+                ? tokenPoolDto.DepositFeeInfo[item].SafeToDecimal()
+                : 0;
+            detailDto.CurrentAmount = (withdrawFee + depositFee).ToString(6, DecimalHelper.RoundingOption.Floor);
+            detailDto.ChangeAmount =
+                (detailDto.CurrentAmount.SafeToDecimal() - detailDto.InitAmount.SafeToDecimal()).ToString();
+            var exchange = 0M;
+            try
+            {
+                exchange = detailDto.ChangeAmount.SafeToDecimal() == 0M
+                    ? 0M
+                    : await _networkAppService.GetAvgExchangeAsync(item, CommonConstant.Symbol.USD);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "Rec GetFeeOverviewAsync exchange error, {symbol}", item);
+            }
+
+            detailDto.ChangeAmountUsd =
+                (detailDto.ChangeAmount.SafeToDecimal() * exchange).ToString(6, DecimalHelper.RoundingOption.Floor);
+            result.Fee.Etransfer.Items.Add(detailDto);
+            result.Fee.Etransfer.TotalUsd =
+                (result.Fee.Etransfer.TotalUsd.SafeToDecimal() + detailDto.ChangeAmountUsd.SafeToDecimal())
+                .ToString();
+        }
+
+        var subsidyFee = new FeeItemDto
+        {
+            Symbol = TokenSymbol.ELF,
+            CurrentAmount = "0",
+            InitAmount = tokenPoolInitDto != null && tokenPoolInitDto.DepositFeeInfo.ContainsKey(TokenSymbol.ELF)
+                ? tokenPoolInitDto.DepositFeeInfo[TokenSymbol.ELF].SafeToDecimal().ToString(6, DecimalHelper.RoundingOption.Floor)
+                : "0"
+        };
+        subsidyFee.ChangeAmount =
+            (subsidyFee.CurrentAmount.SafeToDecimal() - subsidyFee.InitAmount.SafeToDecimal()).ToString();
+        result.Fee.Subsidy.Items.Add(subsidyFee);
+
+        return result;
+    }
+
+    public async Task<bool> ResetFeeInitAsync(GetFeeRequestDto request)
+    {
+        if (request.Symbol.IsNullOrWhiteSpace() ||
+            !decimal.TryParse(request.ResetAmount, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+            return false;
+        
+        var tokenPoolInitGrain = _clusterClient.GetGrain<ITokenPoolGrain>(
+            DateTime.MinValue.Date.ToUtcString(TimeHelper.DatePattern));
+        var dto = await tokenPoolInitGrain.Get();
+        if (dto == null) dto = new TokenPoolDto();
+
+        if (request.Type == 0)
+        {
+            var tokenPoolGrain = _clusterClient.GetGrain<ITokenPoolGrain>(ITokenPoolGrain.GenerateGrainId());
+            var tokenPoolDto = await tokenPoolGrain.Get();
+            if (tokenPoolDto == null)
+            {
+                tokenPoolGrain = _clusterClient.GetGrain<ITokenPoolGrain>(
+                    ITokenPoolGrain.GenerateGrainId(DateTime.UtcNow.AddDays(-1).Date.ToUtcMilliSeconds()));
+                tokenPoolDto = await tokenPoolGrain.Get();
+            }
+
+            if (tokenPoolDto != null)
+            {
+                if (tokenPoolDto.ThirdPoolFeeInfo.ContainsKey(request.Symbol))
+                {
+                    dto.ThirdPoolFeeInfo.AddOrReplace(request.Symbol, request.ResetAmount);
+                    await tokenPoolInitGrain.AddOrUpdate(dto);
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        else if (request.Type == 1){
+            var symbolList = _tokenOptions.Value.Transfer.Select(t => t.Symbol).ToList();
+            if (!symbolList.Contains(request.Symbol))
+                return false;
+            dto.WithdrawFeeInfo.AddOrReplace(request.Symbol, request.ResetAmount);
+            await tokenPoolInitGrain.AddOrUpdate(dto);
+            return true;
+        }
+
+        if (request.Symbol != TokenSymbol.ELF) return false;
+        dto.DepositFeeInfo.AddOrReplace(request.Symbol, request.ResetAmount);
+        await tokenPoolInitGrain.AddOrUpdate(dto);
+        return true;
+    }
+
+    public async Task<FeeChangeListDto<FeeChangeDto>> GetFeeChangeListAsync(PagedAndSortedResultRequestDto request)
+    {
+        var dto = new Dictionary<string, Dictionary<string, List<FeeChangeDto>>>();
+
+        var (count, list) = await GetTokenPoolIndexChangeListAsync(request, 3);
+        var tokenPoolGrain = _clusterClient.GetGrain<ITokenPoolGrain>(ITokenPoolGrain.GenerateGrainId());
+        var tokenPoolDto = await tokenPoolGrain.Get();
+        if (tokenPoolDto == null)
+        {
+            tokenPoolGrain = _clusterClient.GetGrain<ITokenPoolGrain>(
+                ITokenPoolGrain.GenerateGrainId(DateTime.UtcNow.AddDays(-1).Date.ToUtcMilliSeconds()));
+            tokenPoolDto = await tokenPoolGrain.Get();
+        }
+        var symbolList = _tokenOptions.Value.Transfer.Select(t => t.Symbol).ToList();
+        foreach (var changeItem in list)
+        {
+            if (!dto.ContainsKey(changeItem.Date)) dto.Add(changeItem.Date, new Dictionary<string, List<FeeChangeDto>>());
+            if (tokenPoolDto != null)
+            {
+                foreach (var kvp in tokenPoolDto.ThirdPoolFeeInfo)
+                {
+                    if (!dto[changeItem.Date].ContainsKey("thirdPart"))
+                        dto[changeItem.Date].Add("thirdPart", new List<FeeChangeDto>());
+                    dto[changeItem.Date]["thirdPart"].Add(new FeeChangeDto
+                    {
+                        Symbol = kvp.Key,
+                        ChangeAmount = changeItem.ThirdPoolFeeInfo != null && changeItem.ThirdPoolFeeInfo.ContainsKey(kvp.Key)
+                            ? changeItem.ThirdPoolFeeInfo[kvp.Key].SafeToDecimal().ToString(6, DecimalHelper.RoundingOption.Floor)
+                                .RemoveTrailingZeros()
+                            : "0"
+                    });
+                }
+            }
+
+            foreach (var item in symbolList)
+            {
+                if (!dto[changeItem.Date].ContainsKey("etransfer"))
+                    dto[changeItem.Date].Add("etransfer", new List<FeeChangeDto>());
+                var changeDto = new FeeChangeDto
+                {
+                    Symbol = item
+                };
+                var withdrawChangeFee =
+                    changeItem.WithdrawFeeInfo != null && changeItem.WithdrawFeeInfo.ContainsKey(item)
+                        ? changeItem.WithdrawFeeInfo[item].SafeToDecimal()
+                        : 0;
+                var depositChangeFee = changeItem.DepositFeeInfo != null && changeItem.DepositFeeInfo.ContainsKey(item)
+                    ? changeItem.DepositFeeInfo[item].SafeToDecimal()
+                    : 0;
+                changeDto.ChangeAmount = (withdrawChangeFee + depositChangeFee)
+                    .ToString(6, DecimalHelper.RoundingOption.Floor)
+                    .RemoveTrailingZeros();
+                dto[changeItem.Date]["etransfer"].Add(changeDto);
+            }
+            
+            if (!dto[changeItem.Date].ContainsKey("subsidy"))
+                dto[changeItem.Date].Add("subsidy", new List<FeeChangeDto>());
+            dto[changeItem.Date]["subsidy"].Add(new FeeChangeDto
+            {
+                Symbol = TokenSymbol.ELF,
+                ChangeAmount = "0"
+            });
+        }
+        
+        return new FeeChangeListDto<FeeChangeDto>
+        {
+            TotalCount = count,
+            Fee = dto
         };
     }
 
@@ -1231,7 +1567,7 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         return result;
     }
     
-    private async Task<Dictionary<string, string>> QueryAELfFeeSumAggAsync(bool includeAll, int type)
+    private async Task<Dictionary<string, string>> QueryOrderFeeSumAggAsync(bool includeAll, int type)
     {
         var result = new Dictionary<string, string>();
         var mustQuery = await GetMustQueryFeeAsync(includeAll, type);
@@ -1263,7 +1599,7 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         var searchResponse = await _orderIndexRepository.SearchAsync(s, 0, 0);
         if (!searchResponse.IsValid)
         {
-            _logger.LogError("Rec QueryAELfFeeSumAggAsync error: {error}", searchResponse.ServerError?.Error);
+            _logger.LogError("Rec QueryOrderFeeSumAggAsync error: {error}", searchResponse.ServerError?.Error);
             return result;
         }
 
@@ -1283,8 +1619,17 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
         mustQuery.Add(q => q.Terms(i =>
             i.Field(f => f.Status).Terms(OrderStatusHelper.GetSucceedList())));
-        mustQuery.Add(q => q.Term(i =>
-            i.Field(f => f.OrderType).Value(OrderTypeEnum.Withdraw.ToString())));
+        if (type == 2)
+        {
+            mustQuery.Add(q => q.Term(i =>
+                i.Field(f => f.OrderType).Value(OrderTypeEnum.Deposit.ToString())));
+        }
+        else
+        {
+            mustQuery.Add(q => q.Term(i =>
+                i.Field(f => f.OrderType).Value(OrderTypeEnum.Withdraw.ToString())));
+        }
+
         if (type == 0)
         {
             mustQuery.Add(q => q.Exists(i =>
@@ -1535,9 +1880,19 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         return total;
     }
     
-    private async Task<Tuple<long, List<TokenPoolIndex>>> GetPoolChangeListAsync(PagedAndSortedResultRequestDto request)
+    private async Task<Tuple<long, List<TokenPoolIndex>>> GetTokenPoolIndexChangeListAsync(PagedAndSortedResultRequestDto request, int type = -1)
     {
         var mustQuery = new List<Func<QueryContainerDescriptor<TokenPoolIndex>, QueryContainer>>();
+        if (type == 0)
+        {
+            mustQuery.Add(q => q.Exists(k =>
+                k.Field("pool.USDT")));
+        }
+        else if(type == 3)
+        {
+            mustQuery.Add(q => q.Exists(k =>
+                k.Field("withdrawFeeInfo.USDT")));
+        }
 
         QueryContainer Filter(QueryContainerDescriptor<TokenPoolIndex> f) => f.Bool(b => b.Must(mustQuery));
         
