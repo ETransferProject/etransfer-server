@@ -1534,9 +1534,10 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
                                 if (params._source.thirdPartFee != null && 
                                     params._source.thirdPartFee.length > 0) {
                                     def fee = params._source.thirdPartFee[0];
-                                    def amount = Double.parseDouble(fee.amount);
+                                    try { def amount = Double.parseDouble(fee.amount);
                                     def decimals = Integer.parseInt(fee.decimals);
-                                    return amount / Math.pow(10, decimals);
+                                    return amount / Math.pow(10, decimals); }
+                                    catch (Exception e) { return 0; }
                                 }
                                 return 0;
                             ")
@@ -1583,10 +1584,12 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
                     .Sum("sum_amount", sum => sum
                         .Script(script => script
                             .Source(@"
-                                if (params._source.toTransfer.feeInfo != null && 
+                                if (params._source.toTransfer != null &&
+                                    params._source.toTransfer.feeInfo != null && 
                                     params._source.toTransfer.feeInfo.length > 0) {
                                     def fee = params._source.toTransfer.feeInfo[0];
-                                    return Double.parseDouble(fee.amount);
+                                    try { return Double.parseDouble(fee.amount); }
+                                    catch (Exception e) { return 0; }
                                 }
                                 return 0;
                             ")
