@@ -700,6 +700,8 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         return true;
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ReconciliationAppService),
+        MethodName = nameof(HandleGetPoolOverviewExceptionAsync))]
     public async Task<PoolOverviewListDto> GetPoolOverviewAsync()
     {
         var result = new PoolOverviewListDto();
@@ -763,6 +765,8 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         return result;
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ReconciliationAppService),
+        MethodName = nameof(HandleResetPoolInitExceptionAsync))]
     public async Task<bool> ResetPoolInitAsync(GetPoolRequestDto request)
     {
         if (request.Symbol.IsNullOrWhiteSpace() ||
@@ -781,6 +785,8 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         return true;
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ReconciliationAppService),
+        MethodName = nameof(HandleGetPoolChangeListExceptionAsync))]
     public async Task<PoolChangeListDto<PoolChangeDto>> GetPoolChangeListAsync(PagedAndSortedResultRequestDto request)
     {
         var dto = new Dictionary<string, List<PoolChangeDto>>();
@@ -810,6 +816,8 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         };
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ReconciliationAppService),
+        MethodName = nameof(HandleGetMultiPoolOverviewExceptionAsync))]
     public async Task<MultiPoolOverviewDto> GetMultiPoolOverviewAsync()
     {
         var result = new MultiPoolOverviewDto();
@@ -871,6 +879,8 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         return result;
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ReconciliationAppService),
+        MethodName = nameof(HandleResetMultiPoolThresholdExceptionAsync))]
     public async Task<bool> ResetMultiPoolThresholdAsync(GetMultiPoolRequestDto request)
     {
         if (request.Network.IsNullOrWhiteSpace() || request.Symbol.IsNullOrWhiteSpace() ||
@@ -894,6 +904,8 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         return true;
     }
     
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ReconciliationAppService),
+        MethodName = nameof(HandleGetMultiPoolChangeListExceptionAsync))]
     public async Task<MultiPoolChangeListDto<MultiPoolChangeDto>> GetMultiPoolChangeListAsync(PagedAndSortedResultRequestDto request)
     {
         var dto = new Dictionary<string, List<MultiPoolChangeDto>>();
@@ -944,6 +956,8 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         };
     }
     
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ReconciliationAppService),
+        MethodName = nameof(HandleGetTokenPoolOverviewExceptionAsync))]
     public async Task<TokenPoolOverviewDto> GetTokenPoolOverviewAsync()
     {
         var result = new TokenPoolOverviewDto();
@@ -1002,6 +1016,8 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         return result;
     }
     
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ReconciliationAppService),
+        MethodName = nameof(HandleResetTokenPoolThresholdExceptionAsync))]
     public async Task<bool> ResetTokenPoolThresholdAsync(GetTokenPoolRequestDto request)
     {
         if (request.ChainId.IsNullOrWhiteSpace() || request.Symbol.IsNullOrWhiteSpace() ||
@@ -1023,6 +1039,8 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         return true;
     }
     
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ReconciliationAppService),
+        MethodName = nameof(HandleGetTokenPoolChangeListExceptionAsync))]
     public async Task<TokenPoolChangeListDto<TokenPoolChangeDto>> GetTokenPoolChangeListAsync(PagedAndSortedResultRequestDto request)
     {
         var dto = new Dictionary<string, List<TokenPoolChangeDto>>();
@@ -1078,6 +1096,8 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         return Tuple.Create(thirdPartFee, withdrawFee, depositFee);
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ReconciliationAppService),
+        MethodName = nameof(HandleGetFeeOverviewExceptionAsync))]
     public async Task<FeeOverviewDto> GetFeeOverviewAsync()
     {
         var result = new FeeOverviewDto();
@@ -1183,6 +1203,8 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         return result;
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ReconciliationAppService),
+        MethodName = nameof(HandleResetFeeInitExceptionAsync))]
     public async Task<bool> ResetFeeInitAsync(GetFeeRequestDto request)
     {
         if (request.Symbol.IsNullOrWhiteSpace() ||
@@ -1232,6 +1254,8 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         return true;
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(ReconciliationAppService),
+        MethodName = nameof(HandleGetFeeChangeListExceptionAsync))]
     public async Task<FeeChangeListDto<FeeChangeDto>> GetFeeChangeListAsync(PagedAndSortedResultRequestDto request)
     {
         var dto = new Dictionary<string, Dictionary<string, List<FeeChangeDto>>>();
@@ -1253,9 +1277,9 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
             {
                 foreach (var kvp in tokenPoolDto.ThirdPoolFeeInfo)
                 {
-                    if (!dto[changeItem.Date].ContainsKey("thirdPart"))
-                        dto[changeItem.Date].Add("thirdPart", new List<FeeChangeDto>());
-                    dto[changeItem.Date]["thirdPart"].Add(new FeeChangeDto
+                    if (!dto[changeItem.Date].ContainsKey(CommonConstant.ReconciliationThirdPartKey))
+                        dto[changeItem.Date].Add(CommonConstant.ReconciliationThirdPartKey, new List<FeeChangeDto>());
+                    dto[changeItem.Date][CommonConstant.ReconciliationThirdPartKey].Add(new FeeChangeDto
                     {
                         Symbol = kvp.Key,
                         ChangeAmount = changeItem.ThirdPoolFeeInfo != null && changeItem.ThirdPoolFeeInfo.ContainsKey(kvp.Key)
@@ -1268,8 +1292,8 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
 
             foreach (var item in symbolList)
             {
-                if (!dto[changeItem.Date].ContainsKey("etransfer"))
-                    dto[changeItem.Date].Add("etransfer", new List<FeeChangeDto>());
+                if (!dto[changeItem.Date].ContainsKey(CommonConstant.ReconciliationEtransferKey))
+                    dto[changeItem.Date].Add(CommonConstant.ReconciliationEtransferKey, new List<FeeChangeDto>());
                 var changeDto = new FeeChangeDto
                 {
                     Symbol = item
@@ -1284,12 +1308,12 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
                 changeDto.ChangeAmount = (withdrawChangeFee + depositChangeFee)
                     .ToString(6, DecimalHelper.RoundingOption.Floor)
                     .RemoveTrailingZeros();
-                dto[changeItem.Date]["etransfer"].Add(changeDto);
+                dto[changeItem.Date][CommonConstant.ReconciliationEtransferKey].Add(changeDto);
             }
             
-            if (!dto[changeItem.Date].ContainsKey("subsidy"))
-                dto[changeItem.Date].Add("subsidy", new List<FeeChangeDto>());
-            dto[changeItem.Date]["subsidy"].Add(new FeeChangeDto
+            if (!dto[changeItem.Date].ContainsKey(CommonConstant.ReconciliationSubsidyKey))
+                dto[changeItem.Date].Add(CommonConstant.ReconciliationSubsidyKey, new List<FeeChangeDto>());
+            dto[changeItem.Date][CommonConstant.ReconciliationSubsidyKey].Add(new FeeChangeDto
             {
                 Symbol = TokenSymbol.ELF,
                 ChangeAmount = "0"

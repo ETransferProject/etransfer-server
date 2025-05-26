@@ -66,6 +66,8 @@ public partial class TransactionAppService : ETransferServerAppService, ITransac
         return NotificationEnum.Ok.ToString().ToLower();
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(TransactionAppService),
+        MethodName = nameof(HandleTransactionCheckExceptionAsync))]
     public async Task<TransactionCheckResult> TransactionCheckAsync(GetTransactionCheckRequestDto request)
     {
         var mustQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();

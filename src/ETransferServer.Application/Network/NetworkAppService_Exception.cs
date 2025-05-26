@@ -2,8 +2,11 @@ using System;
 using System.Threading.Tasks;
 using AElf.ExceptionHandler;
 using ETransferServer.Models;
+using ETransferServer.Network.Dtos;
+using ETransferServer.Token.Dtos;
 using Microsoft.Extensions.Logging;
 using Volo.Abp;
+using Volo.Abp.Application.Dtos;
 
 namespace ETransferServer.Network;
 
@@ -25,6 +28,27 @@ public partial class NetworkAppService
         return new FlowBehavior
         {
             ExceptionHandlingStrategy = ExceptionHandlingStrategy.Rethrow
+        };
+    }
+    
+    public async Task<FlowBehavior> HandleGetNetworkTokenListExceptionAsync(Exception ex, GetNetworkTokenListRequestDto request,
+        string version = null)
+    {
+        _logger.LogError(ex, "Get network token list error");
+        return new FlowBehavior
+        {
+            ExceptionHandlingStrategy = ExceptionHandlingStrategy.Return,
+            ReturnValue = new GetNetworkTokenListDto()
+        };
+    }
+    
+    public async Task<FlowBehavior> HandleGetTokenPriceListExceptionAsync(Exception ex, GetTokenPriceListRequestDto request)
+    {
+        _logger.LogError(ex, "Get token price list error");
+        return new FlowBehavior
+        {
+            ExceptionHandlingStrategy = ExceptionHandlingStrategy.Return,
+            ReturnValue = new ListResultDto<TokenPriceDataDto>()
         };
     }
 }

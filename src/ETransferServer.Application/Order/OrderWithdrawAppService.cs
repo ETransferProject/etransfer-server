@@ -117,7 +117,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
         AssertHelper.IsTrue(VerifyMemo(request.Memo), ErrorResult.MemoInvalidCode);
         var stopwatch = Stopwatch.StartNew();
         var userId = await GetUserIdAsync(request.SourceType, request.FromAddress);
-        _logger.LogInformation("Get transfer info cost time to get user: {time}", stopwatch.ElapsedMilliseconds);
+        _logger.LogInformation("Get withdraw info cost time to get user: {time}", stopwatch.ElapsedMilliseconds);
         if (!request.Network.IsNullOrEmpty())
         {
             var networkConfig = _networkInfoOptions.Value.NetworkMap[request.Symbol]
@@ -160,14 +160,14 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
 
         stopwatch = Stopwatch.StartNew();
         feeAmount = await GetTransactionFeeAsync(request, userId, feeAmount);
-        _logger.LogInformation("Get transfer info cost time to get tx fee: {time}", stopwatch.ElapsedMilliseconds);
+        _logger.LogInformation("Get withdraw info cost time to get tx fee: {time}", stopwatch.ElapsedMilliseconds);
         withdrawInfoDto.TransactionFee = feeAmount.ToString(decimals, DecimalHelper.RoundingOption.Ceiling);
         withdrawInfoDto.TransactionUnit = request.Symbol;
         withdrawInfoDto.ExpiredTimestamp = expireAt.ToString();
 
         stopwatch = Stopwatch.StartNew();
         var networkFee = await networkFeeTask;
-        _logger.LogInformation("Get transfer info cost time to cal network fee: {time}", stopwatch.ElapsedMilliseconds);
+        _logger.LogInformation("Get withdraw info cost time to cal network fee: {time}", stopwatch.ElapsedMilliseconds);
         withdrawInfoDto.AelfTransactionFee = networkFee.ToString(CommonConstant.DefaultConst.ElfDecimals,
             DecimalHelper.RoundingOption.Ceiling);
         withdrawInfoDto.AelfTransactionUnit = CommonConstant.Symbol.Elf;
@@ -190,7 +190,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
             stopwatch = Stopwatch.StartNew();
             var avgExchange =
                 await _networkAppService.GetAvgExchangeAsync(request.Symbol, CommonConstant.Symbol.USD);
-            _logger.LogInformation("Get transfer info cost time to get symbol usd: {time}", stopwatch.ElapsedMilliseconds);
+            _logger.LogInformation("Get withdraw info cost time to get symbol usd: {time}", stopwatch.ElapsedMilliseconds);
             withdrawInfoDto.TotalLimit =
                 (_networkInfoOptions.Value.WithdrawLimit24H / avgExchange).ToString(decimals,
                     DecimalHelper.RoundingOption.Ceiling);
@@ -210,7 +210,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
                 avgExchange =
                     await _networkAppService.GetAvgExchangeAsync(CommonConstant.Symbol.Elf,
                         CommonConstant.Symbol.USD);
-                _logger.LogInformation("Get transfer info cost time to get elf usd: {time}", stopwatch.ElapsedMilliseconds);
+                _logger.LogInformation("Get withdraw info cost time to get elf usd: {time}", stopwatch.ElapsedMilliseconds);
                 fee += networkFee * avgExchange;
             }
 
@@ -227,9 +227,9 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
             return new GetWithdrawInfoDto { WithdrawInfo = withdrawInfoDto };
 
         stopwatch = Stopwatch.StartNew();
-        AssertHelper.IsTrue(await IsAddressSupport(request.ChainId, request.Symbol, request.Address, version),
-            ErrorResult.AddressInvalidCode);
-        _logger.LogInformation("Get transfer info cost time to check address: {time}", stopwatch.ElapsedMilliseconds);
+        AssertHelper.IsTrue(await IsAddressSupport(request.ChainId, request.Symbol, request.Address, version, 
+            request.SourceType, request.FromAddress), ErrorResult.AddressInvalidCode);
+        _logger.LogInformation("Get withdraw info cost time to check address: {time}", stopwatch.ElapsedMilliseconds);
         return new GetWithdrawInfoDto
         {
             WithdrawInfo = withdrawInfoDto
@@ -455,7 +455,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
                 Owner = address,
                 Symbol = CommonConstant.Symbol.Elf
             });
-        _logger.LogInformation("Get transfer info cost time to call balance: {time}", stopwatch.ElapsedMilliseconds);
+        _logger.LogInformation("Get withdraw info cost time to call balance: {time}", stopwatch.ElapsedMilliseconds);
         
         // When the user does not have a balance, the user's money will not be deducted in any case,
         // and when the free amount is not enough, the transaction fee will be deducted from the delegate account.
@@ -469,7 +469,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
         stopwatch = Stopwatch.StartNew();
         var freeAllowances = await _contractProvider.CallTransactionAsync<TransactionFeeFreeAllowancesMap>(chainId,
             SystemContractName.TokenContract, "GetTransactionFeeFreeAllowances", address);
-        _logger.LogInformation("Get transfer info cost time to call free allowances: {time}", stopwatch.ElapsedMilliseconds);
+        _logger.LogInformation("Get withdraw info cost time to call free allowances: {time}", stopwatch.ElapsedMilliseconds);
         var totalAllowance = freeAllowances.Map.Values
             .SelectMany(d => d.Map.Values)
             .Sum(m => m.Amount);
@@ -493,7 +493,8 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
             .ToArray());
     }
 
-    private async Task<bool> IsAddressSupport(string chainId, string symbol, string address, string version = null)
+    private async Task<bool> IsAddressSupport(string chainId, string symbol, string address, string version = null,
+        string sourceType = null, string fromAddress = null)
     {
         try
         {
@@ -503,7 +504,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
                 ChainId = chainId,
                 Symbol = symbol,
                 Address = address
-            }, version, true);
+            }, version, true, sourceType, fromAddress);
             return network != null && !network.NetworkList.IsNullOrEmpty();
         }
         catch (Exception e)

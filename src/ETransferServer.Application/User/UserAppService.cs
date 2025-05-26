@@ -66,6 +66,8 @@ public partial class UserAppService : ApplicationService, IUserAppService
         return ObjectMapper.Map<UserIndex, UserDto>(user.Item2.FirstOrDefault());
     }
     
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(UserAppService),
+        MethodName = nameof(HandleCheckEoaRegistrationExceptionAsync))]
     public async Task<EoaRegistrationResult> CheckEoaRegistrationAsync(GetEoaRegistrationResultRequestDto requestDto)
     {
         var user = await _userManager.FindByNameAsync(requestDto.Address);
@@ -75,6 +77,8 @@ public partial class UserAppService : ApplicationService, IUserAppService
         };
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(UserAppService),
+        MethodName = nameof(HandleCheckRegistrationExceptionAsync))]
     public async Task<RegistrationResult> CheckRegistrationAsync(GetRegistrationResultRequestDto requestDto)
     {
         if (!Enum.TryParse<WalletEnum>(requestDto.SourceType, true, out _))

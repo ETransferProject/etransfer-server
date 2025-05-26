@@ -30,6 +30,10 @@ public static class CommonConstant
     public const string PortKeyAppId = "PortKey";
     public const string NightElfAppId = "NightElf";
 
+    public const string ReconciliationThirdPartKey = "thirdPart";
+    public const string ReconciliationEtransferKey = "etransfer";
+    public const string ReconciliationSubsidyKey = "subsidy";
+
     public static class DefaultConst {
         public const int ThirdPartDigitals = 4;
         public const int ElfDecimals = 8;

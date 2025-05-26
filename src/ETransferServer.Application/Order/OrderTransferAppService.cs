@@ -75,7 +75,7 @@ public partial class OrderWithdrawAppService
                 .FirstOrDefault(t => t.NetworkInfo.Network == request.FromNetwork)?.NetworkInfo?.ContractAddress
                 ?? _networkInfoOptions.Value.NetworkMap[CommonConstant.Symbol.USDT]
                 .FirstOrDefault(t => t.NetworkInfo.Network == request.FromNetwork)?.NetworkInfo?.ContractAddress;
-            _logger.LogInformation("Get transfer info cost time: {time}", stopwatch.ElapsedMilliseconds);
+            _logger.LogInformation("Get withdraw info cost time: {time}", stopwatch.ElapsedMilliseconds);
             return new GetTransferInfoDto
             {
                 TransferInfo = transferInfo
@@ -182,8 +182,8 @@ public partial class OrderWithdrawAppService
         if (request.ToAddress.IsNullOrEmpty())
             return new GetTransferInfoDto { TransferInfo = withdrawInfoDto };
 
-        AssertHelper.IsTrue(await IsAddressSupport(request.FromNetwork, request.Symbol, request.ToAddress, version),
-            ErrorResult.AddressFormatWrongCode);
+        AssertHelper.IsTrue(await IsAddressSupport(request.FromNetwork, request.Symbol, request.ToAddress, 
+            version, request.SourceType, request.FromAddress), ErrorResult.AddressFormatWrongCode);
         return new GetTransferInfoDto
         {
             TransferInfo = withdrawInfoDto

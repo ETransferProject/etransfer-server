@@ -96,6 +96,8 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
         return getNetworkListDto;
     }
 
+    [ExceptionHandler(typeof(Exception), TargetType = typeof(NetworkAppService), 
+        MethodName = nameof(HandleGetNetworkTokenListExceptionAsync))]
     public async Task<GetNetworkTokenListDto> GetNetworkTokenListAsync(GetNetworkTokenListRequestDto request,
         string version = null)
     {
@@ -222,7 +224,7 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
     }
 
     public async Task<GetNetworkListDto> GetNetworkListWithLocalFeeAsync(GetNetworkListRequestDto request, 
-        string version = null, bool isAddressSupport = false)
+        string version = null, bool isAddressSupport = false, string sourceType = null, string address = null)
     {
         AssertHelper.NotNull(request, "Request empty. Please refresh and try again.");
         AssertHelper.NotEmpty(request.Type, "Invalid type. Please refresh and try again.");
@@ -251,7 +253,7 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
                         ? a.SupportType.Contains(request.Type) 
                         : a.SupportType.Contains(request.Type) && a.SupportChain.Contains(request.ChainId))
                 .ToList();
-        networkConfigs = await FilterByVersionAndWhiteList(networkConfigs, version);
+        networkConfigs = await FilterByVersionAndWhiteList(networkConfigs, version, sourceType, address);
 
         var networkInfos = networkConfigs.Select(config => config.NetworkInfo).ToList();
         var withdrawInfo = networkConfigs
@@ -389,6 +391,8 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
                 .FirstOrDefault(token => token.Symbol == toSymbol)?.Icon);
     }
 
+    [ExceptionHandler(typeof(Exception), 
+        TargetType = typeof(NetworkAppService), MethodName = nameof(HandleGetTokenPriceListExceptionAsync))]
     public async Task<ListResultDto<TokenPriceDataDto>> GetTokenPriceListAsync(GetTokenPriceListRequestDto request)
     {
         if (string.IsNullOrWhiteSpace(request.Symbols)) return new ListResultDto<TokenPriceDataDto>();
@@ -501,9 +505,11 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
         }
 
         if (!sourceType.IsNullOrEmpty() && !address.IsNullOrEmpty() &&
-            Enum.TryParse<WalletEnum>(sourceType, true, out _))
+            Enum.TryParse<WalletEnum>(sourceType, true, out var walletType))
         {
-            var fullAddress = string.Concat(sourceType.ToLower(), CommonConstant.Underline, address);
+            var fullAddress = (int)walletType > 1 
+                ? string.Concat(sourceType.ToLower(), CommonConstant.Underline, address)
+                : address;
             return networkConfigs.Where(config =>
                 config.NetworkInfo.MinShowVersion.IsNullOrEmpty()
                 || (VerifyHelper.VerifyMemoVersion(version, config.NetworkInfo.MinShowVersion)
