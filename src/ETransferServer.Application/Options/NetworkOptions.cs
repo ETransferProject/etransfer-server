@@ -74,20 +74,11 @@ public class NetworkConfig
 }
 
 /// <summary>
-/// Basic network information and blockchain parameters
+/// Base configuration containing common blockchain operation parameters
+/// Shared across different operation types to eliminate duplication
 /// </summary>
-public class NetworkInfo
+public class BaseBlockchainConfig
 {
-    /// <summary>
-    /// Network identifier (e.g., "Ethereum", "BSC", "Polygon")
-    /// </summary>
-    public string Network { get; set; }
-    
-    /// <summary>
-    /// Human-readable network display name
-    /// </summary>
-    public string Name { get; set; }
-    
     /// <summary>
     /// Number of block confirmations required for security
     /// Can be numeric string or "auto" for dynamic confirmation
@@ -101,10 +92,37 @@ public class NetworkInfo
     public decimal MultiConfirmSeconds { get; set; }
     
     /// <summary>
-    /// Smart contract address for token operations on this network
+    /// Smart contract address for operations on this network
     /// Empty for native tokens
     /// </summary>
     public string ContractAddress { get; set; }
+    
+    /// <summary>
+    /// Additional notes or warnings displayed to users
+    /// </summary>
+    public List<string> ExtraNotes { get; set; } = new();
+    
+    /// <summary>
+    /// Whether operations are currently enabled
+    /// Default: true
+    /// </summary>
+    public bool IsOpen { get; set; } = true;
+}
+
+/// <summary>
+/// Basic network information and blockchain parameters
+/// </summary>
+public class NetworkInfo : BaseBlockchainConfig
+{
+    /// <summary>
+    /// Network identifier (e.g., "Ethereum", "BSC", "Polygon")
+    /// </summary>
+    public string Network { get; set; }
+    
+    /// <summary>
+    /// Human-readable network display name
+    /// </summary>
+    public string Name { get; set; }
     
     /// <summary>
     /// Average time in seconds for block generation on this network
@@ -157,15 +175,10 @@ public class NetworkInfo
 
 /// <summary>
 /// Deposit operation configuration for a specific network
+/// Inherits common blockchain parameters from BaseBlockchainConfig
 /// </summary>
-public class DepositInfo
+public class DepositInfo : BaseBlockchainConfig
 {
-    /// <summary>
-    /// Whether deposit operations are currently enabled
-    /// Default: true
-    /// </summary>
-    public bool IsOpen { get; set; } = true;
-    
     /// <summary>
     /// Minimum deposit amount allowed
     /// Specified as string to maintain precision
@@ -179,34 +192,26 @@ public class DepositInfo
     public string MaxDeposit { get; set; }
     
     /// <summary>
-    /// Number of confirmations required for deposit completion
-    /// Can be numeric string or "auto"
-    /// </summary>
-    public string MultiConfirm { get; set; }
-    
-    /// <summary>
-    /// Time in seconds to wait for deposit confirmations
-    /// </summary>
-    public decimal MultiConfirmSeconds { get; set; }
-    
-    /// <summary>
-    /// Contract address for deposit operations (if different from main contract)
-    /// </summary>
-    public string ContractAddress { get; set; }
-    
-    /// <summary>
-    /// Additional notes or warnings displayed to users during deposit
-    /// </summary>
-    public List<string> ExtraNotes { get; set; } = new();
-    
-    /// <summary>
     /// Additional notes specific to swap operations during deposit
     /// </summary>
     public List<string> SwapExtraNotes { get; set; } = new();
+    
+    /// <summary>
+    /// Supported deposit methods for this network
+    /// e.g., ["direct", "swap", "bridge"]
+    /// </summary>
+    public List<string> SupportedMethods { get; set; } = new();
+    
+    /// <summary>
+    /// Minimum confirmation time in seconds for fast deposits
+    /// Used for urgent or express deposit processing
+    /// </summary>
+    public decimal? FastConfirmSeconds { get; set; }
 }
 
 /// <summary>
 /// Withdrawal operation configuration for a specific network
+/// Contains withdrawal-specific parameters with common blockchain config
 /// </summary>
 public class WithdrawInfo
 {
@@ -217,10 +222,21 @@ public class WithdrawInfo
     public bool IsOpen { get; set; } = true;
     
     /// <summary>
+    /// Time in seconds to wait for withdrawal confirmations
+    /// </summary>
+    public decimal MultiConfirmSeconds { get; set; }
+    
+    /// <summary>
     /// Minimum withdrawal amount allowed
     /// Specified as string to maintain precision
     /// </summary>
     public string MinWithdraw { get; set; }
+    
+    /// <summary>
+    /// Maximum withdrawal amount allowed per transaction
+    /// Specified as string to maintain precision
+    /// </summary>
+    public string MaxWithdraw { get; set; }
     
     /// <summary>
     /// Standard withdrawal fee amount
@@ -258,13 +274,84 @@ public class WithdrawInfo
     public string WithdrawLimit24h { get; set; }
     
     /// <summary>
-    /// Time in seconds to wait for withdrawal confirmations
-    /// </summary>
-    public decimal MultiConfirmSeconds { get; set; }
-    
-    /// <summary>
     /// Number of decimal places for withdrawal amounts
     /// Used for UI formatting and validation
     /// </summary>
     public int Decimals { get; set; }
+    
+    /// <summary>
+    /// Risk management configuration for withdrawals
+    /// </summary>
+    public WithdrawRiskConfig RiskConfig { get; set; } = new();
+    
+    /// <summary>
+    /// Fee structure configuration
+    /// </summary>
+    public WithdrawFeeConfig FeeConfig { get; set; } = new();
+}
+
+/// <summary>
+/// Risk management configuration for withdrawal operations
+/// </summary>
+public class WithdrawRiskConfig
+{
+    /// <summary>
+    /// Maximum allowed withdrawal amount per transaction for risk control
+    /// Null means no additional risk limit
+    /// </summary>
+    public decimal? MaxRiskAmount { get; set; }
+    
+    /// <summary>
+    /// Requires additional verification for amounts above this threshold
+    /// </summary>
+    public decimal? VerificationThreshold { get; set; }
+    
+    /// <summary>
+    /// Cooling period in seconds before next withdrawal
+    /// Used for high-risk scenarios
+    /// </summary>
+    public int? CoolingPeriodSeconds { get; set; }
+    
+    /// <summary>
+    /// Whether to enable real-time fraud detection
+    /// </summary>
+    public bool EnableFraudDetection { get; set; } = true;
+}
+
+/// <summary>
+/// Fee structure configuration for withdrawal operations
+/// </summary>
+public class WithdrawFeeConfig
+{
+    /// <summary>
+    /// Fee calculation method
+    /// Values: "fixed", "percentage", "dynamic", "tiered"
+    /// </summary>
+    public string FeeType { get; set; } = "fixed";
+    
+    /// <summary>
+    /// Base fee amount (for fixed fee type)
+    /// </summary>
+    public decimal BaseFee { get; set; }
+    
+    /// <summary>
+    /// Fee percentage (for percentage fee type)
+    /// </summary>
+    public decimal FeePercentage { get; set; }
+    
+    /// <summary>
+    /// Minimum fee amount regardless of calculation method
+    /// </summary>
+    public decimal MinFee { get; set; }
+    
+    /// <summary>
+    /// Maximum fee amount regardless of calculation method
+    /// </summary>
+    public decimal MaxFee { get; set; }
+    
+    /// <summary>
+    /// Tiered fee structure for different amount ranges
+    /// Key: Amount threshold, Value: Fee configuration
+    /// </summary>
+    public Dictionary<decimal, decimal> TieredFees { get; set; } = new();
 }
