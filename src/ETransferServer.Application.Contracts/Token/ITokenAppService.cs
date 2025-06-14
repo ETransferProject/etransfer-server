@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using ETransferServer.Models;
 using ETransferServer.Token.Dtos;
@@ -12,4 +13,5 @@ public interface ITokenAppService : IApplicationService
     Task<GetTokenOptionListDto> GetTokenOptionListAsync(GetTokenOptionListRequestDto request);
     bool IsValidDeposit(string toChainId, string fromSymbol, [CanBeNull] string toSymbol);
     bool IsValidSwap(string toChainId, string fromSymbol, [CanBeNull] string toSymbol);
+    List<GetDepositSwapInfoDto> GetDepositSwapInfo();
 }
