@@ -2163,11 +2163,19 @@ public class TokenSwapConfigLegacy
 /// </summary>
 public class ToTokenConfig
 {
+    public string Symbol { get; set; }
     public string Name { get; set; }
+    public List<string> ChainIdList { get; set; } = new();
+    public string Icon { get; set; }
+}
+
+/// <summary>
+/// Backward compatibility class for existing ToTokenInfo usage
+/// </summary>
+public class ToTokenInfo
+{
     public string Symbol { get; set; }
     public List<string> ChainIdList { get; set; } = new();
-    public int Decimals { get; set; }
-    public string Icon { get; set; }
 }
 
 #endregion 
