@@ -80,7 +80,7 @@ public partial class TokenAppService : ETransferServerAppService, ITokenAppServi
         var getTokenOptionListDto = new GetTokenOptionListDto();
         var depositSwapConfigs = _tokenOptions.Value.DepositSwap;
         
-        var tokenOptionDtos = _objectMapper.Map<List<TokenSwapConfig>, List<TokenOptionConfigDto>>(depositSwapConfigs);
+        var tokenOptionDtos = _objectMapper.Map<List<TokenSwapConfigLegacy>, List<TokenOptionConfigDto>>(depositSwapConfigs);
 
         getTokenOptionListDto.TokenList = tokenOptionDtos;
         return getTokenOptionListDto;
@@ -106,5 +106,21 @@ public partial class TokenAppService : ETransferServerAppService, ITokenAppServi
     {
         return DepositSwapHelper.IsDepositSwap(fromSymbol, toSymbol) && _tokenOptions.Value.DepositSwap
             .Any(config => config.Symbol == fromSymbol && config.ToTokenList.Any(token => token.Symbol == toSymbol && token.ChainIdList.Any(chainId => chainId == toChainId)));
+    }
+
+    public List<GetDepositSwapInfoDto> GetDepositSwapInfo()
+    {
+        var depositSwapConfigs = _tokenOptions.Value.DepositSwap;
+        var swapInfos = depositSwapConfigs.Select(config => new GetDepositSwapInfoDto
+        {
+            FromSymbol = config.Symbol,
+            ToTokenList = config.ToTokenList?.Select(toToken => new ToTokenDto
+            {
+                Symbol = toToken.Symbol,
+                ChainIdList = toToken.ChainIdList
+            }).ToList() ?? new List<ToTokenDto>()
+        }).ToList();
+
+        return swapInfos;
     }
 }

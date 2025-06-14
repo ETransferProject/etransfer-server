@@ -141,20 +141,19 @@ public class TokenAppServiceTest : ETransferServerApplicationTestBase
                         Decimals = 6
                     }
                 },
-                DepositSwap = new List<TokenSwapConfig>()
+                DepositSwap = new List<TokenSwapConfigLegacy>()
                 {
-                    new TokenSwapConfig()
+                    new TokenSwapConfigLegacy
                     {
                         Symbol = "USDT",
                         Name = "USDT",
                         Decimals = 6,
-                        ToTokenList = new List<ToTokenConfig>()
+                        ToTokenList = new List<ToTokenConfig>
                         {
-                            new ToTokenConfig()
+                            new()
                             {
                                 Symbol = "ELF",
-                                Name = "ELF",
-                                ChainIdList = new List<string>() { "AELF" }
+                                ChainIdList = new List<string> { "AELF", "tDVV", "tDVW" }
                             }
                         }
                     }
