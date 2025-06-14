@@ -564,7 +564,7 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
             {
                 networkDto.Status = config.WithdrawInfo.IsOpen
                     ? CommonConstant.NetworkStatus.Health
-                    : CommonConstant.NetworkStatus.Offline;
+                    : CommonConstant.NetworkStatus.Offline; 
                 multiConfirmSeconds = config.WithdrawInfo.MultiConfirmSeconds;
                 foreach (var kv in multiTokens) {
                     networkDto.MultiStatus ??= new Dictionary<string, string>();
