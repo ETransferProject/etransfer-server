@@ -42,6 +42,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
     private readonly IOptionsSnapshot<DepositAddressOptions> _depositAddressOption;
     private readonly IOptionsSnapshot<NetworkOptions> _networkOption;
     private readonly IOptionsSnapshot<CoBoOptions> _coBoOptions;
+    private readonly IOptionsSnapshot<TokenPaymentAddressOptions> _tokenPaymentAddressOptions;
     private readonly IUserAppService _userAppService;
     private readonly IUserAddressService _userAddressService;
     private readonly INetworkAppService _networkService;
@@ -60,6 +61,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         IOptionsSnapshot<DepositAddressOptions> depositAddressOption, 
         IOptionsSnapshot<NetworkOptions> networkOption,
         IOptionsSnapshot<CoBoOptions> coBoOptions,
+        IOptionsSnapshot<TokenPaymentAddressOptions> tokenPaymentAddressOptions,
         IUserAppService userAppService, 
         IUserAddressService userAddressService,
         INetworkAppService networkService,
@@ -74,6 +76,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         _depositAddressOption = depositAddressOption;
         _networkOption = networkOption;
         _coBoOptions = coBoOptions;
+        _tokenPaymentAddressOptions = tokenPaymentAddressOptions;
         _userAppService = userAppService;
         _userAddressService = userAddressService;
         _networkService = networkService;
@@ -263,16 +266,32 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         AssertHelper.NotNull(addressInfo, "addressInfo empty");
 
         var paymentAddressExists =
-            _depositOption.Value.PaymentAddresses?.ContainsKey(userAddress.ChainId) ?? false;
+            _tokenPaymentAddressOptions.Value.PaymentAddresses?.ContainsKey(userAddress.ChainId) ?? false;
         AssertHelper.IsTrue(paymentAddressExists, "Payment address missing, ChainId={ChainId}", userAddress.ChainId);
-        var paymentAddressDic = _depositOption.Value.PaymentAddresses.GetValueOrDefault(userAddress.ChainId);
+        var paymentAddressDic = _tokenPaymentAddressOptions.Value.PaymentAddresses.GetValueOrDefault(userAddress.ChainId);
         AssertHelper.NotEmpty(paymentAddressDic, "Payment address empty, ChainId={ChainId}", userAddress.ChainId);
         var (isOpen, amountThreshold, serviceFee, minAmount) = await GetServiceFeeAsync(coinInfo.Network, coinInfo.Symbol);
-        var toAmount = isOpen && coBoTransaction.AbsAmount.SafeToDecimal() >= minAmount && coBoTransaction.AbsAmount.SafeToDecimal() < amountThreshold
-            ? coBoTransaction.AbsAmount.SafeToDecimal() - serviceFee
-            : (!isOpen && coBoTransaction.AbsAmount.SafeToDecimal() >= minAmount) || (isOpen && coBoTransaction.AbsAmount.SafeToDecimal() >= amountThreshold)
-                ? coBoTransaction.AbsAmount.SafeToDecimal()
-                : 0M;
+        var amount = coBoTransaction.AbsAmount.SafeToDecimal();
+        decimal toAmount;
+        if (isOpen)
+        {
+            if (amount >= minAmount && amount < amountThreshold)
+            {
+                toAmount = amount - serviceFee;
+            }
+            else if (amount >= amountThreshold)
+            {
+                toAmount = amount;
+            }
+            else
+            {
+                toAmount = 0M;
+            }
+        }
+        else
+        {
+            toAmount = amount >= minAmount ? amount : 0M;
+        }
         toAmount = toAmount < 0 ? 0M : toAmount;
 
         var depositOrderDto = new DepositOrderDto
@@ -351,12 +370,12 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
                 _logger.LogInformation("Swap to mainChain, {fromSymbol}, {toSymbol}", dto.FromTransfer.Symbol, symbol);
                 dto.ExtensionInfo.AddOrReplace(ExtensionKey.SwapToMain, Boolean.TrueString);
                 dto.ExtensionInfo.AddOrReplace(ExtensionKey.SwapFromAddress, GetPaymentAddress(
-                    _depositOption.Value.PaymentAddresses.GetValueOrDefault(dto.ToTransfer.ChainId), symbol));
+                    _tokenPaymentAddressOptions.Value.PaymentAddresses.GetValueOrDefault(dto.ToTransfer.ChainId), symbol));
                 dto.ExtensionInfo.AddOrReplace(ExtensionKey.SwapOriginFromAddress, dto.ToTransfer.FromAddress);
                 dto.ExtensionInfo.AddOrReplace(ExtensionKey.SwapToAddress, dto.ToTransfer.ToAddress);
                 dto.ExtensionInfo.AddOrReplace(ExtensionKey.SwapChainId, dto.ToTransfer.ChainId);
-                var sideChainId = _depositOption.Value.PaymentAddresses.Keys.FirstOrDefault(t => t != ChainId.AELF);
-                var paymentAddressDic = _depositOption.Value.PaymentAddresses.GetValueOrDefault(sideChainId);
+                var sideChainId = _tokenPaymentAddressOptions.Value.PaymentAddresses.Keys.FirstOrDefault(t => t != ChainId.AELF);
+                var paymentAddressDic = _tokenPaymentAddressOptions.Value.PaymentAddresses.GetValueOrDefault(sideChainId);
                 dto.ToTransfer.FromAddress = GetPaymentAddress(paymentAddressDic, dto.FromTransfer.Symbol);
                 dto.ToTransfer.ToAddress = GetPaymentAddress(paymentAddressDic, symbol);
                 dto.ToTransfer.ChainId = sideChainId;

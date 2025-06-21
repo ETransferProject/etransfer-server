@@ -29,8 +29,8 @@ public partial class InfoAppService : ETransferServerAppService, IInfoAppService
     private readonly INetworkAppService _networkAppService;
     private readonly IOptionsSnapshot<NetworkOptions> _networkOptions;
     private readonly IOptionsSnapshot<TokenOptions> _tokenOptions;
-    private readonly IOptionsSnapshot<TokenInfoOptions> _tokenInfoOptions;
-    private readonly IOptionsSnapshot<DepositInfoOptions> _depositInfoOptions;
+    private readonly IOptionsSnapshot<TokenInfoOptionsBack> _tokenInfoOptions;
+    private readonly IOptionsSnapshot<DepositInfoOptionsBak> _depositInfoOptions;
     private readonly IObjectMapper _objectMapper;
     private readonly ILogger<InfoAppService> _logger;
 
@@ -38,8 +38,8 @@ public partial class InfoAppService : ETransferServerAppService, IInfoAppService
         INetworkAppService networkAppService, 
         IOptionsSnapshot<NetworkOptions> networkOptions,
         IOptionsSnapshot<TokenOptions> tokenOptions,
-        IOptionsSnapshot<TokenInfoOptions> tokenInfoOptions,
-        IOptionsSnapshot<DepositInfoOptions> depositInfoOptions,
+        IOptionsSnapshot<TokenInfoOptionsBack> tokenInfoOptions,
+        IOptionsSnapshot<DepositInfoOptionsBak> depositInfoOptions,
         IObjectMapper objectMapper,
         ILogger<InfoAppService> logger)
     {

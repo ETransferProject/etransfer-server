@@ -282,9 +282,9 @@ public class OrderDepositTest : ETransferServerApplicationTestBase
                 {
                     Symbol = "USDT",
                     Decimals = 8,
-                    ToTokenList = new List<ToTokenOptionConfigDto>()
+                    ToTokenList = new List<TargetTokenOptionConfigDto>()
                     {
-                        new ToTokenOptionConfigDto()
+                        new TargetTokenOptionConfigDto()
                         {
                             Symbol = "USDT",
                             Decimals = 8,
@@ -295,7 +295,7 @@ public class OrderDepositTest : ETransferServerApplicationTestBase
                                 "tDVW"
                             }
                         },
-                        new ToTokenOptionConfigDto()
+                        new TargetTokenOptionConfigDto()
                         {
                             Symbol = "ELF",
                             Decimals = 8,
