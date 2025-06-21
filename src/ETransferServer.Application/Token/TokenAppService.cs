@@ -21,15 +21,18 @@ namespace ETransferServer.Token;
 public partial class TokenAppService : ETransferServerAppService, ITokenAppService
 {
     private readonly ILogger<TokenAppService> _logger;
-    private readonly IOptionsSnapshot<TokenOptions> _tokenOptions;
+    private readonly IOptionsSnapshot<TokenInfoOptions> _tokenInfoOptions;
     private readonly IObjectMapper _objectMapper;
+    private readonly ISupportedChainTokenProvider _supportedChainTokenProvider;
 
-    public TokenAppService(ILogger<TokenAppService> logger, IOptionsSnapshot<TokenOptions> tokenOptions,
-        IObjectMapper objectMapper)
+    public TokenAppService(ILogger<TokenAppService> logger,
+        IOptionsSnapshot<TokenInfoOptions> tokenInfoOptions,
+        IObjectMapper objectMapper, ISupportedChainTokenProvider supportedChainTokenProvider)
     {
         _logger = logger;
-        _tokenOptions = tokenOptions;
+        _tokenInfoOptions = tokenInfoOptions;
         _objectMapper = objectMapper;
+        _supportedChainTokenProvider = supportedChainTokenProvider;
     }
 
     [ExceptionHandler(typeof(Exception), TargetType = typeof(TokenAppService),
@@ -49,22 +52,8 @@ public partial class TokenAppService : ETransferServerAppService, ITokenAppServi
                             || request.Type == OrderTypeEnum.Transfer.ToString(), "Invalid type value. Please refresh and try again.");
 
         var getTokenListDto = new GetTokenListDto();
-        var configs = new List<TokenConfig>();
-        if (request.Type == OrderTypeEnum.Deposit.ToString())
-        {
-            configs = _tokenOptions.Value.Deposit[request.ChainId];
-        }
-        else if(request.Type == OrderTypeEnum.Withdraw.ToString())
-        {
-            configs = _tokenOptions.Value.Withdraw[request.ChainId];
-        }
-        else
-        {
-            configs = _tokenOptions.Value.Transfer;
-        }
-
-        var tokenDtos = _objectMapper.Map<List<TokenConfig>, List<TokenConfigDto>>(configs);
-        getTokenListDto.TokenList = tokenDtos;
+        var tokenList = _supportedChainTokenProvider.GetTokenListByType(request.Type, request.ChainId);
+        getTokenListDto.TokenList = tokenList;
         getTokenListDto.ChainId = request.ChainId;
         return getTokenListDto;
     }
@@ -77,50 +66,26 @@ public partial class TokenAppService : ETransferServerAppService, ITokenAppServi
         AssertHelper.NotEmpty(request.Type, "Invalid type. Please refresh and try again.");
         AssertHelper.IsTrue(request.Type == OrderTypeEnum.Deposit.ToString(), "Invalid type value. Please refresh and try again.");
 
-        var getTokenOptionListDto = new GetTokenOptionListDto();
-        var depositSwapConfigs = _tokenOptions.Value.DepositSwap;
-        
-        var tokenOptionDtos = _objectMapper.Map<List<TokenSwapConfigLegacy>, List<TokenOptionConfigDto>>(depositSwapConfigs);
-
-        getTokenOptionListDto.TokenList = tokenOptionDtos;
+        var res = _supportedChainTokenProvider.GetTokenConfig();
+        var getTokenOptionListDto = new GetTokenOptionListDto
+        {
+            TokenList = res
+        };
         return getTokenOptionListDto;
     }
 
     public bool IsValidDeposit(string toChainId, string fromSymbol, [CanBeNull] string toSymbol)
     {
-        if (DepositSwapHelper.NoDepositSwap(fromSymbol, toSymbol))
-        {
-            return _tokenOptions.Value.DepositSwap
-                .Any(config => config.Symbol == fromSymbol && config.ToTokenList.Any(token => token.Symbol == fromSymbol && token.ChainIdList.Any(chainId => chainId == toChainId)));
-        }
-
-        if (DepositSwapHelper.IsDepositSwap(fromSymbol, toSymbol))
-        {
-            return IsValidSwap(toChainId, fromSymbol, toSymbol);
-        }
-
-        return false;
+        return _supportedChainTokenProvider.IsTokenSupportedDeposit(fromSymbol, toSymbol, toChainId);
     }
 
     public bool IsValidSwap(string toChainId, string fromSymbol, [CanBeNull] string toSymbol)
     {
-        return DepositSwapHelper.IsDepositSwap(fromSymbol, toSymbol) && _tokenOptions.Value.DepositSwap
-            .Any(config => config.Symbol == fromSymbol && config.ToTokenList.Any(token => token.Symbol == toSymbol && token.ChainIdList.Any(chainId => chainId == toChainId)));
+        return _supportedChainTokenProvider.IsTokenSupportedSwap(fromSymbol, toSymbol, toChainId);
     }
 
-    public List<GetDepositSwapInfoDto> GetDepositSwapInfo()
+    public async Task<TokenInfoDto> GetTokenInfoAsync(string symbol)
     {
-        var depositSwapConfigs = _tokenOptions.Value.DepositSwap;
-        var swapInfos = depositSwapConfigs.Select(config => new GetDepositSwapInfoDto
-        {
-            FromSymbol = config.Symbol,
-            ToTokenList = config.ToTokenList?.Select(toToken => new ToTokenDto
-            {
-                Symbol = toToken.Symbol,
-                ChainIdList = toToken.ChainIdList
-            }).ToList() ?? new List<ToTokenDto>()
-        }).ToList();
-
-        return swapInfos;
+        return _tokenInfoOptions.Value.Tokens[symbol];
     }
 }

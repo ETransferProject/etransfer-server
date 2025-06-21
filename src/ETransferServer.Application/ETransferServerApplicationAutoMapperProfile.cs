@@ -50,7 +50,7 @@ public class ETransferServerApplicationAutoMapperProfile : Profile
         CreateMap<TokenConfig, TokenConfigDto>().ReverseMap();
         CreateMap<TokenConfig, TokenConfigOptionDto>().ReverseMap();
         CreateMap<TokenSwapConfig, TokenOptionConfigDto>().ReverseMap();
-        CreateMap<ToTokenConfig, ToTokenOptionConfigDto>().ReverseMap();
+        CreateMap<ToTokenConfig, TargetTokenOptionConfigDto>().ReverseMap();
         CreateMap<ToTokenConfig, TokenConfig>().ReverseMap();
         
         CreateMap<UserTokenAccessInfoIndex, UserTokenAccessInfoDto>().ReverseMap();

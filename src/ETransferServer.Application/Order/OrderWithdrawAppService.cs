@@ -59,8 +59,8 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
     private readonly INetworkAppService _networkAppService;
     private readonly IUserAppService _userAppService;
     private readonly IContractProvider _contractProvider;
-    private readonly IOptionsSnapshot<WithdrawInfoOptions> _withdrawInfoOptions;
-    private readonly IOptionsSnapshot<DepositInfoOptions> _depositInfoOptions;
+    private readonly IOptionsSnapshot<WithdrawInfoOptionsBak> _withdrawInfoOptions;
+    private readonly IOptionsSnapshot<DepositInfoOptionsBak> _depositInfoOptions;
     private readonly IOptionsSnapshot<NetworkOptions> _networkInfoOptions;
     private readonly IOptionsSnapshot<ChainOptions> _chainOptions;
     private readonly IOptionsSnapshot<CoBoOptions> _coBoOptions;
@@ -76,8 +76,8 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
         INetworkAppService networkAppService, 
         IUserAppService userAppService,
         IContractProvider contractProvider,
-        IOptionsSnapshot<WithdrawInfoOptions> withdrawInfoOptions,
-        IOptionsSnapshot<DepositInfoOptions> depositInfoOptions,
+        IOptionsSnapshot<WithdrawInfoOptionsBak> withdrawInfoOptions,
+        IOptionsSnapshot<DepositInfoOptionsBak> depositInfoOptions,
         IOptionsSnapshot<ChainOptions> chainOptions, 
         IOptionsSnapshot<CoBoOptions> coBoOptions,
         IDistributedCache<CoBoCoinDto> coBoCoinCache, 

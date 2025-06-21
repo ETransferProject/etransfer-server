@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace ETransferServer.Options;
 
-public class DepositInfoOptions
+public class DepositInfoOptionsBak
 {
     public int AssignedAddressExpiredHour { get; set; } = 48;
     public ServiceFeeDto ServiceFee { get; set; } = new();

@@ -14,10 +14,10 @@ public class TokenOptionConfigDto
     public int Decimals { get; set; }
     public string Icon { get; set; }
     public string ContractAddress { get; set; }
-    public List<ToTokenOptionConfigDto> ToTokenList { get; set; }
+    public List<TargetTokenOptionConfigDto> ToTokenList { get; set; }
 }
 
-public class ToTokenOptionConfigDto
+public class TargetTokenOptionConfigDto
 {
     public string Name { get; set; }
     public string Symbol { get; set; }

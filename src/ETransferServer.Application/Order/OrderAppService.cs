@@ -37,7 +37,7 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
     private readonly IClusterClient _clusterClient;
     private readonly IObjectMapper _objectMapper;
     private readonly ILogger<OrderAppService> _logger;
-    private readonly IOptionsSnapshot<DepositInfoOptions> _depositInfoOptions;
+    private readonly IOptionsSnapshot<DepositInfoOptionsBak> _depositInfoOptions;
     private readonly INetworkAppService _networkAppService;
 
     public OrderAppService(INESTRepository<OrderIndex, Guid> orderIndexRepository,
@@ -45,7 +45,7 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
         IClusterClient clusterClient,
         IObjectMapper objectMapper,
         ILogger<OrderAppService> logger,
-        IOptionsSnapshot<DepositInfoOptions> depositInfoOptions,
+        IOptionsSnapshot<DepositInfoOptionsBak> depositInfoOptions,
         INetworkAppService networkAppService)
     {
         _orderIndexRepository = orderIndexRepository;

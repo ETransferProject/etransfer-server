@@ -26,14 +26,14 @@ public partial class TransactionAppService : ETransferServerAppService, ITransac
     private readonly INESTRepository<OrderIndex, Guid> _orderIndexRepository;
     private readonly ILogger<TransactionAppService> _logger;
     private readonly IClusterClient _clusterClient;
-    private readonly IOptionsSnapshot<DepositInfoOptions> _depositInfoOptions;
+    private readonly IOptionsSnapshot<DepositInfoOptionsBak> _depositInfoOptions;
     private readonly IOptionsSnapshot<CoBoOptions> _options;
     private readonly IHttpContextAccessor _httpContextAccessor;
 
     public TransactionAppService(INESTRepository<OrderIndex, Guid> orderIndexRepository,
         ILogger<TransactionAppService> logger, 
         IClusterClient clusterClient,
-        IOptionsSnapshot<DepositInfoOptions> depositInfoOptions, 
+        IOptionsSnapshot<DepositInfoOptionsBak> depositInfoOptions, 
         IOptionsSnapshot<CoBoOptions> options, 
         IHttpContextAccessor httpContextAccessor)
     {

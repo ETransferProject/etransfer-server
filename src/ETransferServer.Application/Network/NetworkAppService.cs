@@ -32,8 +32,8 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
     private readonly ILogger<NetworkAppService> _logger;
     private readonly IOptionsSnapshot<NetworkOptions> _networkOptions;
     private readonly CoinGeckoOptions _coinGeckoOptions;
-    private readonly IOptionsSnapshot<DepositInfoOptions> _depositInfoOptions;
-    private readonly IOptionsSnapshot<WithdrawInfoOptions> _withdrawInfoOptions;
+    private readonly IOptionsSnapshot<DepositInfoOptionsBak> _depositInfoOptions;
+    private readonly IOptionsSnapshot<WithdrawInfoOptionsBak> _withdrawInfoOptions;
     private readonly IOptionsSnapshot<TokenOptions> _tokenOptions;
     private readonly IObjectMapper _objectMapper;
     private readonly IClusterClient _clusterClient;
@@ -43,8 +43,8 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
         IOptionsSnapshot<CoinGeckoOptions> coinGeckoOptions,
         IObjectMapper objectMapper,
         IClusterClient clusterClient, 
-        IOptionsSnapshot<DepositInfoOptions> depositInfoOptions,
-        IOptionsSnapshot<WithdrawInfoOptions> withdrawInfoOptions,
+        IOptionsSnapshot<DepositInfoOptionsBak> depositInfoOptions,
+        IOptionsSnapshot<WithdrawInfoOptionsBak> withdrawInfoOptions,
         IOptionsSnapshot<TokenOptions> tokenOptions)
     {
         _logger = logger;

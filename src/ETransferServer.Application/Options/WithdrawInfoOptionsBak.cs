@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace ETransferServer.Options;
 
-public class WithdrawInfoOptions
+public class WithdrawInfoOptionsBak
 {
     public int ThirdPartCacheFeeExpireSeconds { get; set; } = 180;
     public bool CanCrossSameChain { get; set; }
