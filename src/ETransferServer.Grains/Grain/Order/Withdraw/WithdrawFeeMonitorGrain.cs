@@ -4,6 +4,7 @@ using ETransferServer.Dtos.Notify;
 using ETransferServer.Dtos.Order;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.Provider.Notify;
+using ETransferServer.Options;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
@@ -27,13 +28,13 @@ public partial class WithdrawFeeMonitorGrain : Grain<WithdrawFeeMonitorDto>, IWi
 
     private readonly ILogger<WithdrawFeeMonitorGrain> _logger;
     private readonly Dictionary<string, INotifyProvider> _notifyProvider;
-    private readonly IOptionsSnapshot<WithdrawNetworkOptions> _withdrawNetworkOptions;
+    private readonly IOptionsSnapshot<NetworkInfoOptions> _networkInfoOptions;
     
-    public WithdrawFeeMonitorGrain(ILogger<WithdrawFeeMonitorGrain> logger,
-        IOptionsSnapshot<WithdrawNetworkOptions> withdrawNetworkOptions, IEnumerable<INotifyProvider> notifyProvider)
+    public WithdrawFeeMonitorGrain(ILogger<WithdrawFeeMonitorGrain> logger, 
+        IEnumerable<INotifyProvider> notifyProvider, IOptionsSnapshot<NetworkInfoOptions> networkInfoOptions)
     {
         _logger = logger;
-        _withdrawNetworkOptions = withdrawNetworkOptions;
+        _networkInfoOptions = networkInfoOptions;
         _notifyProvider = notifyProvider.ToDictionary(p => p.NotifyType().ToString());
     }
 
@@ -50,10 +51,8 @@ public partial class WithdrawFeeMonitorGrain : Grain<WithdrawFeeMonitorDto>, IWi
         var currentFee = feeInfo;
         AssertHelper.NotNull(currentFee, "ThirdPartFee not found");
         AssertHelper.IsTrue(currentFee.Amount.SafeToDecimal() > 0, "Invalid thirdPartFee");
-
-        var netWorkInfo =
-            _withdrawNetworkOptions.Value.NetworkInfos.FirstOrDefault(n =>
-                n.Coin.StartsWith(string.Join(CommonConstant.Underline, network, CommonConstant.EmptyString)));
+        
+        var netWorkInfo = _networkInfoOptions.Value.Networks[network];
         AssertHelper.NotNull(netWorkInfo, "Network {} not found", network);
 
         var latestFeeTime = State.FeeTime;

@@ -71,10 +71,8 @@ public partial class OrderWithdrawAppService
             var result = await GetWithdrawInfoAsync(
                 _objectMapper.Map<GetTransferListRequestDto, GetWithdrawListRequestDto>(request), version);
             var transferInfo = _objectMapper.Map<WithdrawInfoDto, TransferDetailInfoDto>(result.WithdrawInfo);
-            transferInfo.ContractAddress = _networkInfoOptions.Value.NetworkMap[request.Symbol]
-                .FirstOrDefault(t => t.NetworkInfo.Network == request.FromNetwork)?.NetworkInfo?.ContractAddress
-                ?? _networkInfoOptions.Value.NetworkMap[CommonConstant.Symbol.USDT]
-                .FirstOrDefault(t => t.NetworkInfo.Network == request.FromNetwork)?.NetworkInfo?.ContractAddress;
+            var network = _tokenNetworkProvider.GetNetworkInfo(request.FromAddress);
+            transferInfo.ContractAddress = network.TokenPoolContractAddress;
             _logger.LogInformation("Get withdraw info cost time: {time}", stopwatch.ElapsedMilliseconds);
             return new GetTransferInfoDto
             {
@@ -82,11 +80,10 @@ public partial class OrderWithdrawAppService
             };
         }
         
-        AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.Symbol),
+        AssertHelper.IsTrue(_tokenSupportedChainOptions.Value.SupportedChains.ContainsKey(request.Symbol),
             ErrorResult.SymbolInvalidCode, null, request.Symbol);
         AssertHelper.IsTrue(
-            _networkInfoOptions.Value.NetworkMap[request.Symbol]
-                .Exists(t => t.NetworkInfo.Network == request.FromNetwork),
+            _tokenSupportedChainOptions.Value.SupportedChains[request.Symbol].Exists(n=>n.Network == request.FromNetwork),
             ErrorResult.NetworkInvalidCode);
         AssertHelper.IsTrue(
             string.IsNullOrWhiteSpace(request.Version) ||
@@ -99,10 +96,9 @@ public partial class OrderWithdrawAppService
         if (!request.ToNetwork.IsNullOrEmpty() && !VerifyAElfChain(request.ToNetwork))
         {
             AssertHelper.IsTrue(request.FromNetwork != request.ToNetwork, ErrorResult.NetworkInvalidCode);
-            var networkConfig = _networkInfoOptions.Value.NetworkMap[request.Symbol]
-                .FirstOrDefault(t => t.NetworkInfo.Network == request.ToNetwork);
-            AssertHelper.NotNull(networkConfig, ErrorResult.NetworkInvalidCode);
-            AssertHelper.IsTrue(await VerifyByVersionAndWhiteList(networkConfig, userId, version),
+            var supportNetworkInfo = _tokenSupportedChainOptions.Value.SupportedChains[request.Symbol]
+                .FirstOrDefault(n => n.Network == request.ToNetwork);
+            AssertHelper.IsTrue(await VerifyByVersionAndWhiteList(supportNetworkInfo, userId, version),
                 ErrorResult.VersionOrWhitelistVerifyFailCode);
         }
         if (VerifyAElfChain(request.ToNetwork))
@@ -116,8 +112,8 @@ public partial class OrderWithdrawAppService
 
         var tokenLimit = await tokenInfoGrain.GetLimit();
         var withdrawInfoDto = new TransferDetailInfoDto();
-        withdrawInfoDto.ContractAddress = _networkInfoOptions.Value.NetworkMap[request.Symbol]
-            .FirstOrDefault(t => t.NetworkInfo.Network == request.FromNetwork).NetworkInfo.ContractAddress;
+        var networkInfo = _tokenNetworkProvider.GetNetworkInfo(request.FromAddress);
+        withdrawInfoDto.ContractAddress = networkInfo.TokenPoolContractAddress;
         withdrawInfoDto.LimitCurrency = request.Symbol;
         withdrawInfoDto.TransactionUnit = request.Symbol;
 
@@ -143,7 +139,7 @@ public partial class OrderWithdrawAppService
 
         var receiveAmount = Math.Max(0, request.Amount) - decimal.Parse(withdrawInfoDto.TransactionFee);
         var minAmount = totalFee;
-        withdrawInfoDto.MinAmount = Math.Max(minAmount, _withdrawInfoOptions.Value.MinWithdraw)
+        withdrawInfoDto.MinAmount = Math.Max(minAmount, _serviceFeeOptions.Value.MinWithdraw)
             .ToString(2, DecimalHelper.RoundingOption.Ceiling);
         if (withdrawInfoDto.MinAmount.SafeToDecimal() <= withdrawInfoDto.TransactionFee.SafeToDecimal())
         {
@@ -204,7 +200,7 @@ public partial class OrderWithdrawAppService
         
         _logger.LogDebug("CreateTransferOrder: {request}", JsonConvert.SerializeObject(request));
         var userId = CurrentUser.GetId();
-        AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.FromSymbol),
+        AssertHelper.IsTrue(_tokenSupportedChainOptions.Value.SupportedChains.ContainsKey(request.FromSymbol),
             ErrorResult.SymbolInvalidCode, null, request.FromSymbol);
         AssertHelper.IsTrue(request.FromSymbol == request.ToSymbol, 
             ErrorResult.SymbolInvalidCode, null, request.FromSymbol);
@@ -216,10 +212,10 @@ public partial class OrderWithdrawAppService
             AssertHelper.IsTrue(IsNetworkOpen(request.ToSymbol, request.ToNetwork, OrderTypeEnum.Transfer.ToString()),
                 ErrorResult.CoinSuspendedTemporarily);
             AssertHelper.IsTrue(request.FromNetwork != request.ToNetwork, ErrorResult.NetworkInvalidCode);
-            var toNetworkConfig = _networkInfoOptions.Value.NetworkMap[request.ToSymbol]
-                .FirstOrDefault(t => t.NetworkInfo.Network == request.ToNetwork);
-            AssertHelper.NotNull(toNetworkConfig, ErrorResult.NetworkInvalidCode);
-            AssertHelper.IsTrue(await VerifyByVersionAndWhiteList(toNetworkConfig, userId, version), ErrorResult.VersionOrWhitelistVerifyFailCode);
+            var supportNetworkInfo = _tokenSupportedChainOptions.Value.SupportedChains[request.FromSymbol]
+                .FirstOrDefault(n => n.Network == request.ToNetwork);
+            AssertHelper.NotNull(supportNetworkInfo, ErrorResult.NetworkInvalidCode);
+            AssertHelper.IsTrue(await VerifyByVersionAndWhiteList(supportNetworkInfo, userId, version), ErrorResult.VersionOrWhitelistVerifyFailCode);
         }
         else
         {
@@ -228,10 +224,10 @@ public partial class OrderWithdrawAppService
 
         AssertHelper.IsTrue(VerifyMemo(request.Memo), ErrorResult.MemoInvalidCode);
         
-        var networkConfig = _networkInfoOptions.Value.NetworkMap[request.FromSymbol]
-            .FirstOrDefault(t => t.NetworkInfo.Network == request.FromNetwork);
-        AssertHelper.NotNull(networkConfig, ErrorResult.NetworkInvalidCode);
-        AssertHelper.IsTrue(await VerifyByVersionAndWhiteList(networkConfig, userId, version), ErrorResult.VersionOrWhitelistVerifyFailCode);
+        var supportFromNetworkInfo = _tokenSupportedChainOptions.Value.SupportedChains[request.FromSymbol]
+            .FirstOrDefault(n => n.Network == request.FromNetwork);
+        AssertHelper.NotNull(supportFromNetworkInfo, ErrorResult.NetworkInvalidCode);
+        AssertHelper.IsTrue(await VerifyByVersionAndWhiteList(supportFromNetworkInfo, userId, version), ErrorResult.VersionOrWhitelistVerifyFailCode);
 
         var userGrain = _clusterClient.GetGrain<IUserGrain>(userId);
         var userDto = await userGrain.GetUser();
@@ -265,7 +261,7 @@ public partial class OrderWithdrawAppService
             thirdPartFee = (await CalculateThirdPartFeeAsync(userId, request.ToNetwork, request.ToSymbol)).Item1;
             AssertHelper.IsTrue(
                 Math.Abs(toFee - thirdPartFee) / thirdPartFee <=
-                _withdrawInfoOptions.Value.FeeFluctuationPercent,
+                _serviceFeeOptions.Value.FeeFluctuationPercent,
                 ErrorResult.FeeExceedCode, null, request.ToNetwork);
         }
 
@@ -273,7 +269,7 @@ public partial class OrderWithdrawAppService
         var withdrawAmount = request.Amount - inputThirdPartFee;
         AssertHelper.IsTrue(withdrawAmount > 0, ErrorResult.AmountInsufficientCode);
 
-        var minWithdraw = Math.Max(thirdPartFee, _withdrawInfoOptions.Value.MinWithdraw)
+        var minWithdraw = Math.Max(thirdPartFee, _serviceFeeOptions.Value.MinWithdraw)
             .ToString(2, DecimalHelper.RoundingOption.Ceiling)
             .SafeToDecimal();
         AssertHelper.IsTrue(request.Amount >= minWithdraw, ErrorResult.AmountInsufficientCode);
@@ -373,9 +369,9 @@ public partial class OrderWithdrawAppService
     private async Task RecycleAddressAsync(WithdrawOrderDto order)
     {
         var addressKey = GuidHelper.GenerateId(order.FromTransfer.Network, order.FromTransfer.Symbol);
-        if (!_depositInfoOptions.Value.TransferAddressLists.IsNullOrEmpty() &&
-            _depositInfoOptions.Value.TransferAddressLists.ContainsKey(addressKey) &&
-            _depositInfoOptions.Value.TransferAddressLists[addressKey]
+        if (!_depositAddressOptions.Value.TransferAddressLists.IsNullOrEmpty() &&
+            _depositAddressOptions.Value.TransferAddressLists.ContainsKey(addressKey) &&
+            _depositAddressOptions.Value.TransferAddressLists[addressKey]
                 .Contains(order.FromTransfer.ToAddress)) return;
         
         _logger.LogInformation("Address recycle when rejected: {orderId}, {address}", order.Id, order.FromTransfer.ToAddress);

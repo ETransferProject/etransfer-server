@@ -7,11 +7,13 @@ using AElf.Indexing.Elasticsearch;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Info;
 using ETransferServer.Dtos.Order;
+using ETransferServer.Grains.Options;
 using ETransferServer.Network;
 using ETransferServer.Options;
 using ETransferServer.Orders;
 using Microsoft.Extensions.Logging;
 using ETransferServer.Service.Info;
+using ETransferServer.Token;
 using Microsoft.Extensions.Options;
 using Nest;
 using Volo.Abp;
@@ -27,30 +29,36 @@ public partial class InfoAppService : ETransferServerAppService, IInfoAppService
 {
     private readonly INESTRepository<OrderIndex, Guid> _orderIndexRepository;
     private readonly INetworkAppService _networkAppService;
-    private readonly IOptionsSnapshot<NetworkOptions> _networkOptions;
-    private readonly IOptionsSnapshot<TokenOptions> _tokenOptions;
-    private readonly IOptionsSnapshot<TokenInfoOptionsBack> _tokenInfoOptions;
-    private readonly IOptionsSnapshot<DepositInfoOptionsBak> _depositInfoOptions;
+    private readonly IOptionsSnapshot<DepositAddressOptions> _depositAddressOptions;
     private readonly IObjectMapper _objectMapper;
     private readonly ILogger<InfoAppService> _logger;
+    private readonly ITokenInfoProvider _tokenInfoProvider;
+    private readonly IOptionsSnapshot<TokenSupportedChainInfoOptions> _tokenSupportedChainOptions;
+    private readonly IOptionsSnapshot<TokenSupportChainListOptions> _tokenSupportChainListOptions;
+    private readonly IOptionsSnapshot<SupportedTokenSwapOptions> _supportedTokenSwapOptions;
+    private readonly ITokenNetworkProvider _tokenNetworkProvider;
 
     public InfoAppService(INESTRepository<OrderIndex, Guid> orderIndexRepository,
         INetworkAppService networkAppService, 
-        IOptionsSnapshot<NetworkOptions> networkOptions,
-        IOptionsSnapshot<TokenOptions> tokenOptions,
-        IOptionsSnapshot<TokenInfoOptionsBack> tokenInfoOptions,
-        IOptionsSnapshot<DepositInfoOptionsBak> depositInfoOptions,
         IObjectMapper objectMapper,
-        ILogger<InfoAppService> logger)
+        ILogger<InfoAppService> logger,
+        ITokenInfoProvider tokenInfoProvider, 
+        IOptionsSnapshot<TokenSupportChainListOptions> tokenSupportChainListOptions,
+        ITokenNetworkProvider tokenNetworkProvider, 
+        IOptionsSnapshot<DepositAddressOptions> depositAddressOptions, 
+        IOptionsSnapshot<SupportedTokenSwapOptions> supportedTokenSwapOptions, 
+        IOptionsSnapshot<TokenSupportedChainInfoOptions> tokenSupportedChainOptions)
     {
         _orderIndexRepository = orderIndexRepository;
         _networkAppService = networkAppService;
-        _networkOptions = networkOptions;
-        _tokenOptions = tokenOptions;
-        _tokenInfoOptions = tokenInfoOptions;
-        _depositInfoOptions = depositInfoOptions;
         _objectMapper = objectMapper;
         _logger = logger;
+        _tokenInfoProvider = tokenInfoProvider;
+        _tokenSupportChainListOptions = tokenSupportChainListOptions;
+        _tokenNetworkProvider = tokenNetworkProvider;
+        _depositAddressOptions = depositAddressOptions;
+        _supportedTokenSwapOptions = supportedTokenSwapOptions;
+        _tokenSupportedChainOptions = tokenSupportedChainOptions;
     }
 
     [ExceptionHandler(typeof(Exception), TargetType = typeof(InfoAppService), 
@@ -139,7 +147,6 @@ public partial class InfoAppService : ETransferServerAppService, IInfoAppService
             result = await GetTokenAmountAsync(DateRangeEnum.Total, OrderTypeEnum.Withdraw, ChainId.tDVW, result);
         }
 
-        var tokenConfigs = _tokenOptions.Value.Deposit[ChainId.AELF];
         foreach (var kvp in result)
         {
             kvp.Value.Details.ForEach(item =>
@@ -151,25 +158,23 @@ public partial class InfoAppService : ETransferServerAppService, IInfoAppService
                 item.Item.AmountTotal = item.Item.AmountTotal.SafeToDecimal().ToString(4, DecimalHelper.RoundingOption.Floor);
                 item.Item.AmountTotalUsd = item.Item.AmountTotalUsd.SafeToDecimal().ToString(2, DecimalHelper.RoundingOption.Floor);
             });
-            var networkConfigs = _networkOptions.Value.NetworkMap[kvp.Key];
-            var networks = networkConfigs.Select(config => config.NetworkInfo.Network).ToList();
+            var networks = _tokenSupportedChainOptions.Value.SupportedChains[kvp.Key].Select(n => n.Network).ToList();
             var names = result[kvp.Key].Details.Select(d => d.Name).ToList();
-            result[kvp.Key].Icon = tokenConfigs.FirstOrDefault(t => t.Symbol == kvp.Key)?.Icon;
-            result[kvp.Key].Networks = networkConfigs.Where(n => names.Contains(n.NetworkInfo.Network))
-                .Select(t => t.NetworkInfo.Network).ToList();
+            result[kvp.Key].Icon = (await _tokenInfoProvider.GetTokenInfoAsync(ChainId.AELF,kvp.Key))?.Icon;
+            result[kvp.Key].Networks = networks.Where(n => names.Contains(n)).ToList();
             if (orderType.IsNullOrEmpty())
             {
-                result[kvp.Key].ChainIds = _tokenInfoOptions.Value[kvp.Key].Deposit
-                    .Concat(_tokenInfoOptions.Value[kvp.Key].Withdraw).Distinct().OrderBy(d =>
+                result[kvp.Key].ChainIds = _tokenSupportChainListOptions.Value[kvp.Key].Deposit
+                    .Concat(_tokenSupportChainListOptions.Value[kvp.Key].Withdraw).Distinct().OrderBy(d =>
                         new List<string> { ChainId.AELF, ChainId.tDVV, ChainId.tDVW }.IndexOf(d)).ToList();
             }
             else if (orderType == OrderTypeEnum.Deposit.ToString())
             {
-                result[kvp.Key].ChainIds = _tokenInfoOptions.Value[kvp.Key].Deposit;
+                result[kvp.Key].ChainIds = _tokenSupportChainListOptions.Value[kvp.Key].Deposit;
             }
             else if (orderType == OrderTypeEnum.Withdraw.ToString())
             {
-                result[kvp.Key].ChainIds = _tokenInfoOptions.Value[kvp.Key].Withdraw;
+                result[kvp.Key].ChainIds = _tokenSupportChainListOptions.Value[kvp.Key].Withdraw;
             }
 
             result[kvp.Key].General.Amount24H = kvp.Value.Details.Sum(d => d.Item.Amount24H.SafeToDecimal())
@@ -196,33 +201,56 @@ public partial class InfoAppService : ETransferServerAppService, IInfoAppService
         MethodName = nameof(HandleOptionExceptionAsync))]
     public async Task<GetTokenOptionResultDto> GetNetworkOptionAsync()
     {
-        var networkInfos = _networkOptions.Value.NetworkMap[CommonConstant.Symbol.USDT].Select(config =>
-            config.NetworkInfo).ToList();
-        var tokenConfigs = _tokenOptions.Value.Deposit[ChainId.AELF];
-        var toTokenConfigs = _tokenOptions.Value.DepositSwap.SelectMany(t => t.ToTokenList);
-        foreach (var item in toTokenConfigs)
+        var networkBasicInfos = _tokenNetworkProvider.GetSupportedNetworkInfoList(CommonConstant.Symbol.USDT);
+        var existNetworks = new HashSet<string>(networkBasicInfos.Select(n => n.Network));
+        
+        var aelfDepositTokenSymbolSet = new HashSet<string>();
+        foreach (var (symbol, chainInfos) in _tokenSupportedChainOptions.Value.SupportedChains)
         {
-            if (!tokenConfigs.Exists(t => t.Symbol == item.Symbol))
+            if (chainInfos.Any(chain => chain.Network == ChainId.AELF && 
+                                        chain.SupportedType.Contains(OrderTypeEnum.Deposit.ToString())))
             {
-                tokenConfigs.Add(_objectMapper.Map<ToTokenConfig, TokenConfig>(item));
+                aelfDepositTokenSymbolSet.Add(symbol);
             }
         }
-        foreach (var item in tokenConfigs)
+
+        foreach (var (_, targetList) in _supportedTokenSwapOptions.Value.SwapTokenMap)
         {
-            if (!_networkOptions.Value.NetworkMap.ContainsKey(item.Symbol) 
-                || item.Symbol == CommonConstant.Symbol.USDT) continue;
-            var networks = _networkOptions.Value.NetworkMap[item.Symbol].Select(config =>
-                config.NetworkInfo).ToList();
-            foreach (var network in networks)
+            foreach (var targetTokenConfig in targetList)
             {
-                if (networkInfos.Exists(t => t.Network == network.Network)) continue;
-                networkInfos.Add(network);
+                aelfDepositTokenSymbolSet.Add(targetTokenConfig.Symbol);  // HashSet 自动去重
+            }
+        }
+
+        var tokenList = new List<TokenInfoDto>();
+        foreach (var symbol in aelfDepositTokenSymbolSet)
+        {
+            tokenList.Add(await _tokenInfoProvider.GetTokenInfoAsync(ChainId.AELF, symbol));
+        }
+        foreach (var symbol in aelfDepositTokenSymbolSet)
+        {
+            if (symbol == CommonConstant.Symbol.USDT || 
+                !_tokenSupportedChainOptions.Value.SupportedChains.TryGetValue(symbol, out var chainInfos))
+            {
+                continue;
+            }
+
+            foreach (var network in chainInfos.Select(n => n.Network))
+            {
+                if (existNetworks.Contains(network)) continue;
+
+                var networkInfo = _tokenNetworkProvider.GetNetworkInfo(network);
+                if (networkInfo != null)
+                {
+                    networkBasicInfos.Add(networkInfo);
+                    existNetworks.Add(network);
+                }
             }
         }
         var result = new GetTokenOptionResultDto
         {
-            NetworkList = _objectMapper.Map<List<NetworkInfo>, List<NetworkOptionDto>>(networkInfos),
-            TokenList = _objectMapper.Map<List<TokenConfig>, List<TokenConfigOptionDto>>(tokenConfigs)
+            NetworkList = _objectMapper.Map<List<NetworkBasicInfo>, List<NetworkOptionDto>>(networkBasicInfos),
+            TokenList = _objectMapper.Map<List<TokenInfoDto>, List<TokenConfigOptionDto>>(tokenList)
         };
         return await LoopCollectionItemsAsync(result);
     }
@@ -308,7 +336,7 @@ public partial class InfoAppService : ETransferServerAppService, IInfoAppService
                 k.Field(f => f.Status).Value(OrderStatusEnum.Finish.ToString())),
             s => s.Term(k =>
                 k.Field(f => f.ToTransfer.Amount).Value(0M)))));
-        mustNotQuery.Add(GetFilterCondition(_depositInfoOptions.Value.AssignedAddressExpiredHour));
+        mustNotQuery.Add(GetFilterCondition(_depositAddressOptions.Value.AssignedAddressExpiredHour));
         
         QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery)
             .MustNot(mustNotQuery));

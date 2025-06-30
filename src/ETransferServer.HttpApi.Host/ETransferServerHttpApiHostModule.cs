@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using AElf.OpenTelemetry;
 using AutoResponseWrapper;
+using ETransferServer.Grains.Options;
 using GraphQL.Client.Abstractions;
 using GraphQL.Client.Http;
 using GraphQL.Client.Serializer.Newtonsoft;
@@ -17,7 +18,9 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.OpenApi.Models;
 using StackExchange.Redis;
 using ETransferServer.MongoDB;
+using ETransferServer.Network;
 using ETransferServer.Options;
+using ETransferServer.Token;
 using Microsoft.AspNetCore.Identity;
 using Volo.Abp;
 using Volo.Abp.AspNetCore.Mvc;
@@ -35,7 +38,8 @@ using Volo.Abp.Modularity;
 using Volo.Abp.OpenIddict.Tokens;
 using Volo.Abp.Swashbuckle;
 using Volo.Abp.VirtualFileSystem;
-using TokenOptions = ETransferServer.Options.TokenOptions;
+using SwapInfosOptions = ETransferServer.Options.SwapInfosOptions;
+using TokenAccessOptions = ETransferServer.Options.TokenAccessOptions;
 
 namespace ETransferServer
 {
@@ -70,18 +74,36 @@ namespace ETransferServer
             var hostingEnvironment = context.Services.GetHostingEnvironment();
             Configure<SignatureServiceOption>(configuration.GetSection("SignatureService"));
             Configure<ChainOptions>(configuration.GetSection("Chains"));
-            Configure<TokenOptions>(configuration.GetSection("TokenOptions"));
-            Configure<NetworkOptions>(configuration.GetSection("NetworkOptions"));
+            Configure<NetworkInfoOptions>(configuration.GetSection("NetworkInfoOptions"));
             Configure<TokenAccessOptions>(configuration.GetSection("TokenAccess"));
             Configure<TokenInfoOptions>(configuration.GetSection("TokenInfo"));
             Configure<DepositInfoOptions>(configuration.GetSection("DepositInfo"));
+            Configure<DepositAddressOptions>(configuration.GetSection("DepositAddress"));
             Configure<WithdrawInfoOptions>(configuration.GetSection("WithdrawInfo"));
             Configure<CoinGeckoOptions>(configuration.GetSection("CoinGecko"));
             Configure<CoBoOptions>(configuration.GetSection("CoBo"));
             Configure<HubOptions>(configuration.GetSection("Hub"));
             Configure<SwapInfosOptions>(configuration.GetSection("SwapInfos"));
             Configure<StringEncryptionOptions>(configuration.GetSection("StringEncryption"));
+            Configure<TokenSupportChainListOptions>(configuration.GetSection("TokenSupportChainList"));
+            Configure<TokenSupportedChainInfoOptions>(configuration.GetSection("TokenSupportedChainInfo"));
+            //TokenPaymentAddressOptions
+            Configure<TokenPaymentAddressOptions>(configuration.GetSection("TokenPaymentAddress"));
+            //SupportedTokenSwapOptions
+            Configure<SupportedTokenSwapOptions>(configuration.GetSection("SupportedTokenSwap"));
+            //SupportedChainTokensOptions
+            Configure<SupportedChainTokensOptions>(configuration.GetSection("SupportedChainTokens"));
+            //ServiceFeeOptions
+            Configure<ServiceFeeOptions>(configuration.GetSection("ServiceFee"));
+            //TransactionCheckOptions
+            Configure<TransactionCheckOptions>(configuration.GetSection("TransactionCheck"));
+            context.Services.AddTransient<ITokenNetworkProvider, TokenNetworkProvider>();
+            //ISupportedChainTokenProvider
+            context.Services.AddTransient<ISupportedChainTokenProvider, SupportedChainTokenProvider>();
+            //ITokenInfoProvider
+            context.Services.AddTransient<ITokenInfoProvider, TokenInfoProvider>();
 
+            
             ConfigureConventionalControllers();
             // ConfigureAuthentication(context, configuration);
             ConfigureLocalization();

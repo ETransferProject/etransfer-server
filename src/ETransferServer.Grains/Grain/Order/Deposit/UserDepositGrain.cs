@@ -34,7 +34,7 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
     private readonly IOrderStatusFlowProvider _orderStatusFlowProvider;
 
     private readonly IOptionsSnapshot<ChainOptions> _chainOptions;
-    private readonly IOptionsSnapshot<DepositOptions> _depositOptions;
+    private readonly IOptionsSnapshot<DepositInfoOptions> _depositOptions;
 
     private IUserDepositRecordGrain _recordGrain;
     private IOrderStatusFlowGrain _orderStatusFlowGrain;
@@ -55,7 +55,7 @@ public partial class UserDepositGrain : Orleans.Grain, IAsyncObserver<DepositOrd
 
     public UserDepositGrain(IUserDepositProvider userDepositProvider,
         ILogger<UserDepositGrain> logger, IContractProvider contractProvider,
-        IOptionsSnapshot<ChainOptions> chainOptions, IOptionsSnapshot<DepositOptions> depositOptions,
+        IOptionsSnapshot<ChainOptions> chainOptions, IOptionsSnapshot<DepositInfoOptions> depositOptions,
         IOrderStatusFlowProvider orderStatusFlowProvider,
         IObjectMapper objectMapper, 
         IBus bus)

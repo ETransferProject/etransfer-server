@@ -10,6 +10,7 @@ using ETransferServer.Grains.Grain.Token;
 using ETransferServer.Grains.Grain.Users;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.State.Token;
+using ETransferServer.Options;
 using ETransferServer.ThirdPart.CoBo;
 using ETransferServer.TokenAccess;
 using Volo.Abp.Application.Dtos;
@@ -30,17 +31,19 @@ public class TokenLiquidityTimerGrain : Grain<TokenLiquidityState>, ITokenLiquid
     private readonly IContractProvider _contractProvider;
     private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
     private readonly IOptionsSnapshot<TokenAccessOptions> _tokenAccessOptions;
-    private readonly IOptionsSnapshot<WithdrawOptions> _withdrawOptions;
+    private readonly IOptionsSnapshot<WithdrawInfoOptions> _withdrawOptions;
     private readonly ILogger<TokenAddressRecycleTimerGrain> _logger;
     private const int PageSize = 1000;
+    private readonly IOptionsSnapshot<TokenPaymentAddressOptions> _tokenPaymentAddressOptions;
     
     public TokenLiquidityTimerGrain(ITokenAccessAppService tokenAccessAppService, 
         ICoBoProvider coBoProvider,
         IContractProvider contractProvider,
         IOptionsSnapshot<TimerOptions> timerOptions,
         IOptionsSnapshot<TokenAccessOptions> tokenAccessOptions,
-        IOptionsSnapshot<WithdrawOptions> withdrawOptions,
-        ILogger<TokenAddressRecycleTimerGrain> logger)
+        IOptionsSnapshot<WithdrawInfoOptions> withdrawOptions,
+        ILogger<TokenAddressRecycleTimerGrain> logger, 
+        IOptionsSnapshot<TokenPaymentAddressOptions> tokenPaymentAddressOptions)
     {
         _tokenAccessAppService = tokenAccessAppService;
         _coBoProvider = coBoProvider;
@@ -49,6 +52,7 @@ public class TokenLiquidityTimerGrain : Grain<TokenLiquidityState>, ITokenLiquid
         _tokenAccessOptions = tokenAccessOptions;
         _withdrawOptions = withdrawOptions;
         _logger = logger;
+        _tokenPaymentAddressOptions = tokenPaymentAddressOptions;
     }
 
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
@@ -110,8 +114,8 @@ public class TokenLiquidityTimerGrain : Grain<TokenLiquidityState>, ITokenLiquid
                         foreach (var chain in item.ChainTokenInfo)
                         {
                             chainId = chain.ChainId;
-                            if (!_withdrawOptions.Value.PaymentAddresses?.ContainsKey(chainId) ?? false) continue;
-                            var poolAddress = _withdrawOptions.Value.PaymentAddresses.GetValueOrDefault(chainId)?.GetValueOrDefault(item.Symbol);
+                            if (!_tokenPaymentAddressOptions.Value.PaymentAddresses?.ContainsKey(chainId) ?? false) continue;
+                            var poolAddress = _tokenPaymentAddressOptions.Value.PaymentAddresses.GetValueOrDefault(chainId)?.GetValueOrDefault(item.Symbol);
                             if (poolAddress.IsNullOrEmpty()) continue;
                             tokenApplyList = AddTokenApplyList(tokenApplyList, item.Symbol, item.UserAddress, poolAddress, chainId);
                         }
@@ -121,8 +125,8 @@ public class TokenLiquidityTimerGrain : Grain<TokenLiquidityState>, ITokenLiquid
                 {
                     foreach (var chain in item.ChainTokenInfo)
                     {
-                        if (!_withdrawOptions.Value.PaymentAddresses?.ContainsKey(chain.ChainId) ?? false) continue;
-                        var poolAddress = _withdrawOptions.Value.PaymentAddresses.GetValueOrDefault(chain.ChainId)?.GetValueOrDefault(item.Symbol);
+                        if (!_tokenPaymentAddressOptions.Value.PaymentAddresses?.ContainsKey(chain.ChainId) ?? false) continue;
+                        var poolAddress = _tokenPaymentAddressOptions.Value.PaymentAddresses.GetValueOrDefault(chain.ChainId)?.GetValueOrDefault(item.Symbol);
                         if (poolAddress.IsNullOrEmpty()) continue;
                         tokenApplyList = AddTokenApplyList(tokenApplyList, item.Symbol, item.UserAddress, poolAddress, chain.ChainId);
                     }

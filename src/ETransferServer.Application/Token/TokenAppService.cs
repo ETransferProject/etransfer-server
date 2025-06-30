@@ -84,8 +84,8 @@ public partial class TokenAppService : ETransferServerAppService, ITokenAppServi
         return _supportedChainTokenProvider.IsTokenSupportedSwap(fromSymbol, toSymbol, toChainId);
     }
 
-    public async Task<TokenInfoDto> GetTokenInfoAsync(string symbol)
+    public async Task<TokenInfoDto> GetTokenInfoAsync(string chainId, string symbol)
     {
-        return _tokenInfoOptions.Value.Tokens[symbol];
+        return _tokenInfoOptions.Value.Tokens[chainId][symbol];
     }
 }

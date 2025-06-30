@@ -38,7 +38,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
 
     private readonly ILogger<CoBoDepositQueryTimerGrain> _logger;
     private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
-    private readonly IOptionsSnapshot<DepositOptions> _depositOption;
+    private readonly IOptionsSnapshot<DepositInfoOptions> _depositOption;
     private readonly IOptionsSnapshot<DepositAddressOptions> _depositAddressOption;
     private readonly IOptionsSnapshot<NetworkOptions> _networkOption;
     private readonly IOptionsSnapshot<CoBoOptions> _coBoOptions;
@@ -52,12 +52,14 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
     private IDepositOrderStatusReminderGrain _depositOrderStatusReminderGrain;
     private readonly IObjectMapper _objectMapper;
     private readonly IBus _bus;
+    
+    private readonly IOptionsSnapshot<ServiceFeeOptions> _serviceFeeOptions;
 
     public CoBoDepositQueryTimerGrain(ILogger<CoBoDepositQueryTimerGrain> logger,
         IOptionsSnapshot<TimerOptions> timerOptions, 
         ICoBoProvider coBoProvider,
         IUserDepositProvider userDepositProvider,
-        IOptionsSnapshot<DepositOptions> depositOption, 
+        IOptionsSnapshot<DepositInfoOptions> depositOption, 
         IOptionsSnapshot<DepositAddressOptions> depositAddressOption, 
         IOptionsSnapshot<NetworkOptions> networkOption,
         IOptionsSnapshot<CoBoOptions> coBoOptions,
@@ -66,7 +68,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         IUserAddressService userAddressService,
         INetworkAppService networkService,
         IObjectMapper objectMapper, 
-        IBus bus)
+        IBus bus, IOptionsSnapshot<ServiceFeeOptions> serviceFeeOptions)
     {
         _logger = logger;
         _timerOptions = timerOptions;
@@ -82,6 +84,7 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         _networkService = networkService;
         _objectMapper = objectMapper;
         _bus = bus;
+        _serviceFeeOptions = serviceFeeOptions;
     }
 
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
@@ -397,19 +400,19 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
     
     private async Task<Tuple<bool, decimal, decimal, decimal>> GetServiceFeeAsync(string network, string symbol)
     {
-        var isOpen = _depositOption.Value.ServiceFee.IsOpen;
-        var amountThreshold = _depositOption.Value.ServiceFee.AmountThreshold.ContainsKey(symbol)
-            ? _depositOption.Value.ServiceFee.AmountThreshold[symbol]
+        var isOpen = _serviceFeeOptions.Value.IsOpen;
+        var amountThreshold = _serviceFeeOptions.Value.AmountThreshold.ContainsKey(symbol)
+            ? _serviceFeeOptions.Value.AmountThreshold[symbol]
             : 0M;
         var (estimateFee, coin) = network == ChainId.AELF || network == ChainId.tDVV || network == ChainId.tDVW
             ? Tuple.Create(0M, new CoBoCoinDto { ExpireTime = 0L })
             : await _networkService.CalculateNetworkFeeAsync(network, symbol);
         var feeKey = string.Join(CommonConstant.Underline, network, symbol);
-        var serviceFee = Math.Min(estimateFee, _depositOption.Value.ServiceFee.MaxThirdPartFee.ContainsKey(feeKey)
-            ? _depositOption.Value.ServiceFee.MaxThirdPartFee[feeKey]
+        var serviceFee = Math.Min(estimateFee, _serviceFeeOptions.Value.MaxThirdPartFee.ContainsKey(feeKey)
+            ? _serviceFeeOptions.Value.MaxThirdPartFee[feeKey]
             : 0M).ToString(2, DecimalHelper.RoundingOption.Ceiling).SafeToDecimal();
-        var minAmount = _depositOption.Value.ServiceFee.MinAmount.ContainsKey(feeKey)
-            ? _depositOption.Value.ServiceFee.MinAmount[feeKey]
+        var minAmount =_serviceFeeOptions.Value.MinAmount.ContainsKey(feeKey)
+            ? _serviceFeeOptions.Value.MinAmount[feeKey]
             : 0M;
         _logger.LogDebug("Grain Deposit from network fee: {network}, {symbol}, {isOpen}, {serviceFee}, {minAmount}", 
             network, symbol, isOpen, serviceFee, minAmount);

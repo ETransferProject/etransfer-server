@@ -32,23 +32,23 @@ public partial class OrderDepositAppService : ApplicationService, IOrderDepositA
     private readonly INESTRepository<OrderIndex, Guid> _depositOrderIndexRepository;
     private readonly IObjectMapper _objectMapper;
     private readonly ILogger<OrderDepositAppService> _logger;
-    private readonly IOptionsSnapshot<NetworkOptions> _networkInfoOptions;
+    private readonly IOptionsSnapshot<TokenSupportedChainInfoOptions> _tokenSupportedChainOptions;
     private readonly IOptionsSnapshot<ChainOptions> _chainOptions;
     private readonly IUserAddressService _userAddressService;
     private readonly INetworkAppService _networkAppService;
     private readonly ITokenAppService _tokenAppService;
     private readonly ISwapAppService _swapAppService;
+    private readonly ITokenNetworkProvider _tokenNetworkProvider;
 
     public OrderDepositAppService(INESTRepository<OrderIndex, Guid> depositOrderIndexRepository,
         IObjectMapper objectMapper,
         ILogger<OrderDepositAppService> logger,
-        IOptionsSnapshot<NetworkOptions> networkInfoOptions,
         IOptionsSnapshot<ChainOptions> chainOptions,
         IUserAddressService userAddressService,
-        INetworkAppService networkAppService, ITokenAppService tokenAppService, ISwapAppService swapAppService)
+        INetworkAppService networkAppService, ITokenAppService tokenAppService, ISwapAppService swapAppService,
+        IOptionsSnapshot<TokenSupportedChainInfoOptions> tokenSupportedChainOptions, ITokenNetworkProvider tokenNetworkProvider)
     {
         _depositOrderIndexRepository = depositOrderIndexRepository;
-        _networkInfoOptions = networkInfoOptions;
         _chainOptions = chainOptions;
         _objectMapper = objectMapper;
         _logger = logger;
@@ -56,6 +56,8 @@ public partial class OrderDepositAppService : ApplicationService, IOrderDepositA
         _networkAppService = networkAppService;
         _tokenAppService = tokenAppService;
         _swapAppService = swapAppService;
+        _tokenSupportedChainOptions = tokenSupportedChainOptions;
+        _tokenNetworkProvider = tokenNetworkProvider;
     }
 
     [ExceptionHandler(typeof(Exception), TargetType = typeof(OrderDepositAppService),
@@ -64,18 +66,18 @@ public partial class OrderDepositAppService : ApplicationService, IOrderDepositA
     {
         AssertHelper.IsTrue(request.ChainId == ChainId.AELF || request.ChainId == ChainId.tDVV
             || request.ChainId == ChainId.tDVW, "Param is invalid. Please refresh and try again.");
-        AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.Symbol), 
+        AssertHelper.IsTrue(_tokenSupportedChainOptions.Value.SupportedChains.ContainsKey(request.Symbol), 
             "Symbol is not exist. Please refresh and try again.");
         AssertHelper.IsTrue(
             request.ToSymbol.IsNullOrEmpty() || 
             _tokenAppService.IsValidDeposit(request.ChainId, request.Symbol, request.ToSymbol),
             "The combination of ChainId, FromSymbol and ToSymbol is an invalid parameter. Please refresh and try again.");
         
-        var networkConfigs = _networkInfoOptions.Value.NetworkMap[request.Symbol];
-        var depositInfo = networkConfigs.Where(n => n.NetworkInfo.Network == request.Network)
-            .Select(n => n.DepositInfo).FirstOrDefault();
-        AssertHelper.IsTrue(depositInfo != null, "Network is not exist. Please refresh and try again.");
-
+        var tokenSupportDepositInfo = _tokenSupportedChainOptions.Value.SupportedChains[request.Symbol]
+            .FirstOrDefault(n => n.Network == request.Network);
+        AssertHelper.IsTrue(tokenSupportDepositInfo != null, "Network is not exist. Please refresh and try again.");
+        var networkBasicInfo = _tokenNetworkProvider.GetNetworkInfo(request.Network);
+        
         var getUserDepositAddressInput = new GetUserDepositAddressInput
         {
             UserId = CurrentUser.GetId().ToString(),
@@ -90,18 +92,24 @@ public partial class OrderDepositAppService : ApplicationService, IOrderDepositA
         var (isOpen, amountThreshold, serviceFee, minAmount) = 
             await _networkAppService.GetServiceFeeAsync(request.Network, request.Symbol);
         var maxFee = await _networkAppService.GetMaxThirdPartFeeAsync(request.Network, request.Symbol);
+        var extraNotes = _tokenNetworkProvider.GetExtraNotesTemplate();
+        var replacedNotes = extraNotes.Select(note =>
+            note.Replace("{X}", request.Symbol).Replace("{ConfirmationCount}", networkBasicInfo.ConfirmNum.ToString())
+        ).ToList();
         getDepositInfoDto.DepositInfo = new DepositInfoDto
         {
             DepositAddress = userAddressAsync,
             ServiceFee = isOpen ? maxFee.ToString() : "0",
             MinAmount = minAmount.ToString(),
             CurrentThreshold = amountThreshold.ToString(),
-            ExtraNotes = depositInfo.ExtraNotes
+            ExtraNotes = replacedNotes
         };
 
+        var swapExtraNotes = _tokenNetworkProvider.GetSwapExtraNotesTemplate().Select(note=>
+            note.Replace("{X}", request.Symbol).Replace("{ConfirmationCount}",networkBasicInfo.ConfirmNum.ToString())).ToList();
         if (DepositSwapHelper.IsDepositSwap(request.Symbol, request.ToSymbol))
         {
-            getDepositInfoDto.DepositInfo.ExtraNotes = depositInfo.SwapExtraNotes;
+            getDepositInfoDto.DepositInfo.ExtraNotes = swapExtraNotes;
             getDepositInfoDto.DepositInfo.ExtraInfo = new ExtraInfo
             {
                 Slippage = _swapAppService.GetSlippage(request.Symbol, request.ToSymbol)
@@ -178,7 +186,7 @@ public partial class OrderDepositAppService : ApplicationService, IOrderDepositA
     {
         AssertHelper.IsTrue(request.ToChainId == ChainId.AELF || request.ToChainId == ChainId.tDVV
                             || request.ToChainId == ChainId.tDVW, "Param is invalid. Please refresh and try again.");
-        AssertHelper.IsTrue(_networkInfoOptions.Value.NetworkMap.ContainsKey(request.FromSymbol), 
+        AssertHelper.IsTrue(_tokenSupportedChainOptions.Value.SupportedChains.ContainsKey(request.FromSymbol), 
             "FromSymbol is not exist. Please refresh and try again.");
         AssertHelper.IsTrue(DepositSwapAmountHelper.IsValidRange(request.FromAmount), "FromAmount is an invalid parameter. Please refresh and try again. ");
         AssertHelper.IsTrue(_tokenAppService.IsValidSwap(request.ToChainId, request.FromSymbol, request.ToSymbol), "The combination of ChainId, FromSymbol and ToSymbol is an invalid parameter. Please refresh and try again.");
