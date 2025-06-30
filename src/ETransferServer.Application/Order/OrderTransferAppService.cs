@@ -71,7 +71,7 @@ public partial class OrderWithdrawAppService
             var result = await GetWithdrawInfoAsync(
                 _objectMapper.Map<GetTransferListRequestDto, GetWithdrawListRequestDto>(request), version);
             var transferInfo = _objectMapper.Map<WithdrawInfoDto, TransferDetailInfoDto>(result.WithdrawInfo);
-            var network = _tokenNetworkProvider.GetNetworkInfo(request.FromAddress);
+            var network = _tokenNetworkProvider.GetNetworkInfo(request.FromNetwork);
             transferInfo.ContractAddress = network.TokenPoolContractAddress;
             _logger.LogInformation("Get withdraw info cost time: {time}", stopwatch.ElapsedMilliseconds);
             return new GetTransferInfoDto
