@@ -13,8 +13,10 @@ using ETransferServer.Grains.Grain.Users;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.Provider.Notify;
 using ETransferServer.MongoDB;
+using ETransferServer.Network;
 using ETransferServer.Options;
 using ETransferServer.ThirdPart.Exchange;
+using ETransferServer.Token;
 using ETransferServer.User;
 using MassTransit;
 using Volo.Abp.AspNetCore.Serilog;
@@ -76,6 +78,11 @@ public class ETransferServerOrleansSiloModule : AbpModule
         context.Services.AddTransient<IUserAddressProvider, UserAddressProvider>();
         context.Services.AddTransient<IUserAppService, UserAppService>();
         context.Services.AddTransient<IUserWithdrawProvider, UserWithdrawProvider>();
+        context.Services.AddTransient<ITokenNetworkProvider, TokenNetworkProvider>();
+        //ISupportedChainTokenProvider
+        context.Services.AddTransient<ISupportedChainTokenProvider, SupportedChainTokenProvider>();
+        //ITokenInfoProvider
+        context.Services.AddTransient<ITokenInfoProvider, TokenInfoProvider>();
 
         context.Services.AddTransient<INotifyProvider, FeiShuRobotNotifyProvider>();
         
