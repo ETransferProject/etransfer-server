@@ -25,6 +25,8 @@ public class TokenAppServiceTest : ETransferServerApplicationTestBase
     protected override void AfterAddApplication(IServiceCollection services)
     {
         services.AddSingleton(MockTokenOptions());
+        //MockSupportedChainTokensOptions
+        services.AddSingleton(MockSupportedChainTokensOptions());
         base.AfterAddApplication(services);
     }
 
@@ -114,50 +116,94 @@ public class TokenAppServiceTest : ETransferServerApplicationTestBase
         }
     }
 
-    private IOptionsSnapshot<TokenOptions> MockTokenOptions()
+    private IOptionsSnapshot<TokenInfoOptions> MockTokenOptions()
     {
-        var mockOptionsSnapshot = new Mock<IOptionsSnapshot<TokenOptions>>();
+        var mockOptionsSnapshot = new Mock<IOptionsSnapshot<TokenInfoOptions>>();
         mockOptionsSnapshot.Setup(o => o.Value).Returns(
-            new TokenOptions
+            new TokenInfoOptions
             {
-                Withdraw = new Dictionary<string, List<TokenConfig>>()
+                Tokens = new Dictionary<string, Dictionary<string, TokenInfoDto>>
                 {
-                    ["AELF"] = new List<TokenConfig>()
                     {
-                        new TokenConfig()
+                        "AELF", new Dictionary<string, TokenInfoDto>
                         {
-                            Symbol = "USDT",
-                            Name = "USDT",
-                            Decimals = 6
-                        }
-                    }
-                },
-                Transfer = new List<TokenConfig>()
-                {
-                    new TokenConfig()
-                    {
-                        Symbol = "USDT",
-                        Name = "USDT",
-                        Decimals = 6
-                    }
-                },
-                DepositSwap = new List<TokenSwapConfig>()
-                {
-                    new TokenSwapConfig()
-                    {
-                        Symbol = "USDT",
-                        Name = "USDT",
-                        Decimals = 6,
-                        ToTokenList = new List<ToTokenConfig>()
-                        {
-                            new ToTokenConfig()
                             {
-                                Symbol = "ELF",
-                                Name = "ELF",
-                                ChainIdList = new List<string>() { "AELF" }
+                                "USDT", new TokenInfoDto
+                                {
+                                    Symbol = "USDT",
+                                    Name = "Tether USD",
+                                    Decimal = 8,
+                                    Icon = "https://example.com/usdt.png",
+                                    TokenAddress = "0x1234567890abcdef1234567890abcdef12345678"
+                                }
+                            },
+                            {
+                                "ELF", new TokenInfoDto
+                                {
+                                    Symbol = "ELF",
+                                    Name = "AELF",
+                                    Decimal = 8,
+                                    Icon = "https://example.com/elf.png",
+                                    TokenAddress = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+                                }
                             }
                         }
                     }
+                }
+            }
+            );
+        return mockOptionsSnapshot.Object;
+    }
+    // mock SupportedChainTokensOptions
+    /**
+     * public class SupportedChainTokensOptions
+{
+    // chain id -> token
+    public Dictionary<string, SupportTokenInfo> Tokens { get; set; } = new();
+    // symbol -> status
+    public Dictionary<string, StatusInfo> Transfer { get; set; } = new();
+}
+
+public class SupportTokenInfo
+{
+    // symbol -> status
+    public Dictionary<string, StatusInfo> Deposit { get; set; } = new();
+    public Dictionary<string, StatusInfo> Withdraw { get; set; } = new();
+}
+
+public class StatusInfo
+{
+    public bool IsOpen { get; set; } = true;
+}
+     */
+    private IOptionsSnapshot<SupportedChainTokensOptions> MockSupportedChainTokensOptions()
+    {
+        var mockOptionsSnapshot = new Mock<IOptionsSnapshot<SupportedChainTokensOptions>>();
+        mockOptionsSnapshot.Setup(o => o.Value).Returns(
+            new SupportedChainTokensOptions
+            {
+                Tokens = new Dictionary<string, SupportTokenInfo>
+                {
+                    {
+                        "AELF", new SupportTokenInfo
+                        {
+                            Deposit = new Dictionary<string, StatusInfo>
+                            {
+                                { "USDT", new StatusInfo { IsOpen = true } },
+                                { "ELF", new StatusInfo { IsOpen = true } }
+                            },
+                            Withdraw = new Dictionary<string, StatusInfo>
+                            {
+                                { "USDT", new StatusInfo { IsOpen = true } },
+                                { "ELF", new StatusInfo { IsOpen = true } }
+                            }
+                        }
+                    }
+                },
+                Transfer = new Dictionary<string, StatusInfo>
+                {
+                    { "USDT", new StatusInfo { IsOpen = true } },
+                    { "ELF", new StatusInfo { IsOpen = true } }
                 }
             });
         return mockOptionsSnapshot.Object;

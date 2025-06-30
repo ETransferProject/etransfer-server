@@ -1,4 +1,6 @@
+using ETransferServer.Network;
 using ETransferServer.ThirdPart.Exchange;
+using ETransferServer.Token;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Volo.Abp;
@@ -28,6 +30,10 @@ public class ETransferServerOrleansTestBaseModule : AbpModule
         context.Services.AddTransient<IExchangeProvider, CoinGeckoProvider>();
         context.Services.AddTransient<IExchangeProvider, GateIoProvider>();
         context.Services.AddTransient<IExchangeProvider, UniswapV3Provider>();
+        //ITokenNetworkProvider
+        context.Services.AddTransient<ITokenNetworkProvider, TokenNetworkProvider>();
+        // ISupportedChainTokenProvider
+        context.Services.AddTransient<ISupportedChainTokenProvider, SupportedChainTokenProvider>();
         context.Services.AddSingleton<ClusterFixture>();
         context.Services.AddSingleton<IClusterClient>(sp => context.Services.GetRequiredService<ClusterFixture>().Cluster.Client);
 
