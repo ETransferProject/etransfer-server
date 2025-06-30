@@ -5,6 +5,7 @@ using ETransferServer.Grains.Common;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.Provider.Notify;
 using ETransferServer.Grains.State.Order;
+using ETransferServer.Options;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
@@ -26,11 +27,11 @@ public class WithdrawOrderMonitorGrain : Grain<WithdrawOrderMonitorState>, IWith
     private const string TransferCallbackAlarm = "TransferCallbackAlarm";
 
     private readonly ILogger<WithdrawOrderMonitorGrain> _logger;
-    private readonly IOptionsSnapshot<WithdrawOptions> _withdrawOptions;
+    private readonly IOptionsSnapshot<WithdrawInfoOptions> _withdrawOptions;
     private readonly Dictionary<string, INotifyProvider> _notifyProvider;
 
     public WithdrawOrderMonitorGrain(ILogger<WithdrawOrderMonitorGrain> logger, 
-        IOptionsSnapshot<WithdrawOptions> withdrawOptions,
+        IOptionsSnapshot<WithdrawInfoOptions> withdrawOptions,
         IEnumerable<INotifyProvider> notifyProvider)
     {
         _logger = logger;

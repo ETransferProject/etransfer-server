@@ -35,11 +35,11 @@ public abstract class AbstractTxFastTimerGrain<TOrder> : Grain<OrderFastTimerSta
 
     private readonly IOptionsSnapshot<ChainOptions> _chainOptions;
     private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
-    private readonly IOptionsSnapshot<WithdrawOptions> _withdrawOptions;
+    private readonly IOptionsSnapshot<WithdrawInfoOptions> _withdrawOptions;
 
     protected AbstractTxFastTimerGrain(ILogger<AbstractTxFastTimerGrain<TOrder>> logger, IContractProvider contractProvider,
         IOptionsSnapshot<ChainOptions> chainOptions, IOptionsSnapshot<TimerOptions> timerOptions, 
-        IOptionsSnapshot<WithdrawOptions> withdrawOptions, ITokenTransferProvider transferProvider,
+        IOptionsSnapshot<WithdrawInfoOptions> withdrawOptions, ITokenTransferProvider transferProvider,
         IUserWithdrawProvider userWithdrawProvider)
     {
         _logger = logger;

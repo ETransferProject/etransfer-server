@@ -23,16 +23,19 @@ public class UserDepositRecordGrain : Grain<DepositOrderState>, IUserDepositReco
     private readonly ILogger<UserDepositRecordGrain> _logger;
     private readonly IOptionsSnapshot<ChainOptions> _chainOptions;
     private readonly IOptionsSnapshot<WithdrawNetworkOptions> _withdrawNetworkOptions;
+    private readonly IOptionsSnapshot<NetworkInfoOptions> _networkInfoOptions;
 
     public UserDepositRecordGrain(IObjectMapper objectMapper, 
         ILogger<UserDepositRecordGrain> logger, 
         IOptionsSnapshot<ChainOptions> chainOptions,
-        IOptionsSnapshot<WithdrawNetworkOptions> withdrawNetworkOptions)
+        IOptionsSnapshot<WithdrawNetworkOptions> withdrawNetworkOptions,
+        IOptionsSnapshot<NetworkInfoOptions> networkInfoOptions)
     {
         _objectMapper = objectMapper;
         _logger = logger;
         _chainOptions = chainOptions;
         _withdrawNetworkOptions = withdrawNetworkOptions;
+        _networkInfoOptions = networkInfoOptions;
     }
 
     public async Task<CommonResponseDto<DepositOrderDto>> CreateOrUpdateAsync(DepositOrderDto orderDto)
@@ -51,9 +54,7 @@ public class UserDepositRecordGrain : Grain<DepositOrderState>, IUserDepositReco
             }
             if (!State.ArrivalTime.HasValue && orderDto.Status == OrderStatusEnum.FromTransferring.ToString())
             {
-                var netWorkInfo = _withdrawNetworkOptions.Value.NetworkInfos.FirstOrDefault(t =>
-                    t.Coin.Equals(GuidHelper.GenerateId(orderDto.FromTransfer.Network,
-                        orderDto.FromTransfer.Symbol), StringComparison.OrdinalIgnoreCase));
+                var netWorkInfo = _networkInfoOptions.Value.Networks[orderDto.FromTransfer.Network];
                 arrivalTime = DateTime.UtcNow.AddSeconds(
                         _chainOptions.Value.ChainInfos[orderDto.ToTransfer.ChainId].EstimatedArrivalTime)
                     .AddSeconds(netWorkInfo.EstimatedArrivalTime).ToUtcMilliSeconds();

@@ -10,6 +10,7 @@ using ETransferServer.Entities;
 using ETransferServer.Etos.Order;
 using ETransferServer.Grains.Grain.Token;
 using ETransferServer.Grains.Grain.Users;
+using ETransferServer.Grains.Options;
 using ETransferServer.Network;
 using ETransferServer.Options;
 using ETransferServer.Orders;
@@ -37,24 +38,26 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
     private readonly IClusterClient _clusterClient;
     private readonly IObjectMapper _objectMapper;
     private readonly ILogger<OrderAppService> _logger;
-    private readonly IOptionsSnapshot<DepositInfoOptionsBak> _depositInfoOptions;
+    // private readonly IOptionsSnapshot<DepositInfoOptionsBak> _depositInfoOptions;
     private readonly INetworkAppService _networkAppService;
+    private readonly IOptionsSnapshot<DepositAddressOptions> _depositAddressOptions;
 
     public OrderAppService(INESTRepository<OrderIndex, Guid> orderIndexRepository,
         INESTRepository<UserIndex, Guid> userIndexRepository,
         IClusterClient clusterClient,
         IObjectMapper objectMapper,
         ILogger<OrderAppService> logger,
-        IOptionsSnapshot<DepositInfoOptionsBak> depositInfoOptions,
-        INetworkAppService networkAppService)
+        // IOptionsSnapshot<DepositInfoOptionsBak> depositInfoOptions,
+        INetworkAppService networkAppService, IOptionsSnapshot<DepositAddressOptions> depositAddressOptions)
     {
         _orderIndexRepository = orderIndexRepository;
         _userIndexRepository = userIndexRepository;
         _clusterClient = clusterClient;
         _objectMapper = objectMapper;
         _logger = logger;
-        _depositInfoOptions = depositInfoOptions;
+        // _depositInfoOptions = depositInfoOptions;
         _networkAppService = networkAppService;
+        _depositAddressOptions = depositAddressOptions;
     }
 
     [ExceptionHandler(typeof(Exception), TargetType = typeof(OrderAppService),
@@ -171,7 +174,7 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
             mustNotQuery.Add(q => q.Match(i =>
                 i.Field("extensionInfo.ToConfirmedNum").Query("0")));
         }
-        mustNotQuery.Add(GetFilterCondition(_depositInfoOptions.Value.AssignedAddressExpiredHour));
+        mustNotQuery.Add(GetFilterCondition(_depositAddressOptions.Value.AssignedAddressExpiredHour));
 
         QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery)
             .MustNot(mustNotQuery));
@@ -426,7 +429,7 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
         }
 
         var mustNotQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
-        mustNotQuery.Add(GetFilterCondition(_depositInfoOptions.Value.AssignedAddressExpiredHour));
+        mustNotQuery.Add(GetFilterCondition(_depositAddressOptions.Value.AssignedAddressExpiredHour));
         QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery)
             .MustNot(mustNotQuery));
 
@@ -522,7 +525,7 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
         var mustNotQuery = new List<Func<QueryContainerDescriptor<OrderIndex>, QueryContainer>>();
         mustNotQuery.Add(q => q.Match(i =>
             i.Field("extensionInfo.RefundTx").Query(ExtensionKey.RefundTx)));
-        mustNotQuery.Add(GetFilterCondition(_depositInfoOptions.Value.AssignedAddressExpiredHour));
+        mustNotQuery.Add(GetFilterCondition(_depositAddressOptions.Value.AssignedAddressExpiredHour));
         
         QueryContainer Filter(QueryContainerDescriptor<OrderIndex> f) => f.Bool(b => b.Must(mustQuery)
             .MustNot(mustNotQuery));

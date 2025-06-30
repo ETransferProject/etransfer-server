@@ -15,6 +15,8 @@ public interface ISupportedChainTokenProvider
     bool IsTokenSupportedDeposit(string fromSymbol, [CanBeNull] string toSymbol, string toChainId);
     bool IsTokenSupportedSwap(string fromSymbol, [CanBeNull] string toSymbol, string toChainId);
     List<TokenConfigDto> GetTokenListByType(string type, [CanBeNull] string chainId);
+    bool IsDepositHealth(string symbol, string chainId);
+    bool IsWithdrawHealth(string symbol, string chainId);
 }
 
 public class SupportedChainTokenProvider : ISupportedChainTokenProvider, ITransientDependency
@@ -58,7 +60,7 @@ public class SupportedChainTokenProvider : ISupportedChainTokenProvider, ITransi
                 continue;
             }
 
-            var tokenInfo = tokens[symbol];
+            var tokenInfo = tokens[ChainId.AELF][symbol];
             var tokenConfig = new TokenOptionConfigDto
             {
                 Symbol = tokenInfo.Symbol,
@@ -72,7 +74,11 @@ public class SupportedChainTokenProvider : ISupportedChainTokenProvider, ITransi
             var toTokenConfigs = swapMap[symbol];
             foreach (var toToken in toTokenConfigs)
             {
-                if (!tokens.TryGetValue(toToken.Symbol, out var targetTokenInfo))
+                if (!tokens.TryGetValue(ChainId.AELF, out var targetTokenInfoDic))
+                {
+                    continue;
+                }
+                if (!targetTokenInfoDic.TryGetValue(toToken.Symbol, out var targetTokenInfo))
                 {
                     continue;
                 }
@@ -140,27 +146,47 @@ public class SupportedChainTokenProvider : ISupportedChainTokenProvider, ITransi
             tokens = _supportedChainTokensOptions.Value.Transfer;
         }
 
-        if (tokens != null)
+        foreach (var pair in tokens)
         {
-            foreach (var pair in tokens)
+            var symbol = pair.Key;
+            chainId ??= ChainId.AELF; // Default to AELF if chainId is null
+            if (!_tokenInfoOptions.Value.Tokens.TryGetValue(chainId, out var tokenInfoDic))
+                continue;
+            if (!tokenInfoDic.TryGetValue(symbol, out var tokenInfo))
+                continue;
+
+            var tokenDto = new TokenConfigDto
             {
-                var symbol = pair.Key;
-                if (!_tokenInfoOptions.Value.Tokens.TryGetValue(symbol, out var tokenInfo))
-                    continue;
+                Symbol = tokenInfo.Symbol,
+                Name = tokenInfo.Name,
+                Decimals = tokenInfo.Decimal,
+                Icon = tokenInfo.Icon,
+                ContractAddress = tokenInfo.TokenAddress
+            };
 
-                var tokenDto = new TokenConfigDto
-                {
-                    Symbol = tokenInfo.Symbol,
-                    Name = tokenInfo.Name,
-                    Decimals = tokenInfo.Decimal,
-                    Icon = tokenInfo.Icon,
-                    ContractAddress = tokenInfo.TokenAddress
-                };
-
-                result.Add(tokenDto);
-            }
+            result.Add(tokenDto);
         }
 
         return result;
+    }
+
+    public bool IsDepositHealth(string symbol, string chainId)
+    {
+        if (!_supportedChainTokensOptions.Value.Tokens.TryGetValue(chainId, out var chainTokens))
+        {
+            return false;
+        }
+
+        return chainTokens.Deposit.TryGetValue(symbol, out var statusInfo) && statusInfo.IsOpen;
+    }
+
+    public bool IsWithdrawHealth(string symbol, string chainId)
+    {
+        if (!_supportedChainTokensOptions.Value.Tokens.TryGetValue(chainId, out var chainTokens))
+        {
+            return false;
+        }
+
+        return chainTokens.Withdraw.TryGetValue(symbol, out var statusInfo) && statusInfo.IsOpen;
     }
 }

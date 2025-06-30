@@ -64,9 +64,11 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
     private IAsyncStream<WithdrawOrderDto> _orderChangeStream;
 
     private readonly IOptionsSnapshot<ChainOptions> _chainOptions;
-    private readonly IOptionsSnapshot<WithdrawOptions> _withdrawOptions;
-    private readonly IOptionsSnapshot<WithdrawNetworkOptions> _withdrawNetworkOptions;
     private readonly IOptionsSnapshot<DepositAddressOptions> _depositAddressOption;
+    private readonly IOptionsSnapshot<TokenInfoOptions> _tokenInfoOptions;
+    private readonly IOptionsSnapshot<WithdrawInfoOptions> _withdrawInfoOptions;
+    private readonly IOptionsSnapshot<TokenPaymentAddressOptions> _tokenPaymentAddressOptions;
+
 
     private IUserWithdrawRecordGrain _recordGrain;
     private IOrderStatusFlowGrain _orderStatusFlowGrain;
@@ -95,26 +97,27 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
     private int _currentSteps = 0;
 
     public UserWithdrawGrain(IUserWithdrawProvider userWithdrawProvider,
-        ILogger<UserWithdrawGrain> logger, IOptionsSnapshot<ChainOptions> chainOptions,
-        IOptionsSnapshot<WithdrawOptions> withdrawOptions, IContractProvider contractProvider,
+        ILogger<UserWithdrawGrain> logger, IOptionsSnapshot<ChainOptions> chainOptions, 
+        IContractProvider contractProvider,
         IOrderStatusFlowProvider orderStatusFlowProvider,
         IUserAddressProvider userAddressProvider,
         IOptionsSnapshot<WithdrawNetworkOptions> withdrawNetworkOptions,
         IOptionsSnapshot<DepositAddressOptions> depositAddressOption,
         IObjectMapper objectMapper, 
-        IBus bus)
+        IBus bus, IOptionsSnapshot<TokenInfoOptions> tokenInfoOptions, IOptionsSnapshot<WithdrawInfoOptions> withdrawInfoOptions, IOptionsSnapshot<TokenPaymentAddressOptions> tokenPaymentAddressOptions)
     {
         _userWithdrawProvider = userWithdrawProvider;
         _logger = logger;
         _chainOptions = chainOptions;
-        _withdrawOptions = withdrawOptions;
         _contractProvider = contractProvider;
         _orderStatusFlowProvider = orderStatusFlowProvider;
         _userAddressProvider = userAddressProvider;
-        _withdrawNetworkOptions = withdrawNetworkOptions;
         _depositAddressOption = depositAddressOption;
         _objectMapper = objectMapper;
         _bus = bus;
+        _tokenInfoOptions = tokenInfoOptions;
+        _withdrawInfoOptions = withdrawInfoOptions;
+        _tokenPaymentAddressOptions = tokenPaymentAddressOptions;
     }
 
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
@@ -125,7 +128,7 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         // subscribe stream
         var streamProvider = this.GetStreamProvider(CommonConstant.StreamConstant.MessageStreamNameSpace);
         _orderChangeStream =
-            streamProvider.GetStream<WithdrawOrderDto>(_withdrawOptions.Value.OrderChangeTopic,
+            streamProvider.GetStream<WithdrawOrderDto>(_withdrawInfoOptions.Value.OrderChangeTopic,
                 this.GetPrimaryKey());
         await _orderChangeStream.SubscribeAsync(OnNextAsync, OnErrorAsync, OnCompletedAsync);
         _logger.LogInformation("StreamProvider withdraw subscribe ok.");
@@ -172,9 +175,9 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         AssertHelper.NotNull(withdrawOrderDto.ToTransfer.Symbol, ErrorResult.TransactionFailCode);
         AssertHelper.IsTrue(withdrawOrderDto.ToTransfer.Amount > 0, ErrorResult.TransactionFailCode);
         
-        var coinInfo = _withdrawNetworkOptions.Value.GetNetworkInfo(withdrawOrderDto.ToTransfer.Network,
-            withdrawOrderDto.ToTransfer.Symbol);
-        AssertHelper.IsTrue(coinInfo.Decimal >= 0, ErrorResult.TransactionFailCode);
+        var tokenInfo =
+            _tokenInfoOptions.Value.Tokens[withdrawOrderDto.ToTransfer.Network][withdrawOrderDto.ToTransfer.Symbol];
+        AssertHelper.IsTrue(tokenInfo.Decimal >= 0, ErrorResult.TransactionFailCode);
         
         withdrawOrderDto.Id = this.GetPrimaryKey();
         withdrawOrderDto.Status = OrderStatusEnum.Created.ToString();
@@ -326,7 +329,7 @@ public partial class UserWithdrawGrain : Orleans.Grain, IAsyncObserver<WithdrawO
         var isAElf = withdrawOrderDto.ToTransfer.Network == CommonConstant.Network.AElf;
         if (isAElf)
         {
-            _withdrawOptions.Value.Homogeneous.TryGetValue(withdrawOrderDto.FromTransfer.Symbol, out var threshold);
+            _withdrawInfoOptions.Value.Homogeneous.TryGetValue(withdrawOrderDto.FromTransfer.Symbol, out var threshold);
             var amountThreshold = threshold?.AmountThreshold ?? 0L;
             var blockHeightUpperThreshold = threshold?.BlockHeightUpperThreshold ?? 0L;
             var blockHeightLowerThreshold = threshold?.BlockHeightLowerThreshold ?? 0L;

@@ -26,23 +26,22 @@ public partial class TransactionAppService : ETransferServerAppService, ITransac
     private readonly INESTRepository<OrderIndex, Guid> _orderIndexRepository;
     private readonly ILogger<TransactionAppService> _logger;
     private readonly IClusterClient _clusterClient;
-    private readonly IOptionsSnapshot<DepositInfoOptionsBak> _depositInfoOptions;
     private readonly IOptionsSnapshot<CoBoOptions> _options;
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly IOptionsSnapshot<TransactionCheckOptions> _transactionCheckOptions;
 
     public TransactionAppService(INESTRepository<OrderIndex, Guid> orderIndexRepository,
         ILogger<TransactionAppService> logger, 
         IClusterClient clusterClient,
-        IOptionsSnapshot<DepositInfoOptionsBak> depositInfoOptions, 
         IOptionsSnapshot<CoBoOptions> options, 
-        IHttpContextAccessor httpContextAccessor)
+        IHttpContextAccessor httpContextAccessor, IOptionsSnapshot<TransactionCheckOptions> transactionCheckOptions)
     {
         _orderIndexRepository = orderIndexRepository;
         _logger = logger;
         _clusterClient = clusterClient;
-        _depositInfoOptions = depositInfoOptions;
         _options = options;
         _httpContextAccessor = httpContextAccessor;
+        _transactionCheckOptions = transactionCheckOptions;
     }
 
     [ExceptionHandler(typeof(Exception), TargetType = typeof(TransactionAppService),
@@ -80,9 +79,9 @@ public partial class TransactionAppService : ETransferServerAppService, ITransac
             mustQuery.Add(q => q.Term(i =>
                 i.Field(f => f.ToTransfer.Symbol).Value(CommonConstant.Symbol.SGR)));
         }
-        else if (_depositInfoOptions.Value.TxPairType.ContainsKey(request.Type.Value.ToString()))
+        else if (_transactionCheckOptions.Value.TxPairType.ContainsKey(request.Type.Value.ToString()))
         {
-            var tokenPairs = _depositInfoOptions.Value.TxPairType[request.Type.Value.ToString()]
+            var tokenPairs = _transactionCheckOptions.Value.TxPairType[request.Type.Value.ToString()]
                 .Split(CommonConstant.Underline);
             if (tokenPairs.Length <= 1)
             {

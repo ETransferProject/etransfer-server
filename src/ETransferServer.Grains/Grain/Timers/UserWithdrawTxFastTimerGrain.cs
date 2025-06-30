@@ -22,7 +22,7 @@ public class UserWithdrawTxFastTimerGrain : AbstractTxFastTimerGrain<WithdrawOrd
 
     public UserWithdrawTxFastTimerGrain(ILogger<UserWithdrawTxFastTimerGrain> logger,
         IContractProvider contractProvider, IOptionsSnapshot<ChainOptions> chainOptions,
-        IOptionsSnapshot<TimerOptions> timerOptions, IOptionsSnapshot<WithdrawOptions> withdrawOptions,
+        IOptionsSnapshot<TimerOptions> timerOptions, IOptionsSnapshot<WithdrawInfoOptions> withdrawOptions,
         ITokenTransferProvider transferProvider, IUserWithdrawProvider userWithdrawProvider) : base(logger,
         contractProvider, chainOptions, timerOptions, withdrawOptions, transferProvider, userWithdrawProvider)
     {

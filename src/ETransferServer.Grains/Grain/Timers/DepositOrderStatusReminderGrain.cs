@@ -8,6 +8,7 @@ using Orleans.Runtime;
 using Orleans.Timers;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.Provider.Notify;
+using ETransferServer.Options;
 using Newtonsoft.Json;
 
 namespace ETransferServer.Grains.Grain.Timers;
@@ -25,7 +26,7 @@ public class DepositOrderStatusReminderGrain : Orleans.Grain, IDepositOrderStatu
     private readonly ILogger<DepositOrderStatusReminderGrain> _logger;
     private readonly IReminderRegistry _reminderRegistry;
     private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
-    private readonly IOptionsSnapshot<DepositOptions> _depositOptions;
+    private readonly IOptionsSnapshot<DepositInfoOptions> _depositOptions;
     private readonly IUserDepositProvider _userDepositProvider;
     private readonly Dictionary<string, INotifyProvider> _notifyProvider;
     private readonly Dictionary<string, int> _reminderCountMap = new();
@@ -34,7 +35,7 @@ public class DepositOrderStatusReminderGrain : Orleans.Grain, IDepositOrderStatu
     public DepositOrderStatusReminderGrain(IReminderRegistry reminderRegistry,
         ILogger<DepositOrderStatusReminderGrain> logger,
         IOptionsSnapshot<TimerOptions> timerOptions,
-        IOptionsSnapshot<DepositOptions> depositOptions,
+        IOptionsSnapshot<DepositInfoOptions> depositOptions,
         IUserDepositProvider userDepositProvider,
         IEnumerable<INotifyProvider> notifyProvider)
     {

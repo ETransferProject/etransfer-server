@@ -26,6 +26,7 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
     private readonly ICoBoProvider _coBoProvider;
     private readonly IOptionsSnapshot<WithdrawNetworkOptions> _withdrawNetworkOptions;
     private readonly IOptionsSnapshot<CoBoOptions> _coBoOptions;
+    private readonly IOptionsSnapshot<NetworkInfoOptions> _networkInfoOptions;
 
     private const string SUCCESS = "success";
     private const string FAIL = "failed";
@@ -35,13 +36,14 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
         IOptionsSnapshot<TimerOptions> timerOptions,
         ICoBoProvider coBoProvider, 
         IOptionsSnapshot<WithdrawNetworkOptions> withdrawNetworkOptions,
-        IOptionsSnapshot<CoBoOptions> coBoOptions)
+        IOptionsSnapshot<CoBoOptions> coBoOptions, IOptionsSnapshot<NetworkInfoOptions> networkInfoOptions)
     {
         _logger = logger;
         _coBoProvider = coBoProvider;
         _withdrawNetworkOptions = withdrawNetworkOptions;
         _timerOptions = timerOptions.Value;
         _coBoOptions = coBoOptions;
+        _networkInfoOptions = networkInfoOptions;
     }
 
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
@@ -74,8 +76,7 @@ public class WithdrawTimerGrain : Grain<WithdrawTimerState>, IWithdrawTimerGrain
             }
 
             var coin = GuidHelper.GenerateId(order.ToTransfer.Network, order.ToTransfer.Symbol);
-            var netWorkInfo = _withdrawNetworkOptions.Value.NetworkInfos.FirstOrDefault(t =>
-                t.Coin.Equals(coin, StringComparison.OrdinalIgnoreCase));
+            var netWorkInfo = _networkInfoOptions.Value.Networks[order.ToTransfer.Network];
             var requestTime = DateTime.UtcNow.AddMinutes(1).ToUtcSeconds();
             var extraRequestTime = DateTime.UtcNow.AddMinutes(1).ToUtcSeconds();
             if (netWorkInfo != null)

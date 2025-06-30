@@ -8,6 +8,7 @@ using ETransferServer.Grains.Grain.Token;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.Provider;
 using ETransferServer.Grains.State.Order;
+using ETransferServer.Options;
 using ETransferServer.ThirdPart.CoBo;
 using ETransferServer.Tokens;
 using Microsoft.Extensions.Logging;
@@ -28,18 +29,20 @@ public class TokenPoolTimerGrain : Grain<TokenPoolTimerState>, ITokenPoolTimerGr
     private readonly ILogger<TokenPoolTimerGrain> _logger;
     private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
     private readonly IOptionsSnapshot<WithdrawNetworkOptions> _withdrawNetworkOptions;
-    private readonly IOptionsSnapshot<WithdrawOptions> _withdrawOption;
+    private readonly IOptionsSnapshot<WithdrawInfoOptions> _withdrawOption;
     private readonly ICoBoProvider _coBoProvider;
     private readonly IContractProvider _contractProvider;
     private readonly ITokenPoolProvider _tokenPoolProvider;
+    private readonly IOptionsSnapshot<TokenPaymentAddressOptions> _tokenPaymentAddressOptions;
     
     public TokenPoolTimerGrain(ILogger<TokenPoolTimerGrain> logger,
         IOptionsSnapshot<TimerOptions> timerOptions, 
         IOptionsSnapshot<WithdrawNetworkOptions> withdrawNetworkOptions,
-        IOptionsSnapshot<WithdrawOptions> withdrawOption,
+        IOptionsSnapshot<WithdrawInfoOptions> withdrawOption,
         ICoBoProvider coBoProvider,
         IContractProvider contractProvider,
-        ITokenPoolProvider tokenPoolProvider)
+        ITokenPoolProvider tokenPoolProvider, 
+        IOptionsSnapshot<TokenPaymentAddressOptions> tokenPaymentAddressOptions)
     {
         _logger = logger;
         _timerOptions = timerOptions;
@@ -48,6 +51,7 @@ public class TokenPoolTimerGrain : Grain<TokenPoolTimerState>, ITokenPoolTimerGr
         _coBoProvider = coBoProvider;
         _contractProvider = contractProvider;
         _tokenPoolProvider = tokenPoolProvider;
+        _tokenPaymentAddressOptions = tokenPaymentAddressOptions;
     }
     
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
@@ -106,7 +110,7 @@ public class TokenPoolTimerGrain : Grain<TokenPoolTimerState>, ITokenPoolTimerGr
                 _withdrawNetworkOptions.Value.NetworkInfos.Select(n => n.Coin).ToList().IndexOf(k.Key))
             .ToDictionary(k => k.Key, v => v.Value);
 
-        foreach (var kv in _withdrawOption.Value.PaymentAddresses)
+        foreach (var kv in _tokenPaymentAddressOptions.Value.PaymentAddresses)
         {
             var chainId = kv.Key;
             foreach (var subKv in kv.Value)
@@ -132,7 +136,7 @@ public class TokenPoolTimerGrain : Grain<TokenPoolTimerState>, ITokenPoolTimerGr
             }
         }
         
-        foreach (var kv in _withdrawOption.Value.PaymentAddresses)
+        foreach (var kv in _tokenPaymentAddressOptions.Value.PaymentAddresses)
         {
             if (kv.Key != ChainId.AELF) continue;
             foreach (var subKey in kv.Value.Keys)

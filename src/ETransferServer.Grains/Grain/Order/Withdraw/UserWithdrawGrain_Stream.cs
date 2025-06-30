@@ -209,7 +209,7 @@ public partial class UserWithdrawGrain
         var statusFlow = await _orderStatusFlowGrain.GetAsync();
         var querySuccess = statusFlow?.Data != null;
         var retryFrom = OrderStatusEnum.ToStartTransfer.ToString();
-        var maxRetry = _withdrawOptions.Value.ToTransferMaxRetry;
+        var maxRetry = _withdrawInfoOptions.Value.ToTransferMaxRetry;
         var maxRetryCountExceeded = querySuccess &&
                                     ((OrderStatusFlowDto)statusFlow.Data).StatusFlow.Count(s =>
                                         s.Status == retryFrom) >= maxRetry;

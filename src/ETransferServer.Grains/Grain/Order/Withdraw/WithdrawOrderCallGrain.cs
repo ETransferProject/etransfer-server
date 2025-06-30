@@ -3,6 +3,7 @@ using ETransferServer.Dtos.Order;
 using ETransferServer.Grains.Grain.Timers;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.State.Order;
+using ETransferServer.Options;
 using ETransferServer.ThirdPart.CoBo;
 using ETransferServer.ThirdPart.CoBo.Dtos;
 using Microsoft.Extensions.Logging;
@@ -22,19 +23,23 @@ public interface IWithdrawOrderCallGrain : IGrainWithGuidKey
 public class WithdrawOrderCallGrain : Grain<WithdrawOrderCallState>, IWithdrawOrderCallGrain
 {
     private readonly ICoBoProvider _coBoProvider;
-    private readonly IOptionsSnapshot<WithdrawOptions> _withdrawOptions;
-    private readonly IOptionsSnapshot<WithdrawNetworkOptions> _withdrawNetworkOptions;
     private readonly ILogger<WithdrawOrderCallGrain> _logger;
+    private readonly IOptionsSnapshot<TokenInfoOptions> _tokenInfoOptions;
+    private readonly IOptionsSnapshot<WithdrawInfoOptions> _withdrawInfoOptions;
+    private readonly IOptionsSnapshot<WithdrawNetworkOptions> _withdrawNetworkOptions;
+
 
     public WithdrawOrderCallGrain(ICoBoProvider coBoProvider, 
-        IOptionsSnapshot<WithdrawOptions> withdrawOptions,
         IOptionsSnapshot<WithdrawNetworkOptions> withdrawNetworkOptions,
-        ILogger<WithdrawOrderCallGrain> logger)
+        ILogger<WithdrawOrderCallGrain> logger, 
+        IOptionsSnapshot<TokenInfoOptions> tokenInfoOptions, 
+        IOptionsSnapshot<WithdrawInfoOptions> withdrawInfoOptions)
     {
         _coBoProvider = coBoProvider;
-        _withdrawOptions = withdrawOptions;
         _withdrawNetworkOptions = withdrawNetworkOptions;
         _logger = logger;
+        _tokenInfoOptions = tokenInfoOptions;
+        _withdrawInfoOptions = withdrawInfoOptions;
     }
 
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
@@ -68,8 +73,8 @@ public class WithdrawOrderCallGrain : Grain<WithdrawOrderCallState>, IWithdrawOr
             State.CallRetry += 1;
             _logger.LogInformation(
                 "WithdrawOrderCallGrain, orderId:{orderId}, callRetry:{callRetry}, callMaxRetry:{callMaxRetry}",
-                this.GetPrimaryKey(), State.CallRetry, _withdrawOptions.Value.CallMaxRetry);
-            if (State.CallRetry > _withdrawOptions.Value.CallMaxRetry)
+                this.GetPrimaryKey(), State.CallRetry, _withdrawInfoOptions.Value.CallMaxRetry);
+            if (State.CallRetry > _withdrawInfoOptions.Value.CallMaxRetry)
                 return false;
         }
         else if(State.Status >= 3 && State.Status <= 4)
@@ -77,8 +82,8 @@ public class WithdrawOrderCallGrain : Grain<WithdrawOrderCallState>, IWithdrawOr
             State.CallbackRetry += 1;
             _logger.LogInformation(
                 "WithdrawOrderCallGrain, orderId:{orderId}, callbackRetry:{callbackRetry}, callbackMaxRetry:{callbackMaxRetry}",
-                this.GetPrimaryKey(), State.CallbackRetry, _withdrawOptions.Value.CallbackMaxRetry);
-            if (State.CallbackRetry > _withdrawOptions.Value.CallbackMaxRetry)
+                this.GetPrimaryKey(), State.CallbackRetry, _withdrawInfoOptions.Value.CallbackMaxRetry);
+            if (State.CallbackRetry > _withdrawInfoOptions.Value.CallbackMaxRetry)
                 return false;
         }
         else if (State.Status > 4)
@@ -86,8 +91,8 @@ public class WithdrawOrderCallGrain : Grain<WithdrawOrderCallState>, IWithdrawOr
             State.CallQueryRetry += 1;
             _logger.LogInformation(
                 "WithdrawOrderCallGrain, orderId:{orderId}, callQueryRetry:{callQueryRetry}, callQueryMaxRetry:{callQueryMaxRetry}",
-                this.GetPrimaryKey(), State.CallQueryRetry, _withdrawOptions.Value.CallQueryMaxRetry);
-            if (State.CallQueryRetry > _withdrawOptions.Value.CallQueryMaxRetry)
+                this.GetPrimaryKey(), State.CallQueryRetry, _withdrawInfoOptions.Value.CallQueryMaxRetry);
+            if (State.CallQueryRetry > _withdrawInfoOptions.Value.CallQueryMaxRetry)
                 return false;
         }
 
@@ -98,7 +103,7 @@ public class WithdrawOrderCallGrain : Grain<WithdrawOrderCallState>, IWithdrawOr
     public async Task AddToRequest(WithdrawOrderDto order)
     {
         _logger.LogInformation("WithdrawOrderCallGrain addToRequest, orderId:{orderId}", this.GetPrimaryKey());
-        if (State.CallRetry > _withdrawOptions.Value.CallMaxRetry)
+        if (State.CallRetry > _withdrawInfoOptions.Value.CallMaxRetry)
         {
             _logger.LogError("WithdrawOrderCallGrain addToRequest after retry {times}, {orderId}",
                 State.CallRetry, this.GetPrimaryKey());
@@ -125,7 +130,7 @@ public class WithdrawOrderCallGrain : Grain<WithdrawOrderCallState>, IWithdrawOr
     public async Task AddToQuery(WithdrawOrderDto order)
     {
         _logger.LogInformation("WithdrawOrderCallGrain addToQuery, orderId:{orderId}", this.GetPrimaryKey());
-        if (State.CallQueryRetry > _withdrawOptions.Value.CallQueryMaxRetry)
+        if (State.CallQueryRetry > _withdrawInfoOptions.Value.CallQueryMaxRetry)
         {
             _logger.LogError("WithdrawOrderCallGrain addToQuery after retry {times}, {orderId}",
                 State.CallQueryRetry, this.GetPrimaryKey());
@@ -186,7 +191,8 @@ public class WithdrawOrderCallGrain : Grain<WithdrawOrderCallState>, IWithdrawOr
         {
             var coinInfo =
                 _withdrawNetworkOptions.Value.GetNetworkInfo(orderDto.ToTransfer.Network, orderDto.ToTransfer.Symbol);
-            var amount = BigCalculationHelper.CalculateAmount(orderDto.ToTransfer.Amount, coinInfo.Decimal);
+            var tokenInfo = _tokenInfoOptions.Value.Tokens[orderDto.ToTransfer.Network][orderDto.ToTransfer.Symbol];
+            var amount = BigCalculationHelper.CalculateAmount(orderDto.ToTransfer.Amount, tokenInfo.Decimal);
             var requestDto = new WithdrawRequestDto
             {
                 Coin = coinInfo.Coin,

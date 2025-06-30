@@ -14,6 +14,7 @@ using ETransferServer.Models;
 using ETransferServer.Options;
 using ETransferServer.Network.Dtos;
 using ETransferServer.ThirdPart.Exchange;
+using ETransferServer.Token;
 using ETransferServer.Token.Dtos;
 using NBitcoin;
 using Orleans;
@@ -30,31 +31,35 @@ namespace ETransferServer.Network;
 public partial class NetworkAppService : ETransferServerAppService, INetworkAppService
 {
     private readonly ILogger<NetworkAppService> _logger;
-    private readonly IOptionsSnapshot<NetworkOptions> _networkOptions;
     private readonly CoinGeckoOptions _coinGeckoOptions;
-    private readonly IOptionsSnapshot<DepositInfoOptionsBak> _depositInfoOptions;
-    private readonly IOptionsSnapshot<WithdrawInfoOptionsBak> _withdrawInfoOptions;
-    private readonly IOptionsSnapshot<TokenOptions> _tokenOptions;
+    private readonly IOptionsSnapshot<WithdrawInfoOptions> _withdrawInfoOptions;
+    private readonly IOptionsSnapshot<TokenInfoOptions> _tokenOptions;
     private readonly IObjectMapper _objectMapper;
     private readonly IClusterClient _clusterClient;
+    private readonly IOptionsSnapshot<TokenSupportedChainInfoOptions> _tokenSupportedChainOptions;
+    private readonly ITokenNetworkProvider _tokenNetworkProvider;
+    private readonly ISupportedChainTokenProvider _supportedChainTokenProvider;
+    private readonly IOptionsSnapshot<NetworkInfoOptions> _networkInfoOptions;
+    private readonly IOptionsSnapshot<ServiceFeeOptions> _serviceFeeOptions;
 
     public NetworkAppService(ILogger<NetworkAppService> logger, 
-        IOptionsSnapshot<NetworkOptions> networkOptions,
         IOptionsSnapshot<CoinGeckoOptions> coinGeckoOptions,
         IObjectMapper objectMapper,
         IClusterClient clusterClient, 
-        IOptionsSnapshot<DepositInfoOptionsBak> depositInfoOptions,
-        IOptionsSnapshot<WithdrawInfoOptionsBak> withdrawInfoOptions,
-        IOptionsSnapshot<TokenOptions> tokenOptions)
+        IOptionsSnapshot<WithdrawInfoOptions> withdrawInfoOptions,
+        IOptionsSnapshot<TokenInfoOptions> tokenOptions, IOptionsSnapshot<TokenSupportedChainInfoOptions> tokenSupportedChainOptions, ITokenNetworkProvider tokenNetworkProvider, ISupportedChainTokenProvider supportedChainTokenProvider, IOptionsSnapshot<NetworkInfoOptions> networkInfoOptions, IOptionsSnapshot<ServiceFeeOptions> serviceFeeOptions)
     {
         _logger = logger;
-        _networkOptions = networkOptions;
         _coinGeckoOptions = coinGeckoOptions.Value;
         _objectMapper = objectMapper;
         _clusterClient = clusterClient;
-        _depositInfoOptions = depositInfoOptions;
         _withdrawInfoOptions = withdrawInfoOptions;
         _tokenOptions = tokenOptions;
+        _tokenSupportedChainOptions = tokenSupportedChainOptions;
+        _tokenNetworkProvider = tokenNetworkProvider;
+        _supportedChainTokenProvider = supportedChainTokenProvider;
+        _networkInfoOptions = networkInfoOptions;
+        _serviceFeeOptions = serviceFeeOptions;
     }
 
     [ExceptionHandler(typeof(UserFriendlyException), typeof(Exception), 
@@ -102,32 +107,32 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
         string version = null)
     {
         var getNetworkTokenListDto = new GetNetworkTokenListDto();
-        var symbolList = _tokenOptions.Value.Transfer.Select(t => t.Symbol).ToList();
+        // var symbolList = _tokenOptions.Value.Transfer.Select(t => t.Symbol).ToList();
+        var symbolList = _tokenNetworkProvider.GetSupportTransferSymbolList();
         foreach (var symbol in symbolList)
         {
             if (!request.TokenList.IsNullOrEmpty() && !request.TokenList.Contains(symbol)) continue;
-            if (!_networkOptions.Value.NetworkMap.ContainsKey(symbol)) continue;
-            var fullNetworkConfigs = _networkOptions.Value.NetworkMap[symbol].Where(a =>
-                a.SupportType.Contains(OrderTypeEnum.Transfer.ToString())).ToList();
+            // if (!_networkOptions.Value.NetworkMap.ContainsKey(symbol)) continue;
+            if (!_tokenSupportedChainOptions.Value.SupportedChains.ContainsKey(symbol))
+            {
+                continue;
+            }
+            // var fullNetworkConfigs = _networkOptions.Value.NetworkMap[symbol].Where(a =>
+            //     a.SupportType.Contains(OrderTypeEnum.Transfer.ToString())).ToList();
+            var fullNetworkConfigs = _tokenSupportedChainOptions.Value.SupportedChains[symbol]
+                .Where(a => a.SupportedType.Contains(OrderTypeEnum.Transfer.ToString())).ToList();
             var networkConfigs = request.NetworkList.IsNullOrEmpty()
                 ? fullNetworkConfigs
-                : _networkOptions.Value.NetworkMap[symbol].Where(a =>
-                    request.NetworkList.Contains(a.NetworkInfo.Network) &&
-                    a.SupportType.Contains(OrderTypeEnum.Transfer.ToString())).ToList();
-            fullNetworkConfigs = await FilterByVersionAndWhiteList(fullNetworkConfigs, version, request.SourceType, request.Address);
-            networkConfigs = await FilterByVersionAndWhiteList(networkConfigs, version, request.SourceType, request.Address);
-            var fullBasicDtos = fullNetworkConfigs.ConvertAll(t => new NetworkBasicDto
-            {
-                Network = t.NetworkInfo.Network, Name = t.NetworkInfo.Name, Status = t.WithdrawInfo.IsOpen
-                    ? CommonConstant.NetworkStatus.Health
-                    : CommonConstant.NetworkStatus.Offline
-            });
-            var basicDtos = networkConfigs.ConvertAll(t => new NetworkBasicDto
-            {
-                Network = t.NetworkInfo.Network, Name = t.NetworkInfo.Name, Status = t.WithdrawInfo.IsOpen
-                    ? CommonConstant.NetworkStatus.Health
-                    : CommonConstant.NetworkStatus.Offline
-            });
+                : _tokenSupportedChainOptions.Value.SupportedChains[symbol]
+                    .Where(n => request.NetworkList.Contains(n.Network) &&
+                                n.SupportedType.Contains(OrderTypeEnum.Transfer.ToString())).ToList();
+                // : _networkOptions.Value.NetworkMap[symbol].Where(a =>
+                //     request.NetworkList.Contains(a.NetworkInfo.Network) &&
+                //     a.SupportType.Contains(OrderTypeEnum.Transfer.ToString())).ToList();
+            var fullNetworkBasicInfoList = await FilterByVersionAndWhiteList(fullNetworkConfigs, version, request.SourceType, request.Address);
+            var networkBasicInfoList = await FilterByVersionAndWhiteList(networkConfigs, version, request.SourceType, request.Address);
+            var fullBasicDtos = ConvertNetworkBasic(symbol, fullNetworkBasicInfoList);
+            var basicDtos = ConvertNetworkBasic(symbol, networkBasicInfoList);
             
             if (_withdrawInfoOptions.Value.TransferPath.ContainsKey(symbol))
             {
@@ -140,7 +145,7 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
                     {
                         new()
                         {
-                            Network = split[1], Name = GetNetworkName(symbol, split[1]),
+                            Network = split[1], Name = GetNetworkName(split[1]),
                             Status = GetNetworkStatus(symbol, split[1])
                         }
                     };
@@ -185,26 +190,31 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
         return getNetworkTokenListDto;
     }
 
-    private string GetNetworkName(string symbol, string network)
+    private List<NetworkBasicDto> ConvertNetworkBasic(string symbol,List<NetworkBasicInfo> networkBasicInfos)
     {
-        var name = _networkOptions.Value.NetworkMap[symbol].
-            FirstOrDefault(t => t.NetworkInfo.Network == network)?.NetworkInfo?.Name;
-        if (!name.IsNullOrEmpty()) return name;
-        return _networkOptions.Value.NetworkMap[CommonConstant.Symbol.USDT]
-            .FirstOrDefault(t => t.NetworkInfo.Network == network)
-            ?.NetworkInfo?.Name;
+        return networkBasicInfos.Select(full => new NetworkBasicDto
+            {
+                Name = full.Name,
+                Network = full.Network,
+                Status = _supportedChainTokenProvider.IsWithdrawHealth(symbol, full.Network)
+                    ? CommonConstant.NetworkStatus.Health
+                    : CommonConstant.NetworkStatus.Offline
+            })
+            .ToList();
+    }
+
+    private string GetNetworkName(string network)
+    {
+        return _tokenNetworkProvider.GetNetworkInfo(network).Name;
     }
     
     private string GetNetworkStatus(string symbol, string network)
     {
         if (network == ChainId.AELF || network == ChainId.tDVV || network == ChainId.tDVW)
             return CommonConstant.NetworkStatus.Health;
-        var networkConfig = _networkOptions.Value.NetworkMap[symbol]
-            .FirstOrDefault(t => t.NetworkInfo.Network == network);
-        if (networkConfig != null) return networkConfig.WithdrawInfo.IsOpen
+        return _supportedChainTokenProvider.IsWithdrawHealth(symbol,network)
             ? CommonConstant.NetworkStatus.Health
             : CommonConstant.NetworkStatus.Offline;
-        return CommonConstant.NetworkStatus.Health;
     }
 
     private GetNetworkListDto FilterByChainId(GetNetworkListDto networkListDto, string chainId)
@@ -238,47 +248,34 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
                             || request.Type == OrderTypeEnum.Transfer.ToString(),
             "Invalid type value. Please refresh and try again.");
         AssertHelper.IsTrue(request.Symbol.IsNullOrEmpty() || (!request.Symbol.IsNullOrEmpty() 
-                            && _networkOptions.Value.NetworkMap.ContainsKey(request.Symbol)),
+                            && _tokenSupportedChainOptions.Value.SupportedChains.ContainsKey(request.Symbol)),
             "Symbol is not exist. Please refresh and try again.");
 
-        var networkConfigs = request.Symbol.IsNullOrEmpty()
-            ? _networkOptions.Value.NetworkMap.Where(t => _tokenOptions.Value.Transfer.Any(
-                    c => c.Symbol == t.Key)).OrderBy(m => 
-                    _tokenOptions.Value.Transfer.Select(t => t.Symbol).ToList().IndexOf(m.Key))
-                .SelectMany(kvp => kvp.Value).Where(a =>
-                    a.SupportType.Contains(request.Type)).GroupBy(g => g.NetworkInfo.Network)
-                .Select(s => s.First()).ToList()
-            : _networkOptions.Value.NetworkMap[request.Symbol].Where(a =>
-                    request.Type == OrderTypeEnum.Transfer.ToString() 
-                        ? a.SupportType.Contains(request.Type) 
-                        : a.SupportType.Contains(request.Type) && a.SupportChain.Contains(request.ChainId))
-                .ToList();
-        networkConfigs = await FilterByVersionAndWhiteList(networkConfigs, version, sourceType, address);
-
-        var networkInfos = networkConfigs.Select(config => config.NetworkInfo).ToList();
-        var withdrawInfo = networkConfigs
-            .Where(config => config.NetworkInfo != null && config.WithdrawInfo != null)
-            .ToDictionary(config => config.NetworkInfo.Network, config => config.WithdrawInfo);
+        var networkConfigs = new List<SupportedChainInfo>();
+        FilterNetworkList(request.Symbol, request.Type, request.ChainId, networkConfigs);
+        
+        var networkBasicInfos = await FilterByVersionAndWhiteList(networkConfigs, version, sourceType, address);
+        
         var getNetworkListDto = new GetNetworkListDto();
         getNetworkListDto.ChainId = request.ChainId;
 
-        getNetworkListDto.NetworkList = _objectMapper.Map<List<NetworkInfo>, List<NetworkDto>>(networkInfos);
-        FillMultiConfirmMinutes(request.Type, request.Symbol, getNetworkListDto.NetworkList, networkConfigs);
+        getNetworkListDto.NetworkList = _objectMapper.Map<List<NetworkBasicInfo>, List<NetworkDto>>(networkBasicInfos);
+        FillMultiConfirmMinutes(request.Type, request.Symbol, getNetworkListDto.NetworkList,
+            networkConfigs.Select(n=>_tokenNetworkProvider.GetNetworkInfo(n.Network)).ToList());
 
-        foreach (var networkDto in getNetworkListDto.NetworkList)
-        {
-            if (request.Type == OrderTypeEnum.Deposit.ToString() ||
-                !withdrawInfo.TryGetValue(networkDto.Network, out var withdraw)) continue;
-            networkDto.WithdrawFeeUnit = withdraw.WithdrawLocalFeeUnit;
-            networkDto.WithdrawFee = withdraw.WithdrawLocalFee.ToString(CultureInfo.InvariantCulture);
-            networkDto.SpecialWithdrawFeeDisplay = withdraw.SpecialWithdrawFeeDisplay;
-            networkDto.SpecialWithdrawFee = withdraw.SpecialWithdrawFee;
-        }
+        // foreach (var networkDto in getNetworkListDto.NetworkList)
+        // {
+        //     if (request.Type == OrderTypeEnum.Deposit.ToString()) continue;
+        //     networkDto.WithdrawFeeUnit = withdraw.WithdrawLocalFeeUnit;
+        //     networkDto.WithdrawFee = withdraw.WithdrawLocalFee.ToString(CultureInfo.InvariantCulture);
+        //     networkDto.SpecialWithdrawFeeDisplay = withdraw.SpecialWithdrawFeeDisplay;
+        //     networkDto.SpecialWithdrawFee = withdraw.SpecialWithdrawFee;
+        // }
 
         if (request.Address.IsNullOrEmpty() || (isAddressSupport && VerifyHelper.VerifyAelfAddress(request.Address))) 
             return getNetworkListDto;
 
-        var networkByAddress = _networkOptions.Value.NetworkPattern
+        var networkByAddress = _networkInfoOptions.Value.NetworkPattern
             .Where(kv => request.Address.Match(kv.Key))
             .SelectMany(kv => kv.Value)
             .ToList();
@@ -292,6 +289,87 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
         AssertHelper.NotEmpty(getNetworkListDto.NetworkList, ErrorResult.NetworkNotSupportCode,
             string.Join(CommonConstant.Slash, networkByAddress));
         return getNetworkListDto;
+    }
+
+    private void FilterNetworkList(string requestSymbol, string requestType, string requestChainId,
+        List<SupportedChainInfo> networkConfigs)
+    {
+        if (requestSymbol.IsNullOrEmpty())
+        {
+            var transferSymbols = _supportedChainTokenProvider
+                .GetTokenListByType(OrderTypeEnum.Transfer.ToString(), null).Select(t => t.Symbol).ToList();
+            
+            foreach (var symbol in transferSymbols)
+            {
+                if (!_tokenSupportedChainOptions.Value.SupportedChains.ContainsKey(symbol))
+                    continue;
+
+                var configs = _tokenSupportedChainOptions.Value.SupportedChains[symbol];
+                
+                var filteredConfigs = configs
+                    .Where(a => a.SupportedType != null && a.SupportedType.Contains(requestType))
+                    .ToList();
+
+                foreach (var config in filteredConfigs)
+                {
+                    if (networkConfigs.Any(c => c.Network == config.Network))
+                        continue;
+
+                    networkConfigs.Add(config);
+                }
+            }
+        }
+        else
+        {
+            if (_tokenSupportedChainOptions.Value.SupportedChains.TryGetValue(requestSymbol, out var configs))
+            {
+                foreach (var config in configs)
+                {
+                    if (config.SupportedType == null || !config.SupportedType.Contains(requestType))
+                        continue;
+                    
+                    if (requestChainId != null && requestType != OrderTypeEnum.Transfer.ToString())
+                    {
+                        if (config.SupportChain == null || !config.SupportChain.Contains(requestChainId))
+                            continue;
+                    }
+
+                    networkConfigs.Add(config);
+                }
+            }
+        }
+    }
+
+    private Dictionary<string, SupportedChainInfo> WrappedNetworkInfoToDic(string requestSymbol, string requestType, string network)
+    {
+        var res = new Dictionary<string, SupportedChainInfo>();
+        if (requestSymbol.IsNullOrEmpty())
+        {
+            var transferSymbols = _supportedChainTokenProvider
+                .GetTokenListByType(OrderTypeEnum.Transfer.ToString(), null).Select(t => t.Symbol).ToList();
+            
+            foreach (var symbol in transferSymbols)
+            {
+                var config = _tokenSupportedChainOptions.Value.SupportedChains[symbol]
+                    .FirstOrDefault(n => n.Network == network);
+                res.TryAdd(symbol, config);
+            }
+        }
+        else
+        {
+            if (_tokenSupportedChainOptions.Value.SupportedChains.TryGetValue(requestSymbol, out var configs))
+            {
+                foreach (var config in configs)
+                {
+                    if (config.SupportedType.Contains(requestType) && config.Network == network)
+                    {
+                        res.TryAdd(requestSymbol, config);
+                    }
+                }
+            }
+        }
+
+        return res;
     }
 
     public async Task<Tuple<decimal, CoBoCoinDto>> CalculateNetworkFeeAsync(string network, string symbol)
@@ -333,24 +411,24 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
     public Task<decimal> GetMinThirdPartFeeAsync(string network, string symbol)
     {
         var minFeeKey = string.Join(CommonConstant.Underline, network, symbol);
-        return Task.FromResult(_withdrawInfoOptions.Value.MinThirdPartFee.ContainsKey(minFeeKey)
-            ? _withdrawInfoOptions.Value.MinThirdPartFee[minFeeKey]
+        return Task.FromResult(_serviceFeeOptions.Value.MinThirdPartFee.TryGetValue(minFeeKey, out var value)
+            ? value
             : CommonConstant.DefaultConst.DefaultMinThirdPartFee);
     }
 
     public Task<decimal> GetMaxThirdPartFeeAsync(string network, string symbol)
     {
         var maxFeeKey = string.Join(CommonConstant.Underline, network, symbol);
-        return Task.FromResult(_withdrawInfoOptions.Value.MaxThirdPartFee.ContainsKey(maxFeeKey)
-            ? _withdrawInfoOptions.Value.MaxThirdPartFee[maxFeeKey]
-            : 0M);
+        return Task.FromResult(_serviceFeeOptions.Value.MaxThirdPartFee.TryGetValue(maxFeeKey, out var value)
+            ? value
+            :  0M);
     }
 
     public async Task<Tuple<bool, decimal, decimal, decimal>> GetServiceFeeAsync(string network, string symbol)
     {
-        var isOpen = _depositInfoOptions.Value.ServiceFee.IsOpen;
-        var amountThreshold = _depositInfoOptions.Value.ServiceFee.AmountThreshold.ContainsKey(symbol)
-            ? _depositInfoOptions.Value.ServiceFee.AmountThreshold[symbol]
+        var isOpen = _serviceFeeOptions.Value.IsOpen;
+        var amountThreshold = _serviceFeeOptions.Value.AmountThreshold.ContainsKey(symbol)
+            ? _serviceFeeOptions.Value.AmountThreshold[symbol]
             : 0M;
         var serviceFee = 0M;
         if (!network.IsNullOrEmpty())
@@ -361,10 +439,9 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
             serviceFee = Math.Min(estimateFee, await GetMaxThirdPartFeeAsync(network, symbol)).ToString(
                 2, DecimalHelper.RoundingOption.Ceiling).SafeToDecimal();
         }
-        var minAmount = _networkOptions.Value.NetworkMap.ContainsKey(symbol)
-            ? _networkOptions.Value.NetworkMap[symbol].FirstOrDefault(t => t.NetworkInfo.Network == network)
-                ?.DepositInfo?.MinDeposit.SafeToDecimal() ?? (_depositInfoOptions.Value.ServiceFee.MinDeposit.ContainsKey(symbol)
-            ? _depositInfoOptions.Value.ServiceFee.MinDeposit[symbol] : 0M)
+
+        var minAmount = _serviceFeeOptions.Value.MinDeposit.ContainsKey(symbol)
+            ? _serviceFeeOptions.Value.MinDeposit[symbol]
             : 0M;
         _logger.LogDebug("Deposit from network fee: {network}, {symbol}, {isOpen}, {threshold}, {serviceFee}, {minAmount}", 
             network, symbol, isOpen, amountThreshold, serviceFee, minAmount);
@@ -373,22 +450,14 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
 
     public Task<int> GetDecimalsAsync(string chainId, string symbol)
     {
-        return Task.FromResult((!chainId.IsNullOrEmpty() && _tokenOptions.Value.Withdraw.ContainsKey(chainId)
-                ? _tokenOptions.Value.Withdraw[chainId]
-                : null)
-            ?.FirstOrDefault(t => t.Symbol == symbol)
-            ?.Decimals ?? DecimalHelper.GetDecimals(symbol));
+        var tokenDecimals = _tokenOptions.Value.Tokens[chainId][symbol].Decimal;
+        return Task.FromResult(tokenDecimals);
     }
 
     public Task<string> GetIconAsync(string orderType, string chainId, string fromSymbol, string toSymbol = null)
     {
-        var tokenDic = orderType == OrderTypeEnum.Withdraw.ToString()
-            ? _tokenOptions.Value.Withdraw
-            : _tokenOptions.Value.Deposit;
-        return Task.FromResult(tokenDic.ContainsKey(chainId) && (toSymbol.IsNullOrEmpty() || fromSymbol == toSymbol)
-            ? tokenDic[chainId]?.FirstOrDefault(t => t.Symbol == fromSymbol)?.Icon
-            : _tokenOptions.Value.DepositSwap.FirstOrDefault(config => config.Symbol == fromSymbol)?.ToTokenList?
-                .FirstOrDefault(token => token.Symbol == toSymbol)?.Icon);
+        var icon = _tokenOptions.Value.Tokens[chainId][fromSymbol].Icon;
+        return Task.FromResult(icon);
     }
 
     [ExceptionHandler(typeof(Exception), 
@@ -484,7 +553,7 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
         return coin?.AbsEstimateFee;
     }
     
-    private async Task<List<NetworkConfig>> FilterByVersionAndWhiteList(List<NetworkConfig> networkConfigs, 
+    private async Task<List<NetworkBasicInfo>> FilterByVersionAndWhiteList(List<SupportedChainInfo> supportNetworkList,
         string version = null, string sourceType = null, string address = null)
     {
         var userId = CurrentUser.IsAuthenticated ? CurrentUser?.GetId() : null;
@@ -493,14 +562,11 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
             _logger.LogInformation("GetNetworkList currentUser:{userId},version:{version}", userId.Value, version);
             var userGrain = _clusterClient.GetGrain<IUserGrain>(userId.Value);
             var userDto = await userGrain.GetUser();
+            var res = new List<NetworkBasicInfo>();
             if (userDto.Success && userDto.Data != null && !userDto.Data.AddressInfos.IsNullOrEmpty())
             {
-                return networkConfigs.Where(config =>
-                    config.NetworkInfo.MinShowVersion.IsNullOrEmpty()
-                    || (VerifyHelper.VerifyMemoVersion(version, config.NetworkInfo.MinShowVersion)
-                        && (config.SupportWhiteList.IsNullOrEmpty() ||
-                            config.SupportWhiteList.Any(t => userDto.Data.AddressInfos.Exists(a =>
-                                a.Address.ToLower() == t.ToLower()))))).ToList();
+                return GetNetworkBasicInfos(supportNetworkList,version,
+                    userDto.Data.AddressInfos.Select(a => a.Address).ToList());
             }
         }
 
@@ -510,67 +576,81 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
             var fullAddress = (int)walletType > 1 
                 ? string.Concat(sourceType.ToLower(), CommonConstant.Underline, address)
                 : address;
-            return networkConfigs.Where(config =>
-                config.NetworkInfo.MinShowVersion.IsNullOrEmpty()
-                || (VerifyHelper.VerifyMemoVersion(version, config.NetworkInfo.MinShowVersion)
-                    && (config.SupportWhiteList.IsNullOrEmpty() ||
-                        config.SupportWhiteList.Any(t => fullAddress.ToLower() == t.ToLower())))).ToList();
+            return GetNetworkBasicInfos(supportNetworkList, version, new List<string>() { fullAddress });
         }
 
-        return networkConfigs.Where(config =>
-            config.NetworkInfo.MinShowVersion.IsNullOrEmpty()
-            || (VerifyHelper.VerifyMemoVersion(version, config.NetworkInfo.MinShowVersion)
-                && config.SupportWhiteList.IsNullOrEmpty())).ToList();
+        return GetNetworkBasicInfos(supportNetworkList, version, null);
+    }
+
+    private List<NetworkBasicInfo> GetNetworkBasicInfos(List<SupportedChainInfo> supportNetworkList,string version,List<string> addressInfos)
+    {
+        var res = new List<NetworkBasicInfo>();
+        foreach (var supportedChainInfo in supportNetworkList)
+        {
+            var network = supportedChainInfo.Network;
+            var supportWhiteList = supportedChainInfo.SupportWhiteList;
+            var networkInfo = _tokenNetworkProvider.GetNetworkInfo(network);
+            if ((networkInfo != null && networkInfo.MinShowVersion.IsNullOrEmpty()) ||
+                (VerifyHelper.VerifyMemoVersion(version, networkInfo.MinShowVersion)
+                 && (supportWhiteList.IsNullOrEmpty() || (addressInfos != null && 
+                     supportWhiteList.Any(t =>addressInfos.Exists(a =>
+                         a.ToLower() == t.ToLower()))))))
+            {
+                res.Add(networkInfo);
+            }
+        }
+
+        return res;
     }
 
     private void FillMultiConfirmMinutes(string type, string symbol, List<NetworkDto> networkList, 
-        List<NetworkConfig> networkConfigs)
+        List<NetworkBasicInfo> networkConfigs)
     {
         foreach (var networkDto in networkList)
         {
             var config = networkConfigs
-                .Where(c => c.NetworkInfo != null)
-                .FirstOrDefault(c => c.NetworkInfo.Network == networkDto.Network);
+                .FirstOrDefault(c => c.Network == networkDto.Network);
             if (config == null) continue;
 
-            var multiConfirmSeconds = config.NetworkInfo.MultiConfirmSeconds;
-            var multiTokens = symbol.IsNullOrEmpty()
-                ? _networkOptions.Value.NetworkMap.Where(t => _tokenOptions.Value.Transfer.Any(
-                        c => c.Symbol == t.Key)).OrderBy(m => 
-                        _tokenOptions.Value.Transfer.Select(t => t.Symbol).ToList().IndexOf(m.Key))
-                    .ToDictionary(kv => kv.Key, kv => kv.Value.FirstOrDefault(t => t.NetworkInfo.Network == networkDto.Network))
-                : _networkOptions.Value.NetworkMap[symbol].Where(a =>
-                        a.SupportType.Contains(type) && a.NetworkInfo.Network == networkDto.Network)
-                    .ToDictionary(c => symbol, c => c);
-            if (type == OrderTypeEnum.Deposit.ToString() && config.DepositInfo != null)
+            var multiConfirmSeconds = config.MultiConfirmSeconds;
+            var multiTokens = WrappedNetworkInfoToDic(symbol, type, networkDto.Network);
+
+            // var multiTokens = symbol.IsNullOrEmpty()
+            //     ? _networkOptions.Value.NetworkMap.Where(t => _tokenOptions.Value.Transfer.Any(
+            //             c => c.Symbol == t.Key)).OrderBy(m => 
+            //             _tokenOptions.Value.Transfer.Select(t => t.Symbol).ToList().IndexOf(m.Key))
+            //         .ToDictionary(kv => kv.Key, kv => kv.Value.FirstOrDefault(t => t.NetworkInfo.Network == networkDto.Network))
+            //     : _networkOptions.Value.NetworkMap[symbol].Where(a =>
+            //             a.SupportType.Contains(type) && a.NetworkInfo.Network == networkDto.Network)
+            //         .ToDictionary(c => symbol, c => c);
+            if (type == OrderTypeEnum.Deposit.ToString())
             {
-                networkDto.Status = config.DepositInfo.IsOpen
+                networkDto.Status = _supportedChainTokenProvider.IsDepositHealth(symbol, networkDto.Network)
                     ? CommonConstant.NetworkStatus.Health
                     : CommonConstant.NetworkStatus.Offline;
-                multiConfirmSeconds = config.DepositInfo.MultiConfirmSeconds;
+                multiConfirmSeconds = config.MultiConfirmSeconds;
                 foreach (var kv in multiTokens) {
                     networkDto.MultiStatus ??= new Dictionary<string, string>();
-                    if (kv.Value != null && kv.Value.DepositInfo != null)
+                    if (kv.Value != null)
                     {
-                        networkDto.MultiStatus.AddOrReplace(kv.Key, kv.Value.DepositInfo.IsOpen
+                        networkDto.MultiStatus.AddOrReplace(kv.Key, _supportedChainTokenProvider.IsDepositHealth(symbol, kv.Value.Network)
                             ? CommonConstant.NetworkStatus.Health
                             : CommonConstant.NetworkStatus.Offline);
                     }
                 }
             }
 
-            if ((type == OrderTypeEnum.Withdraw.ToString() || type == OrderTypeEnum.Transfer.ToString())
-                && config.WithdrawInfo != null)
+            if ((type == OrderTypeEnum.Withdraw.ToString() || type == OrderTypeEnum.Transfer.ToString()))
             {
-                networkDto.Status = config.WithdrawInfo.IsOpen
+                networkDto.Status = _supportedChainTokenProvider.IsWithdrawHealth(CommonConstant.Symbol.USDT, networkDto.Network)
                     ? CommonConstant.NetworkStatus.Health
                     : CommonConstant.NetworkStatus.Offline;
-                multiConfirmSeconds = config.WithdrawInfo.MultiConfirmSeconds;
+                multiConfirmSeconds = config.MultiConfirmSeconds;
                 foreach (var kv in multiTokens) {
                     networkDto.MultiStatus ??= new Dictionary<string, string>();
-                    if (kv.Value != null && kv.Value.WithdrawInfo != null)
+                    if (kv.Value != null)
                     {
-                        networkDto.MultiStatus.AddOrReplace(kv.Key, kv.Value.WithdrawInfo.IsOpen
+                        networkDto.MultiStatus.AddOrReplace(kv.Key, _supportedChainTokenProvider.IsWithdrawHealth(symbol, kv.Value.Network)
                             ? CommonConstant.NetworkStatus.Health
                             : CommonConstant.NetworkStatus.Offline);
                     }
