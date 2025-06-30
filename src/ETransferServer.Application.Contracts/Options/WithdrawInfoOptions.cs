@@ -4,6 +4,7 @@ namespace ETransferServer.Options;
 
 public class WithdrawInfoOptions
 {
+    public bool IsOpen { get; set; } = true;
     public bool CanCrossSameChain { get; set; }
     public long WithdrawThreshold { get; set; } = 100000;
     public string OrderChangeTopic { get; set; }
@@ -16,6 +17,7 @@ public class WithdrawInfoOptions
     public int MaxListLength { get; set; } = 1000;
     public Dictionary<string, decimal> LargeAmount { get; set; } = new();
     public Dictionary<string, TransactionThreshold> Homogeneous { get; set; } = new();
+    public Dictionary<string, List<string>> TransferPath { get; set; } = new();
 }
 public class TransactionThreshold
 {

@@ -13,4 +13,7 @@ public class ServiceFeeOptions
     public Dictionary<string, decimal> MinAmount { get; set; } = new();
     public decimal MinWithdraw { get; set; } = 0.2M;
     public Dictionary<string, decimal> MinDeposit { get; set; } = new();
+    public List<string> WithdrawFeeNetwork { get; set; }
+    public int ThirdPartCacheFeeExpireSeconds { get; set; } = 180;
+
 }
