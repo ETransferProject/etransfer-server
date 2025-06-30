@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using ETransferServer.Models;
+using ETransferServer.Options;
 using ETransferServer.Token.Dtos;
 using JetBrains.Annotations;
 using Volo.Abp.Application.Services;
@@ -12,4 +13,5 @@ public interface ITokenAppService : IApplicationService
     Task<GetTokenOptionListDto> GetTokenOptionListAsync(GetTokenOptionListRequestDto request);
     bool IsValidDeposit(string toChainId, string fromSymbol, [CanBeNull] string toSymbol);
     bool IsValidSwap(string toChainId, string fromSymbol, [CanBeNull] string toSymbol);
+    Task<TokenInfoDto> GetTokenInfoAsync(string chainId, string symbol);
 }

@@ -23,20 +23,19 @@ public class UserWithdrawRecordGrain : Grain<WithdrawOrderState>, IUserWithdrawR
     private readonly IObjectMapper _objectMapper;
     private readonly ILogger<UserWithdrawRecordGrain> _logger;
     private readonly IOptionsSnapshot<ChainOptions> _chainOptions;
-    private readonly IOptionsSnapshot<WithdrawNetworkOptions> _withdrawNetworkOptions;
-    private readonly IOptionsSnapshot<WithdrawOptions> _withdrawOptions;
-
+    private readonly IOptionsSnapshot<NetworkInfoOptions> _networkInfoOptions;
+    private readonly IOptionsSnapshot<WithdrawInfoOptions> _withdrawInfoOptions;
     public UserWithdrawRecordGrain(IObjectMapper objectMapper, 
         ILogger<UserWithdrawRecordGrain> logger,
-        IOptionsSnapshot<ChainOptions> chainOptions,
-        IOptionsSnapshot<WithdrawNetworkOptions> withdrawNetworkOptions,
-        IOptionsSnapshot<WithdrawOptions> withdrawOptions)
+        IOptionsSnapshot<ChainOptions> chainOptions, 
+        IOptionsSnapshot<NetworkInfoOptions> networkInfoOptions, 
+        IOptionsSnapshot<WithdrawInfoOptions> withdrawInfoOptions)
     {
         _objectMapper = objectMapper;
         _logger = logger;
         _chainOptions = chainOptions;
-        _withdrawNetworkOptions = withdrawNetworkOptions;
-        _withdrawOptions = withdrawOptions;
+        _networkInfoOptions = networkInfoOptions;
+        _withdrawInfoOptions = withdrawInfoOptions;
     }
 
     public async Task<CommonResponseDto<WithdrawOrderDto>> AddOrUpdate(WithdrawOrderDto orderDto)
@@ -60,9 +59,7 @@ public class UserWithdrawRecordGrain : Grain<WithdrawOrderState>, IUserWithdrawR
             }
             if (!State.ArrivalTime.HasValue)
             {
-                var netWorkInfo = _withdrawNetworkOptions.Value.NetworkInfos.FirstOrDefault(t =>
-                    t.Coin.Equals(GuidHelper.GenerateId(orderDto.ToTransfer.Network,
-                        orderDto.ToTransfer.Symbol), StringComparison.OrdinalIgnoreCase));
+                var netWorkInfo = _networkInfoOptions.Value.Networks[orderDto.ToTransfer.Network];
                 if (orderDto.FromTransfer.Network == CommonConstant.Network.AElf)
                 {
                     State.ArrivalTime = !IsBigAmountInAElf(orderDto, orderDto.FromTransfer).HasValue
@@ -81,9 +78,7 @@ public class UserWithdrawRecordGrain : Grain<WithdrawOrderState>, IUserWithdrawR
                 }
                 else
                 {
-                    var fromTime = _withdrawNetworkOptions.Value.NetworkInfos.FirstOrDefault(t =>
-                        t.Coin.Equals(GuidHelper.GenerateId(orderDto.FromTransfer.Network,
-                            orderDto.FromTransfer.Symbol), StringComparison.OrdinalIgnoreCase))?.EstimatedArrivalTime;
+                    var fromTime = _networkInfoOptions.Value.Networks[orderDto.FromTransfer.Network]?.EstimatedArrivalTime;
                     var toTime = orderDto.ToTransfer.Network != CommonConstant.Network.AElf
                         ? netWorkInfo?.EstimatedArrivalTime
                         : !IsBigAmountInAElf(orderDto, orderDto.ToTransfer).HasValue
@@ -160,7 +155,7 @@ public class UserWithdrawRecordGrain : Grain<WithdrawOrderState>, IUserWithdrawR
         {
             if (orderDto.ToTransfer.Network != CommonConstant.Network.AElf) return null;
             var symbol = transfer.Symbol;
-            var thresholdExists = _withdrawOptions.Value.Homogeneous.TryGetValue(symbol, out var threshold);
+            var thresholdExists = _withdrawInfoOptions.Value.Homogeneous.TryGetValue(symbol, out var threshold);
             AssertHelper.IsTrue(thresholdExists, "Homogeneous symbol {symbol} not found", symbol);
             AssertHelper.NotNull(threshold, "Homogeneous threshold not fount, symbol:{symbol}", symbol);
 

@@ -1,3 +1,4 @@
+using System.Globalization;
 using AutoMapper;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Info;
@@ -47,12 +48,12 @@ public class ETransferServerApplicationAutoMapperProfile : Profile
         CreateMap<OrderRecordDto, OrderMoreDetailDto>().ReverseMap();
         CreateMap<OrderDetailDto, OrderMoreDetailDto>().ReverseMap();
         CreateMap<Transfer, TransferInfoDto>().ReverseMap();
-        CreateMap<TokenConfig, TokenConfigDto>().ReverseMap();
-        CreateMap<TokenConfig, TokenConfigOptionDto>().ReverseMap();
-        CreateMap<TokenSwapConfig, TokenOptionConfigDto>().ReverseMap();
-        CreateMap<ToTokenConfig, ToTokenOptionConfigDto>().ReverseMap();
-        CreateMap<ToTokenConfig, TokenConfig>().ReverseMap();
-        
+        CreateMap<TokenInfoDto, TokenConfigDto>().ReverseMap();
+        CreateMap<TokenInfoDto, TokenConfigOptionDto>().ReverseMap();
+        CreateMap<TokenInfoDto, TokenOptionConfigDto>().ReverseMap();
+        CreateMap<TargetTokenConfig, TargetTokenOptionConfigDto>().ReverseMap();
+        CreateMap<TargetTokenConfig, TokenInfoDto>().ReverseMap();
+
         CreateMap<UserTokenAccessInfoIndex, UserTokenAccessInfoDto>().ReverseMap();
         CreateMap<UserTokenAccessInfoInput, UserTokenAccessInfoDto>().ReverseMap();
         CreateMap<UserTokenAccessInfoDto, UserTokenAccessInfoIndex>().ReverseMap();
@@ -65,7 +66,7 @@ public class ETransferServerApplicationAutoMapperProfile : Profile
             .ForMember(des => des.MultiConfirmTime, opt =>
                 opt.MapFrom(src => TimeHelper.SecondsToMinute((int)src.MultiConfirmSeconds)))
             .ReverseMap();
-        CreateMap<NetworkInfo, NetworkOptionDto>().ReverseMap();
+        CreateMap<NetworkBasicInfo, NetworkOptionDto>().ReverseMap();
         CreateMap<OrderStatusFlowDto, OrderStatusFlow>().ReverseMap();
         CreateMap<OrderChangeEto, OrderIndex>().ReverseMap();
         CreateMap<WithdrawInfoDto, TransferDetailInfoDto>().ReverseMap();
@@ -88,5 +89,13 @@ public class ETransferServerApplicationAutoMapperProfile : Profile
             .ForMember(
                 destination => destination.Symbol,
                 opt => opt.MapFrom(source => source.FromSymbol));
+        CreateMap<NetworkBasicInfo, NetworkDto>().ForMember(
+                destination => destination.ContractAddress,
+                opt => opt.MapFrom(source => source.TokenPoolContractAddress))
+            .ForMember(destination => destination.ExplorerUrl,
+                    opt => opt.MapFrom(source => source.TokePoolExplorerUrl))
+            .ForMember(destination => destination.WithdrawFee,
+            opt => opt.MapFrom(source => source.WithdrawLocalFee.ToString(CultureInfo.InvariantCulture)));
+
     }
 }

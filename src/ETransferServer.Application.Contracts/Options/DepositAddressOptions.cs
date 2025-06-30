@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace ETransferServer.Grains.Options;
 
 public class DepositAddressOptions

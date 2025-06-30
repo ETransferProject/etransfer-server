@@ -1,3 +1,6 @@
+using ETransferServer.Network;
+using ETransferServer.Token;
+using Microsoft.Extensions.DependencyInjection;
 using Volo.Abp.AutoMapper;
 using Volo.Abp.EventBus;
 using Volo.Abp.Modularity;
@@ -18,5 +21,9 @@ public class ETransferServerApplicationTestModule : AbpModule
     {
         base.ConfigureServices(context);
         Configure<AbpAutoMapperOptions>(options => { options.AddMaps<ETransferServerApplicationModule>(); });
+        //ITokenNetworkProvider
+        context.Services.AddTransient<ITokenNetworkProvider, TokenNetworkProvider>();
+        // ISupportedChainTokenProvider
+        context.Services.AddTransient<ISupportedChainTokenProvider, SupportedChainTokenProvider>();
     }
 }

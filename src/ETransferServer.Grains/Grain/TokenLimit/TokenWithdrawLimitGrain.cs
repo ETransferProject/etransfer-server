@@ -1,6 +1,7 @@
 using ETransferServer.Common;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.State.TokenLimitState;
+using ETransferServer.Options;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -26,10 +27,10 @@ public interface ITokenWithdrawLimitGrain : IGrainWithStringKey
 
 public class TokenWithdrawLimitGrain : Grain<TokenLimitState>, ITokenWithdrawLimitGrain
 {
-    private readonly IOptionsSnapshot<WithdrawOptions> _withdrawOptions;
+    private readonly IOptionsSnapshot<WithdrawInfoOptions> _withdrawOptions;
     private readonly ILogger<TokenWithdrawLimitGrain> _logger;
 
-    public TokenWithdrawLimitGrain(IOptionsSnapshot<WithdrawOptions> withdrawOptions, ILogger<TokenWithdrawLimitGrain> logger)
+    public TokenWithdrawLimitGrain(IOptionsSnapshot<WithdrawInfoOptions> withdrawOptions, ILogger<TokenWithdrawLimitGrain> logger)
     {
         _withdrawOptions = withdrawOptions;
         _logger = logger;

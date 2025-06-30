@@ -12,6 +12,7 @@ using ETransferServer.Grains.Grain.TokenLimit;
 using ETransferServer.Grains.GraphQL;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.State.Order;
+using ETransferServer.Options;
 using ETransferServer.User;
 using MassTransit;
 using Microsoft.IdentityModel.Tokens;
@@ -37,20 +38,24 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
 
     private readonly ILogger<WithdrawQueryTimerGrain> _logger;
     private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
-    private readonly IOptionsSnapshot<WithdrawOptions> _withdrawOption;
+    private readonly IOptionsSnapshot<WithdrawInfoOptions> _withdrawOption;
     private readonly IUserAppService _userAppService;
 
     private readonly ITokenTransferProvider _tokenTransferProvider;
     private readonly IObjectMapper _objectMapper;
     private readonly IBus _bus;
 
+    private readonly IOptionsSnapshot<ServiceFeeOptions> _serviceFeeOptions;
+    private readonly IOptionsSnapshot<TokenInfoOptions> _tokenInfoOptions;
+
     public WithdrawQueryTimerGrain(ILogger<WithdrawQueryTimerGrain> logger,
         IOptionsSnapshot<TimerOptions> timerOptions,
-        IOptionsSnapshot<WithdrawOptions> withdrawOption,
+        IOptionsSnapshot<WithdrawInfoOptions> withdrawOption,
         IUserAppService userAppService,
         ITokenTransferProvider tokenTransferProvider,
         IObjectMapper objectMapper, 
-        IBus bus)
+        IBus bus, IOptionsSnapshot<ServiceFeeOptions> serviceFeeOptions,
+        IOptionsSnapshot<TokenInfoOptions> tokenInfoOptions)
     {
         _logger = logger;
         _timerOptions = timerOptions;
@@ -59,6 +64,8 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
         _tokenTransferProvider = tokenTransferProvider;
         _objectMapper = objectMapper;
         _bus = bus;
+        _serviceFeeOptions = serviceFeeOptions;
+        _tokenInfoOptions = tokenInfoOptions;
     }
 
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
@@ -185,7 +192,7 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
                 transferRecord.Symbol, amountDecimal, maxEstimateFee);
             AssertHelper.IsTrue(isGo,
                 "Invalid amount/fee, amount:{amount}, maxEstimateFee:{maxEstimateFee}, realFee:{realFee}, minWithdraw:{minWithdraw}",
-                amountDecimal, maxEstimateFee, realFee, _withdrawOption.Value.MinWithdraw);
+                amountDecimal, maxEstimateFee, realFee, _serviceFeeOptions.Value.MinWithdraw);
             AssertHelper.IsTrue(VerifyByWhiteList(transferRecord.From, transferRecord.ToChainId),
                 "The whitelist is not allowed");
 
@@ -337,9 +344,8 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
 
     private int GetDecimals(string symbol)
     {
-        return _withdrawOption.Value.TokenInfo.ContainsKey(symbol)
-            ? _withdrawOption.Value.TokenInfo[symbol]
-            : DecimalHelper.GetDecimals(symbol);
+        var tokenInfo = _tokenInfoOptions.Value.Tokens[ChainId.AELF][symbol];
+        return tokenInfo.Decimal;
     }
 
     private decimal AssertWithdrawAmount(decimal amount, decimal estimateFee, decimal realFee)
@@ -351,7 +357,7 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
 
         var withdrawAmount = amount - realFee;
         AssertHelper.IsTrue(withdrawAmount > 0, ErrorResult.AmountInsufficientCode);
-        var minWithdraw = Math.Max(realFee, _withdrawOption.Value.MinWithdraw)
+        var minWithdraw = Math.Max(realFee, _serviceFeeOptions.Value.MinWithdraw)
             .ToString(2, DecimalHelper.RoundingOption.Ceiling)
             .SafeToDecimal();
         AssertHelper.IsTrue(amount >= minWithdraw, ErrorResult.AmountInsufficientCode);
@@ -387,8 +393,8 @@ public class WithdrawQueryTimerGrain : Grain<WithdrawTimerOrderState>, IWithdraw
     public Task<decimal> GetMinThirdPartFeeAsync(string network, string symbol)
     {
         var minFeeKey = ICoBoCoinGrain.Id(network, symbol);
-        return Task.FromResult(_withdrawOption.Value.MinThirdPartFee.ContainsKey(minFeeKey)
-            ? _withdrawOption.Value.MinThirdPartFee[minFeeKey]
+        return Task.FromResult(_serviceFeeOptions.Value.MinThirdPartFee.ContainsKey(minFeeKey)
+            ? _serviceFeeOptions.Value.MinThirdPartFee[minFeeKey]
             : DefaultMinThirdPartFee);
     }
     

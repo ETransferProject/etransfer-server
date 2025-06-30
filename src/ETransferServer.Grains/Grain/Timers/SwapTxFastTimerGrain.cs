@@ -35,14 +35,14 @@ public class SwapTxFastTimerGrain: Grain<OrderSwapFastTimerState>, ISwapTxFastTi
     private readonly IUserDepositProvider _userDepositProvider;
 
     private readonly IOptionsSnapshot<ChainOptions> _chainOptions;
-    private readonly IOptionsSnapshot<WithdrawOptions> _withdrawOptions;
+    private readonly IOptionsSnapshot<WithdrawInfoOptions> _withdrawOptions;
     private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
 
     public SwapTxFastTimerGrain(ILogger<SwapTxFastTimerGrain> logger,
         IContractProvider contractProvider,
         IUserDepositProvider userDepositProvider,
         IOptionsSnapshot<ChainOptions> chainOptions,
-        IOptionsSnapshot<WithdrawOptions> withdrawOptions,
+        IOptionsSnapshot<WithdrawInfoOptions> withdrawOptions,
         IOptionsSnapshot<TimerOptions> timerOptions,
         ITokenTransferProvider transferProvider)
     {

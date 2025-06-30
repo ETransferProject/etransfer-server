@@ -39,7 +39,7 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
     private readonly IOptionsSnapshot<NetworkOptions> _networkInfoOptions;
     private readonly IOptionsSnapshot<TokenOptions> _tokenOptions;
     private readonly IOptionsSnapshot<TokenAccessOptions> _tokenAccessOptions;
-    private readonly IOptionsSnapshot<TokenInfoOptions> _tokenInfoOptions;
+    private readonly IOptionsSnapshot<TokenInfoOptionsBack> _tokenInfoOptions;
     private readonly IObjectMapper _objectMapper;
     private readonly ILogger<TokenAccessAppService> _logger;
     private readonly IClusterClient _clusterClient;
@@ -51,7 +51,7 @@ public partial class TokenAccessAppService : ApplicationService, ITokenAccessApp
         IOptionsSnapshot<NetworkOptions> networkInfoOptions,
         IOptionsSnapshot<TokenOptions> tokenOptions,
         IOptionsSnapshot<TokenAccessOptions> tokenAccessOptions,
-        IOptionsSnapshot<TokenInfoOptions> tokenInfoOptions,
+        IOptionsSnapshot<TokenInfoOptionsBack> tokenInfoOptions,
         IObjectMapper objectMapper,
         ILogger<TokenAccessAppService> logger,
         IClusterClient clusterClient

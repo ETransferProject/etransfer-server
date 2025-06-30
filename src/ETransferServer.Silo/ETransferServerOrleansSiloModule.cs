@@ -41,8 +41,8 @@ public class ETransferServerOrleansSiloModule : AbpModule
         Configure<SyncStateServiceOption>(configuration.GetSection("SyncStateService"));
         Configure<TimerOptions>(configuration.GetSection("Timer"));
         Configure<ETransferServer.Grains.Options.TokenAccessOptions>(configuration.GetSection("TokenAccess"));
-        Configure<DepositOptions>(configuration.GetSection("Deposit"));
-        Configure<WithdrawOptions>(configuration.GetSection("Withdraw"));
+        Configure<DepositInfoOptions>(configuration.GetSection("DepositInfo"));
+        Configure<WithdrawInfoOptions>(configuration.GetSection("WithdrawInfo"));
         Configure<DepositAddressOptions>(configuration.GetSection("DepositAddress"));
         Configure<ETransferServer.Grains.Options.NetworkOptions>(configuration.GetSection("CoinNetworks"));
         Configure<WithdrawNetworkOptions>(configuration.GetSection("WithdrawNetwork"));
@@ -53,6 +53,19 @@ public class ETransferServerOrleansSiloModule : AbpModule
         Configure<SwapInfosOptions>(configuration.GetSection("SwapInfos"));
         Configure<GraphQLOptions>(configuration.GetSection("GraphQL"));
         Configure<BlockChainInfoOptions>(configuration.GetSection("BlockChainInfo"));
+        Configure<TokenInfoOptions>(configuration.GetSection("TokenInfo"));
+        Configure<TokenSupportChainListOptions>(configuration.GetSection("TokenSupportChainList"));
+        Configure<TokenSupportedChainInfoOptions>(configuration.GetSection("TokenSupportedNetworkInfo"));
+        //TokenPaymentAddressOptions
+        Configure<TokenPaymentAddressOptions>(configuration.GetSection("TokenPaymentAddress"));
+        //SupportedTokenSwapOptions
+        Configure<SupportedTokenSwapOptions>(configuration.GetSection("SupportedTokenSwap"));
+        //SupportedChainTokensOptions
+        Configure<SupportedChainTokensOptions>(configuration.GetSection("SupportedChainTokens"));
+        //ServiceFeeOptions
+        Configure<ServiceFeeOptions>(configuration.GetSection("ServiceFee"));
+        //TransactionCheckOptions
+        Configure<TransactionCheckOptions>(configuration.GetSection("TransactionCheck"));
 
         context.Services.AddHostedService<ETransferServerHostedService>();
         context.Services.AddOrleansExceptionHandler();

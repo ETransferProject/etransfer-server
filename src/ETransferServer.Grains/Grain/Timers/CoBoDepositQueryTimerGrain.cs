@@ -38,10 +38,11 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
 
     private readonly ILogger<CoBoDepositQueryTimerGrain> _logger;
     private readonly IOptionsSnapshot<TimerOptions> _timerOptions;
-    private readonly IOptionsSnapshot<DepositOptions> _depositOption;
+    private readonly IOptionsSnapshot<DepositInfoOptions> _depositOption;
     private readonly IOptionsSnapshot<DepositAddressOptions> _depositAddressOption;
     private readonly IOptionsSnapshot<NetworkOptions> _networkOption;
     private readonly IOptionsSnapshot<CoBoOptions> _coBoOptions;
+    private readonly IOptionsSnapshot<TokenPaymentAddressOptions> _tokenPaymentAddressOptions;
     private readonly IUserAppService _userAppService;
     private readonly IUserAddressService _userAddressService;
     private readonly INetworkAppService _networkService;
@@ -51,20 +52,23 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
     private IDepositOrderStatusReminderGrain _depositOrderStatusReminderGrain;
     private readonly IObjectMapper _objectMapper;
     private readonly IBus _bus;
+    
+    private readonly IOptionsSnapshot<ServiceFeeOptions> _serviceFeeOptions;
 
     public CoBoDepositQueryTimerGrain(ILogger<CoBoDepositQueryTimerGrain> logger,
         IOptionsSnapshot<TimerOptions> timerOptions, 
         ICoBoProvider coBoProvider,
         IUserDepositProvider userDepositProvider,
-        IOptionsSnapshot<DepositOptions> depositOption, 
+        IOptionsSnapshot<DepositInfoOptions> depositOption, 
         IOptionsSnapshot<DepositAddressOptions> depositAddressOption, 
         IOptionsSnapshot<NetworkOptions> networkOption,
         IOptionsSnapshot<CoBoOptions> coBoOptions,
+        IOptionsSnapshot<TokenPaymentAddressOptions> tokenPaymentAddressOptions,
         IUserAppService userAppService, 
         IUserAddressService userAddressService,
         INetworkAppService networkService,
         IObjectMapper objectMapper, 
-        IBus bus)
+        IBus bus, IOptionsSnapshot<ServiceFeeOptions> serviceFeeOptions)
     {
         _logger = logger;
         _timerOptions = timerOptions;
@@ -74,11 +78,13 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         _depositAddressOption = depositAddressOption;
         _networkOption = networkOption;
         _coBoOptions = coBoOptions;
+        _tokenPaymentAddressOptions = tokenPaymentAddressOptions;
         _userAppService = userAppService;
         _userAddressService = userAddressService;
         _networkService = networkService;
         _objectMapper = objectMapper;
         _bus = bus;
+        _serviceFeeOptions = serviceFeeOptions;
     }
 
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
@@ -263,16 +269,32 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
         AssertHelper.NotNull(addressInfo, "addressInfo empty");
 
         var paymentAddressExists =
-            _depositOption.Value.PaymentAddresses?.ContainsKey(userAddress.ChainId) ?? false;
+            _tokenPaymentAddressOptions.Value.PaymentAddresses?.ContainsKey(userAddress.ChainId) ?? false;
         AssertHelper.IsTrue(paymentAddressExists, "Payment address missing, ChainId={ChainId}", userAddress.ChainId);
-        var paymentAddressDic = _depositOption.Value.PaymentAddresses.GetValueOrDefault(userAddress.ChainId);
+        var paymentAddressDic = _tokenPaymentAddressOptions.Value.PaymentAddresses.GetValueOrDefault(userAddress.ChainId);
         AssertHelper.NotEmpty(paymentAddressDic, "Payment address empty, ChainId={ChainId}", userAddress.ChainId);
         var (isOpen, amountThreshold, serviceFee, minAmount) = await GetServiceFeeAsync(coinInfo.Network, coinInfo.Symbol);
-        var toAmount = isOpen && coBoTransaction.AbsAmount.SafeToDecimal() >= minAmount && coBoTransaction.AbsAmount.SafeToDecimal() < amountThreshold
-            ? coBoTransaction.AbsAmount.SafeToDecimal() - serviceFee
-            : (!isOpen && coBoTransaction.AbsAmount.SafeToDecimal() >= minAmount) || (isOpen && coBoTransaction.AbsAmount.SafeToDecimal() >= amountThreshold)
-                ? coBoTransaction.AbsAmount.SafeToDecimal()
-                : 0M;
+        var amount = coBoTransaction.AbsAmount.SafeToDecimal();
+        decimal toAmount;
+        if (isOpen)
+        {
+            if (amount >= minAmount && amount < amountThreshold)
+            {
+                toAmount = amount - serviceFee;
+            }
+            else if (amount >= amountThreshold)
+            {
+                toAmount = amount;
+            }
+            else
+            {
+                toAmount = 0M;
+            }
+        }
+        else
+        {
+            toAmount = amount >= minAmount ? amount : 0M;
+        }
         toAmount = toAmount < 0 ? 0M : toAmount;
 
         var depositOrderDto = new DepositOrderDto
@@ -351,12 +373,12 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
                 _logger.LogInformation("Swap to mainChain, {fromSymbol}, {toSymbol}", dto.FromTransfer.Symbol, symbol);
                 dto.ExtensionInfo.AddOrReplace(ExtensionKey.SwapToMain, Boolean.TrueString);
                 dto.ExtensionInfo.AddOrReplace(ExtensionKey.SwapFromAddress, GetPaymentAddress(
-                    _depositOption.Value.PaymentAddresses.GetValueOrDefault(dto.ToTransfer.ChainId), symbol));
+                    _tokenPaymentAddressOptions.Value.PaymentAddresses.GetValueOrDefault(dto.ToTransfer.ChainId), symbol));
                 dto.ExtensionInfo.AddOrReplace(ExtensionKey.SwapOriginFromAddress, dto.ToTransfer.FromAddress);
                 dto.ExtensionInfo.AddOrReplace(ExtensionKey.SwapToAddress, dto.ToTransfer.ToAddress);
                 dto.ExtensionInfo.AddOrReplace(ExtensionKey.SwapChainId, dto.ToTransfer.ChainId);
-                var sideChainId = _depositOption.Value.PaymentAddresses.Keys.FirstOrDefault(t => t != ChainId.AELF);
-                var paymentAddressDic = _depositOption.Value.PaymentAddresses.GetValueOrDefault(sideChainId);
+                var sideChainId = _tokenPaymentAddressOptions.Value.PaymentAddresses.Keys.FirstOrDefault(t => t != ChainId.AELF);
+                var paymentAddressDic = _tokenPaymentAddressOptions.Value.PaymentAddresses.GetValueOrDefault(sideChainId);
                 dto.ToTransfer.FromAddress = GetPaymentAddress(paymentAddressDic, dto.FromTransfer.Symbol);
                 dto.ToTransfer.ToAddress = GetPaymentAddress(paymentAddressDic, symbol);
                 dto.ToTransfer.ChainId = sideChainId;
@@ -378,19 +400,19 @@ public class CoBoDepositQueryTimerGrain : Grain<CoBoOrderState>, ICoBoDepositQue
     
     private async Task<Tuple<bool, decimal, decimal, decimal>> GetServiceFeeAsync(string network, string symbol)
     {
-        var isOpen = _depositOption.Value.ServiceFee.IsOpen;
-        var amountThreshold = _depositOption.Value.ServiceFee.AmountThreshold.ContainsKey(symbol)
-            ? _depositOption.Value.ServiceFee.AmountThreshold[symbol]
+        var isOpen = _serviceFeeOptions.Value.IsOpen;
+        var amountThreshold = _serviceFeeOptions.Value.AmountThreshold.ContainsKey(symbol)
+            ? _serviceFeeOptions.Value.AmountThreshold[symbol]
             : 0M;
         var (estimateFee, coin) = network == ChainId.AELF || network == ChainId.tDVV || network == ChainId.tDVW
             ? Tuple.Create(0M, new CoBoCoinDto { ExpireTime = 0L })
             : await _networkService.CalculateNetworkFeeAsync(network, symbol);
         var feeKey = string.Join(CommonConstant.Underline, network, symbol);
-        var serviceFee = Math.Min(estimateFee, _depositOption.Value.ServiceFee.MaxThirdPartFee.ContainsKey(feeKey)
-            ? _depositOption.Value.ServiceFee.MaxThirdPartFee[feeKey]
+        var serviceFee = Math.Min(estimateFee, _serviceFeeOptions.Value.MaxThirdPartFee.ContainsKey(feeKey)
+            ? _serviceFeeOptions.Value.MaxThirdPartFee[feeKey]
             : 0M).ToString(2, DecimalHelper.RoundingOption.Ceiling).SafeToDecimal();
-        var minAmount = _depositOption.Value.ServiceFee.MinAmount.ContainsKey(feeKey)
-            ? _depositOption.Value.ServiceFee.MinAmount[feeKey]
+        var minAmount =_serviceFeeOptions.Value.MinAmount.ContainsKey(feeKey)
+            ? _serviceFeeOptions.Value.MinAmount[feeKey]
             : 0M;
         _logger.LogDebug("Grain Deposit from network fee: {network}, {symbol}, {isOpen}, {serviceFee}, {minAmount}", 
             network, symbol, isOpen, serviceFee, minAmount);

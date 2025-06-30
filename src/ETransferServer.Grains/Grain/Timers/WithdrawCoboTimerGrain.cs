@@ -6,6 +6,7 @@ using ETransferServer.Dtos.Order;
 using ETransferServer.Grains.Grain.Order.Withdraw;
 using ETransferServer.Grains.Options;
 using ETransferServer.Grains.State.Order;
+using ETransferServer.Options;
 using ETransferServer.ThirdPart.CoBo;
 using ETransferServer.ThirdPart.CoBo.Dtos;
 using Volo.Abp;
@@ -25,17 +26,19 @@ public class WithdrawCoboTimerGrain : Grain<WithdrawCoboTimerState>, IWithdrawCo
     private readonly TimerOptions _timerOptions;
     private readonly ICoBoProvider _coBoProvider;
     private readonly IOptionsSnapshot<WithdrawNetworkOptions> _withdrawNetworkOptions;
+    private readonly IOptionsSnapshot<TokenInfoOptions> _tokenInfoOptions;
 
     private const int RETRYCOUNT = 4;
 
     public WithdrawCoboTimerGrain(ILogger<WithdrawCoboTimerGrain> logger, 
         IOptionsSnapshot<TimerOptions> timerOptions,
         ICoBoProvider coBoProvider, 
-        IOptionsSnapshot<WithdrawNetworkOptions> withdrawNetworkOptions)
+        IOptionsSnapshot<WithdrawNetworkOptions> withdrawNetworkOptions, IOptionsSnapshot<TokenInfoOptions> tokenInfoOptions)
     {
         _logger = logger;
         _coBoProvider = coBoProvider;
         _withdrawNetworkOptions = withdrawNetworkOptions;
+        _tokenInfoOptions = tokenInfoOptions;
         _timerOptions = timerOptions.Value;
     }
 
@@ -180,7 +183,8 @@ public class WithdrawCoboTimerGrain : Grain<WithdrawCoboTimerState>, IWithdrawCo
         try
         {
             var coinInfo = _withdrawNetworkOptions.Value.GetNetworkInfo(orderDto.ToTransfer.Network, orderDto.ToTransfer.Symbol);
-            var amount = BigCalculationHelper.CalculateAmount(orderDto.ToTransfer.Amount, coinInfo.Decimal);
+            var tokenInfo = _tokenInfoOptions.Value.Tokens[orderDto.ToTransfer.Network][orderDto.ToTransfer.Symbol];
+            var amount = BigCalculationHelper.CalculateAmount(orderDto.ToTransfer.Amount, tokenInfo.Decimal);
             var requestDto = new WithdrawRequestDto
             {
                 Coin = coinInfo.Coin,
@@ -237,7 +241,8 @@ public class WithdrawCoboTimerGrain : Grain<WithdrawCoboTimerState>, IWithdrawCo
         try
         {
             var coinInfo = _withdrawNetworkOptions.Value.GetNetworkInfo(orderDto.ToTransfer.Network, orderDto.ToTransfer.Symbol);
-            var amount = BigCalculationHelper.CalculateAmount(orderDto.ToTransfer.Amount, coinInfo.Decimal);
+            var tokenInfo = _tokenInfoOptions.Value.Tokens[orderDto.ToTransfer.Network][orderDto.ToTransfer.Symbol];
+            var amount = BigCalculationHelper.CalculateAmount(orderDto.ToTransfer.Amount, tokenInfo.Decimal);
             var requestDto = new WithdrawRequestDto
             {
                 Coin = coinInfo.Coin,

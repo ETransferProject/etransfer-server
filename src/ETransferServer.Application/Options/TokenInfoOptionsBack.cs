@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace ETransferServer.Options;
 
-public class TokenInfoOptions : Dictionary<string, SupportChainInfo>
+public class TokenInfoOptionsBack : Dictionary<string, SupportChainInfo>
 {
 }
 

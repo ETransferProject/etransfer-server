@@ -7,6 +7,7 @@ using ETransferServer.Dtos.Order;
 using ETransferServer.Entities;
 using ETransferServer.Etos.Order;
 using ETransferServer.Grains.Grain.Token;
+using ETransferServer.Grains.Options;
 using ETransferServer.Options;
 using ETransferServer.ThirdPart.CoBo.Dtos;
 using ETransferServer.User;
@@ -19,6 +20,7 @@ using Shouldly;
 using Volo.Abp.Users;
 using Xunit;
 using Xunit.Abstractions;
+using TransactionThreshold = ETransferServer.Options.TransactionThreshold;
 
 namespace ETransferServer.Order;
 
@@ -44,6 +46,12 @@ public class OrderAppServiceTest : ETransferServerApplicationTestBase
         services.AddSingleton(MockTokenOptions());
         services.AddSingleton(MockCoBoCoinGrain());
         services.AddSingleton(MockUserAppService());
+        services.AddSingleton(MockNetworkOptions());
+        services.AddSingleton(MockTokenSupportedChainOptions());
+        services.AddSingleton(MockSupportedChainTokensOptions());
+        services.AddSingleton(MockDepositAddressOptions());
+        services.AddSingleton(MockServiceFeeOptions());
+        services.AddSingleton(MockWithdrawInfoOptions());
         base.AfterAddApplication(services);
         _currentUser = Substitute.For<ICurrentUser>();
         services.AddSingleton(_currentUser);
@@ -106,6 +114,7 @@ public class OrderAppServiceTest : ETransferServerApplicationTestBase
             {
                 Network = "AELF",
                 ChainId = "AELF",
+                Symbol = "USDT",
                 ToAddress = "CC",
                 Amount = 20,
                 Status = "Confirmed"
@@ -113,6 +122,7 @@ public class OrderAppServiceTest : ETransferServerApplicationTestBase
             ToTransfer = new TransferInfo
             {
                 Network = "ETH",
+                Symbol = "USDT",
                 ToAddress = "DD",
                 Amount = 19,
                 Status = "success",
@@ -174,28 +184,28 @@ public class OrderAppServiceTest : ETransferServerApplicationTestBase
         input.Sorting = "createTime";
         result = await _orderAppService.GetOrderRecordListAsync(input);
         result.TotalCount.ShouldBeGreaterThan(0);
-        
+
         input.Sorting = "createTime asc";
         result = await _orderAppService.GetOrderRecordListAsync(input);
         result.TotalCount.ShouldBeGreaterThan(0);
-        
+
         status = await _orderAppService.GetOrderRecordStatusAsync(new GetOrderRecordStatusRequestDto());
         status.Status.ShouldBeFalse();
 
         input.Sorting = " ";
         result = await _orderAppService.GetOrderRecordListAsync(input);
         result.TotalCount.ShouldBeGreaterThan(0);
-        
+
         input.AddressList = new List<string>() { "DD" };
         result = await _orderAppService.GetOrderRecordListAsync(input);
         result.TotalCount.ShouldBeGreaterThan(0);
-        
+
         _currentUser.IsAuthenticated.Returns(false);
         result = await _orderAppService.GetOrderRecordListAsync(input);
         result.TotalCount.ShouldBeGreaterThan(0);
     }
 
-    
+
     [Fact]
     public async Task GetTransferOrderAsyncTest()
     {
@@ -240,7 +250,7 @@ public class OrderAppServiceTest : ETransferServerApplicationTestBase
         });
         orderIndex.Id.ShouldBe(Guid.Parse("10000000-0000-0000-0000-000000000000"));
         orderIndex.OrderType.ShouldBe("Withdraw");
-        
+
         orderIndex = await _orderAppService.GetTransferOrderAsync(new CoBoTransactionDto()
         {
             Coin = "ETH_USDT",
@@ -253,7 +263,7 @@ public class OrderAppServiceTest : ETransferServerApplicationTestBase
         orderIndex.Id.ShouldBe(Guid.Parse("10000000-0000-0000-0000-000000000000"));
         orderIndex.OrderType.ShouldBe("Withdraw");
     }
-    
+
     [Fact]
     public async Task CheckTransferOrderAsyncTest()
     {
@@ -297,7 +307,7 @@ public class OrderAppServiceTest : ETransferServerApplicationTestBase
             TxId = "0x1"
         }, DateTime.UtcNow.ToUtcMilliSeconds());
         orderIndex.ShouldBe(true);
-        
+
         orderIndex = await _orderAppService.CheckTransferOrderAsync(new CoBoTransactionDto()
         {
             Coin = "ETH_USDT",
@@ -309,7 +319,7 @@ public class OrderAppServiceTest : ETransferServerApplicationTestBase
         }, DateTime.UtcNow.ToUtcMilliSeconds());
         orderIndex.ShouldBe(true);
     }
-    
+
     [Fact]
     public async Task GetOrderRecordStatusAsyncTest()
     {
@@ -352,9 +362,9 @@ public class OrderAppServiceTest : ETransferServerApplicationTestBase
             }
         });
         status.Status.ShouldBeTrue();
-        
+
         Login(Guid.Parse("3a946083-ac0e-4e24-b913-3c9fc57ab03b"));
-        
+
         status = await _orderAppService.GetOrderRecordStatusAsync(new GetOrderRecordStatusRequestDto()
         {
             AddressList = new List<string>()
@@ -408,7 +418,7 @@ public class OrderAppServiceTest : ETransferServerApplicationTestBase
             LastModifyTime = DateTime.UtcNow.AddHours(-1).ToUtcMilliSeconds(),
             ArrivalTime = DateTime.UtcNow.AddHours(-1).ToUtcMilliSeconds()
         });
-        
+
         Login(Guid.Parse("3a946083-ac0e-4e24-b913-3c9fc57ab03b"));
 
         var result = await _orderAppService.GetUserOrderRecordListAsync(new GetUserOrderRecordRequestDto()
@@ -422,11 +432,11 @@ public class OrderAppServiceTest : ETransferServerApplicationTestBase
                 }
             }
         });
-        result.ShouldNotBeNull();    
+        result.ShouldNotBeNull();
         result.Address.ShouldBe("AA");
         result.Processing.TransferCount.ShouldBe(1);
         result.Processing.WithdrawCount.ShouldBe(1);
-        
+
         result = await _orderAppService.GetUserOrderRecordListAsync(new GetUserOrderRecordRequestDto()
         {
             AddressList = new List<GetUserAddressDto>()
@@ -437,12 +447,12 @@ public class OrderAppServiceTest : ETransferServerApplicationTestBase
                 }
             }
         });
-        result.ShouldNotBeNull();  
+        result.ShouldNotBeNull();
         result.AddressList[0].Address.ShouldBe("AA");
         result.Processing.TransferCount.ShouldBe(1);
         result.Processing.WithdrawCount.ShouldBe(1);
     }
-    
+
     [Fact]
     public async Task GetOrderRecordDetailAsyncTest()
     {
@@ -482,7 +492,7 @@ public class OrderAppServiceTest : ETransferServerApplicationTestBase
         Login(Guid.Parse("3a946083-ac0e-4e24-b913-3c9fc57ab03b"));
         var result = await _orderAppService.GetOrderRecordDetailAsync("3a946083-ac0e-4e24-b913-3c9fc57ab03b");
         result.ShouldNotBeNull();
-        
+
         input.ExtensionInfo = new Dictionary<string, string>()
         {
             [ExtensionKey.FromConfirmingThreshold] = "0",
@@ -518,48 +528,48 @@ public class OrderAppServiceTest : ETransferServerApplicationTestBase
         await _orderDepositAppService.AddOrUpdateAsync(input);
         result = await _orderAppService.GetOrderRecordDetailAsync("3a946083-ac0e-4e24-b913-3c9fc57ab03b");
         result.ShouldNotBeNull();
-        
+
         input.Status = "ToTransferFailed";
         input.FromTransfer.Status = "Confirmed";
         input.ToTransfer.Status = "Transferring";
         await _orderDepositAppService.AddOrUpdateAsync(input);
         result = await _orderAppService.GetOrderRecordDetailAsync("3a946083-ac0e-4e24-b913-3c9fc57ab03b");
         result.ShouldNotBeNull();
-        
+
         input.Status = "Failed";
         input.FromTransfer.Status = "Transferring";
         input.ToTransfer.Status = string.Empty;
         await _orderDepositAppService.AddOrUpdateAsync(input);
         result = await _orderAppService.GetOrderRecordDetailAsync("3a946083-ac0e-4e24-b913-3c9fc57ab03b");
         result.ShouldNotBeNull();
-        
+
         input.Status = "Failed";
         input.FromTransfer.Status = "Failed";
         input.ToTransfer.Status = string.Empty;
         await _orderDepositAppService.AddOrUpdateAsync(input);
         result = await _orderAppService.GetOrderRecordDetailAsync("3a946083-ac0e-4e24-b913-3c9fc57ab03b");
         result.ShouldNotBeNull();
-        
+
         input.Status = "FromTransferred";
         input.FromTransfer.Status = "Transferred";
         input.ToTransfer.Status = string.Empty;
         await _orderDepositAppService.AddOrUpdateAsync(input);
         result = await _orderAppService.GetOrderRecordDetailAsync("3a946083-ac0e-4e24-b913-3c9fc57ab03b");
         result.ShouldNotBeNull();
-        
+
         input.Status = "FromTransferred";
         input.FromTransfer.Status = "StartTransfer";
         await _orderDepositAppService.AddOrUpdateAsync(input);
         result = await _orderAppService.GetOrderRecordDetailAsync("3a946083-ac0e-4e24-b913-3c9fc57ab03b");
         result.ShouldNotBeNull();
-        
+
         input.Status = "ToTransferred";
         input.FromTransfer.Status = "Confirmed";
         input.ToTransfer.Status = "Transferring";
         await _orderDepositAppService.AddOrUpdateAsync(input);
         result = await _orderAppService.GetOrderRecordDetailAsync("3a946083-ac0e-4e24-b913-3c9fc57ab03b");
         result.ShouldNotBeNull();
-        
+
         input.Status = "ToTransferred";
         input.FromTransfer.Status = "Confirmed";
         input.ToTransfer.Status = "Transferring";
@@ -666,60 +676,45 @@ public class OrderAppServiceTest : ETransferServerApplicationTestBase
         result.ShouldNotBeNull();
     }
 
-    private IOptionsSnapshot<TokenOptions> MockTokenOptions()
+    private IOptionsSnapshot<TokenInfoOptions> MockTokenOptions()
     {
-        var mockOptionsSnapshot = new Mock<IOptionsSnapshot<TokenOptions>>();
+        var mockOptionsSnapshot = new Mock<IOptionsSnapshot<TokenInfoOptions>>();
         mockOptionsSnapshot.Setup(o => o.Value).Returns(
-            new TokenOptions
+            new TokenInfoOptions
             {
-                Withdraw = new Dictionary<string, List<TokenConfig>>()
+                Tokens = new Dictionary<string, Dictionary<string, TokenInfoDto>>
                 {
-                    ["AELF"] = new List<TokenConfig>()
                     {
-                        new TokenConfig()
+                        "AELF", new Dictionary<string, TokenInfoDto>
                         {
-                            Symbol = "USDT",
-                            Name = "USDT",
-                            Decimals = 6,
-                            Icon = "icon1"
-                        }
-                    }
-                },
-                Deposit = new Dictionary<string, List<TokenConfig>>()
-                {
-                    ["AELF"] = new List<TokenConfig>()
-                    {
-                        new TokenConfig()
-                        {
-                            Symbol = "USDT",
-                            Name = "USDT",
-                            Decimals = 6,
-                            Icon = "icon2"
-                        }
-                    }
-                },
-                DepositSwap = new List<TokenSwapConfig>()
-                {
-                    new TokenSwapConfig()
-                    {
-                        Symbol = "USDT",
-                        Name = "USDT",
-                        Decimals = 6,
-                        ToTokenList = new List<ToTokenConfig>()
-                        {
-                            new ToTokenConfig()
                             {
-                                Symbol = "ELF",
-                                Name = "ELF",
-                                ChainIdList = new List<string>() { "AELF" }
+                                "USDT", new TokenInfoDto
+                                {
+                                    Symbol = "USDT",
+                                    Name = "Tether USD",
+                                    Decimal = 8,
+                                    Icon = "https://example.com/usdt.png",
+                                    TokenAddress = "0x1234567890abcdef1234567890abcdef12345678"
+                                }
+                            },
+                            {
+                                "ELF", new TokenInfoDto
+                                {
+                                    Symbol = "ELF",
+                                    Name = "ELF",
+                                    Decimal = 8,
+                                    Icon = "https://example.com/elf.png",
+                                    TokenAddress = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+                                }
                             }
                         }
                     }
                 }
-            });
+            }
+        );
         return mockOptionsSnapshot.Object;
     }
-    
+
     private ICoBoCoinGrain MockCoBoCoinGrain()
     {
         var coboCoinGrain = new Mock<ICoBoCoinGrain>();
@@ -733,7 +728,7 @@ public class OrderAppServiceTest : ETransferServerApplicationTestBase
 
         return coboCoinGrain.Object;
     }
-    
+
     private IUserAppService MockUserAppService()
     {
         var user = new Mock<IUserAppService>();
@@ -742,5 +737,213 @@ public class OrderAppServiceTest : ETransferServerApplicationTestBase
             new UserDto());
 
         return user.Object;
+    }
+
+    private IOptionsSnapshot<NetworkInfoOptions> MockNetworkOptions()
+    {
+        var mockOptionsSnapshot = new Mock<IOptionsSnapshot<NetworkInfoOptions>>();
+        mockOptionsSnapshot.Setup(o => o.Value).Returns(
+            new NetworkInfoOptions
+            {
+                Networks = new Dictionary<string, NetworkBasicInfo>
+                {
+                    ["ETH"] = new NetworkBasicInfo
+                    {
+                        Network = "ETH",
+                        Name = "Ethereum",
+                        MultiConfirmSeconds = 15,
+                        TokenPoolContractAddress = "0x1234567890abcdef1234567890abcdef12345678",
+                        TokePoolExplorerUrl = "https://etherscan.io/address/0x1234567890abcdef1234567890abcdef12345678",
+                        IsTokenAccessRange = true,
+                        
+                        ConfirmNum = 12,
+                        BlockingTime = 60,
+                        ExtraRequestTime = 30,
+                        EstimatedArrivalTime = 1000,
+                        FeeAlarmPercent = 10,
+                        MinShowVersion = "1.0.0",
+                        WithdrawLocalFee = 0.01m,
+                        WithdrawLocalFeeUnit = "ETH",
+                        SpecialWithdrawFee = "0.001 ETH",
+                        SpecialWithdrawFeeDisplay = true
+                    }
+                },
+                NetworkPattern = new Dictionary<string, List<string>>()
+                {
+                    ["."] = new List<string>() { "ETH" }
+                },
+                ExtraNotesTemplate = new List<string> { "Note1", "Note2" },
+                SwapExtraNotesTemplate = new List<string> { "SwapNote1", "SwapNote2" },
+            });
+        return mockOptionsSnapshot.Object;
+    }
+
+    // mock TokenSupportedChainOptions
+    private IOptionsSnapshot<TokenSupportedChainInfoOptions> MockTokenSupportedChainOptions()
+    {
+        var mockOptionsSnapshot = new Mock<IOptionsSnapshot<TokenSupportedChainInfoOptions>>();
+        mockOptionsSnapshot.Setup(o => o.Value).Returns(
+            new TokenSupportedChainInfoOptions
+            {
+                SupportedChains = new Dictionary<string, List<SupportedChainInfo>>()
+                {
+                    ["USDT"] = new List<SupportedChainInfo>
+                    {
+                        new SupportedChainInfo
+                        {
+                            Network = "ETH",
+                            SupportedType = new List<string> { "Deposit", "Withdraw" },
+                            SupportWhiteList = new List<string> { "0x1234567890abcdef1234567890abcdef12345678" },
+                            SupportChain = new List<string> { "AELF" }
+                        }
+                    }
+                }
+            });
+        return mockOptionsSnapshot.Object;
+    }
+
+    // mock WithdrawInfoOptions
+    private IOptionsSnapshot<WithdrawInfoOptions> MockWithdrawInfoOptions()
+    {
+        var mockOptionsSnapshot = new Mock<IOptionsSnapshot<WithdrawInfoOptions>>();
+        mockOptionsSnapshot.Setup(o => o.Value).Returns(
+            new WithdrawInfoOptions
+            {
+                IsOpen = true,
+                CanCrossSameChain = true,
+                WithdrawThreshold = 100000,
+                OrderChangeTopic = "OrderChange",
+                SupportWhiteLists = new Dictionary<string, List<string>>(),
+                ToTransferMaxRetry = 5,
+                CallMaxRetry = 5,
+                CallbackMaxRetry = 5,
+                CallQueryMaxRetry = 5,
+                MaxListLength = 1000,
+                LargeAmount = new Dictionary<string, decimal>
+                {
+                    ["USDT"] = 10000.0m
+                },
+                Homogeneous = new Dictionary<string, TransactionThreshold>
+                {
+                    ["USDT"] = new TransactionThreshold
+                    {
+                        AmountThreshold = 300,
+                        BlockHeightUpperThreshold = 300,
+                        BlockHeightLowerThreshold = 30,
+                        WithdrawFee = 0.01m
+                    }
+                },
+                TransferPath = new Dictionary<string, List<string>>()
+            });
+        return mockOptionsSnapshot.Object;
+    }
+
+    // mock DepositAddressOptions
+    private IOptionsSnapshot<DepositAddressOptions> MockDepositAddressOptions()
+    {
+        var mockOptionsSnapshot = new Mock<IOptionsSnapshot<DepositAddressOptions>>();
+        mockOptionsSnapshot.Setup(o => o.Value).Returns(
+            new DepositAddressOptions
+            {
+                RemainingThreshold = 50,
+                MaxRequestNewAddressCount = 2,
+                MaxAssignedTransferThreshold = 200,
+                MaxRequestNewAddressRetry = 3,
+                MaxRequestRetryTimes = 3,
+                AssignedAddressExpiredHour = 48,
+                TransferAddressLists = new Dictionary<string, List<string>>(),
+                AddressWhiteLists = new List<string> { "0x1234567890abcdef1234567890abcdef12345678" },
+                SupportCoins = new List<string> { "USDT", "ELF" },
+                EVMCoins = new List<string> { "USDT", "ELF" }
+            });
+        return mockOptionsSnapshot.Object;
+    }
+
+    private IOptionsSnapshot<SupportedChainTokensOptions> MockSupportedChainTokensOptions()
+    {
+        var mockOptionsSnapshot = new Mock<IOptionsSnapshot<SupportedChainTokensOptions>>();
+        mockOptionsSnapshot.Setup(o => o.Value).Returns(
+            new SupportedChainTokensOptions
+            {
+                Tokens = new Dictionary<string, SupportTokenInfo>
+                {
+                    {
+                        "AELF", new SupportTokenInfo
+                        {
+                            Deposit = new Dictionary<string, StatusInfo>
+                            {
+                                { "USDT", new StatusInfo { IsOpen = true } },
+                                { "ELF", new StatusInfo { IsOpen = true } }
+                            },
+                            Withdraw = new Dictionary<string, StatusInfo>
+                            {
+                                { "USDT", new StatusInfo { IsOpen = true } },
+                                { "ELF", new StatusInfo { IsOpen = true } }
+                            }
+                        }
+                    }
+                },
+                Transfer = new Dictionary<string, StatusInfo>
+                {
+                    { "USDT", new StatusInfo { IsOpen = true } },
+                    { "ELF", new StatusInfo { IsOpen = true } }
+                }
+            });
+        return mockOptionsSnapshot.Object;
+    }
+
+    // mock ServiceFeeOptions
+    /*
+     * public bool IsOpen { get; set; } = true;
+       public Dictionary<string, decimal> AmountThreshold { get; set; } = new();
+       public Dictionary<string, decimal> MinThirdPartFee { get; set; } = new();
+       public Dictionary<string, decimal> MaxThirdPartFee { get; set; } = new();
+       public decimal FeeFluctuationPercent { get; set; } = (decimal)0.1;
+       public int ThirdPartFeeExpireSeconds { get; set; } = 180;
+       public Dictionary<string, decimal> MinAmount { get; set; } = new();
+       public decimal MinWithdraw { get; set; } = 0.2M;
+       public Dictionary<string, decimal> MinDeposit { get; set; } = new();
+       public List<string> WithdrawFeeNetwork { get; set; }
+       public int ThirdPartCacheFeeExpireSeconds { get; set; } = 180;
+     */
+    private IOptionsSnapshot<ServiceFeeOptions> MockServiceFeeOptions()
+    {
+        var mockOptionsSnapshot = new Mock<IOptionsSnapshot<ServiceFeeOptions>>();
+        mockOptionsSnapshot.Setup(o => o.Value).Returns(
+            new ServiceFeeOptions
+            {
+                IsOpen = true,
+                AmountThreshold = new Dictionary<string, decimal>
+                {
+                    { "USDT", 1000 },
+                    { "ELF", 500 }
+                },
+                MinThirdPartFee = new Dictionary<string, decimal>
+                {
+                    { "USDT", 0.01m },
+                    { "ELF", 0.001m }
+                },
+                MaxThirdPartFee = new Dictionary<string, decimal>
+                {
+                    { "USDT", 10m },
+                    { "ELF", 1m }
+                },
+                FeeFluctuationPercent = 0.1m,
+                ThirdPartFeeExpireSeconds = 180,
+                MinAmount = new Dictionary<string, decimal>
+                {
+                    { "USDT", 10m },
+                    { "ELF", 1m }
+                },
+                MinWithdraw = 0.2m,
+                MinDeposit = new Dictionary<string, decimal>
+                {
+                    { "USDT", 5m },
+                    { "ELF", 0.5m }
+                },
+                WithdrawFeeNetwork = new List<string> { "ETH", "AELF" },
+                ThirdPartCacheFeeExpireSeconds = 180
+            });
+        return mockOptionsSnapshot.Object;
     }
 }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using ETransferServer.Common;
 using ETransferServer.Dtos.Order;
+using ETransferServer.Grains.Options;
 using ETransferServer.Models;
 using ETransferServer.Network;
 using ETransferServer.Options;
@@ -17,6 +18,7 @@ using Moq;
 using Shouldly;
 using Xunit;
 using Xunit.Abstractions;
+using TransactionThreshold = ETransferServer.Options.TransactionThreshold;
 
 namespace ETransferServer.Order;
 
@@ -34,6 +36,8 @@ public class OrderDepositTest : ETransferServerApplicationTestBase
     {
         base.AfterAddApplication(services);
         services.AddSingleton(MockNetworkOptions());
+        services.AddSingleton(MockTokenSupportedChainOptions());
+        services.AddSingleton(MockTokenOptions());
         services.AddSingleton(MockChainOptions());
         services.AddSingleton(MockUserAddressService());
         services.AddSingleton(MockTokenAppService());
@@ -195,46 +199,249 @@ public class OrderDepositTest : ETransferServerApplicationTestBase
             e.ShouldNotBeNull();
         }
     }
-
-    private IOptionsSnapshot<NetworkOptions> MockNetworkOptions()
+    private IOptionsSnapshot<TokenInfoOptions> MockTokenOptions()
     {
-        var mockOptionsSnapshot = new Mock<IOptionsSnapshot<NetworkOptions>>();
+        var mockOptionsSnapshot = new Mock<IOptionsSnapshot<TokenInfoOptions>>();
         mockOptionsSnapshot.Setup(o => o.Value).Returns(
-            new NetworkOptions
+            new TokenInfoOptions
             {
-                NetworkMap = new Dictionary<string, List<NetworkConfig>>()
+                Tokens = new Dictionary<string, Dictionary<string, TokenInfoDto>>
                 {
-                    ["USDT"] = new List<NetworkConfig>()
                     {
-                        new NetworkConfig()
+                        "AELF", new Dictionary<string, TokenInfoDto>
                         {
-                            NetworkInfo = new NetworkInfo()
                             {
-                                Network = "ETH"
+                                "USDT", new TokenInfoDto
+                                {
+                                    Symbol = "USDT",
+                                    Name = "Tether USD",
+                                    Decimal = 8,
+                                    Icon = "https://example.com/usdt.png",
+                                    TokenAddress = "0x1234567890abcdef1234567890abcdef12345678"
+                                }
                             },
-                            DepositInfo = new DepositInfo()
                             {
-                                MinDeposit = "1",
-                                ExtraNotes = new List<string>() { "test" }
-                            }
-                        }
-                    },
-                    ["ELF"] = new List<NetworkConfig>()
-                    {
-                        new NetworkConfig()
-                        {
-                            NetworkInfo = new NetworkInfo()
-                            {
-                                Network = "AELF"
-                            },
-                            DepositInfo = new DepositInfo()
-                            {
-                                MinDeposit = "1",
-                                ExtraNotes = new List<string>() { "test" }
+                                "ELF", new TokenInfoDto
+                                {
+                                    Symbol = "ELF",
+                                    Name = "ELF",
+                                    Decimal = 8,
+                                    Icon = "https://example.com/elf.png",
+                                    TokenAddress = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+                                }
                             }
                         }
                     }
                 }
+            }
+        );
+        return mockOptionsSnapshot.Object;
+    }
+
+    private IOptionsSnapshot<NetworkInfoOptions> MockNetworkOptions()
+    {
+        var mockOptionsSnapshot = new Mock<IOptionsSnapshot<NetworkInfoOptions>>();
+        mockOptionsSnapshot.Setup(o => o.Value).Returns(
+            new NetworkInfoOptions
+            {
+                Networks = new Dictionary<string, NetworkBasicInfo>
+                {
+                    ["ETH"] = new NetworkBasicInfo
+                    {
+                        Network = "ETH",
+                        Name = "Ethereum",
+                        MultiConfirmSeconds = 15,
+                        TokenPoolContractAddress = "0x1234567890abcdef1234567890abcdef12345678",
+                        TokePoolExplorerUrl = "https://etherscan.io/address/0x1234567890abcdef1234567890abcdef12345678",
+                        IsTokenAccessRange = true,
+                        ConfirmNum = 12,
+                        BlockingTime = 60,
+                        ExtraRequestTime = 30,
+                        EstimatedArrivalTime = 1000,
+                        FeeAlarmPercent = 10,
+                        MinShowVersion = "1.0.0",
+                        WithdrawLocalFee = 0.01m,
+                        WithdrawLocalFeeUnit = "ETH",
+                        SpecialWithdrawFee = "0.001 ETH",
+                        SpecialWithdrawFeeDisplay = true
+                    }
+                },
+                NetworkPattern = new Dictionary<string, List<string>>()
+                {
+                    ["."] = new List<string>() { "ETH" }
+                },
+                ExtraNotesTemplate = new List<string> { "Note1", "Note2" },
+                SwapExtraNotesTemplate = new List<string> { "SwapNote1", "SwapNote2" },
+
+            });
+        return mockOptionsSnapshot.Object;
+    }
+
+    // mock TokenSupportedChainOptions
+    private IOptionsSnapshot<TokenSupportedChainInfoOptions> MockTokenSupportedChainOptions()
+    {
+        var mockOptionsSnapshot = new Mock<IOptionsSnapshot<TokenSupportedChainInfoOptions>>();
+        mockOptionsSnapshot.Setup(o => o.Value).Returns(
+            new TokenSupportedChainInfoOptions
+            {
+                SupportedChains = new Dictionary<string, List<SupportedChainInfo>>()
+                {
+                    ["USDT"] = new List<SupportedChainInfo>
+                    {
+                        new SupportedChainInfo
+                        {
+                            Network = "ETH",
+                            SupportedType = new List<string> { "Deposit", "Withdraw" },
+                            SupportWhiteList = new List<string> { "0x1234567890abcdef1234567890abcdef12345678" },
+                            SupportChain = new List<string> { "AELF" }
+                        }
+                    }
+                }
+            });
+        return mockOptionsSnapshot.Object;
+    }
+
+    // mock WithdrawInfoOptions
+    private IOptionsSnapshot<WithdrawInfoOptions> MockWithdrawInfoOptions()
+    {
+        var mockOptionsSnapshot = new Mock<IOptionsSnapshot<WithdrawInfoOptions>>();
+        mockOptionsSnapshot.Setup(o => o.Value).Returns(
+            new WithdrawInfoOptions
+            {
+                IsOpen = true,
+                CanCrossSameChain = true,
+                WithdrawThreshold = 100000,
+                OrderChangeTopic = "OrderChange",
+                SupportWhiteLists = new Dictionary<string, List<string>>(),
+                ToTransferMaxRetry = 5,
+                CallMaxRetry = 5,
+                CallbackMaxRetry = 5,
+                CallQueryMaxRetry = 5,
+                MaxListLength = 1000,
+                LargeAmount = new Dictionary<string, decimal>
+                {
+                    ["USDT"] = 10000.0m
+                },
+                Homogeneous = new Dictionary<string, TransactionThreshold>
+                {
+                    ["USDT"] = new TransactionThreshold
+                    {
+                        AmountThreshold = 300,
+                        BlockHeightUpperThreshold = 300,
+                        BlockHeightLowerThreshold = 30,
+                        WithdrawFee = 0.01m
+                    }
+                },
+                TransferPath = new Dictionary<string, List<string>>()
+            });
+        return mockOptionsSnapshot.Object;
+    }
+
+    // mock DepositAddressOptions
+    private IOptionsSnapshot<DepositAddressOptions> MockDepositAddressOptions()
+    {
+        var mockOptionsSnapshot = new Mock<IOptionsSnapshot<DepositAddressOptions>>();
+        mockOptionsSnapshot.Setup(o => o.Value).Returns(
+            new DepositAddressOptions
+            {
+                RemainingThreshold = 50,
+                MaxRequestNewAddressCount = 2,
+                MaxAssignedTransferThreshold = 200,
+                MaxRequestNewAddressRetry = 3,
+                MaxRequestRetryTimes = 3,
+                AssignedAddressExpiredHour = 48,
+                TransferAddressLists = new Dictionary<string, List<string>>(),
+                AddressWhiteLists = new List<string> { "0x1234567890abcdef1234567890abcdef12345678" },
+                SupportCoins = new List<string> { "USDT", "ELF" },
+                EVMCoins = new List<string> { "USDT", "ELF" }
+            });
+        return mockOptionsSnapshot.Object;
+    }
+
+    private IOptionsSnapshot<SupportedChainTokensOptions> MockSupportedChainTokensOptions()
+    {
+        var mockOptionsSnapshot = new Mock<IOptionsSnapshot<SupportedChainTokensOptions>>();
+        mockOptionsSnapshot.Setup(o => o.Value).Returns(
+            new SupportedChainTokensOptions
+            {
+                Tokens = new Dictionary<string, SupportTokenInfo>
+                {
+                    {
+                        "AELF", new SupportTokenInfo
+                        {
+                            Deposit = new Dictionary<string, StatusInfo>
+                            {
+                                { "USDT", new StatusInfo { IsOpen = true } },
+                                { "ELF", new StatusInfo { IsOpen = true } }
+                            },
+                            Withdraw = new Dictionary<string, StatusInfo>
+                            {
+                                { "USDT", new StatusInfo { IsOpen = true } },
+                                { "ELF", new StatusInfo { IsOpen = true } }
+                            }
+                        }
+                    }
+                },
+                Transfer = new Dictionary<string, StatusInfo>
+                {
+                    { "USDT", new StatusInfo { IsOpen = true } },
+                    { "ELF", new StatusInfo { IsOpen = true } }
+                }
+            });
+        return mockOptionsSnapshot.Object;
+    }
+
+    // mock ServiceFeeOptions
+    /*
+     * public bool IsOpen { get; set; } = true;
+       public Dictionary<string, decimal> AmountThreshold { get; set; } = new();
+       public Dictionary<string, decimal> MinThirdPartFee { get; set; } = new();
+       public Dictionary<string, decimal> MaxThirdPartFee { get; set; } = new();
+       public decimal FeeFluctuationPercent { get; set; } = (decimal)0.1;
+       public int ThirdPartFeeExpireSeconds { get; set; } = 180;
+       public Dictionary<string, decimal> MinAmount { get; set; } = new();
+       public decimal MinWithdraw { get; set; } = 0.2M;
+       public Dictionary<string, decimal> MinDeposit { get; set; } = new();
+       public List<string> WithdrawFeeNetwork { get; set; }
+       public int ThirdPartCacheFeeExpireSeconds { get; set; } = 180;
+     */
+    private IOptionsSnapshot<ServiceFeeOptions> MockServiceFeeOptions()
+    {
+        var mockOptionsSnapshot = new Mock<IOptionsSnapshot<ServiceFeeOptions>>();
+        mockOptionsSnapshot.Setup(o => o.Value).Returns(
+            new ServiceFeeOptions
+            {
+                IsOpen = true,
+                AmountThreshold = new Dictionary<string, decimal>
+                {
+                    { "USDT", 1000 },
+                    { "ELF", 500 }
+                },
+                MinThirdPartFee = new Dictionary<string, decimal>
+                {
+                    { "USDT", 0.01m },
+                    { "ELF", 0.001m }
+                },
+                MaxThirdPartFee = new Dictionary<string, decimal>
+                {
+                    { "USDT", 10m },
+                    { "ELF", 1m }
+                },
+                FeeFluctuationPercent = 0.1m,
+                ThirdPartFeeExpireSeconds = 180,
+                MinAmount = new Dictionary<string, decimal>
+                {
+                    { "USDT", 10m },
+                    { "ELF", 1m }
+                },
+                MinWithdraw = 0.2m,
+                MinDeposit = new Dictionary<string, decimal>
+                {
+                    { "USDT", 5m },
+                    { "ELF", 0.5m }
+                },
+                WithdrawFeeNetwork = new List<string> { "ETH", "AELF" },
+                ThirdPartCacheFeeExpireSeconds = 180
             });
         return mockOptionsSnapshot.Object;
     }
@@ -282,9 +489,9 @@ public class OrderDepositTest : ETransferServerApplicationTestBase
                 {
                     Symbol = "USDT",
                     Decimals = 8,
-                    ToTokenList = new List<ToTokenOptionConfigDto>()
+                    ToTokenList = new List<TargetTokenOptionConfigDto>()
                     {
-                        new ToTokenOptionConfigDto()
+                        new TargetTokenOptionConfigDto()
                         {
                             Symbol = "USDT",
                             Decimals = 8,
@@ -295,7 +502,7 @@ public class OrderDepositTest : ETransferServerApplicationTestBase
                                 "tDVW"
                             }
                         },
-                        new ToTokenOptionConfigDto()
+                        new TargetTokenOptionConfigDto()
                         {
                             Symbol = "ELF",
                             Decimals = 8,

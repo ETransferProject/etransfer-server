@@ -53,9 +53,10 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
     private readonly IOrderAppService _orderService;
     private readonly INetworkAppService _networkAppService;
     private readonly IdentityUserManager _userManager;
-    private readonly IOptionsSnapshot<TokenOptions> _tokenOptions;
+    // private readonly IOptionsSnapshot<TokenOptions> _tokenOptions;
     private readonly IOptionsSnapshot<StringEncryptionOptions> _stringEncryptionOptions;
     private readonly Dictionary<string, string> MappingItems = new();
+    private readonly IOptionsSnapshot<SupportedChainTokensOptions> _supportedChainTokensOptions;
 
     public ReconciliationAppService(INESTRepository<OrderIndex, Guid> orderIndexRepository,
         INESTRepository<TokenPoolIndex, Guid> tokenPoolIndexRepository,
@@ -66,8 +67,9 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         IOrderAppService orderService,
         INetworkAppService networkAppService,
         IdentityUserManager userManager,
-        IOptionsSnapshot<TokenOptions> tokenOptions,
-        IOptionsSnapshot<StringEncryptionOptions> stringEncryptionOptions)
+        // IOptionsSnapshot<TokenOptions> tokenOptions,
+        IOptionsSnapshot<StringEncryptionOptions> stringEncryptionOptions, 
+        IOptionsSnapshot<SupportedChainTokensOptions> supportedChainTokensOptions)
     {
         _orderIndexRepository = orderIndexRepository;
         _tokenPoolIndexRepository = tokenPoolIndexRepository;
@@ -78,8 +80,9 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         _orderService = orderService;
         _networkAppService = networkAppService;
         _userManager = userManager;
-        _tokenOptions = tokenOptions;
+        // _tokenOptions = tokenOptions;
         _stringEncryptionOptions = stringEncryptionOptions;
+        _supportedChainTokensOptions = supportedChainTokensOptions;
     }
 
     public async Task<GetTokenOptionResultDto> GetNetworkOptionAsync()
@@ -718,7 +721,7 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
             DateTime.MinValue.Date.ToUtcString(TimeHelper.DatePattern));
         var tokenPoolInitDto = await tokenPoolInitGrain.Get();
         
-        var symbolList = _tokenOptions.Value.Transfer.Select(t => t.Symbol).ToList();
+        var symbolList = _supportedChainTokensOptions.Value.Transfer.Keys.ToList();
         foreach (var item in symbolList)
         {
             var detailDto = new PoolOverviewDetailDto
@@ -772,7 +775,7 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         if (request.Symbol.IsNullOrWhiteSpace() ||
             !decimal.TryParse(request.ResetAmount, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
             return false;
-        var symbolList = _tokenOptions.Value.Transfer.Select(t => t.Symbol).ToList();
+        var symbolList = _supportedChainTokensOptions.Value.Transfer.Keys.ToList();
         if (!symbolList.Contains(request.Symbol))
             return false;
         
@@ -792,7 +795,7 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         var dto = new Dictionary<string, List<PoolChangeDto>>();
 
         var (count, list) = await GetTokenPoolIndexChangeListAsync(request, 0);
-        var symbolList = _tokenOptions.Value.Transfer.Select(t => t.Symbol).ToList();
+        var symbolList = _supportedChainTokensOptions.Value.Transfer.Keys.ToList();
         foreach (var changeItem in list)
         {
             foreach (var item in symbolList)
@@ -834,7 +837,7 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
             DateTime.MinValue.Date.ToUtcString(TimeHelper.DatePattern));
         var tokenPoolThresholdDto = await tokenPoolThresholdGrain.Get();
         
-        var symbolList = _tokenOptions.Value.Transfer.Select(t => t.Symbol).ToList();
+        var symbolList = _supportedChainTokensOptions.Value.Transfer.Keys.ToList();
         foreach (var item in symbolList)
         {
             var symbol = MappingItems.ContainsKey(item) ? MappingItems[item] : item;
@@ -911,7 +914,7 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         var dto = new Dictionary<string, List<MultiPoolChangeDto>>();
 
         var (count, list) = await GetTokenPoolIndexChangeListAsync(request);
-        var symbolList = _tokenOptions.Value.Transfer.Select(t => t.Symbol).ToList();
+        var symbolList = _supportedChainTokensOptions.Value.Transfer.Keys.ToList();
         var networkList = await _networkAppService.GetNetworkTokenListAsync(new GetNetworkTokenListRequestDto());
         foreach (var changeItem in list)
         {
@@ -974,7 +977,7 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
             DateTime.MinValue.Date.ToUtcString(TimeHelper.DatePattern));
         var tokenPoolThresholdDto = await tokenPoolThresholdGrain.Get();
         
-        var symbolList = _tokenOptions.Value.Transfer.Select(t => t.Symbol).ToList();
+        var symbolList = _supportedChainTokensOptions.Value.Transfer.Keys.ToList();
         foreach (var item in symbolList)
         {
             if (!result.TokenPool.ContainsKey("Total"))
@@ -1046,7 +1049,7 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         var dto = new Dictionary<string, List<TokenPoolChangeDto>>();
 
         var (count, list) = await GetTokenPoolIndexChangeListAsync(request);
-        var symbolList = _tokenOptions.Value.Transfer.Select(t => t.Symbol).ToList();
+        var symbolList = _supportedChainTokensOptions.Value.Transfer.Keys.ToList();
         var networkList = await _networkAppService.GetNetworkTokenListAsync(new GetNetworkTokenListRequestDto());
         foreach (var changeItem in list)
         {
@@ -1149,7 +1152,7 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
             }
         }
         
-        var symbolList = _tokenOptions.Value.Transfer.Select(t => t.Symbol).ToList();
+        var symbolList = _supportedChainTokensOptions.Value.Transfer.Keys.ToList();
         foreach (var item in symbolList)
         {
             var detailDto = new FeeItemDto
@@ -1240,7 +1243,7 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
             return false;
         }
         else if (request.Type == 1){
-            var symbolList = _tokenOptions.Value.Transfer.Select(t => t.Symbol).ToList();
+            var symbolList = _supportedChainTokensOptions.Value.Transfer.Keys.ToList();
             if (!symbolList.Contains(request.Symbol))
                 return false;
             dto.WithdrawFeeInfo.AddOrReplace(request.Symbol, request.ResetAmount);
@@ -1269,7 +1272,7 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
                 ITokenPoolGrain.GenerateGrainId(DateTime.UtcNow.AddDays(-1).Date.ToUtcMilliSeconds()));
             tokenPoolDto = await tokenPoolGrain.Get();
         }
-        var symbolList = _tokenOptions.Value.Transfer.Select(t => t.Symbol).ToList();
+        var symbolList = _supportedChainTokensOptions.Value.Transfer.Keys.ToList();
         foreach (var changeItem in list)
         {
             if (!dto.ContainsKey(changeItem.Date)) dto.Add(changeItem.Date, new Dictionary<string, List<FeeChangeDto>>());

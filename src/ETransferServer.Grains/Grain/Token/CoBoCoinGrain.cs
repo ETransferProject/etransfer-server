@@ -31,15 +31,16 @@ public class CoBoCoinGrain: Grain<CoBoCoinState>, ICoBoCoinGrain
     private readonly ICoBoProvider _coBoProvider;
     private readonly IOptionsSnapshot<CoBoOptions> _coBoOptions;
     private readonly IOptionsSnapshot<WithdrawNetworkOptions> _withdrawNetworkOptions;
-    private readonly IOptionsSnapshot<WithdrawOptions> _withdrawOptions;
+    private readonly IOptionsSnapshot<WithdrawInfoOptions> _withdrawOptions;
     private readonly IOptionsSnapshot<ChainOptions> _chainOptions;
+    private readonly IOptionsSnapshot<NetworkInfoOptions> _networkInfoOptions;
     
     public CoBoCoinGrain(ICoBoProvider coBoProvider, 
         IObjectMapper objectMapper, 
         IOptionsSnapshot<CoBoOptions> coBoOptions,
         IOptionsSnapshot<WithdrawNetworkOptions> withdrawNetworkOptions,
-        IOptionsSnapshot<WithdrawOptions> withdrawOptions,
-        IOptionsSnapshot<ChainOptions> chainOptions)
+        IOptionsSnapshot<WithdrawInfoOptions> withdrawOptions,
+        IOptionsSnapshot<ChainOptions> chainOptions, IOptionsSnapshot<NetworkInfoOptions> networkInfoOptions)
     {
         _coBoProvider = coBoProvider;
         _objectMapper = objectMapper;
@@ -47,6 +48,7 @@ public class CoBoCoinGrain: Grain<CoBoCoinState>, ICoBoCoinGrain
         _withdrawNetworkOptions = withdrawNetworkOptions;
         _withdrawOptions = withdrawOptions;
         _chainOptions = chainOptions;
+        _networkInfoOptions = networkInfoOptions;
     }
 
     public async Task<CoBoCoinDto> Get()
@@ -83,8 +85,9 @@ public class CoBoCoinGrain: Grain<CoBoCoinState>, ICoBoCoinGrain
     
     public async Task<int> GetConfirmingThreshold()
     {
-        var netWorkInfo = _withdrawNetworkOptions.Value.NetworkInfos.FirstOrDefault(t =>
-            t.Coin.Equals(this.GetPrimaryKeyString(), StringComparison.OrdinalIgnoreCase));
+        var key = this.GetPrimaryKeyString();
+        var network = key.Split("_").First();
+        var netWorkInfo = _networkInfoOptions.Value.Networks[network];
         return netWorkInfo?.ConfirmNum ?? 0;
     }
     
