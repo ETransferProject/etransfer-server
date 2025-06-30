@@ -19,12 +19,7 @@ public class WithdrawNetworkOptions
 
 public class NetWorkInfo
 {
+    // network_symbol
     public string Coin { get; set; }
-    public int ConfirmNum { get; set; }
-    public decimal BlockingTime { get; set; }
-    public int ExtraRequestTime { get; set; } = 30;
-    public int Decimal { get; set; }
     public decimal Amount { get; set; } = 0;
-    public decimal FeeAlarmPercent { get; set; } = 10;
-    public int EstimatedArrivalTime { get; set; } = 1000;
 }

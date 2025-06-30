@@ -4,7 +4,8 @@ namespace ETransferServer.Options;
 
 public class TokenInfoOptions
 {
-    public Dictionary<string,TokenInfoDto> Tokens { get; set; } = new();
+    // chain id -> symbol -> TokenInfoDto
+    public Dictionary<string,Dictionary<string,TokenInfoDto>> Tokens { get; set; } = new();
 }
 
 public class TokenInfoDto
