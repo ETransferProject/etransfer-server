@@ -74,7 +74,7 @@ namespace ETransferServer
             var hostingEnvironment = context.Services.GetHostingEnvironment();
             Configure<SignatureServiceOption>(configuration.GetSection("SignatureService"));
             Configure<ChainOptions>(configuration.GetSection("Chains"));
-            Configure<NetworkInfoOptions>(configuration.GetSection("NetworkInfoOptions"));
+            Configure<NetworkInfoOptions>(configuration.GetSection("NetworkInfo"));
             Configure<TokenAccessOptions>(configuration.GetSection("TokenAccess"));
             Configure<TokenInfoOptions>(configuration.GetSection("TokenInfo"));
             Configure<DepositInfoOptions>(configuration.GetSection("DepositInfo"));

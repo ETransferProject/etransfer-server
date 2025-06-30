@@ -66,6 +66,7 @@ public class ETransferServerOrleansSiloModule : AbpModule
         Configure<ServiceFeeOptions>(configuration.GetSection("ServiceFee"));
         //TransactionCheckOptions
         Configure<TransactionCheckOptions>(configuration.GetSection("TransactionCheck"));
+        Configure<NetworkInfoOptions>(configuration.GetSection("NetworkInfo"));
 
         context.Services.AddHostedService<ETransferServerHostedService>();
         context.Services.AddOrleansExceptionHandler();
