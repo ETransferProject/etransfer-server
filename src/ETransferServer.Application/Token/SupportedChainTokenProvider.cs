@@ -40,27 +40,35 @@ public class SupportedChainTokenProvider : ISupportedChainTokenProvider, ITransi
         var swapMap = _supportedTokenSwapOptions.Value.SwapTokenMap;
         var tokens = _tokenInfoOptions.Value.Tokens;
 
-        var symbolsToQuery = new List<string>();
-        if (string.IsNullOrEmpty(fromTokenSymbol))
+        // 提前构建 symbol -> TokenInfoDto 快速查找字典
+        var tokenLookup = new Dictionary<string, TokenInfoDto>();
+        foreach (var (_, tokenDic) in tokens)
         {
-            foreach (var key in swapMap.Keys)
+            foreach (var (symbol, tokenInfo) in tokenDic)
             {
-                symbolsToQuery.Add(key);
+                if (!tokenLookup.ContainsKey(symbol))
+                {
+                    tokenLookup[symbol] = tokenInfo;
+                }
             }
         }
-        else
-        {
-            symbolsToQuery.Add(fromTokenSymbol);
-        }
+
+        var symbolsToQuery = string.IsNullOrEmpty(fromTokenSymbol)
+            ? swapMap.Keys.ToList()
+            : new List<string> { fromTokenSymbol };
 
         foreach (var symbol in symbolsToQuery)
         {
-            if (!tokens.ContainsKey(symbol) || !swapMap.ContainsKey(symbol))
+            if (!swapMap.TryGetValue(symbol, out var toTokenConfigs))
             {
                 continue;
             }
 
-            var tokenInfo = tokens[ChainId.AELF][symbol];
+            if (!tokenLookup.TryGetValue(symbol, out var tokenInfo))
+            {
+                continue;
+            }
+
             var tokenConfig = new TokenOptionConfigDto
             {
                 Symbol = tokenInfo.Symbol,
@@ -71,14 +79,9 @@ public class SupportedChainTokenProvider : ISupportedChainTokenProvider, ITransi
                 ToTokenList = new List<TargetTokenOptionConfigDto>()
             };
 
-            var toTokenConfigs = swapMap[symbol];
             foreach (var toToken in toTokenConfigs)
             {
-                if (!tokens.TryGetValue(ChainId.AELF, out var targetTokenInfoDic))
-                {
-                    continue;
-                }
-                if (!targetTokenInfoDic.TryGetValue(toToken.Symbol, out var targetTokenInfo))
+                if (!tokenLookup.TryGetValue(toToken.Symbol, out var targetTokenInfo))
                 {
                     continue;
                 }
