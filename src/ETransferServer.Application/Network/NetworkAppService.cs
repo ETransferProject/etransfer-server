@@ -633,7 +633,7 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
                     networkDto.MultiStatus ??= new Dictionary<string, string>();
                     if (kv.Value != null)
                     {
-                        networkDto.MultiStatus.AddOrReplace(kv.Key, _supportedChainTokenProvider.IsDepositHealth(symbol, kv.Value.Network)
+                        networkDto.MultiStatus.AddOrReplace(kv.Key, _supportedChainTokenProvider.IsDepositHealth(kv.Key, kv.Value.Network)
                             ? CommonConstant.NetworkStatus.Health
                             : CommonConstant.NetworkStatus.Offline);
                     }
@@ -650,7 +650,7 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
                     networkDto.MultiStatus ??= new Dictionary<string, string>();
                     if (kv.Value != null)
                     {
-                        networkDto.MultiStatus.AddOrReplace(kv.Key, _supportedChainTokenProvider.IsWithdrawHealth(symbol, kv.Value.Network)
+                        networkDto.MultiStatus.AddOrReplace(kv.Key, _supportedChainTokenProvider.IsWithdrawHealth(kv.Key, kv.Value.Network)
                             ? CommonConstant.NetworkStatus.Health
                             : CommonConstant.NetworkStatus.Offline);
                     }
