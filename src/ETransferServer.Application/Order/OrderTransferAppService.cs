@@ -112,7 +112,7 @@ public partial class OrderWithdrawAppService
 
         var tokenLimit = await tokenInfoGrain.GetLimit();
         var withdrawInfoDto = new TransferDetailInfoDto();
-        var networkInfo = _tokenNetworkProvider.GetNetworkInfo(request.FromAddress);
+        var networkInfo = _tokenNetworkProvider.GetNetworkInfo(request.FromNetwork);
         withdrawInfoDto.ContractAddress = networkInfo.TokenPoolContractAddress;
         withdrawInfoDto.LimitCurrency = request.Symbol;
         withdrawInfoDto.TransactionUnit = request.Symbol;
