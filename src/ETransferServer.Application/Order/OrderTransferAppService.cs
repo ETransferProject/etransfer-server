@@ -118,7 +118,7 @@ public partial class OrderWithdrawAppService
         withdrawInfoDto.TransactionUnit = request.Symbol;
 
         // query async
-        var decimals = await _networkAppService.GetDecimalsAsync(request.FromNetwork, request.Symbol);
+        var decimals = await _tokenInfoProvider.GetTokenDecimalAsync(null, request.Symbol);
         var (feeAmount, expireAt) = (0M,
             DateTime.UtcNow.AddSeconds(_coBoOptions.Value.CoinExpireSeconds).ToUtcMilliSeconds());
         withdrawInfoDto.TransactionFee = feeAmount.ToString();

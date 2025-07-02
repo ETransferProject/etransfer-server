@@ -72,6 +72,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
     private readonly IOptionsSnapshot<NetworkInfoOptions> _networkInfoOptions;
     private readonly ISupportedChainTokenProvider _supportedChainTokenProvider;
     private readonly IOptionsSnapshot<DepositAddressOptions> _depositAddressOptions;
+    private readonly ITokenInfoProvider _tokenInfoProvider;
 
 
     public OrderWithdrawAppService(INESTRepository<Orders.OrderIndex, Guid> withdrawOrderIndexRepository,
@@ -91,7 +92,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
         IOptionsSnapshot<WithdrawInfoOptions> withdrawInfoOptions,
         IOptionsSnapshot<ServiceFeeOptions> serviceFeeOptions, 
         IOptionsSnapshot<NetworkInfoOptions> networkInfoOptions, 
-        ISupportedChainTokenProvider supportedChainTokenProvider, IOptionsSnapshot<DepositAddressOptions> depositAddressOptions)
+        ISupportedChainTokenProvider supportedChainTokenProvider, IOptionsSnapshot<DepositAddressOptions> depositAddressOptions, ITokenInfoProvider tokenInfoProvider)
     {
         _withdrawOrderIndexRepository = withdrawOrderIndexRepository;
         _userAddressIndexRepository = userAddressIndexRepository;
@@ -112,6 +113,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
         _networkInfoOptions = networkInfoOptions;
         _supportedChainTokenProvider = supportedChainTokenProvider;
         _depositAddressOptions = depositAddressOptions;
+        _tokenInfoProvider = tokenInfoProvider;
     }
 
     [ExceptionHandler(typeof(Exception), TargetType = typeof(OrderWithdrawAppService),
@@ -162,7 +164,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
 
         // query async
         var networkFeeTask = CalculateNetworkFeeAsync(userId, request.ChainId, request.Version, request.FromAddress);
-        var decimals = await _networkAppService.GetDecimalsAsync(request.ChainId, request.Symbol);
+        var decimals = await _tokenInfoProvider.GetTokenDecimalAsync(null, request.Symbol);
         var (feeAmount, expireAt) = (0M,
             DateTime.UtcNow.AddSeconds(_coBoOptions.Value.CoinExpireSeconds).ToUtcMilliSeconds());
         withdrawInfoDto.TransactionFee = feeAmount.ToString();
@@ -387,7 +389,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
     {
         if (!userId.HasValue || network.IsNullOrEmpty()) return;
         var coinFeeCacheKey = CacheKey(FeeInfo.FeeName.CoBoFee, userId.ToString(), network, symbol);
-        var decimals = await _networkAppService.GetDecimalsAsync(ChainId.AELF, symbol);
+        var decimals = await _tokenInfoProvider.GetTokenDecimalAsync(null, symbol);
         await _coBoCoinCache.SetAsync(coinFeeCacheKey, new CoBoCoinDto { AbsEstimateFee = fee.ToString(decimals, DecimalHelper.RoundingOption.Ceiling) }, 
             new DistributedCacheEntryOptions
             {
@@ -401,7 +403,7 @@ public partial class OrderWithdrawAppService : ApplicationService, IOrderWithdra
     {
         if (!userId.HasValue || fromNetwork.IsNullOrEmpty() || toNetwork.IsNullOrEmpty()) return;
         var coinFeeCacheKey = CacheKey(FeeInfo.FeeName.CoBoFee, userId.ToString(), fromNetwork, toNetwork, symbol);
-        var decimals = await _networkAppService.GetDecimalsAsync(ChainId.AELF, symbol);
+        var decimals = await _tokenInfoProvider.GetTokenDecimalAsync(null, symbol);
         await _coBoCoinCache.SetAsync(coinFeeCacheKey, new CoBoCoinDto { AbsEstimateFee = fee.ToString(decimals, DecimalHelper.RoundingOption.Ceiling) }, 
             new DistributedCacheEntryOptions
             {

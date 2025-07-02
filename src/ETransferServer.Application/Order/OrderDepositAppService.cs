@@ -39,6 +39,7 @@ public partial class OrderDepositAppService : ApplicationService, IOrderDepositA
     private readonly ITokenAppService _tokenAppService;
     private readonly ISwapAppService _swapAppService;
     private readonly ITokenNetworkProvider _tokenNetworkProvider;
+    private readonly ITokenInfoProvider _tokenInfoProvider;
 
     public OrderDepositAppService(INESTRepository<OrderIndex, Guid> depositOrderIndexRepository,
         IObjectMapper objectMapper,
@@ -46,7 +47,7 @@ public partial class OrderDepositAppService : ApplicationService, IOrderDepositA
         IOptionsSnapshot<ChainOptions> chainOptions,
         IUserAddressService userAddressService,
         INetworkAppService networkAppService, ITokenAppService tokenAppService, ISwapAppService swapAppService,
-        IOptionsSnapshot<TokenSupportedChainInfoOptions> tokenSupportedChainOptions, ITokenNetworkProvider tokenNetworkProvider)
+        IOptionsSnapshot<TokenSupportedChainInfoOptions> tokenSupportedChainOptions, ITokenNetworkProvider tokenNetworkProvider, ITokenInfoProvider tokenInfoProvider)
     {
         _depositOrderIndexRepository = depositOrderIndexRepository;
         _chainOptions = chainOptions;
@@ -58,6 +59,7 @@ public partial class OrderDepositAppService : ApplicationService, IOrderDepositA
         _swapAppService = swapAppService;
         _tokenSupportedChainOptions = tokenSupportedChainOptions;
         _tokenNetworkProvider = tokenNetworkProvider;
+        _tokenInfoProvider = tokenInfoProvider;
     }
 
     [ExceptionHandler(typeof(Exception), TargetType = typeof(OrderDepositAppService),
@@ -121,7 +123,7 @@ public partial class OrderDepositAppService : ApplicationService, IOrderDepositA
             var avgExchange =
                 await _networkAppService.GetAvgExchangeAsync(request.Symbol, CommonConstant.Symbol.USD);
             var decimals =
-                await _networkAppService.GetDecimalsAsync(request.ChainId, request.Symbol);
+                await _tokenInfoProvider.GetTokenDecimalAsync(request.ChainId, request.Symbol);
             getDepositInfoDto.DepositInfo.ServiceFeeUsd = isOpen
                 ? (maxFee * avgExchange).ToString(
                     decimals, DecimalHelper.RoundingOption.Ceiling)

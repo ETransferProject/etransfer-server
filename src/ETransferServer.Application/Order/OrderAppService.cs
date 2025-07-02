@@ -15,6 +15,7 @@ using ETransferServer.Network;
 using ETransferServer.Options;
 using ETransferServer.Orders;
 using ETransferServer.ThirdPart.CoBo.Dtos;
+using ETransferServer.Token;
 using ETransferServer.User.Dtos;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -38,26 +39,27 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
     private readonly IClusterClient _clusterClient;
     private readonly IObjectMapper _objectMapper;
     private readonly ILogger<OrderAppService> _logger;
-    // private readonly IOptionsSnapshot<DepositInfoOptionsBak> _depositInfoOptions;
     private readonly INetworkAppService _networkAppService;
     private readonly IOptionsSnapshot<DepositAddressOptions> _depositAddressOptions;
+    private readonly ITokenInfoProvider _tokenInfoProvider;
 
     public OrderAppService(INESTRepository<OrderIndex, Guid> orderIndexRepository,
         INESTRepository<UserIndex, Guid> userIndexRepository,
         IClusterClient clusterClient,
         IObjectMapper objectMapper,
         ILogger<OrderAppService> logger,
-        // IOptionsSnapshot<DepositInfoOptionsBak> depositInfoOptions,
-        INetworkAppService networkAppService, IOptionsSnapshot<DepositAddressOptions> depositAddressOptions)
+        INetworkAppService networkAppService, 
+        IOptionsSnapshot<DepositAddressOptions> depositAddressOptions, 
+        ITokenInfoProvider tokenInfoProvider)
     {
         _orderIndexRepository = orderIndexRepository;
         _userIndexRepository = userIndexRepository;
         _clusterClient = clusterClient;
         _objectMapper = objectMapper;
         _logger = logger;
-        // _depositInfoOptions = depositInfoOptions;
         _networkAppService = networkAppService;
         _depositAddressOptions = depositAddressOptions;
+        _tokenInfoProvider = tokenInfoProvider;
     }
 
     [ExceptionHandler(typeof(Exception), TargetType = typeof(OrderAppService),
@@ -671,10 +673,10 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
         }
 
         item.FromTransfer.Amount = item.FromTransfer.Amount.SafeToDecimal(0M).ToString(
-            await _networkAppService.GetDecimalsAsync(ChainId.AELF, item.FromTransfer.Symbol),
+            await _tokenInfoProvider.GetTokenDecimalAsync(null, item.FromTransfer.Symbol),
             DecimalHelper.RoundingOption.Floor);
         item.ToTransfer.Amount = item.ToTransfer.Amount.SafeToDecimal(0M).ToString(
-            await _networkAppService.GetDecimalsAsync(ChainId.AELF, item.ToTransfer.Symbol),
+            await _tokenInfoProvider.GetTokenDecimalAsync(null, item.ToTransfer.Symbol),
             DecimalHelper.RoundingOption.Floor);
         item.FromTransfer.AmountUsd =
             (item.FromTransfer.Amount.SafeToDecimal(0M) * await GetExchangeAsync(item.FromTransfer.Symbol))
@@ -870,7 +872,7 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
                 Id = item.Id.ToString(),
                 Symbol = item.ToTransfer.Symbol,
                 Amount = item.ToTransfer.Amount.ToString(
-                    await _networkAppService.GetDecimalsAsync(ChainId.AELF, item.ToTransfer.Symbol),
+                    await _tokenInfoProvider.GetTokenDecimalAsync(null, item.ToTransfer.Symbol),
                     DecimalHelper.RoundingOption.Floor),
                 IsSwap = !item.ExtensionInfo.IsNullOrEmpty() &&
                          item.ExtensionInfo.ContainsKey(ExtensionKey.SwapStage),
@@ -898,7 +900,7 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
                 Id = item.Id.ToString(),
                 Symbol = item.ToTransfer.Symbol,
                 Amount = item.ToTransfer.Amount.ToString(
-                    await _networkAppService.GetDecimalsAsync(ChainId.AELF, item.ToTransfer.Symbol),
+                    await _tokenInfoProvider.GetTokenDecimalAsync(null, item.ToTransfer.Symbol),
                     DecimalHelper.RoundingOption.Floor)
             };
             result.Add(record);

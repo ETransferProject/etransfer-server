@@ -41,13 +41,20 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
     private readonly ISupportedChainTokenProvider _supportedChainTokenProvider;
     private readonly IOptionsSnapshot<NetworkInfoOptions> _networkInfoOptions;
     private readonly IOptionsSnapshot<ServiceFeeOptions> _serviceFeeOptions;
+    private readonly ITokenInfoProvider _tokenInfoProvider;
 
     public NetworkAppService(ILogger<NetworkAppService> logger, 
         IOptionsSnapshot<CoinGeckoOptions> coinGeckoOptions,
         IObjectMapper objectMapper,
         IClusterClient clusterClient, 
         IOptionsSnapshot<WithdrawInfoOptions> withdrawInfoOptions,
-        IOptionsSnapshot<TokenInfoOptions> tokenOptions, IOptionsSnapshot<TokenSupportedChainInfoOptions> tokenSupportedChainOptions, ITokenNetworkProvider tokenNetworkProvider, ISupportedChainTokenProvider supportedChainTokenProvider, IOptionsSnapshot<NetworkInfoOptions> networkInfoOptions, IOptionsSnapshot<ServiceFeeOptions> serviceFeeOptions)
+        IOptionsSnapshot<TokenInfoOptions> tokenOptions, 
+        IOptionsSnapshot<TokenSupportedChainInfoOptions> tokenSupportedChainOptions, 
+        ITokenNetworkProvider tokenNetworkProvider, 
+        ISupportedChainTokenProvider supportedChainTokenProvider, 
+        IOptionsSnapshot<NetworkInfoOptions> networkInfoOptions, 
+        IOptionsSnapshot<ServiceFeeOptions> serviceFeeOptions,
+        ITokenInfoProvider tokenInfoProvider)
     {
         _logger = logger;
         _coinGeckoOptions = coinGeckoOptions.Value;
@@ -60,6 +67,7 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
         _supportedChainTokenProvider = supportedChainTokenProvider;
         _networkInfoOptions = networkInfoOptions;
         _serviceFeeOptions = serviceFeeOptions;
+        _tokenInfoProvider = tokenInfoProvider;
     }
 
     [ExceptionHandler(typeof(UserFriendlyException), typeof(Exception), 
@@ -448,12 +456,6 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
         return Tuple.Create(isOpen, amountThreshold, serviceFee, minAmount);
     }
 
-    public Task<int> GetDecimalsAsync(string chainId, string symbol)
-    {
-        var tokenDecimals = _tokenOptions.Value.Tokens[chainId][symbol].Decimal;
-        return Task.FromResult(tokenDecimals);
-    }
-
     public Task<string> GetIconAsync(string orderType, string chainId, string fromSymbol, string toSymbol = null)
     {
         var icon = _tokenOptions.Value.Tokens[chainId][fromSymbol].Icon;
@@ -510,7 +512,7 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
                 network.WithdrawFee = Math.Max(await GetMinThirdPartFeeAsync(network.Network, symbol),
                         network.WithdrawFee.SafeToDecimal() *
                         exchange[_coinGeckoOptions.CoinIdMapping[network.WithdrawFeeUnit]].Exchange)
-                    .ToString(CommonConstant.DefaultConst.ThirdPartDigitals, await GetDecimalsAsync(chainId, symbol),
+                    .ToString(CommonConstant.DefaultConst.ThirdPartDigitals, await _tokenInfoProvider.GetTokenDecimalAsync(chainId, symbol),
                         DecimalHelper.RoundingOption.Ceiling);
             }
 
@@ -535,7 +537,7 @@ public partial class NetworkAppService : ETransferServerAppService, INetworkAppS
 
                 network.WithdrawFee = Math.Max(await GetMinThirdPartFeeAsync(network.Network, symbol),
                         network.WithdrawFee.SafeToDecimal() * avgExchange)
-                    .ToString(CommonConstant.DefaultConst.ThirdPartDigitals, await GetDecimalsAsync(chainId, symbol),
+                    .ToString(CommonConstant.DefaultConst.ThirdPartDigitals, await _tokenInfoProvider.GetTokenDecimalAsync(chainId, symbol),
                         DecimalHelper.RoundingOption.Ceiling);
             }
 

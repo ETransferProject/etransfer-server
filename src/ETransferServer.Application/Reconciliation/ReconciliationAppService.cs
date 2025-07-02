@@ -24,6 +24,7 @@ using ETransferServer.Options;
 using ETransferServer.Order;
 using ETransferServer.Orders;
 using ETransferServer.Service.Info;
+using ETransferServer.Token;
 using ETransferServer.Tokens;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -52,8 +53,8 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
     private readonly IInfoAppService _infoService;
     private readonly IOrderAppService _orderService;
     private readonly INetworkAppService _networkAppService;
-    private readonly IdentityUserManager _userManager;
-    // private readonly IOptionsSnapshot<TokenOptions> _tokenOptions;
+    private readonly IdentityUserManager _userManager; 
+    private readonly ITokenInfoProvider _tokenInfoProvider;
     private readonly IOptionsSnapshot<StringEncryptionOptions> _stringEncryptionOptions;
     private readonly Dictionary<string, string> MappingItems = new();
     private readonly IOptionsSnapshot<SupportedChainTokensOptions> _supportedChainTokensOptions;
@@ -69,7 +70,7 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         IdentityUserManager userManager,
         // IOptionsSnapshot<TokenOptions> tokenOptions,
         IOptionsSnapshot<StringEncryptionOptions> stringEncryptionOptions, 
-        IOptionsSnapshot<SupportedChainTokensOptions> supportedChainTokensOptions)
+        IOptionsSnapshot<SupportedChainTokensOptions> supportedChainTokensOptions, ITokenInfoProvider tokenInfoProvider)
     {
         _orderIndexRepository = orderIndexRepository;
         _tokenPoolIndexRepository = tokenPoolIndexRepository;
@@ -83,6 +84,7 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
         // _tokenOptions = tokenOptions;
         _stringEncryptionOptions = stringEncryptionOptions;
         _supportedChainTokensOptions = supportedChainTokensOptions;
+        _tokenInfoProvider = tokenInfoProvider;
     }
 
     public async Task<GetTokenOptionResultDto> GetNetworkOptionAsync()
@@ -242,7 +244,7 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
             throw new UserFriendlyException("Invalid order.");
         }
 
-        var amount = orderIndex.ToTransfer.Amount.ToString(await _networkAppService.GetDecimalsAsync(ChainId.AELF, 
+        var amount = orderIndex.ToTransfer.Amount.ToString(await _tokenInfoProvider.GetTokenDecimalAsync(null, 
             orderIndex.ToTransfer.Symbol), DecimalHelper.RoundingOption.Floor);
         if (orderIndex.ToTransfer.ToAddress != request.ToAddress
             || amount.SafeToDecimal() != request.Amount.SafeToDecimal()
@@ -402,7 +404,7 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
             throw new UserFriendlyException("Invalid order.");
         }
         
-        var amount = orderIndex.FromTransfer.Amount.ToString(await _networkAppService.GetDecimalsAsync(ChainId.AELF, 
+        var amount = orderIndex.FromTransfer.Amount.ToString(await _tokenInfoProvider.GetTokenDecimalAsync(null, 
             orderIndex.FromTransfer.Symbol), DecimalHelper.RoundingOption.Floor);
         if (orderIndex.FromTransfer.FromAddress != request.FromAddress
             || amount.SafeToDecimal() != request.Amount.SafeToDecimal()
@@ -555,7 +557,7 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
             throw new UserFriendlyException("Invalid order.");
         }
 
-        var amount = orderIndex.ToTransfer.Amount.ToString(await _networkAppService.GetDecimalsAsync(ChainId.AELF, 
+        var amount = orderIndex.ToTransfer.Amount.ToString(await _tokenInfoProvider.GetTokenDecimalAsync(null, 
             orderIndex.ToTransfer.Symbol), DecimalHelper.RoundingOption.Floor);
         if (orderIndex.ToTransfer.ToAddress != request.ToAddress
             || amount.SafeToDecimal() != request.Amount.SafeToDecimal()

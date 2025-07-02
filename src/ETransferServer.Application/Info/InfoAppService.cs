@@ -218,14 +218,14 @@ public partial class InfoAppService : ETransferServerAppService, IInfoAppService
         {
             foreach (var targetTokenConfig in targetList)
             {
-                aelfDepositTokenSymbolSet.Add(targetTokenConfig.Symbol);  // HashSet 自动去重
+                aelfDepositTokenSymbolSet.Add(targetTokenConfig.Symbol); 
             }
         }
 
         var tokenList = new List<TokenInfoDto>();
         foreach (var symbol in aelfDepositTokenSymbolSet)
         {
-            tokenList.Add(await _tokenInfoProvider.GetTokenInfoAsync(ChainId.AELF, symbol));
+            tokenList.Add(await _tokenInfoProvider.GetTokenInfoAsync(null, symbol));
         }
         foreach (var symbol in aelfDepositTokenSymbolSet)
         {
