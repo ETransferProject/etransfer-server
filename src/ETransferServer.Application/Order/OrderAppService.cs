@@ -685,9 +685,9 @@ public partial class OrderAppService : ApplicationService, IOrderAppService
             (item.ToTransfer.Amount.SafeToDecimal(0M) * await GetExchangeAsync(item.ToTransfer.Symbol))
             .ToString(2, DecimalHelper.RoundingOption.Floor);
         item.FromTransfer.Icon =
-            await _networkAppService.GetIconAsync(item.OrderType, ChainId.AELF, item.FromTransfer.Symbol);
+            (await _tokenInfoProvider.GetTokenInfoAsync(null, item.FromTransfer.Symbol))?.Icon;
         item.ToTransfer.Icon =
-            await _networkAppService.GetIconAsync(item.OrderType, ChainId.AELF, item.FromTransfer.Symbol, item.ToTransfer.Symbol);
+            (await _tokenInfoProvider.GetTokenInfoAsync(null, item.ToTransfer.Symbol))?.Icon;
         item.SecondOrderType = orderIndex != null && !orderIndex.ExtensionInfo.IsNullOrEmpty() &&
                                orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.OrderType)
             ? orderIndex.ExtensionInfo[ExtensionKey.OrderType]

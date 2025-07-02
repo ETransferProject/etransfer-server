@@ -25,5 +25,8 @@ public class ETransferServerApplicationTestModule : AbpModule
         context.Services.AddTransient<ITokenNetworkProvider, TokenNetworkProvider>();
         // ISupportedChainTokenProvider
         context.Services.AddTransient<ISupportedChainTokenProvider, SupportedChainTokenProvider>();
+        // ITokenInfoProvider
+        context.Services.AddTransient<ITokenInfoProvider, TokenInfoProvider>();
+
     }
 }

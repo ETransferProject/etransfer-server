@@ -1719,10 +1719,10 @@ public partial class ReconciliationAppService : ApplicationService, IReconciliat
                 (decimal.Parse(item.ToTransfer.Amount) * exchangeDic[item.ToTransfer.Symbol]).ToString(2,
                     DecimalHelper.RoundingOption.Floor);
             item.FromTransfer.Icon =
-                await _networkAppService.GetIconAsync(item.OrderType, ChainId.AELF, item.FromTransfer.Symbol);
+                (await _tokenInfoProvider.GetTokenInfoAsync(null, item.FromTransfer.Symbol))?.Icon;
             item.ToTransfer.Icon =
-                await _networkAppService.GetIconAsync(item.OrderType, ChainId.AELF, item.FromTransfer.Symbol,
-                    item.ToTransfer.Symbol);
+                (await _tokenInfoProvider.GetTokenInfoAsync(null, item.ToTransfer.Symbol))?.Icon;
+
             var orderIndex = orderList.FirstOrDefault(i => i.Id == item.Id);
             if (orderIndex != null && !orderIndex.ExtensionInfo.IsNullOrEmpty() &&
                 orderIndex.ExtensionInfo.ContainsKey(ExtensionKey.SwapToMain) &&
