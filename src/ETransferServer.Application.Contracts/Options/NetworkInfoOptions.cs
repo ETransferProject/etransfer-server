@@ -6,7 +6,7 @@ public class NetworkInfoOptions
 {
     public Dictionary<string, List<string>> NetworkPattern { get; set; }
     public Dictionary<string,NetworkBasicInfo> Networks { get; set; } = new();
-    public decimal WithdrawLimit24H { get; set; }= 10_0000;
+    public decimal WithdrawLimit24H { get; set; }= 50_0000;
     
     public List<string> ExtraNotesTemplate { get; set; }
     public List<string> SwapExtraNotesTemplate { get; set; }
