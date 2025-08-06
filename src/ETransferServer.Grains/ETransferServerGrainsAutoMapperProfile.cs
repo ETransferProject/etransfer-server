@@ -6,6 +6,7 @@ using ETransferServer.Dtos.Token;
 using ETransferServer.Dtos.TokenAccess;
 using ETransferServer.Dtos.User;
 using ETransferServer.Etos.Order;
+using ETransferServer.Token.Dtos;
 using ETransferServer.Grains.Grain.Users;
 using ETransferServer.Grains.State;
 using ETransferServer.Grains.State.Order;
@@ -43,6 +44,7 @@ public class ETransferServerGrainsAutoMapperProfile : Profile
         CreateMap<TokenApplyOrderResultDto, TokenApplyOrderDto>().ReverseMap();
         CreateMap<UserTokenIssueState, UserTokenIssueDto>().ReverseMap();
         CreateMap<TokenPoolState, TokenPoolDto>().ReverseMap();
+        CreateMap<TokenConfigurationState, TokenConfigurationDto>().ReverseMap();
 
         CreateMap<UserAddressDto, TokenDepositAddressState>().ReverseMap();
         CreateMap<UserAddressDto, UserDepositAddressState>().ReverseMap();
