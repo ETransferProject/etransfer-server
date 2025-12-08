@@ -1,0 +1,166 @@
+{
+  
+  "NotifyTemplates": {
+    "Templates":{
+      "WithdrawFeeAlarm" : {
+        "FeiShuGroup": {
+          "WebhookUrl": "https://open.feishu.cn/open-apis/bot/v2/hook/xxxxx",
+          "Secret": "xxxxx",
+          "TitleTemplate": "orange",
+          "Title": "❗️[test] Withdraw expense alert",
+          "Contents": [
+            "Network: **{network}**  Percentage of fluctuation **{percent}%**",
+            "Last fee: **{lastFeeAmount} {lastFeeSymbol}**\nLast time: **{lastFeeTime}**",
+            "Current fee: **{currentFeeAmount} {currentFeeSymbol}**\nCurrent time: **{currentFeeTime}**"
+          ]
+        }
+      },
+      "OrderStatusAlarm" : {
+        "FeiShuGroup": {
+          "WebhookUrl": "",
+          "Secret": "",
+          "TitleTemplate": "orange",
+          "Title": "❗️[test3] Order failed alert",
+          "Contents": [
+            "OrderType: {orderType}",
+            "OrderId: {orderId}\nUserId: {userId}\nTxId: {txId}\nCreateTime: {createTime}\nReason: {reason}",
+            "NetworkFrom: {networkFrom} NetworkTo: {networkTo}\nAmountFrom: {amountFrom} AmountTo: {amountTo}",
+            "FromAddressFrom: {fromAddressFrom}\nFromAddressTo: {fromAddressTo}",
+            "ToAddressFrom: {toAddressFrom}\nToAddressTo: {toAddressTo}"
+          ]
+        }
+      },
+      "DepositOrderPendingAlarm" : {
+        "FeiShuGroup": {
+          "WebhookUrl": "",
+          "Secret": "",
+          "TitleTemplate": "orange",
+          "Title": "❗️[test3] Order pending alert",
+          "Contents": [
+            "OrderType: {orderType}\nStatus: {status}",
+            "OrderId: {orderId}\nUserId: {userId}\nTxId: {txId}\nCreateTime: {createTime}\nReason: {reason}",
+            "NetworkFrom: {networkFrom} NetworkTo: {networkTo}\nAmountFrom: {amountFrom} AmountTo: {amountTo}",
+            "FromAddressFrom: {fromAddressFrom}\nFromAddressTo: {fromAddressTo}",
+            "ToAddressFrom: {toAddressFrom}\nToAddressTo: {toAddressTo}"
+          ]
+        }
+      },
+      "DepositOrderLostAlarm" : {
+        "FeiShuGroup": {
+          "WebhookUrl": "",
+          "Secret": "",
+          "TitleTemplate": "orange",
+          "Title": "❗️[test3] Order lost alert",
+          "Contents": [
+            "OrderType: {orderType}",
+            "Message: {message}"
+          ]
+        }
+      },
+      "DepositOrderCoinNotSupportAlarm" : {
+        "FeiShuGroup": {
+          "WebhookUrl": "",
+          "Secret": "",
+          "TitleTemplate": "blue",
+          "Title": "💡️ [test3] Order Coin Support Alarm",
+          "Contents": [
+            "OrderType: {orderType}",
+            "Message: {message}"
+          ]
+        }
+      },
+      "DepositOrderSwapFailureAlarm": {
+        "FeiShuGroup": {
+          "WebhookUrl": "",
+          "Secret": "",
+          "TitleTemplate": "orange",
+          "Title": "❗️ [test3] Deposit swap failure alert",
+          "Contents": [
+            "OrderType: {orderType}",
+            "OrderId: {orderId}\nUserId: {userId}\nTxId: {txId}\nCreateTime: {createTime}",
+            "NetworkFrom: {networkFrom} NetworkTo: {networkTo}\nSymbolFrom: {symbolFrom} SymbolTo: {symbolTo}",
+            "AmountFrom: {amountFrom} ChainIdTo: {chainIdTo}",
+            "Failure Reason: {reason}"
+          ]
+        }
+      },
+      "WithdrawOrderFailureAlarm": {
+        "FeiShuGroup": {
+          "WebhookUrl": "",
+          "Secret": "",
+          "TitleTemplate": "orange",
+          "Title": "❗️ [test3] Withdraw order invalid alert",
+          "Contents": [
+            "OrderType: {orderType}",
+            "TransactionId: {transactionId}\nMethodName: {methodName}\nFrom: {from}\nTo: {to}",
+            "FromChainId: {chainId} ToChainId: {toChainId}\nSymbol: {symbol} Amount: {amount}\nToAddress: {toAddress}",
+            "MaxEstimateFee: {maxEstimateFee} Timestamp: {timestamp}",
+            "BlockHash: {blockHash}\nBlockHeight: {blockHeight}",
+            "Reason: {reason}"
+          ]
+        }
+      },
+      "WithdrawLargeAmountAlarm": {
+        "FeiShuGroup": {
+          "WebhookUrl": "",
+          "Secret": "",
+          "TitleTemplate": "orange",
+          "Title": "❗️ [test3] Withdraw large amount alert",
+          "Contents": [
+            "OrderType: {orderType}",
+            "OrderId: {orderId}\nTxId: {txId}\nCreateTime: {createTime}\nToNetwork: {toNetwork}",
+            "Amount: {amount} Symbol: {symbol}\nToAddress: {toAddress}"
+          ]
+        }
+      },
+      "TransferCallbackAlarm": {
+        "FeiShuGroup": {
+          "WebhookUrl": "",
+          "Secret": "",
+          "TitleTemplate": "orange",
+          "Title": "❗️ [test3] Transfer callback abnormal alert",
+          "Contents": [
+            "OrderType: {orderType}",
+            "OrderId: {orderId}\nFromNetwork: {fromNetwork}\nToNetwork: {toNetwork}",
+            "Amount: {amount} Symbol: {symbol}\nReason: {reason}"
+          ]
+        }
+      },
+      "TokenListingAlarm": {
+        "FeiShuGroup": {
+          "WebhookUrl": "",
+          "Secret": "",
+          "TitleTemplate": "orange",
+          "Title": "❗️ [test3] New Listing alert",
+          "Contents": [
+            "Token: {token}\nTokenContract: {tokenContract}\nChain: {chain}\nWebsite: {website}"
+          ]
+        }
+      },
+      "TokenIntegrateAlarm": {
+        "FeiShuGroup": {
+          "WebhookUrl": "",
+          "Secret": "",
+          "TitleTemplate": "orange",
+          "Title": "❗️ [test3] Cross-chain integration alert",
+          "Contents": [
+            "Token: {token}\nTokenContract: {tokenContract}\nChain: {chain}"
+          ]
+        }
+      },
+      "LiquidityInsufficientAlarm": {
+        "FeiShuGroup": {
+          "WebhookUrl": "",
+          "Secret": "",
+          "TitleTemplate": "orange",
+          "Title": "❗️ [test3] Liquidity Insufficient alert",
+          "Contents": [
+            "Token: {token}\nLiquidityInUsd: {liquidityInUsd}\nChain: {chain}",
+            "PersonName: {personName}\nTelegramHandler: {telegramHandler}\nEmail: {email}"
+          ]
+        }
+      }
+    }
+  }
+  
+}
