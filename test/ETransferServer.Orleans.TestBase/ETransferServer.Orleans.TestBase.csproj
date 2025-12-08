@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <Import Project="..\..\common.props" />
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <RootNamespace>ETransferServer</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.TestingHost" Version="8.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ETransferServer.Application\ETransferServer.Application.csproj" />
+    <ProjectReference Include="..\..\src\ETransferServer.Grains\ETransferServer.Grains.csproj" />
+    <ProjectReference Include="..\ETransferServer.TestBase\ETransferServer.TestBase.csproj" />
+  </ItemGroup>
+
+
+</Project>

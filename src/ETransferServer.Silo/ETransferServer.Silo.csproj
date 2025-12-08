@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net8.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <RootNamespace>ETransferServer.Silo</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="AElf.OpenTelemetry" Version="8.0.5" />
+        <PackageReference Include="Com.Ctrip.Framework.Apollo.Configuration" Version="2.10.2" />
+        <PackageReference Include="JsonNet.PrivateSettersContractResolvers" Version="1.0.0" />
+        <PackageReference Include="Microsoft.Orleans.Server" Version="8.1.0" />
+        <PackageReference Include="Microsoft.Orleans.Sdk" Version="8.1.0" />
+        <PackageReference Include="Orleans.Providers.MongoDB" Version="8.0.3" />
+        <PackageReference Include="AeFinder.Orleans.Streams.Kafka" Version="0.0.1" />
+        <PackageReference Include="OrleansDashboard" Version="8.0.0" />
+        <PackageReference Include="Serilog.AspNetCore" Version="8.0.1" />
+        <PackageReference Include="Serilog.Sinks.Async" Version="1.5.0" />
+        <PackageReference Include="Serilog.Sinks.OpenTelemetry" Version="4.0.0" />
+        <PackageReference Include="Serilog.Sinks.RollingFile" Version="3.3.0" />
+        <PackageReference Include="Volo.Abp.AspNetCore.Serilog" Version="8.2.0" />
+        <PackageReference Include="Volo.Abp.Autofac" Version="8.2.0" />
+        <PackageReference Include="Volo.Abp.Caching.StackExchangeRedis" Version="8.2.0" />
+        <PackageReference Include="Volo.Abp.EventBus.RabbitMQ" Version="8.2.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\ETransferServer.Application\ETransferServer.Application.csproj" />
+        <ProjectReference Include="..\ETransferServer.Grains\ETransferServer.Grains.csproj" />
+        <ProjectReference Include="..\ETransferServer.MongoDB\ETransferServer.MongoDB.csproj" />
+    </ItemGroup>
+
+
+    <ItemGroup>
+        <None Remove="appsettings.json" />
+        <Content Include="appsettings.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+        <Content Update="appsettings.Development.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+        <None Update="network.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <Content Update="appsettings.Development.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+        <None Update="notify.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="apollosettings.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+
+</Project>
